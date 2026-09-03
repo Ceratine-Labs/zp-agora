@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+        <!--
+            No sqlite override, and no in-memory database.
+
+            Agora's schema is T-SQL: IDENTITY, ROWVERSION, schema-qualified
+            names, stored procedures. A test that passes against sqlite proves
+            nothing about the system that ships, and the procedure layer — where
+            every business rule lives — cannot run there at all.
+
+            So tests run against the connection in .env, which is the customer's
+            PumpIT database. Two rules follow, and neither is optional:
+
+              * NEVER use RefreshDatabase. It would drop the customer's estate.
+              * A test that writes cleans up after itself in tearDown, and
+                prefixes anything it creates with TEST- so a leftover row is
+                obvious in a listing.
+
+            Read-only tests are strongly preferred. Where a test must write, it
+            writes into the agora schema and never into dbo.
+        -->
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>

@@ -1,0 +1,11 @@
+{
+    "name": "{{name}}",
+    "alias": "{{alias}}",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": {{order}},
+    "requires": {{requires}},
+    "providers": [
+        "Modules\\{{name}}\\Providers\\{{name}}ServiceProvider"
+    ]
+}

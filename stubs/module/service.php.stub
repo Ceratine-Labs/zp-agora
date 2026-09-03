@@ -1,0 +1,17 @@
+<?php
+
+namespace Modules\{{name}}\Services;
+
+use App\Support\ProcedureService;
+
+/**
+ * All of this module's business logic.
+ *
+ * Reads may use Eloquent. Every transactional write goes through
+ * ProcedureService to an agora.usp_* procedure — if a rule exists both here
+ * and in a proc, the proc is right and this is the bug (plan §3.4).
+ */
+class {{name}}Service
+{
+    public function __construct(protected ProcedureService $procedures) {}
+}

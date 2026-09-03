@@ -1,0 +1,26 @@
+<?php
+
+namespace Modules\{{name}}\Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Modules\Core\Services\MenuService;
+
+/**
+ * This module's navigation.
+ *
+ * The sidebar and mega menus are database-driven (plan §3.10) — never edit a
+ * blade nav file. Each module seeds its own items; MenuService::item() is an
+ * upsert keyed on (workspace, section, path), so re-running is safe.
+ */
+class MenuSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // MenuService::item('ho', 'today', [
+        //     'label' => '{{name}}',
+        //     'route' => 'app.{{alias}}.index',
+        //     'parent' => 'Capture',
+        //     'sort' => 50,
+        // ]);
+    }
+}

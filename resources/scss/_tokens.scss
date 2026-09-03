@@ -1,0 +1,53 @@
+/*
+ | Design tokens, verbatim from the mockup (docs/reference/agoraretailconsole.html
+ | lines 6-66). Three theme states, because the viewer has three: an explicit
+ | choice stamps data-theme on <html>, and the default "system" setting stamps
+ | nothing — so the media query has to carry the dark palette on its own,
+ | guarded so an explicit light choice still beats a dark OS.
+ |
+ | No component may define a colour outside this file.
+ */
+
+:root {
+  color-scheme: light;
+  --paper:#eaeff0; --surface:#ffffff; --surface-2:#f5f8f8; --surface-3:#eef3f3;
+  --ink:#0c1417; --ink-2:#4a585d; --muted:#7b898e;
+  --line:#dbe2e3; --line-soft:#e9eeee;
+  --brand:#0f6d85; --brand-soft:#e2f0f3; --brand-ink:#0b5566;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --good-bg:#e6f6e6; --warn-bg:#fdf3dc; --serious-bg:#fceee7; --crit-bg:#fae8e8;
+  --good-ink:#0a6b0a; --warn-ink:#8a6000; --serious-ink:#a1462a; --crit-ink:#9b2626;
+  --grid:#e6ecec; --axis:#c4cfd0;
+  --shadow:0 1px 2px rgba(12,20,23,.06), 0 8px 24px -12px rgba(12,20,23,.18);
+  --shadow-pop:0 12px 40px -8px rgba(8,33,41,.35);
+  --chrome:#0a2129; --chrome-2:#0f3040; --chrome-3:#14424f;
+  --chrome-ink:#e2edef; --chrome-muted:#8aabb4; --chrome-line:rgba(255,255,255,.13);
+  --sand:#e6c15c;
+  --r:6px;
+
+  --font-display:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;
+  --font-text:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --appbar-h:52px;
+}
+
+@mixin agora-dark {
+  color-scheme: dark;
+  --paper:#080c0d; --surface:#151b1e; --surface-2:#1b2327; --surface-3:#212a2e;
+  --ink:#eef3f4; --ink-2:#a7b5ba; --muted:#7b898e;
+  --line:#283236; --line-soft:#1f282b;
+  --brand:#38a7c0; --brand-soft:#123039; --brand-ink:#7fcfe2;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  --good-bg:#0f2a14; --warn-bg:#2e2408; --serious-bg:#2e1c14; --crit-bg:#2e1414;
+  --good-ink:#5fd35f; --warn-ink:#f5c65a; --serious-ink:#f0a381; --crit-ink:#f08080;
+  --grid:#232c30; --axis:#33403f;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.8);
+  --shadow-pop:0 12px 40px -8px rgba(0,0,0,.75);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { @include agora-dark; }
+}
+
+:root[data-theme="dark"] { @include agora-dark; }

@@ -1,0 +1,1799 @@
+<title>Agora Build Plan</title>
+
+
+<style>
+  :root {
+    --ground:        #f2f5f4;
+    --surface:       #ffffff;
+    --surface-sunk:  #eaeeed;
+    --ink:           #101d1b;
+    --ink-soft:      #3d4f4c;
+    --muted:         #5f716e;
+    --line:          #d8e1df;
+    --line-strong:   #b9c7c4;
+    --accent:        #0d6b61;
+    --accent-soft:   #e2efed;
+    --signal:        #9a5b00;
+    --signal-bg:     #fdf3e3;
+    --signal-line:   #e0b46a;
+    --alert:         #a52a1e;
+    --alert-bg:      #fbeae7;
+    --alert-line:    #e3a396;
+    --ok:            #256d45;
+    --ok-bg:         #e6f2ea;
+    --ok-line:       #93c4a8;
+    /* Buttons get their OWN ground, not --accent. Never dark text on the green:
+       the accent is tuned to read AS text against a page ground, so reusing it
+       as a button fill forces the label dark to survive it, and Ryan finds that
+       hard to read (2026-08-15). Buttons sit on a deeper green carrying light
+       text instead. */
+    --btn-bg:        #0d6b61;
+    --btn-fg:        #ffffff;
+    --shadow:        0 1px 2px rgba(16, 29, 27, .06), 0 8px 24px -16px rgba(16, 29, 27, .3);
+
+    --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:       #0d1413;
+      --surface:      #141d1c;
+      --surface-sunk: #101817;
+      --ink:          #e7eeec;
+      --ink-soft:     #c2d0cd;
+      --muted:        #8ba09d;
+      --line:         #24322f;
+      --line-strong:  #354643;
+      --accent:       #4bb5a6;
+      --accent-soft:  #16302c;
+      --signal:       #e5a951;
+      --signal-bg:    #2a2114;
+      --signal-line:  #6b5326;
+      --alert:        #f08a78;
+      --alert-bg:     #2c1815;
+      --alert-line:   #6d332b;
+      --ok:           #63c48a;
+      --ok-bg:        #14271d;
+      --ok-line:      #2f5c42;
+      --btn-bg:       #17766a;
+      --btn-fg:       #f2fbf9;
+      --shadow:       0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:       #0d1413;
+    --surface:      #141d1c;
+    --surface-sunk: #101817;
+    --ink:          #e7eeec;
+    --ink-soft:     #c2d0cd;
+    --muted:        #8ba09d;
+    --line:         #24322f;
+    --line-strong:  #354643;
+    --accent:       #4bb5a6;
+    --accent-soft:  #16302c;
+    --signal:       #e5a951;
+    --signal-bg:    #2a2114;
+    --signal-line:  #6b5326;
+    --alert:        #f08a78;
+    --alert-bg:     #2c1815;
+    --alert-line:   #6d332b;
+    --ok:           #63c48a;
+    --ok-bg:        #14271d;
+    --ok-line:      #2f5c42;
+    --btn-bg:       #17766a;
+    --btn-fg:       #f2fbf9;
+    --shadow:       0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 20px 150px;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* The dock survives on a question-less page (save-only), so the body still
+     has to clear it. */
+  body.no-questions { padding-bottom: 96px; }
+
+  .frame { max-width: 900px; margin: 0 auto; }
+  .prose { max-width: 68ch; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    padding: 56px 0 28px;
+    border-bottom: 2px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+  .eyebrow b { color: var(--accent); font-weight: 600; }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.1;
+    letter-spacing: -.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .standfirst { font-size: 17.5px; color: var(--ink-soft); max-width: 60ch; margin: 0; }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    padding-top: 4px;
+  }
+  .meta-row b { font-weight: 600; }
+  .meta-row .blocking b { color: var(--alert); }
+
+  /* ---------- sections ---------- */
+
+  section { padding: 40px 0 4px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin: 0 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .sec-head h2 {
+    font-family: var(--serif);
+    font-size: 25px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .sec-head .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  p { margin: 0 0 14px; }
+  .prose p:last-child { margin-bottom: 0; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  code {
+    font-family: var(--mono);
+    font-size: .875em;
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .1em .38em;
+  }
+  strong { font-weight: 650; }
+
+  /* ---------- task reference ---------- */
+
+  .task-ref {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    max-width: 100%;
+    text-decoration: none;
+    border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 1px;
+  }
+  .task-ref:hover { border-bottom-color: var(--accent); }
+  .task-ref .tr-id {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .04em;
+    color: var(--muted);
+    flex: none;
+  }
+  .task-ref .tr-title { color: var(--accent); font-weight: 550; line-height: 1.4; }
+  .task-ref:hover .tr-title { text-decoration: underline; }
+
+  /* Inline icons — paste the <symbol>s you need from ~/Development/report-icons.html */
+  .ico { width: 1.1em; height: 1.1em; vertical-align: -.15em; flex: none; }
+  .ico-lg { width: 1.8em; height: 1.8em; }
+
+  /* ---------- key/value grid (decisions, state, summaries) ---------- */
+
+  .grid-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .gc {
+    background: var(--surface);
+    padding: 15px 17px 17px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .gc .k {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .gc .v { font-weight: 600; font-size: 15px; line-height: 1.35; }
+  .gc .w { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .gc .v .yes { color: var(--ok); }
+  .gc .v .no { color: var(--alert); }
+
+  /* ---------- step strip (a flow, a pipeline, a loop) ---------- */
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 22px 0 8px;
+  }
+  .step { background: var(--surface); padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+  .step .n { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; color: var(--accent); }
+  .step .t { font-weight: 600; font-size: 14.5px; }
+  .step .d { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .step.is-you { background: var(--accent-soft); }
+
+  /* ---------- data table ---------- */
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; margin-top: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--surface); }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface-sunk);
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* ---------- question block ---------- */
+
+  .q {
+    background: var(--signal-bg);
+    border: 1px solid var(--signal-line);
+    border-left: 4px solid var(--signal);
+    border-radius: 6px;
+    padding: 16px 18px 18px;
+    margin: 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-margin-top: 24px;
+  }
+  .q.is-blocking { background: var(--alert-bg); border-color: var(--alert-line); border-left-color: var(--alert); }
+  .q.is-answered { background: var(--ok-bg); border-color: var(--ok-line); border-left-color: var(--ok); }
+  .q-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .q-badge {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--signal);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .q.is-blocking .q-badge { color: var(--alert); }
+  .q.is-answered .q-badge { color: var(--ok); }
+  .q-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; flex: none; }
+  .q-id { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: auto; }
+  .q-text { font-size: 16.5px; font-weight: 600; line-height: 1.4; color: var(--ink); margin: 0; text-wrap: balance; }
+  .q-hint { font-size: 13.5px; color: var(--ink-soft); margin: -4px 0 0; }
+
+  .opts { display: flex; flex-direction: column; gap: 7px; }
+  .opt {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 9px 12px;
+    cursor: pointer;
+    font-size: 14.5px;
+    line-height: 1.45;
+    transition: border-color .12s ease, background .12s ease;
+  }
+  .opt:hover { border-color: var(--line-strong); }
+  .opt input { margin: 3px 0 0; accent-color: var(--accent); flex: none; }
+  .opt.is-picked { border-color: var(--accent); background: var(--accent-soft); font-weight: 550; }
+  .opt-hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .opt .sub { display: block; font-size: 12.5px; color: var(--muted); font-weight: 400; }
+
+  .order { display: flex; flex-direction: column; gap: 6px; }
+  .order-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 7px 8px 7px 12px;
+    font-size: 14.5px;
+  }
+  .order-item .rank {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    min-width: 18px;
+  }
+  .order-item .lbl { flex: 1; line-height: 1.4; }
+  .order-item .lbl .sub { display: block; font-size: 12.5px; color: var(--muted); }
+  .nudge {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1;
+    color: var(--ink-soft);
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    width: 26px;
+    height: 24px;
+    cursor: pointer;
+    flex: none;
+  }
+  .nudge:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .nudge:disabled { opacity: .3; cursor: default; }
+
+  textarea {
+    font-family: var(--sans);
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 5px;
+    padding: 9px 11px;
+    width: 100%;
+    resize: vertical;
+  }
+  textarea::placeholder { color: var(--muted); opacity: .8; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .note-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 5px;
+  }
+  .q-foot {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .linkbtn {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--accent);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* ---------- panels ---------- */
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 20px;
+  }
+  .panel-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: var(--surface-sunk);
+  }
+  .panel-head h3 { font-family: var(--serif); font-size: 18px; font-weight: 600; margin: 0; }
+  .counter {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+  }
+  .counter b { color: var(--ink); font-weight: 600; }
+  .counter .blk { color: var(--alert); font-weight: 600; }
+  .panel-body { padding: 18px; }
+
+  /* ---------- question index ---------- */
+
+  .index-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    font-size: 14.5px;
+  }
+  .index-row:last-child { border-bottom: none; }
+  .index-row .state {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    white-space: nowrap;
+    padding-top: 3px;
+    min-width: 92px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .index-row .state .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+  .index-row.s-blocking .state { color: var(--alert); }
+  .index-row.s-open .state { color: var(--signal); }
+  .index-row.s-done .state { color: var(--ok); }
+  .index-row .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .index-row .qt { line-height: 1.4; }
+  .index-row .ans { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .index-row .ans b { color: var(--ink-soft); font-weight: 550; }
+  .index-row .go { flex: none; padding-top: 2px; }
+
+  .btn {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--btn-fg);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-bg);
+    border-radius: 5px;
+    padding: 9px 16px;
+    cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn.ghost { background: transparent; color: var(--ink-soft); border-color: var(--line-strong); }
+  .btn.ghost:hover { color: var(--ink); border-color: var(--accent); filter: none; }
+
+  /* The archiving action outranks the answers-only copy beside it, so it gets
+     the weight, the ring and the leading position. Everything it sits next to
+     is deliberately ghosted. */
+  .btn.btn-save {
+    background: var(--btn-bg);
+    border-color: var(--btn-bg);
+    color: var(--btn-fg);
+    font-weight: 700;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .btn.btn-save::before { content: "↑ "; font-weight: 400; }
+  .btn.btn-save:hover { filter: brightness(1.08); }
+
+  .save-hint {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 12px 0 0;
+    max-width: 62ch;
+  }
+  .save-hint b { color: var(--ink-soft); font-weight: 650; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+
+  .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 5px; overflow: hidden; }
+  .seg button {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    background: var(--surface);
+    color: var(--muted);
+    border: none;
+    padding: 7px 13px;
+    cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line-strong); }
+  .seg button.on { background: var(--btn-bg); color: var(--btn-fg); }
+
+  pre.out {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+    margin: 0;
+    max-height: 340px;
+    overflow: auto;
+    white-space: pre;
+    color: var(--ink-soft);
+  }
+  .viewhint { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; color: var(--muted); }
+  .flash { font-family: var(--mono); font-size: 11.5px; color: var(--ok); opacity: 0; transition: opacity .18s ease; }
+  .flash.on { opacity: 1; }
+
+  .export-state {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.3;
+  }
+  .export-state.on { display: inline-flex; }
+  .export-state .tick {
+    width: 15px; height: 15px; border-radius: 50%;
+    background: currentColor;
+    color: var(--surface);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; flex: none;
+  }
+  .export-state.fresh { color: var(--ok); }
+  .export-state.stale { color: var(--signal); }
+  .export-state .when { color: var(--muted); }
+  .btn.is-exported { background: transparent; color: var(--ok); border-color: var(--ok); font-weight: 650; }
+  .btn.is-exported:hover { background: var(--ok-bg); filter: none; }
+
+  dialog#preview {
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--ink);
+    padding: 0;
+    width: min(760px, 92vw);
+    max-height: 86vh;
+    box-shadow: 0 24px 60px -24px rgba(0,0,0,.6);
+  }
+  dialog#preview::backdrop { background: rgba(8, 16, 15, .55); }
+  dialog#preview .panel { margin: 0; border: none; box-shadow: none; }
+  dialog#preview pre.out { max-height: 52vh; }
+
+  .dock {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--line-strong);
+    box-shadow: 0 -6px 20px -14px rgba(0,0,0,.5);
+    transform: translateY(110%);
+    transition: transform .22s ease;
+    z-index: 20;
+  }
+  .dock.on { transform: translateY(0); }
+  .dock-in {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .dock .counter { margin-left: 0; }
+  .dock .spacer { margin-left: auto; }
+
+
+  /* ---------- figure: inline SVG / CSS diagrams ----------
+     "Diagrams beat paragraphs" (Ryan, 2026-08-09). Wide drawings scroll
+     inside the figure so the page body never scrolls sideways. */
+  .fig {
+    margin: 20px 0 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 16px;
+    overflow-x: auto;
+  }
+  .fig svg { display: block; min-width: 620px; width: 100%; height: auto; }
+  .fig figcaption { font-size: 12.5px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  .fig text { font-family: var(--mono); }
+
+  /* ---------- callout: an aside that must not be skimmed past ---------- */
+  .callout {
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin: 20px 0 6px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .callout.warn { border-left-color: var(--signal); background: var(--signal-bg); border-color: var(--signal-line); }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ---------- pri: a small inline tag for priority / provenance ---------- */
+  .pri {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .pri.hi { color: var(--alert); border-color: var(--alert-line); background: var(--alert-bg); }
+
+  /* ---------- snip: a code snippet worth a second pair of eyes ----------
+     INTERNAL reports only (Ryan, 2026-08-16) — never on a customer page.
+     The body scrolls sideways inside the figure so the page body never does.
+     `code` is display:block/max-content so a highlighted line's background
+     still spans the full width once the snippet is scrolled right. */
+  .snip {
+    margin: 20px 0 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .snip-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-sunk);
+  }
+  .snip-path {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    word-break: break-all;
+    user-select: all;            /* one click takes the whole path to quick-open */
+  }
+  .snip-path .ln { color: var(--muted); }
+  .snip-head .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  .snip-body {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--ink);
+    tab-size: 4;
+  }
+  .snip-body code {
+    display: block;
+    min-width: max-content;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    font-size: inherit;
+  }
+  /* Whole-line marks. Negative margins bleed to the padding edge; the 3px rail
+     eats 3 of the 16px so the code itself stays on the same column. */
+  .snip-body mark,
+  .snip-body .ins,
+  .snip-body .del {
+    display: block;
+    margin: 0 -16px;
+    padding: 0 16px 0 13px;
+    border-left: 3px solid transparent;
+  }
+  .snip-body mark { background: var(--signal-bg); border-left-color: var(--signal); color: var(--ink); }
+  .snip-body .ins { background: var(--ok-bg); border-left-color: var(--ok-line); }
+  .snip-body .del { background: var(--alert-bg); border-left-color: var(--alert-line); color: var(--ink-soft); }
+  .snip-body .cmt { color: var(--muted); }
+  .snip-why {
+    margin: 0;
+    padding: 12px 16px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+  }
+  /* .term — a command and its REAL output, as proof rather than as code.
+     Do NOT reach for --ink/--surface to invert the head: those two swap
+     between themes, so an inverted bar in light renders as a WHITE bar in
+     dark. The terminal reads as a terminal from the sunk body and the bold
+     command line alone. */
+  .snip.term .snip-body { background: var(--surface-sunk); color: var(--ink-soft); }
+  .snip.term .snip-body .cmd { color: var(--ink); font-weight: 650; }
+
+  /* Fold a long snippet. Same component, <details> instead of <figure>, so
+     40+ lines don't push the rest of the page below the fold. */
+  details.snip > summary.snip-head { cursor: pointer; list-style: none; }
+  details.snip > summary.snip-head::-webkit-details-marker { display: none; }
+  details.snip > summary.snip-head::after {
+    content: "▸ show";
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  details.snip[open] > summary.snip-head::after { content: "▾ hide"; }
+  details.snip > summary.snip-head:hover::after { color: var(--accent); }
+
+  /* A proof block is jumped to from the shipped table — say so on arrival. */
+  .snip { scroll-margin-top: 24px; }
+  .snip:target { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  /* ---------- jump strip: built from the sections that survived ---------- */
+  .jump {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 14px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+  .jump .lbl { color: var(--line-strong); }
+  .jump a { color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; }
+  .jump a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ---------- chal: the weakest link in my own work, named before he finds it ---------- */
+  .chal {
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--signal);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 14px 16px;
+    margin: 0 0 12px;
+  }
+  .chal-top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .chal-top .claim { font-weight: 650; line-height: 1.4; }
+  .chal-top .pri { margin-left: auto; flex: none; }
+  .chal .doubt { font-size: 14px; line-height: 1.55; color: var(--ink-soft); margin: 0; }
+  .chal .settle {
+    display: block;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .chal .settle b { color: var(--ink-soft); font-weight: 600; }
+
+  /* right-aligned figures in a manifest table */
+  td.num, th.num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+  td.num { color: var(--ink-soft); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 620px) {
+    body { padding: 0 16px 170px; }
+    .masthead { padding-top: 36px; }
+    .dock-in { padding: 8px 16px; gap: 8px; }
+    .dock .btn { padding: 8px 12px; font-size: 13px; }
+    .index-row { flex-wrap: wrap; }
+  }
+  .grid-cards.cols3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+</style>
+
+<div class="frame">
+  <header class="masthead">
+    <p class="eyebrow">AGORA · <b>Zululand Retail &amp; Petroleum</b> · BUILD PLAN · 3 SEPTEMBER 2026</p>
+    <h1>One system for the whole estate, built on the database you already trust</h1>
+    <p class="standfirst">Agora is the successor to PumpIT: the same PumpIT database underneath, a new application on top, organised around the working day rather than the software's menus. This page says what it is, how it will be built, in what order, and what we need from you.</p>
+    <div class="meta-row" id="meta-row">
+      <span data-meta="blocking" class="blocking"></span>
+      <span data-meta="normal"></span>
+      <span data-meta="hint"></span>
+    </div>
+    <nav class="jump" id="jump" hidden></nav>
+  </header>
+
+  <section id="glance" data-jump="At a glance">
+    <div class="sec-head">
+      <h2>In one screen</h2>
+      <span class="tag">the whole plan</span>
+    </div>
+    <div class="grid-cards">
+      <div class="gc">
+        <span class="k">What Agora is</span>
+        <span class="v">PumpIT rebuilt as a web application — desktop and phone — with four sections: Today, Trade, Control, Setup</span>
+        <span class="w">All Group Operations, Reconciliation &amp; Analysis. The dip must tie to the pump, the Z-read to the cashup, the declaration to the bank.</span>
+      </div>
+      <div class="gc">
+        <span class="k">What stays</span>
+        <span class="v">The PumpIT database, every record in it, and the overnight imports into MIST_Import</span>
+        <span class="w">Nothing is re-keyed and nothing moves. Agora adds its own tables and procedures alongside the existing ones and reads the same imports PumpIT reads.</span>
+      </div>
+      <div class="gc">
+        <span class="k">What changes</span>
+        <span class="v">The screens, the reports, the day-close flow, the approvals, the reconciliation desk and the exception register</span>
+        <span class="w">161 legacy reports become 97 named for the question they answer; every branch function becomes a step in one guided day.</span>
+      </div>
+      <div class="gc">
+        <span class="k">How it is delivered</span>
+        <span class="v">Three stages, each usable on its own, with PumpIT running beside Agora until the numbers agree for a full month</span>
+        <span class="w">Foundation → the branch day and head-office control → trading, reporting and cutover. Branch capture is switched off in PumpIT first, reporting last.</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="why" data-jump="Why">
+    <div class="sec-head">
+      <h2>Why the shape changes</h2>
+      <span class="tag">organise by the day, not the module</span>
+    </div>
+    <div class="prose">
+      <p>PumpIT is organised the way it was written: Branch Functions, Head Office Functions, two kinds of masters, a Reporter and Business Tools. Nobody has ever thought "I need a Branch Function". Agora has four sections, named for the work.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><span class="n">TODAY</span><span class="t">What must happen now</span><span class="d">The branch day as one guided close: POS files, pump readings, fuel input, Z-reads, stock areas, banking, drop safe. Head office sees the same list live.</span></div>
+      <div class="step"><span class="n">TRADE</span><span class="t">How the business is doing</span><span class="d">The group position, the site league, the weekly Exco pack, budgets and the report library — with scope as a setting, not a separate report.</span></div>
+      <div class="step"><span class="n">CONTROL</span><span class="t">What does not reconcile</span><span class="d">The exception register, the reconciliation desk, deductions and approvals. Every open item has an owner, an age and a rand value.</span></div>
+      <div class="step"><span class="n">SETUP</span><span class="t">The rules the rest obeys</span><span class="d">Branches, profit centres, category margin bands, expense codes, fuel matrix, people, users and access, thresholds.</span></div>
+    </div>
+    <div class="prose" style="margin-top:22px">
+      <p>Four working rules run through every screen. <strong>The system proposes, the person confirms:</strong> Z-read allocation, bank matching and expense coding arrive with evidence and a confidence, and are auto-accepted above a threshold you set. <strong>An exception is an object with a life:</strong> raised, owned, actioned, cleared — it does not vanish when a report is closed. <strong>Write once, flow everywhere:</strong> a till short reaches the cashup, the deduction schedule and the payroll file from a single capture. <strong>Every number carries its provenance:</strong> click a figure and see which overnight load it came from and which corrections were applied.</p>
+    </div>
+  </section>
+
+  <section id="build" data-jump="How">
+    <div class="sec-head">
+      <h2>How it is built</h2>
+      <span class="tag">the same database, a new application</span>
+    </div>
+    <div class="prose">
+      <p>Agora is a Laravel web application connected directly to the PumpIT SQL Server database. The business rules live in the database as stored procedures, where they are fast, auditable and close to the data; the application handles screens, access and workflow. The other systems — the POS imports in MIST_Import, the reporting extracts in Alteryx, the wet-stock sheet — are read, never written.</p>
+    </div>
+    <figure class="fig">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Agora architecture: browsers talk to the Agora application, which calls procedures in the PumpIT database and reads the import databases">
+        <g fill="currentColor" font-size="11">
+          <rect x="20" y="30" width="200" height="58" rx="6" fill="var(--surface-sunk)" stroke="var(--line-strong)"/>
+          <text x="120" y="54" text-anchor="middle" font-weight="600">Head office · desktop</text>
+          <text x="120" y="72" text-anchor="middle" fill="var(--muted)">Exco · Finance · Ops</text>
+          <rect x="20" y="108" width="200" height="58" rx="6" fill="var(--surface-sunk)" stroke="var(--line-strong)"/>
+          <text x="120" y="132" text-anchor="middle" font-weight="600">Branch · phone or PC</text>
+          <text x="120" y="150" text-anchor="middle" fill="var(--muted)">capture · confirm · raise</text>
+          <path d="M220 59 H268" stroke="var(--line-strong)" stroke-width="1.5" fill="none"/>
+          <path d="M220 137 H268" stroke="var(--line-strong)" stroke-width="1.5" fill="none"/>
+          <path d="M264 55 L270 59 L264 63 Z" fill="var(--line-strong)"/>
+          <path d="M264 133 L270 137 L264 141 Z" fill="var(--line-strong)"/>
+          <rect x="270" y="20" width="250" height="156" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="395" y="44" text-anchor="middle" font-weight="700" fill="var(--accent)">AGORA application</text>
+          <text x="395" y="66" text-anchor="middle">screens · access · workflow</text>
+          <text x="395" y="84" text-anchor="middle">Today · Trade · Control · Setup</text>
+          <text x="395" y="108" text-anchor="middle" fill="var(--muted)">modules per business area</text>
+          <text x="395" y="126" text-anchor="middle" fill="var(--muted)">email · schedules · rules</text>
+          <text x="395" y="156" text-anchor="middle" fill="var(--muted)">reads the sources below</text>
+          <path d="M520 98 H556" stroke="var(--accent)" stroke-width="2" fill="none"/>
+          <path d="M552 93 L560 98 L552 103 Z" fill="var(--accent)"/>
+          <text x="538" y="88" text-anchor="middle" fill="var(--accent)" font-size="10">calls</text>
+          <rect x="560" y="20" width="320" height="156" rx="8" fill="var(--surface-sunk)" stroke="var(--line-strong)"/>
+          <text x="720" y="44" text-anchor="middle" font-weight="700">PumpIT database</text>
+          <rect x="572" y="58" width="146" height="100" rx="6" fill="var(--surface)" stroke="var(--accent)"/>
+          <text x="645" y="80" text-anchor="middle" font-weight="600" fill="var(--accent)">agora schema · new</text>
+          <text x="645" y="100" text-anchor="middle">procedures = rules</text>
+          <text x="645" y="118" text-anchor="middle">new tables</text>
+          <text x="645" y="136" text-anchor="middle" fill="var(--muted)">BranchId on each</text>
+          <rect x="726" y="58" width="146" height="100" rx="6" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="799" y="80" text-anchor="middle" font-weight="600">existing tables kept</text>
+          <text x="799" y="100" text-anchor="middle">banking · counts</text>
+          <text x="799" y="118" text-anchor="middle">readings · requests</text>
+          <text x="799" y="136" text-anchor="middle" fill="var(--muted)">every record stays</text>
+          <path d="M718 108 H726" stroke="var(--line-strong)" stroke-width="1.5" fill="none" stroke-dasharray="3 3"/>
+          <rect x="270" y="212" width="200" height="92" rx="6" fill="var(--surface-sunk)" stroke="var(--line)"/>
+          <text x="370" y="234" text-anchor="middle" font-weight="600">MIST_Import</text>
+          <text x="370" y="252" text-anchor="middle" fill="var(--muted)">WinBranch · ARCH · AURA</text>
+          <text x="370" y="268" text-anchor="middle" fill="var(--muted)">Pilot · NAMOS · GAAP</text>
+          <text x="370" y="290" text-anchor="middle" fill="var(--muted)">overnight loads, as now</text>
+          <rect x="490" y="212" width="190" height="92" rx="6" fill="var(--surface-sunk)" stroke="var(--line)"/>
+          <text x="585" y="234" text-anchor="middle" font-weight="600">Alteryx extracts</text>
+          <text x="585" y="252" text-anchor="middle" fill="var(--muted)">Exco pack facts</text>
+          <text x="585" y="268" text-anchor="middle" fill="var(--muted)">fuel daily · budget</text>
+          <text x="585" y="290" text-anchor="middle" fill="var(--muted)">read only</text>
+          <rect x="700" y="212" width="180" height="92" rx="6" fill="var(--surface-sunk)" stroke="var(--line)"/>
+          <text x="790" y="234" text-anchor="middle" font-weight="600">FuelSheet</text>
+          <text x="790" y="252" text-anchor="middle" fill="var(--muted)">deliveries · dips</text>
+          <text x="790" y="268" text-anchor="middle" fill="var(--muted)">tank reconciliation</text>
+          <text x="790" y="290" text-anchor="middle" fill="var(--muted)">read only</text>
+          <path d="M370 176 V212" stroke="var(--line-strong)" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+          <path d="M440 176 C 460 200, 540 200, 570 212" stroke="var(--line-strong)" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+          <path d="M480 176 C 560 210, 700 200, 760 212" stroke="var(--line-strong)" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+          <text x="120" y="240" text-anchor="middle" fill="var(--muted)">solid = read and write</text>
+          <text x="120" y="258" text-anchor="middle" fill="var(--muted)">dashed = read only</text>
+        </g>
+      </svg>
+      <figcaption>Agora writes to one place — the PumpIT database — through its own procedures. The import and reporting databases stay exactly as they are and are only read.</figcaption>
+    </figure>
+    <div class="grid-cards cols3">
+      <div class="gc"><span class="k">One branch key everywhere</span><span class="v">BranchId leads every table, every procedure and every screen</span><span class="w">The same branch numbering PumpIT and the imports already use. A user only ever sees the branches they are granted.</span></div>
+      <div class="gc"><span class="k">Rules in the database</span><span class="v">Stored procedures own the numbers and the writes</span><span class="w">Fast on 170 GB of history, auditable in one place, and the same answer whether a screen, a report or a schedule asks.</span></div>
+      <div class="gc"><span class="k">Forward-only changes</span><span class="v">Every schema change is a numbered, versioned step</span><span class="w">Nothing is ever dropped in the first release; the legacy tables are wrapped, not rewritten, until a screen is rebuilt on them.</span></div>
+      <div class="gc"><span class="k">Reference data runs once</span><span class="v">A seed ledger records what has been loaded, at which version</span><span class="w">Roles, permissions, menus, categories and templates cannot be accidentally reloaded over live edits.</span></div>
+      <div class="gc"><span class="k">Built from components</span><span class="v">One KPI card, one grid, one chart, one menu — reused on every screen</span><span class="w">A fix to the grid fixes every grid. The look is Agora's own: light and dark, the same on every screen.</span></div>
+      <div class="gc"><span class="k">Phones from day one</span><span class="v">Capture screens are designed for a phone; wide screens get a purpose-built phone view</span><span class="w">Pump readings, fuel input, drop safe, waste, staff shorts and purchase requests can be raised from the forecourt.</span></div>
+    </div>
+  </section>
+
+  <section id="get" data-jump="What you get">
+    <div class="sec-head">
+      <h2>What you get, section by section</h2>
+      <span class="tag">from the concept build</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Section</th><th>Screens</th><th>Replaces in PumpIT</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Today</strong></td><td>Today at my branch (seven-step day close with live status), day close status for head office, pump readings, fuel input with days-cover and order flags, Z-read allocation with proposals, daily banking and cashups, drop safe, staff shorts with reason codes, waste, utility readings, stock count and area locks, purchase requests raised from a phone, overnight-load status.</td><td>18 branch functions and the capture half of head office, each a separate form with no completion state.</td></tr>
+          <tr><td><strong>Trade</strong></td><td>Group trading position, site league table, profit-centre contribution, site scorecard, the weekly Exco pack (36 sheets) as a live page, budgets kept in the system rather than a spreadsheet paste, and the report library: 97 reports in 14 categories, each with a plain-language name, a description and the old name it replaces.</td><td>The Reporter's 23 categories and 161 reports, and the pack assembled by hand.</td></tr>
+          <tr><td><strong>Control</strong></td><td>The exception register with owners, ages, values and escalation; one import screen for every tender file (ABSA, FNB, Smart ATM, cash bags and devices, Yumbi, Infinity, fleet card, bank statements); bank statement management; the two-pane reconciliation desk with auto-match that proposes with evidence; deductions (cash shorts with the leniency rule, stock loss by person, tender shortfalls) and the payroll file; purchase approvals by value band with named delegates and automatic escalation.</td><td>23 head-office functions, seven separate import screens, manual reconciliation by eye across two grids, one approver for every expense code.</td></tr>
+          <tr><td><strong>Setup</strong></td><td>Branches, regions, brands and formats; profit centres; standard categories and category margin bands; recon areas; expense codes with approvers; fuel matrix and price history; products, critical lines and virtual stock items; employees and posts; suppliers and account customers; users, roles and branch access; thresholds and system defaults; audit trail, master-data change log, report usage.</td><td>Standard Masters, System Masters and Business Tools.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <p><strong>Assets travel too.</strong> The asset register, movements between branches and repair job cards — with the rule that a second call on the same asset inside 30 days is flagged as a comeback — are rebuilt under Setup → People and assets.</p>
+    </div>
+  </section>
+
+  <section id="order" data-jump="Order">
+    <div class="sec-head">
+      <h2>The order of work</h2>
+      <span class="tag">three stages</span>
+    </div>
+    <div class="prose">
+      <p>Each stage is usable on its own and is finished before the next starts. The first customer-visible screen is the branch console at the start of stage two; everything in stage one is the ground it stands on.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><span class="n">STAGE 1</span><span class="t">Platform foundation</span><span class="d">The application, connected to a copy of PumpIT; users migrated with role → permission access; the theme, menus, search and components; email and templates; every master under Setup. What you see: sign-in, Setup, the shell.</span></div>
+      <div class="step is-you"><span class="n">STAGE 2</span><span class="t">Today &amp; Control</span><span class="d">The branch day and the head-office desk: day close, fuel, Z-reads, cashups, drop safe, shorts and deductions, imports and reconciliation, stock counts and production, purchase approvals, utilities, assets, the exception register, overnight-load monitoring. What you see: PumpIT's branch and head-office functions, replaced.</span></div>
+      <div class="step"><span class="n">STAGE 3</span><span class="t">Trade, reporting &amp; cutover</span><span class="d">The report library and engine, trading dashboards and scorecards, the Exco pack, budgets, the phone pass over every capture screen, help on every page, then a month of running beside PumpIT before the switch-off.</span></div>
+    </div>
+    <div class="prose" style="margin-top:22px">
+      <p>The plan behind this page holds 78 tasks in 20 work packages, each with what it delivers, how it is verified against real PumpIT data, and what it depends on. They are worked in that order, in parallel lanes where the dependencies allow. No calendar dates are promised on this page; the sequence is the commitment.</p>
+    </div>
+    <div class="callout warn">
+      <p><strong>What happens to PumpIT.</strong> It keeps running throughout. When a branch's day is being closed in Agora and the numbers have agreed with PumpIT's for a full month, PumpIT's capture screens are switched off for that branch. Head-office reconciliation follows, reporting last. Nothing in the database is deleted in the first release, and the overnight imports are not touched.</p>
+    </div>
+  </section>
+
+  <section id="honest" data-jump="Data">
+    <div class="sec-head">
+      <h2>What Agora will show rather than hide</h2>
+      <span class="tag">known data issues</span>
+    </div>
+    <div class="prose">
+      <p>Investigation of the current data found five things that make today's reports look wrong. Agora surfaces each of them as a count on the relevant screen instead of silently reporting around them, so they can be fixed at source.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Issue</th><th>Effect today</th><th>What Agora does</th></tr></thead>
+        <tbody>
+          <tr><td>Budget only exists from July 2025 and covers 16 of 31 sites, as a spreadsheet paste</td><td>Year-on-year budget columns read as zero for earlier periods</td><td>Budgets get their own screen in the system, per site, category and month, and the gap is visible</td></tr>
+          <tr><td>The Z-read-versus-cashup feed stopped in November 2025</td><td>An entire class of control has been dark for ten months</td><td>Z-read allocation and the open-cashup queues are rebuilt directly on the till readings and cashups</td></tr>
+          <tr><td>FNB card settlements are almost entirely unreconciled</td><td>Measured on 27 August 2026: 2,701 open statement lines carrying R88.6 million across 18 branches, against 71 reconciled</td><td>The reconciliation desk proposes matches with evidence; ageing shows what is capture lag and what is a write-off waiting to be found</td></tr>
+          <tr><td>"Dead stock" is flagged from a field that is no longer updated</td><td>Dead-stock counts and capital are overstated</td><td>Dead and slow-moving stock is keyed off the last-sold date</td></tr>
+          <tr><td>Product-to-category mapping is unreliable for the shop POS</td><td>Hundreds of QSR and virtual items leak into shop views and distort margin</td><td>Category rules show which categories have no band and which items are unmapped, as a number on the report</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="need" data-jump="From you">
+    <div class="sec-head">
+      <h2>What we need from Zulu Petroleum</h2>
+      <span class="tag">to keep the build moving</span>
+    </div>
+    <div class="grid-cards cols3">
+      <div class="gc"><span class="k">Database access</span><span class="v">A login for Agora with write access to PumpIT and read access to MIST_Import, Alteryx and FuelSheet</span><span class="w">Needed before the first live schema step. Development runs on a restored copy until then.</span></div>
+      <div class="gc"><span class="k">Where Agora is hosted</span><span class="v">A server beside the SQL instance, or a managed server we run</span><span class="w">Either works; the choice affects who patches the operating system and holds the backups.</span></div>
+      <div class="gc"><span class="k">One sample file per feed</span><span class="v">ABSA MarkOff, FNB, Smart ATM, cash bags and devices, Yumbi, Infinity, fleet card, NAMOS, a bank statement</span><span class="w">The import screen is built from real files, not from their descriptions.</span></div>
+      <div class="gc"><span class="k">Payroll file layout</span><span class="v">The format your payroll expects for deductions</span><span class="w">So the deduction schedule reaches payroll from one capture.</span></div>
+      <div class="gc"><span class="k">Rosters and audit scores</span><span class="v">Where rosters, clock-ins and site audit scores live, if anywhere</span><span class="w">PumpIT does not hold them. Without a source the three roster reports and the incentive-threshold report wait.</span></div>
+      <div class="gc"><span class="k">A budget owner</span><span class="v">Someone to own the FY2027 budget per site and category</span><span class="w">Agora gives budgets a home; it needs the numbers to put in it.</span></div>
+    </div>
+  </section>
+
+  <section id="decisions" data-jump="Decisions">
+    <div class="sec-head">
+      <h2>Decisions already taken</h2>
+      <span class="tag">3 September 2026</span>
+    </div>
+    <div class="grid-cards cols3">
+      <div class="gc"><span class="k">Database</span><span class="v">PumpIT stays the database and is evolved in place</span><span class="w">No migration of 170 GB of history; Agora's tables and procedures sit alongside the existing ones.</span></div>
+      <div class="gc"><span class="k">Imports</span><span class="v">MIST_Import stays the landing zone for every POS system</span><span class="w">The overnight loads are monitored by Agora from day one; rebuilding the loaders is optional and later.</span></div>
+      <div class="gc"><span class="k">Where the logic lives</span><span class="v">In stored procedures, with the application orchestrating</span><span class="w">One rule, one place, one answer.</span></div>
+      <div class="gc"><span class="k">Phones</span><span class="v">Mobile detection and phone views from the start</span><span class="w">Where a desktop screen cannot be represented on a phone, a purpose-built view is made rather than a shrunk one.</span></div>
+      <div class="gc"><span class="k">Look and feel</span><span class="v">Agora's own theme, light and dark, the same on every screen</span><span class="w">Taken from the concept build reviewed with management.</span></div>
+      <div class="gc"><span class="k">Reports</span><span class="v">One report per question, scope as a setting</span><span class="w">97 reports replace 161; the old names still find the new ones in search.</span></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="dock" id="dock">
+  <div class="dock-in">
+    <span class="counter" id="counter-dock"></span>
+    <span class="export-state" id="export-state-dock"></span>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="dock-jump">Go to export</button>
+    <button class="btn ghost" id="dock-preview">Preview</button>
+    <button class="btn ghost" id="dock-copy">Copy JSON</button>
+    <button class="btn btn-save" id="dock-save">Save report &amp; copy</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ======================= FILL THIS IN ======================= */
+
+  var PAGE = {
+    title: "Agora Build Plan",
+    project: "Agora — Zululand Retail & Petroleum",
+    date: "2026-09-03",
+    revision: 1,
+    session_id: "01CeepxSstmTdHfKTiaZf9aj",
+    artifact_url: "https://claude.ai/code/artifact/d47d7399-1f8a-4de0-8aa5-46f8efa3ac8c",
+    key: "agora.build-plan.customer.2026-09-03"
+  };
+
+  // Types: "choice" | "multi" | "order" | "text"
+  // priority: "blocking" | "normal"   ·   Empty array = no questions at all.
+  var QUESTIONS = [];
+  // Keep this array in the same order as the mounts appear in the page — the
+  // index at the bottom stays in page order, and it is built from this list.
+
+  /* ================= MACHINERY — leave alone ================== */
+
+  var answers = {};
+  var HAS_Q = QUESTIONS.length > 0;
+
+  function load() {
+    try {
+      var raw = window.localStorage.getItem(PAGE.key);
+      if (raw) { answers = JSON.parse(raw) || {}; }
+    } catch (e) { answers = {}; }
+  }
+  function save() {
+    try { window.localStorage.setItem(PAGE.key, JSON.stringify(answers)); } catch (e) {}
+  }
+  function get(id) {
+    if (!answers[id]) { answers[id] = { value: null, note: "" }; }
+    return answers[id];
+  }
+
+  // Persistent "you have already exported this" marker. Survives a reload so
+  // walking away mid-page and coming back still shows what was sent.
+  var EXPORT_KEY = PAGE.key + ".export";
+  function loadExport() {
+    try { return JSON.parse(window.localStorage.getItem(EXPORT_KEY) || "null"); }
+    catch (e) { return null; }
+  }
+  function markExported() {
+    var rec = { at: new Date().toISOString(), snapshot: JSON.stringify(answers) };
+    try { window.localStorage.setItem(EXPORT_KEY, JSON.stringify(rec)); } catch (e) {}
+    renderExportState();
+  }
+  function clearExported() {
+    try { window.localStorage.removeItem(EXPORT_KEY); } catch (e) {}
+  }
+  function renderExportState() {
+    var rec = loadExport();
+    var stale = rec && rec.snapshot !== JSON.stringify(answers);
+    var when = "";
+    if (rec) {
+      var d = new Date(rec.at);
+      when = isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+    ["export-state", "export-state-dock"].forEach(function (id) {
+      var n = document.getElementById(id);
+      if (!n) { return; }
+      n.textContent = "";
+      n.classList.toggle("on", !!rec);
+      n.classList.toggle("fresh", !!rec && !stale);
+      n.classList.toggle("stale", !!rec && !!stale);
+      if (!rec) { return; }
+      var tick = el("span", "tick", stale ? "!" : "✓");
+      n.appendChild(tick);
+      n.appendChild(document.createTextNode(stale ? "Changed since export" : "Exported"));
+      if (when) { n.appendChild(el("span", "when", " · " + when)); }
+    });
+    ["copy-btn", "dock-copy", "preview-copy"].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (!b) { return; }
+      b.classList.toggle("is-exported", !!rec && !stale);
+      b.textContent = rec ? (stale ? "Copy updated JSON" : "Copy JSON again") : "Copy JSON";
+    });
+    // The save buttons keep their label whatever the export state — archiving
+    // is a separate intent from re-sending answers, and "Save report again"
+    // would read as though a second copy gets stored.
+  }
+  function questionById(id) {
+    var found = null;
+    QUESTIONS.forEach(function (q) { if (q.id === id) { found = q; } });
+    return found;
+  }
+  function defaultOrder(q) { return q.items.map(function (i) { return i.value; }); }
+  function currentOrder(q) {
+    var v = get(q.id).value;
+    if (!Array.isArray(v) || v.length !== q.items.length) { return defaultOrder(q); }
+    return v.slice();
+  }
+  function isAnswered(id) {
+    var a = answers[id];
+    if (!a) { return false; }
+    if ((a.note || "").trim() !== "") { return true; }
+    if (Array.isArray(a.value)) { return a.value.length > 0; }
+    return a.value !== null && a.value !== undefined && String(a.value).trim() !== "";
+  }
+  function labelFor(q, value) {
+    var pool = q.type === "order" ? q.items : (q.options || []);
+    var found = null;
+    pool.forEach(function (o) { if (o.value === value) { found = o; } });
+    return found ? found.label : value;
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) { n.className = cls; }
+    if (text !== undefined) { n.textContent = text; }
+    return n;
+  }
+  function labelBody(o) {
+    var body = el("span");
+    body.appendChild(document.createTextNode(o.label));
+    if (o.sub) { body.appendChild(el("span", "sub", o.sub)); }
+    return body;
+  }
+
+  function buildChoice(q, host) {
+    var opts = el("div", "opts");
+    q.options.forEach(function (o) {
+      var lab = el("label", "opt");
+      var input = document.createElement("input");
+      input.type = "radio";
+      input.name = q.id + "__r";
+      input.value = o.value;
+      input.checked = get(q.id).value === o.value;
+      if (input.checked) { lab.classList.add("is-picked"); }
+
+      // Clicking the option you already picked CLEARS it (Ryan, 2026-08-17),
+      // so a question can carry a note without any option being endorsed —
+      // "none of these, here is what I actually mean". A radio cannot be
+      // unchecked natively, so the second click is caught by hand.
+      //
+      // The pre-click state has to be captured on mousedown/keydown, NOT read
+      // inside the click handler: for radios the browser fires `change` BEFORE
+      // `click`, so by click time the model already says this option is
+      // selected and every first click would look like a re-click and undo
+      // itself. Re-clicking the SAME option fires no change event at all
+      // (nothing toggled), which is why the deselect lives here.
+      //
+      // Bind to the LABEL, not the input. A click anywhere on the option row
+      // hits the label, and the label's activation behaviour dispatches a
+      // synthetic CLICK to the input — but no mousedown. Capturing on the
+      // input therefore left wasChecked false for every click that did not
+      // land on the ~13px radio dot itself, so clearing worked only if you hit
+      // the dot exactly. That is not how anyone clicks a row-sized target, and
+      // it cost Ryan an answer on 2026-08-19: he could not clear an option he
+      // had picked by accident, and the report recorded a choice he did not
+      // mean alongside a note saying the opposite. mousedown and keydown both
+      // bubble from the input to the label, so the label sees both routes.
+      var wasChecked = false;
+      lab.addEventListener("mousedown", function () { wasChecked = input.checked; });
+
+      // The keyboard route cannot go through the click handler at all: pressing
+      // Space on an ALREADY-CHECKED radio fires nothing — no click, no change —
+      // because there is nothing to toggle. So the deselect is done here
+      // outright rather than by capturing state for a click that never comes.
+      // An unchecked radio falls through to the browser's own behaviour.
+      lab.addEventListener("keydown", function (e) {
+        if (e.key !== " " && e.key !== "Enter") { return; }
+        if (input.checked) {
+          e.preventDefault();
+          input.checked = false;
+          get(q.id).value = null;
+          commit(q.id);
+          wasChecked = false;
+          return;
+        }
+        wasChecked = false;
+      });
+      input.addEventListener("click", function () {
+        if (wasChecked) {
+          input.checked = false;
+          get(q.id).value = null;
+          commit(q.id);
+        }
+        wasChecked = false;
+      });
+
+      input.addEventListener("change", function () {
+        get(q.id).value = o.value;
+        commit(q.id);
+      });
+      lab.appendChild(input);
+      lab.appendChild(labelBody(o));
+      opts.appendChild(lab);
+    });
+    host.appendChild(opts);
+    host.appendChild(el("p", "opt-hint", "Click the option you picked again to clear it — a note on its own is a valid answer."));
+  }
+
+  function buildMulti(q, host) {
+    var opts = el("div", "opts");
+    q.options.forEach(function (o) {
+      var lab = el("label", "opt");
+      var input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = o.value;
+      var picked = Array.isArray(get(q.id).value) && get(q.id).value.indexOf(o.value) > -1;
+      input.checked = picked;
+      if (picked) { lab.classList.add("is-picked"); }
+      input.addEventListener("change", function () {
+        var cur = Array.isArray(get(q.id).value) ? get(q.id).value.slice() : [];
+        var at = cur.indexOf(o.value);
+        if (input.checked && at === -1) { cur.push(o.value); }
+        if (!input.checked && at > -1) { cur.splice(at, 1); }
+        get(q.id).value = cur;
+        commit(q.id);
+      });
+      lab.appendChild(input);
+      lab.appendChild(labelBody(o));
+      opts.appendChild(lab);
+    });
+    host.appendChild(opts);
+  }
+
+  function buildOrder(q, host) {
+    var list = el("div", "order");
+    list.setAttribute("data-order", "1");
+    host.appendChild(list);
+    paintOrder(list, q);
+  }
+
+  function paintOrder(list, q) {
+    var order = currentOrder(q);
+    list.textContent = "";
+    order.forEach(function (val, idx) {
+      var item = null;
+      q.items.forEach(function (i) { if (i.value === val) { item = i; } });
+      if (!item) { return; }
+      var row = el("div", "order-item");
+      row.appendChild(el("span", "rank", String(idx + 1)));
+      var lbl = el("span", "lbl");
+      lbl.appendChild(document.createTextNode(item.label));
+      if (item.sub) { lbl.appendChild(el("span", "sub", item.sub)); }
+      row.appendChild(lbl);
+
+      var up = el("button", "nudge", "↑");
+      up.type = "button";
+      up.setAttribute("aria-label", "Move " + item.label + " up");
+      up.disabled = idx === 0;
+      up.addEventListener("click", function () { move(q, idx, -1); });
+
+      var down = el("button", "nudge", "↓");
+      down.type = "button";
+      down.setAttribute("aria-label", "Move " + item.label + " down");
+      down.disabled = idx === order.length - 1;
+      down.addEventListener("click", function () { move(q, idx, 1); });
+
+      row.appendChild(up);
+      row.appendChild(down);
+      list.appendChild(row);
+    });
+  }
+
+  function move(q, idx, delta) {
+    var order = currentOrder(q);
+    var to = idx + delta;
+    if (to < 0 || to >= order.length) { return; }
+    var tmp = order[idx];
+    order[idx] = order[to];
+    order[to] = tmp;
+    get(q.id).value = order;
+    commit(q.id);
+  }
+
+  function buildQuestion(q) {
+    var wrap = el("div", "q");
+    wrap.setAttribute("data-qid", q.id);
+    wrap.id = "anchor-" + q.id;
+    if (q.priority === "blocking") { wrap.classList.add("is-blocking"); }
+
+    var top = el("div", "q-top");
+    var badge = el("span", "q-badge");
+    badge.appendChild(el("span", "dot"));
+    badge.appendChild(el("span", "label"));
+    top.appendChild(badge);
+    top.appendChild(el("span", "q-id", q.id));
+    wrap.appendChild(top);
+
+    wrap.appendChild(el("p", "q-text", q.text));
+    if (q.hint) { wrap.appendChild(el("p", "q-hint", q.hint)); }
+
+    if (q.type === "choice") { buildChoice(q, wrap); }
+    if (q.type === "multi") { buildMulti(q, wrap); }
+    if (q.type === "order") { buildOrder(q, wrap); }
+
+    var noteWrap = el("div");
+    var uid = q.id + "-note";
+    var noteLabel = el("label", "note-label", q.type === "text" ? "Your answer" : "Note (optional)");
+    noteLabel.setAttribute("for", uid);
+    var ta = document.createElement("textarea");
+    ta.id = uid;
+    ta.rows = q.type === "text" ? 4 : 2;
+    ta.placeholder = q.placeholder || "Anything that does not fit the options…";
+    ta.value = get(q.id).note || "";
+    ta.setAttribute("data-note", "1");
+    ta.addEventListener("input", function () {
+      get(q.id).note = ta.value;
+      commit(q.id);
+    });
+    noteWrap.appendChild(noteLabel);
+    noteWrap.appendChild(ta);
+    wrap.appendChild(noteWrap);
+
+    var foot = el("div", "q-foot");
+    var link = el("button", "linkbtn", "see it in the summary");
+    link.type = "button";
+    link.addEventListener("click", function () {
+      var target = document.querySelector('.index-row[data-qid="' + q.id + '"]');
+      if (target) { target.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    });
+    foot.appendChild(link);
+    foot.appendChild(el("span", "q-status"));
+    wrap.appendChild(foot);
+
+    paint(wrap, q);
+    return wrap;
+  }
+
+  function paint(node, q) {
+    var answered = isAnswered(q.id);
+    node.classList.toggle("is-answered", answered);
+    var lbl = node.querySelector(".q-badge .label");
+    if (lbl) {
+      lbl.textContent = answered
+        ? "Answered"
+        : (q.priority === "blocking" ? "Blocking — I need this" : "Question for you");
+    }
+    var status = node.querySelector(".q-status");
+    if (status) { status.textContent = answered ? "" : (q.priority === "blocking" ? "blocking" : "when you can"); }
+  }
+
+  function commit(id) {
+    var q = questionById(id);
+    var node = document.querySelector('.q[data-qid="' + id + '"]');
+    if (node) {
+      Array.prototype.forEach.call(node.querySelectorAll("input"), function (i) {
+        i.parentNode.classList.toggle("is-picked", i.checked);
+      });
+      var list = node.querySelector("[data-order]");
+      if (list && q.type === "order") { paintOrder(list, q); }
+      paint(node, q);
+    }
+    save();
+    refreshOutputs();
+  }
+
+  function answerSummary(q) {
+    var a = answers[q.id] || {};
+    var bits = [];
+    if (q.type === "choice" && a.value) { bits.push(labelFor(q, a.value)); }
+    if (q.type === "multi" && Array.isArray(a.value) && a.value.length) {
+      bits.push(a.value.map(function (v) { return labelFor(q, v); }).join(", "));
+    }
+    if (q.type === "order") {
+      var touched = Array.isArray(a.value) && a.value.length === q.items.length;
+      bits.push(currentOrder(q).map(function (v, i) { return (i + 1) + ". " + labelFor(q, v); }).join("  ")
+        + (touched ? "" : "  (default order, unchanged)"));
+    }
+    if ((a.note || "").trim()) { bits.push("Note: " + a.note.trim()); }
+    return bits.join(" — ");
+  }
+
+  function buildIndex() {
+    var host = document.getElementById("index-body");
+    if (!host) { return; }
+    host.textContent = "";
+    QUESTIONS.forEach(function (q) {
+      var answered = isAnswered(q.id);
+      var row = el("div", "index-row");
+      row.setAttribute("data-qid", q.id);
+      row.classList.add(answered ? "s-done" : (q.priority === "blocking" ? "s-blocking" : "s-open"));
+
+      var state = el("span", "state");
+      state.appendChild(el("span", "dot"));
+      state.appendChild(el("span", null, answered ? "answered" : (q.priority === "blocking" ? "blocking" : "open")));
+      row.appendChild(state);
+
+      var body = el("div", "body");
+      body.appendChild(el("span", "qt", q.text));
+      var ans = el("span", "ans");
+      if (answered) {
+        ans.appendChild(el("b", null, "You said: "));
+        ans.appendChild(document.createTextNode(answerSummary(q)));
+      } else {
+        ans.textContent = q.section + " · not answered yet";
+      }
+      body.appendChild(ans);
+      row.appendChild(body);
+
+      var go = el("div", "go");
+      var jump = el("button", "linkbtn", "answer →");
+      jump.type = "button";
+      jump.addEventListener("click", function () {
+        var target = document.getElementById("anchor-" + q.id);
+        if (target) { target.scrollIntoView({ behavior: "smooth", block: "center" }); }
+      });
+      go.appendChild(jump);
+      row.appendChild(go);
+      host.appendChild(row);
+    });
+  }
+
+  // opts.save adds `save_report: true`, which is the whole difference between
+  // the two copy buttons. The session reads that key and pushes this page's
+  // HTML to the project manager; without it, it only processes the answers.
+  // Not every report is worth keeping — the flag is Ryan saying this one is.
+  function buildPayload(opts) {
+    var out = {
+      page: PAGE.title,
+      project: PAGE.project,
+      page_date: PAGE.date,
+      revision: PAGE.revision,
+      session_id: PAGE.session_id,
+      artifact_url: PAGE.artifact_url,
+      exported_at: new Date().toISOString(),
+      save_report: !!(opts && opts.save),
+      answered: 0,
+      of: QUESTIONS.length,
+      answers: []
+    };
+    QUESTIONS.forEach(function (q) {
+      var a = answers[q.id] || {};
+      var answered = isAnswered(q.id);
+      if (answered) { out.answered += 1; }
+
+      var row = {
+        id: q.id,
+        section: q.section,
+        priority: q.priority || "normal",
+        question: q.text,
+        type: q.type,
+        answered: answered,
+        answer: null,
+        note: (a.note || "").trim() || null
+      };
+
+      if (q.type === "choice" && a.value) {
+        row.answer = { value: a.value, label: labelFor(q, a.value) };
+      }
+      if (q.type === "multi" && Array.isArray(a.value) && a.value.length) {
+        row.answer = a.value.map(function (v) { return { value: v, label: labelFor(q, v) }; });
+      }
+      if (q.type === "order") {
+        // Always export the order as displayed — an untouched question still
+        // carries a meaningful answer ("the default is right"), flagged so it
+        // is distinguishable from an actual reorder.
+        row.order_touched = Array.isArray(a.value) && a.value.length === q.items.length;
+        row.answer = currentOrder(q).map(function (v, i) {
+          return { rank: i + 1, value: v, label: labelFor(q, v) };
+        });
+      }
+      out.answers.push(row);
+    });
+    return out;
+  }
+
+  function asJson(opts) { return JSON.stringify(buildPayload(opts), null, 2); }
+
+  function asText(opts) {
+    var p = buildPayload(opts);
+    var lines = [];
+    lines.push(p.page);
+    lines.push(p.project + " · " + p.page_date + " · revision " + p.revision);
+    if (p.save_report) { lines.push("** SAVE THIS REPORT to the project manager **"); }
+    lines.push("session " + p.session_id);
+    lines.push(p.answered + " of " + p.of + " answered · exported " + p.exported_at);
+    lines.push("");
+    p.answers.forEach(function (r) {
+      lines.push("[" + r.id + "] " + r.section + (r.priority === "blocking" ? "  (BLOCKING)" : ""));
+      lines.push("Q: " + r.question);
+      if (r.type === "order") {
+        r.answer.forEach(function (x) { lines.push("   " + x.rank + ". " + x.label); });
+        if (!r.order_touched) { lines.push("   (default order, unchanged)"); }
+      } else if (!r.answered) {
+        lines.push("A: (not answered)");
+      } else if (r.answer === null) {
+        lines.push("A: (note only)");
+      } else if (r.type === "choice") {
+        lines.push("A: " + r.answer.label);
+      } else if (r.type === "multi") {
+        lines.push("A: " + r.answer.map(function (x) { return x.label; }).join("; "));
+      }
+      if (r.note) { lines.push("Note: " + r.note); }
+      lines.push("");
+    });
+    return lines.join("\n");
+  }
+
+  var fmt = { export: "text", preview: "text" };
+
+  function renderOut(which) {
+    var target = document.getElementById("out-" + which);
+    if (!target) { return; }
+    target.textContent = fmt[which] === "json" ? asJson() : asText();
+  }
+
+  function refreshOutputs() {
+    if (!HAS_Q) { return; }
+    var p = buildPayload();
+    var blockingOpen = 0;
+    QUESTIONS.forEach(function (q) {
+      if (q.priority === "blocking" && !isAnswered(q.id)) { blockingOpen += 1; }
+    });
+    var html = "<b>" + p.answered + "</b> of " + p.of + " answered";
+    if (blockingOpen > 0) { html += " · <span class='blk'>" + blockingOpen + " blocking</span>"; }
+    ["counter-index", "counter-export", "counter-dock", "counter-preview"].forEach(function (cid) {
+      var n = document.getElementById(cid);
+      if (n) { n.innerHTML = html; }
+    });
+    document.getElementById("out-title").textContent = fmt["export"] === "json" ? "answers.json" : "answers.txt";
+    renderOut("export");
+    renderOut("preview");
+    buildIndex();
+    renderExportState();
+    document.getElementById("dock").classList.toggle("on", p.answered > 0);
+  }
+
+  function flash(id, msg, tone) {
+    var f = document.getElementById(id);
+    if (!f) { return; }
+    f.textContent = msg;
+    f.style.color = tone === "warn" ? "var(--signal)" : "var(--ok)";
+    f.classList.add("on");
+    window.setTimeout(function () { f.classList.remove("on"); }, 2800);
+  }
+
+  function copyJson(flashId, preId, opts) {
+    var text = asJson(opts);
+    var saving = !!(opts && opts.save);
+    var ok = function () {
+      markExported();
+      flash(flashId, saving
+        ? "Copied with save flag — paste it in and I'll archive this report"
+        : "Copied — paste it into the chat", "ok");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok, fallback);
+    } else { fallback(); }
+
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      var done = false;
+      try { done = document.execCommand("copy"); } catch (e) { done = false; }
+      document.body.removeChild(ta);
+      if (done) { ok(); return; }
+      var pre = document.getElementById(preId);
+      if (pre) {
+        pre.textContent = text;
+        var range = document.createRange();
+        range.selectNodeContents(pre);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      // Clipboard API unavailable: only claim "exported" once the browser
+      // actually fires a copy, so the marker can't lie about what was sent.
+      document.addEventListener("copy", function onManual() {
+        document.removeEventListener("copy", onManual);
+        markExported();
+      });
+      flash(flashId, "Selected the JSON — press Ctrl+C", "warn");
+    }
+  }
+
+  /* ---------- boot ---------- */
+
+  // Jump strip. Built from the sections that are actually in the page, so
+  // deleting a section deletes its link too — there is no second list to
+  // forget. The questions index and the export never appear in it: the dock
+  // already carries "Go to export", and repeating page furniture here pushed
+  // the strip onto a second line and buried the content links.
+  (function buildJump() {
+    var nav = document.getElementById("jump");
+    if (!nav) { return; }
+    var secs = document.querySelectorAll("section[id]");
+    var made = 0;
+    Array.prototype.forEach.call(secs, function (sec) {
+      if (sec.hasAttribute("data-questions-only")) { return; }
+      var h = sec.querySelector(".sec-head h2");
+      if (!h) { return; }
+      var a = document.createElement("a");
+      a.href = "#" + sec.id;
+      a.textContent = sec.getAttribute("data-jump") || h.textContent.trim();
+      nav.appendChild(a);
+      made += 1;
+    });
+    if (made < 3) { nav.parentNode.removeChild(nav); return; }  // not worth a strip
+    var lbl = el("span", "lbl", "on this page");
+    nav.insertBefore(lbl, nav.firstChild);
+    nav.hidden = false;
+  })();
+
+  if (!HAS_Q) {
+    document.body.classList.add("no-questions");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-questions-only]"), function (n) {
+      n.parentNode.removeChild(n);
+    });
+    var dlgEl = document.getElementById("preview");
+    if (dlgEl) { dlgEl.parentNode.removeChild(dlgEl); }
+    var meta = document.getElementById("meta-row");
+    if (meta) { meta.parentNode.removeChild(meta); }
+
+    // A page with nothing to ask still has something to keep — a recap or an
+    // audit is often exactly what's worth archiving. So the dock survives,
+    // stripped to the one control that still means anything here.
+    var dockEl = document.getElementById("dock");
+    if (dockEl) {
+      var inner = dockEl.querySelector(".dock-in");
+      if (inner) {
+        inner.innerHTML = "";
+        var note = el("span", "counter", "No questions on this page");
+        var spacer = el("span", "spacer", "");
+        var saveOnly = document.createElement("button");
+        saveOnly.className = "btn btn-save";
+        saveOnly.id = "dock-save";
+        saveOnly.textContent = "Save report";
+        var f = el("span", "flash", "");
+        f.id = "flash";
+        inner.appendChild(note);
+        inner.appendChild(f);
+        inner.appendChild(spacer);
+        inner.appendChild(saveOnly);
+        saveOnly.addEventListener("click", function () { copyJson("flash", null, { save: true }); });
+      }
+      dockEl.classList.add("on");
+    }
+    return;
+  }
+
+  load();
+
+  QUESTIONS.forEach(function (q) {
+    var mount = document.querySelector('[data-mount="' + q.id + '"]');
+    if (mount) { mount.appendChild(buildQuestion(q)); }
+  });
+
+  (function fillMeta() {
+    var blocking = 0, normal = 0;
+    QUESTIONS.forEach(function (q) {
+      if (q.priority === "blocking") { blocking += 1; } else { normal += 1; }
+    });
+    var b = document.querySelector('[data-meta="blocking"]');
+    var n = document.querySelector('[data-meta="normal"]');
+    var h = document.querySelector('[data-meta="hint"]');
+    if (b) { b.innerHTML = blocking ? "<b>" + blocking + "</b> blocking question" + (blocking > 1 ? "s" : "") : ""; }
+    if (n) { n.innerHTML = normal ? "<b>" + normal + "</b> when you can" : ""; }
+    if (h) { h.textContent = "export sits at the bottom"; }
+  })();
+
+  function wireSeg(segId, which) {
+    var seg = document.getElementById(segId);
+    if (!seg) { return; }
+    Array.prototype.forEach.call(seg.querySelectorAll("button"), function (b) {
+      b.addEventListener("click", function () {
+        fmt[which] = b.getAttribute("data-fmt");
+        Array.prototype.forEach.call(seg.querySelectorAll("button"), function (x) {
+          x.classList.toggle("on", x === b);
+        });
+        refreshOutputs();
+      });
+    });
+  }
+  wireSeg("seg-export", "export");
+  wireSeg("seg-preview", "preview");
+
+  var dlg = document.getElementById("preview");
+  document.getElementById("dock-preview").addEventListener("click", function () {
+    refreshOutputs();
+    if (dlg.showModal) { dlg.showModal(); } else { dlg.setAttribute("open", "open"); }
+  });
+  document.getElementById("preview-close").addEventListener("click", function () {
+    if (dlg.close) { dlg.close(); } else { dlg.removeAttribute("open"); }
+  });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) { dlg.close(); } });
+
+  document.getElementById("copy-btn").addEventListener("click", function () { copyJson("flash", "out-export"); });
+  document.getElementById("dock-copy").addEventListener("click", function () { copyJson("flash", "out-export"); });
+  document.getElementById("preview-copy").addEventListener("click", function () { copyJson("flash-preview", "out-preview"); });
+  document.getElementById("save-btn").addEventListener("click", function () { copyJson("flash", "out-export", { save: true }); });
+  document.getElementById("dock-save").addEventListener("click", function () { copyJson("flash", "out-export", { save: true }); });
+  document.getElementById("preview-save").addEventListener("click", function () { copyJson("flash-preview", "out-preview", { save: true }); });
+  document.getElementById("dock-jump").addEventListener("click", function () {
+    document.getElementById("export").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  document.getElementById("clear-btn").addEventListener("click", function () {
+    answers = {};
+    save();
+    clearExported();
+    QUESTIONS.forEach(function (q) {
+      var node = document.querySelector('.q[data-qid="' + q.id + '"]');
+      if (!node) { return; }
+      Array.prototype.forEach.call(node.querySelectorAll("input"), function (i) {
+        i.checked = false;
+        i.parentNode.classList.remove("is-picked");
+      });
+      var list = node.querySelector("[data-order]");
+      if (list && q.type === "order") { paintOrder(list, q); }
+      var note = node.querySelector("textarea[data-note]");
+      if (note) { note.value = ""; }
+      paint(node, q);
+    });
+    refreshOutputs();
+    flash("flash", "Cleared", "warn");
+  });
+
+  refreshOutputs();
+})();
+</script>

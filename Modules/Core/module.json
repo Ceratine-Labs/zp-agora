@@ -1,0 +1,11 @@
+{
+    "name": "Core",
+    "alias": "core",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 1,
+    "requires": [],
+    "providers": [
+        "Modules\\Core\\Providers\\CoreServiceProvider"
+    ]
+}

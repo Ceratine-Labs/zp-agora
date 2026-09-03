@@ -1,0 +1,37 @@
+<?php
+
+use App\Support\Database\MigrationHelper;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+
+/**
+ * {{name}} — base tables (slot {{slot}}).
+ *
+ * MigrationHelper::table() supplies the standard spine: BranchId first in the
+ * clustered key, a BIGINT IDENTITY Id, and the stamped audit columns. Foreign
+ * keys are NOT declared here — they go in one v1__95_{{alias}}_foreign_keys.php
+ * per module, because the reference graph has cycles SQL Server rejects
+ * inside a create (plan §3.3).
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // MigrationHelper::table('Example', function (Blueprint $table) {
+        //     $table->string('Code', 20);
+        //     $table->string('Description', 120);
+        //     $table->boolean('IsActive')->default(true);
+        // });
+        // MigrationHelper::naturalKey('Example', ['BranchId', 'Code']);
+        // MigrationHelper::rowVersion('Example');
+    }
+
+    /**
+     * Live and staging are forward-only; this runs against the local sandbox
+     * only. Never rely on it to undo something in production.
+     */
+    public function down(): void
+    {
+        // MigrationHelper::drop('Example');
+    }
+};

@@ -1,0 +1,10 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Modules\{{name}}\Http\Controllers\{{name}}Controller;
+
+// Registered under the /app prefix with the web middleware stack by
+// ModuleServiceProvider — do not repeat the prefix here.
+Route::middleware('auth')->group(function () {
+    Route::get('{{lowerName}}', [{{name}}Controller::class, 'index'])->name('{{alias}}.index');
+});

@@ -1,0 +1,10 @@
+<x-app-shell :title="__('{{alias}}::{{alias}}.title')">
+    <x-page-head
+        eyebrow="{{name}}"
+        :title="__('{{alias}}::{{alias}}.title')"
+        blurb="{{ __('{{alias}}::{{alias}}.blurb') }}" />
+
+    <x-card>
+        <x-empty-state text="Nothing here yet. This module was scaffolded and has no screens." />
+    </x-card>
+</x-app-shell>

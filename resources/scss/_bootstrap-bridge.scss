@@ -1,0 +1,23 @@
+/*
+ | Bootstrap speaks --bs-*; Agora speaks the tokens above. This is the only
+ | place the two meet, so no view ever reaches for a Bootstrap colour utility
+ | and no component hard-codes a hex (plan §3.8).
+ */
+:root {
+  --bs-body-bg: var(--paper);
+  --bs-body-color: var(--ink);
+  --bs-body-font-family: var(--font-text);
+  --bs-body-font-size: 13.5px;
+  --bs-border-color: var(--line);
+  --bs-border-radius: var(--r);
+  --bs-primary: var(--brand);
+  --bs-link-color: var(--brand);
+  --bs-link-hover-color: var(--brand-ink);
+  --bs-secondary-color: var(--ink-2);
+  --bs-emphasis-color: var(--ink);
+  --bs-tertiary-bg: var(--surface-2);
+  // Bootstrap ships <code> in its own pink. Inline code in Agora is a table
+  // or column name, not a warning, so it takes the muted ink like the rest of
+  // the prose around it.
+  --bs-code-color: var(--ink-2);
+}

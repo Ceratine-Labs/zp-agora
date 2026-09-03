@@ -1,0 +1,22 @@
+<?php
+
+namespace Modules\{{name}}\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Contracts\View\View;
+use Modules\{{name}}\Services\{{name}}Service;
+
+/**
+ * Controllers stay thin: resolve the request, hand it to the service, render.
+ * No business rules here — those live in the service, and the ones that touch
+ * money or stock live in a stored procedure the service calls.
+ */
+class {{name}}Controller extends Controller
+{
+    public function __construct(protected {{name}}Service $service) {}
+
+    public function index(): View
+    {
+        return view('{{alias}}::index');
+    }
+}

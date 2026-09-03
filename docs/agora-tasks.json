@@ -1,0 +1,2023 @@
+{
+ "project": "Agora — PumpIT successor (Zulu Petroleum)",
+ "generated": "2026-09-03",
+ "source": "AGORA_ARCHITECTURE_AND_BUILD_PLAN.md §6",
+ "field_map": {
+  "title": "title",
+  "type": "type",
+  "priority": "priority",
+  "llm_model": "llm_model",
+  "sort_order": "sort_order",
+  "epic_id": "resolve from epic title",
+  "milestone_id": "resolve from milestone title",
+  "description": "'Blocked by: …' line + Deliverables + Acceptance",
+  "instructions": "notes + 'Conventions: Agora KB → Architecture rules'"
+ },
+ "estimate_key": {
+  "S": "≤ half a day",
+  "M": "1–2 days",
+  "L": "3–5 days",
+  "XL": "1–2 weeks"
+ },
+ "milestones": [
+  {
+   "id": "M1",
+   "title": "Agora M1 — Platform foundation",
+   "description": "Repo, database conventions, seed master, RBAC, audit, navigation, component library, mobile base, email, core masters. Everything later stands on this. Nothing customer-visible beyond sign-in, Setup and the shell.",
+   "due": null
+  },
+  {
+   "id": "M2",
+   "title": "Agora M2 — Today & Control (operations core)",
+   "description": "The branch day and what does not reconcile: day-close spine and branch console, fuel capture, Z-reads and cashups, drop safe, staff shorts and deductions, bank imports and the reconcile workbench, stock counts and production, purchase requests with approval bands, utilities, assets, the exception register and overnight-load monitoring. This is the milestone that lets PumpIT's branch and head-office functions be switched off.",
+   "due": null
+  },
+  {
+   "id": "M3",
+   "title": "Agora M3 — Trade, reporting & cutover",
+   "description": "The reporting engine and the 97-report library, trading dashboards and site scorecards, the weekly Exco pack, budgets, the mobile pass over every capture screen, governance reports, help content, and the parallel-run / cutover from PumpIT. Optional importer rebuild (E19).",
+   "due": null
+  }
+ ],
+ "epics": [
+  {
+   "id": "E01",
+   "m": "M1",
+   "title": "Project bootstrap & environments",
+   "intro": "A Laravel 13 repo that boots against a local restore of PumpIT, with the conventions from §3 written into its CLAUDE.md before any feature lands."
+  },
+  {
+   "id": "E02",
+   "m": "M1",
+   "title": "Identity, RBAC & audit",
+   "intro": "Users migrated from SS_Users, role → permission, branch access, the audit tables every later proc writes to."
+  },
+  {
+   "id": "E03",
+   "m": "M1",
+   "title": "Shell, navigation & component library",
+   "intro": "The Agora theme, the app shell, DB-driven menus, Ctrl-K, and the component vocabulary of §3.8 — including the data grid and charts — plus the mobile base."
+  },
+  {
+   "id": "E04",
+   "m": "M1",
+   "title": "Email & templates",
+   "intro": "Mailer, outbox, log, and email templates tagged by module with a per-module variable registry."
+  },
+  {
+   "id": "E05",
+   "m": "M1",
+   "title": "Core masters (Setup)",
+   "intro": "Every master the Setup section shows, adopted or migrated from PumpIT with audit and change logs."
+  },
+  {
+   "id": "E06",
+   "m": "M2",
+   "title": "Day-end spine & branch console",
+   "intro": "The trading day as an object with a close state, and the branch home page as a work queue."
+  },
+  {
+   "id": "E07",
+   "m": "M2",
+   "title": "Fuel & forecourt",
+   "intro": "Pump readings, fuel input, prices and the wet-stock checks."
+  },
+  {
+   "id": "E08",
+   "m": "M2",
+   "title": "Cash, banking, Z-reads & deductions",
+   "intro": "From the till to the drawer to the payslip: Z-read allocation with proposals, cashups with tender legs, till balance, drop safe, staff shorts, deductions and the payroll file."
+  },
+  {
+   "id": "E09",
+   "m": "M2",
+   "title": "Bank reconciliation",
+   "intro": "One import screen, bank statement management, the two-pane workbench, and an auto-match that proposes with evidence."
+  },
+  {
+   "id": "E10",
+   "m": "M2",
+   "title": "Stock counts & production",
+   "intro": "One count, several views; pre-production yield; waste; month end; the correction tools."
+  },
+  {
+   "id": "E11",
+   "m": "M2",
+   "title": "Purchase requests & approvals",
+   "intro": "Header + lines, numbering, and approval by band and delegate with escalation — the control that clears 607 unanswered requests."
+  },
+  {
+   "id": "E12",
+   "m": "M2",
+   "title": "Utilities & assets",
+   "intro": "Meter readings with the zero-usage flag; the asset register, movements and repair job cards with the comeback rule."
+  },
+  {
+   "id": "E13",
+   "m": "M2",
+   "title": "Exception register (Control)",
+   "intro": "An exception is an object with a life. Rules per domain, a fingerprinted register, owners, ages, escalation."
+  },
+  {
+   "id": "E14",
+   "m": "M2",
+   "title": "Overnight-load monitoring",
+   "intro": "What loaded last night from each POS system, what failed and why — over MIST_Import and PumpIT's own logs."
+  },
+  {
+   "id": "E15",
+   "m": "M3",
+   "title": "Reporting engine & library",
+   "intro": "One runner, 97 definitions, scope as a parameter, saved views, extract, schedules, provenance."
+  },
+  {
+   "id": "E16",
+   "m": "M3",
+   "title": "Trade dashboards, Exco pack & budgets",
+   "intro": "The group position, league table, contribution, site scorecard, the 36-sheet Exco pack ported from ZP-NQL, and budgets in their natural home."
+  },
+  {
+   "id": "E17",
+   "m": "M3",
+   "title": "Setup completion, governance & help",
+   "intro": "Users & access polish, audit-trail reports, in-app help and the redesign notes."
+  },
+  {
+   "id": "E18",
+   "m": "M3",
+   "title": "Mobile pass",
+   "intro": "A purpose-built mobile blade for every capture screen and the console; device test matrix."
+  },
+  {
+   "id": "E19",
+   "m": "M3",
+   "title": "Importers under Agora (optional)",
+   "intro": "Move the POS/tender parsers under Agora ownership. Only after M2 is live and only if ZP wants PumpIT's importer retired."
+  },
+  {
+   "id": "E20",
+   "m": "M3",
+   "title": "Parallel run, cutover & decommission",
+   "intro": "Report parity against PumpIT, user migration, training, go-live, PumpIT screens switched off."
+  }
+ ],
+ "tasks": [
+  {
+   "id": "T001",
+   "epic": "E01",
+   "title": "Bootstrap the Agora repo (Laravel 13, sqlsrv, HMVC skeleton, rulebook)",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [],
+   "deliverables": [
+    "Laravel 13 app in ~/Development/ZP/Agora (PHP 8.3, composer, sqlsrv + pdo_sqlsrv + msodbcsql18 verified), git initialised, .env.example with `pumpit`, `mist_import`, `alteryx`, `fuelsheet` connections",
+    "`Modules/` HMVC loader: module.json manifest, `{Module}ServiceProvider` auto-registration, view namespace `module::`, per-module routes/migrations/seeders/lang; `php artisan agora:make-module {Name}` scaffolder producing the §3.2 skeleton",
+    "`App\\Support\\ProcedureService` (call / write, named params, multi result sets, structured THROW → `AgoraProcException`), `BaseModel` (PascalCase timestamps, `BelongsToBranch` global scope, `Auditable` hook points)",
+    "CLAUDE.md + EXTENDED.md for the project carrying §1 and §3 of the plan (condensed), the ZP-NQL rules that still apply (check-the-DB-means-run-the-query, targeted test runs, no commits without Ryan, deploy ritual), README, dev.sh"
+   ],
+   "acceptance": [
+    "`php artisan agora:make-module Demo` produces a module that boots, routes, renders a view and runs an empty migration",
+    "`ProcedureService::call('dbo.sp_GetBranchTills', ['BranchId'=>8])` returns rows from the local PumpIT restore (T002) and a deliberately failing proc surfaces as `AgoraProcException` with the proc's message",
+    "phpunit `Support/ProcedureServiceTest` green"
+   ],
+   "notes": "Copy the module loader and MigrationHelper shapes from Ceratine (~/Development/SAAS/ceratine) rather than inventing new ones; adjust for SQL Server (identity, rowversion, schema-qualified names). Postgres-only helpers (jsonb, partitions) do not come across.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 1,
+   "milestone": "M1"
+  },
+  {
+   "id": "T002",
+   "epic": "E01",
+   "title": "Local SQL Server dev environment with a PumpIT restore",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [],
+   "deliverables": [
+    "Docker compose profile `mssql` (SQL Server 2022, Linux) with a persisted volume; `scripts/restore-pumpit.sh` restoring the latest PumpIT `.bak` from ~/zp-backups into `PumpIT`, plus `MIST_Import` (or a trimmed subset — see notes), logins `agora_app` (db_owner on PumpIT for migrations) and `agora_ro` (db_datareader on MIST_Import / Alteryx / FuelSheet)",
+    "`php artisan agora:db-check` printing each connection, database, schema counts (dbo 573 / cashup 17 on PumpIT), and the row counts of five anchor tables (BRN_DailyBanking, STK_StockReconLine, RCN_BankStatementLinesPumpIT, SS_Branch, SS_Users)"
+   ],
+   "acceptance": [
+    "Restore script is idempotent and documented; `agora:db-check` matches the counts recorded in the plan within the backup's date",
+    "The `agora` schema does not exist yet after restore (proves T003 creates it)"
+   ],
+   "notes": "PumpIT is 170 GB; the restore must be selective if disk is short — SDK_ActionLog_DEFUNCT (100M rows, 17 GB) and the DBF_INVHISTF_CUSTOMER family (68M rows, 33 GB) can be truncated in the local copy by the script with a --slim flag. Never point local at 105.247.172.179 for writes.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 2,
+   "milestone": "M1"
+  },
+  {
+   "id": "T003",
+   "epic": "E01",
+   "title": "Versioned migration convention, MigrationHelper and the `agora` schema",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T001",
+    "T002"
+   ],
+   "deliverables": [
+    "`v1__NN_{module}_tables.php` naming with the slot map from §3.3; `MigrationHelper::branchKey($table)` (BranchId first + Id identity + clustered PK), `addAuditColumns`, `addTimestamps`, `addSoftDeletes`, `addRowVersion`, `money()`, `litres()`, `pct()` column helpers, `naturalKey($table, [...])` that refuses a key without BranchId",
+    "`v1__01_core_tables.php` creating schema `agora`, `agora.SchemaVersion`, `agora.SeedMaster`, `agora.Branch` (empty, filled by T022), and the `agora.vw_Branch` view over `SS_Branch` aliasing SSBranchId → BranchId",
+    "Proc deployment: `v1__NNp_{module}_procs.php` base class that runs every `Modules/{M}/Database/Procedures/*.sql` (CREATE OR ALTER, one proc per file, header comment citing the legacy proc it ports)",
+    "`scripts/check-migrations.sh` and `scripts/check-procs.sh` wired into `composer check`"
+   ],
+   "acceptance": [
+    "`php artisan migrate` on the local restore creates the schema and tables; running it twice is a no-op; `composer check` fails on a fixture migration that omits BranchId or names an enum column",
+    "`agora.SchemaVersion` holds `1.0` after the base migration"
+   ],
+   "notes": "Forward-only: no migrate:fresh outside the Docker restore, ever. Document the rule in CLAUDE.md in bold.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 3,
+   "milestone": "M1"
+  },
+  {
+   "id": "T004",
+   "epic": "E01",
+   "title": "Seed master ledger, orchestrator and `seed:master` command",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T003"
+   ],
+   "deliverables": [
+    "`agora.SeedMaster` model + `SeedMaster::seed()` / `seedDemo()` helpers (Ceratine shape), `DatabaseSeeder` with the system → reference-from-PumpIT → demo phases, `App\\Support\\Seeding\\{SeederCatalog,SeedRunner,SeederEntry}` ported from ZP-NQL (auto-discovery, risk classes safe/review/clobbers/destructive, payload fingerprint versions), `php artisan seed:master --status|--allow|--forget`",
+    "`scripts/check-seeder-versions.sh` (a permission/role slug change must bump the seeder version)"
+   ],
+   "acceptance": [
+    "Running `seed:master` twice creates nothing the second time and the ledger shows skipped rows with versions; a seeder classified `clobbers` is refused without --allow",
+    "phpunit `Seeding/SeedMasterTest`"
+   ],
+   "notes": "Only `safe` seeders may run in a deploy. Reference-from-PumpIT seeders are upserts keyed on the natural key and are `safe` by construction.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 4,
+   "milestone": "M1"
+  },
+  {
+   "id": "T005",
+   "epic": "E01",
+   "title": "Quality gates: composer check, phpstan, pint, phpunit (sqlsrv), Playwright",
+   "priority": "high",
+   "estimate": "S",
+   "depends_on": [
+    "T001"
+   ],
+   "deliverables": [
+    "`composer check` = pint → phpstan (level 6, module-scoped analyse) → check-migrations → check-seeder-versions → check-procs → targeted phpunit; phpunit.xml pointing at the Docker restore with a `TestBranch` (id 999) created by the test seeder; playwright.config with desktop and mobile (375×812) projects and a login fixture",
+    "A `docs/testing.md` page stating the targeted-run rule (Ryan is on solar; never a full suite unless asked)"
+   ],
+   "acceptance": [
+    "`composer check` green on the bootstrap; one Playwright smoke spec signs in and lands on the role landing page in both projects"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 5,
+   "milestone": "M1"
+  },
+  {
+   "id": "T006",
+   "epic": "E01",
+   "title": "Asset pipeline and the Agora token theme (light/dark) over Bootstrap 5",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T001"
+   ],
+   "deliverables": [
+    "Vite build with Bootstrap 5.3 SCSS, `theme/tokens.css` (the mockup's :root tokens, dark under prefers-color-scheme guarded by `:root:not([data-theme=light])` and again under `[data-theme=dark]`), `theme/bootstrap-bridge.scss` remapping `--bs-*` to tokens, self-hosted Barlow Condensed / IBM Plex Sans / IBM Plex Mono, ApexCharts + TomSelect + SweetAlert2 registered as ES modules, theme toggle persisted in UserPreference",
+    "Typography, number formatting helpers (`R`, `Rk`, `Lk`, `pct`, `delta` as PHP + JS twins with en-ZA locale)"
+   ],
+   "acceptance": [
+    "A styleguide page (/dev/theme) renders every token swatch and the type scale in both themes; Playwright screenshot in light and dark shows no unstyled Bootstrap colour"
+   ],
+   "notes": "Take the token values from agoraretailconsole.html verbatim; do not redesign the palette. Prefer UTF-8 glyphs for arrows/states.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 6,
+   "milestone": "M1"
+  },
+  {
+   "id": "T007",
+   "epic": "E02",
+   "title": "Users, authentication and the role landing page",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T003",
+    "T006"
+   ],
+   "deliverables": [
+    "`agora.User` (migrated from SS_Users by `usp_Migrate_Users`: code, name, email, user type HO/Branch, active, last sign-in; passwords reset on first login), session auth, password policy, forgot-password via `core.password_reset` template (T019), sign-in page in the mockup's shape (wordmark, expansion, tagline, live system-state panel: loads failed, exceptions open, Z-reads unallocated, PRs awaiting — each a badge provider), landing route by role",
+    "`agora.UserActivity` sign-in rows"
+   ],
+   "acceptance": [
+    "85 users migrated with a report of unmatched/duplicate emails; sign-in works for a migrated user after reset; a Branch-manager lands on /console, an Executive on /exco (stubbed routes acceptable until those epics land)",
+    "Playwright `auth.spec`"
+   ],
+   "notes": "The system-state panel reads through the same badge providers the bell and the menus use (T011) — build the provider contract here and reuse it.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 7,
+   "milestone": "M1"
+  },
+  {
+   "id": "T008",
+   "epic": "E02",
+   "title": "RBAC: roles, permissions, PermissionService, middleware, seeders",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T004",
+    "T007"
+   ],
+   "deliverables": [
+    "`agora.Role`, `Permission`, `RolePermission`, `UserRole`; `PermissionService::userHas/Any/All` with wildcard expansion; `can:` middleware and `@can`; `PermissionsSeeder` (slugs `module.action`, seeded per module via a `ModulePermissions` contract) and `RolesSeeder` for Executive, Finance, Operations, Branch manager, Auditor (all `*.view` + `audit.*`), Admin",
+    "Role editor screen (Setup → Users and access → Roles): matrix of module × action with wildcard rows"
+   ],
+   "acceptance": [
+    "A route guarded by `can:cash.allocate_zread` returns 403 for Auditor and 200 for Branch manager; changing a slug without bumping the seeder version fails `composer check`",
+    "phpunit `Core/PermissionServiceTest`"
+   ],
+   "notes": "Read BRN_ZUserRights (3,334 rows) once in a migration seeder to propose initial role membership; write the proposal to a report Ryan can review, do not auto-assign anything above Branch manager.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 8,
+   "milestone": "M1"
+  },
+  {
+   "id": "T009",
+   "epic": "E02",
+   "title": "Branch access, BranchContext, workspaces and the scope bar",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T008"
+   ],
+   "deliverables": [
+    "`agora.UserBranch` migrated from SS_UserBranches (1,063 rows); `BranchContext` (workspace HO|Branch, current branch, region/brand/format/period filters, 'as at') resolved per request from route → preference → default; `BelongsToBranch` global scope; `EnsureBranchAccess` middleware; `<x-scope-bar>` and `<x-workspace-switch>` components bound to the context; canonical URLs carry scope",
+    "`agora.UserPreference` (theme, workspace, default branch, default scope, landing)"
+   ],
+   "acceptance": [
+    "A Branch user cannot reach another branch by editing the URL (403 + audit row); an HO user's scope bar filters the branch list on region/brand/format; the choice persists across sign-ins",
+    "phpunit `Core/BranchContextTest`"
+   ],
+   "notes": "The scope is enforced twice: PHP global scope AND the @BranchId every proc receives. Never rely on one.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 9,
+   "milestone": "M1"
+  },
+  {
+   "id": "T010",
+   "epic": "E02",
+   "title": "Audit trail: AuditLog, UserActivity, ApprovalLog, Auditable trait, usp_Audit_Write",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T003",
+    "T007"
+   ],
+   "deliverables": [
+    "`agora.AuditLog`, `agora.UserActivity` (sign-in, screen opened, report run), `agora.ApprovalLog`; `usp_Audit_Write` used by every writer proc; `Auditable` trait on masters (before/after JSON diff); `RecordsActivity` middleware; retention setting",
+    "Admin viewer (Setup → Governance → Audit trail) with the grid component filters: user, branch, entity, date"
+   ],
+   "acceptance": [
+    "Editing a branch name writes a before/after row; a proc write writes its row inside the same transaction (rollback removes both); opening /cash/zread writes a screen-opened row",
+    "phpunit `Core/AuditTest`"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 10,
+   "milestone": "M1"
+  },
+  {
+   "id": "T011",
+   "epic": "E03",
+   "title": "App shell: app bar, mega menus, crumb, footer, tooltip, drawer, DB-driven navigation",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T006",
+    "T009"
+   ],
+   "deliverables": [
+    "`agora.MenuSidebar/MenuSection/MenuItem` + `MenuService::seedSidebar/seedSection/seed` + per-module `MenuSeeder` contract; badge provider contract (`BadgeProvider::count(BranchContext): ?string`) with a 60 s cache; the HO sidebar (Today / Trade / Control / Setup with the column headings and items of the mockup's NAV_HO) and the Branch sidebar (Today / Stock / My site / Assets — NAV_BRANCH)",
+    "Components `<x-app-shell>`, `<x-app-bar>`, `<x-mega-menu>`, `<x-crumb>`, `<x-footer>` (DB · user · version · as-at), `<x-tip>`, `<x-drawer>`; layouts `layouts/app` and `layouts/mobile` (T017 fills the mobile one)"
+   ],
+   "acceptance": [
+    "Menus render from the database only (no static nav blade); items the user lacks permission for are absent from the DOM; badges show the provider counts; Escape closes any open mega/palette/drawer; keyboard reachable",
+    "Playwright `shell.spec` in both themes"
+   ],
+   "notes": "Item labels, columns and hints come from NAV_HO / NAV_BRANCH in the mockup (lines ~1862–1938) — seed them exactly; routes may be stubs until their epic lands, flagged `coming` so they render disabled rather than 404.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 11,
+   "milestone": "M1"
+  },
+  {
+   "id": "T012",
+   "epic": "E03",
+   "title": "Command palette (Ctrl-K) and the search registrar",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T011"
+   ],
+   "deliverables": [
+    "`SearchRegistrar` contract each module implements (menu items, report definitions incl. legacy 'was' names, branches, masters, suppliers, products, employees); `<x-palette>` with keyboard navigation, kinds, recents per user, deep links; `/api/search?q=`"
+   ],
+   "acceptance": [
+    "Typing a legacy report name ('ZReadings Not Allocated') offers 'now called Unallocated Z-reads'; typing a branch opens its scorecard; recents persist",
+    "Playwright `palette.spec`"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 12,
+   "milestone": "M1"
+  },
+  {
+   "id": "T013",
+   "epic": "E03",
+   "title": "Component library v1 (page-head, KPI, card, chip, delta, note, empty-state, tabs, params/runbar, statstrip, checklist, decision list, exception list, proposal, lib-card) + gallery",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T006"
+   ],
+   "deliverables": [
+    "Every component in §3.8 except grid, chart, palette, shell and the two-pane workbench, each a Blade component with typed props, both themes, a mobile mode, and a JS module only where behaviour exists (tabs persist, params collapse, runbar status)",
+    "`/dev/components` gallery (dev-only route) rendering every variant with its props table; a `docs/components.md` generated from the gallery"
+   ],
+   "acceptance": [
+    "Gallery renders with zero console errors in both themes at desktop and 375 px; Playwright screenshot spec per component; no page in later tasks hand-writes KPI/card/chip markup (lint rule: a grep in composer check for `class=\"kpi\"` outside components)"
+   ],
+   "notes": "Mirror the mockup's markup and class names (page-head, kpi/lbl/val/cmp/stripe, card-h/card-b/flush, chip + dot, delta up/dn/flat, params .f, runbar, statstrip) so the CSS ports 1:1.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 13,
+   "milestone": "M1"
+  },
+  {
+   "id": "T014",
+   "epic": "E03",
+   "title": "Data grid component, GridDefinition, sort/paginate/extract, column chooser",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T013"
+   ],
+   "deliverables": [
+    "`<x-data-grid>` (shell: wrapper, header, sort marks, numeric/wide/mono cells, row click, expand row, bulk select, footer totals, limit note 'showing first N — extract to see all', empty state) + `GridDefinition` classes per grid registered in `config/grids.php` (column catalogue: key, label, numeric, wide, format R/Rk/Lk/pct/date/chip, sort value, default visible) + `GridFilter` specs + per-grid `_cells` partial pattern; server-side sort/paginate over proc result sets and Eloquent queries; CSV + XLSX extract through `<x-drawer>` and download; per-user column chooser stored in UserPreference",
+    "Mobile mode: card list of the first three visible columns with expand"
+   ],
+   "acceptance": [
+    "A 10,000-row proc result pages, sorts numerically, extracts to XLSX with the visible columns; column choice persists; phpunit `Grid/GridDefinitionTest`, Playwright `grid.spec` desktop + mobile"
+   ],
+   "notes": "Ceratine's data-grid/grid-column-chooser sections in EXTENDED.md are the reference; keep the 'shell owns structure, partial owns cell content' split.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 14,
+   "milestone": "M1"
+  },
+  {
+   "id": "T015",
+   "epic": "E03",
+   "title": "Chart components over ApexCharts (daily bars, line, donut/mix, bridge, diverging, sparkline, mini bar)",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T006",
+    "T013"
+   ],
+   "deliverables": [
+    "`<x-chart type=… :series :options>` with token colours (s1–s5, good/warn/crit), light/dark aware, en-ZA formatting, empty and loading states, `<x-sparkline>` and `<x-mini-bar>` as inline SVG (no library) for KPI cards and grid cells",
+    "Gallery entries for each type with the mockup's data shapes (daily litres + c/ℓ, margin vs budget, PC mix, TO→GP bridge, diverging vs budget)"
+   ],
+   "acceptance": [
+    "Every chart type renders in both themes with the right series colours and responds to container resize; Playwright screenshot spec"
+   ],
+   "notes": "Charts receive data as props from the controller; a chart component never fetches. Follow the dataviz skill's form rules (one system, accessible contrast).",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 15,
+   "milestone": "M1"
+  },
+  {
+   "id": "T016",
+   "epic": "E03",
+   "title": "Mobile detection, DeviceContext, view resolver and mobile layout",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T011",
+    "T013"
+   ],
+   "deliverables": [
+    "`DeviceDetector` (Sec-CH-UA-Mobile → UA via mobiledetect → preference override → `?device=`), `DeviceContext` middleware, `is_mobile()` / `device()` helpers, `pick('module::view')` resolver returning `module::mobile.view` when it exists; `layouts/mobile` with bottom nav (Today / Trade / Control / Setup or the branch sections), top bar (branch + date), 'Desktop site' toggle; `<x-scope-bar>` as bottom sheet; grid/KPI/params mobile modes wired",
+    "`docs/mobile.md` with the clean-over-capable rules and the mobile blade checklist every capture task must satisfy"
+   ],
+   "acceptance": [
+    "Playwright mobile project: the shell renders with bottom nav at 375×812, the desktop toggle switches and persists, a screen without a mobile blade renders the desktop view inside the mobile layout without horizontal scroll",
+    "phpunit `Device/DeviceDetectorTest` with UA and client-hint fixtures"
+   ],
+   "notes": "Mobile detection is in the base by Ryan's instruction; no screen after this task may be built without deciding its mobile answer (own blade, shared mobile mode, or documented 'desktop only').",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 16,
+   "milestone": "M1"
+  },
+  {
+   "id": "T017",
+   "epic": "E03",
+   "title": "Notifications: SweetAlert2 wrappers, flash, exceptions bell",
+   "priority": "medium",
+   "estimate": "S",
+   "depends_on": [
+    "T011"
+   ],
+   "deliverables": [
+    "`agora.toast/confirm/error` JS wrappers over SweetAlert2 (no native dialogs), flash → toast bridge, `<x-bell>` bound to the open-exception badge provider, keyboard shortcut to Control"
+   ],
+   "acceptance": [
+    "A proc THROW surfaces as a themed error toast with the AGORA code; confirm dialogs are used by every destructive action from here on (grep rule in composer check for `confirm(`)"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 17,
+   "milestone": "M1"
+  },
+  {
+   "id": "T018",
+   "epic": "E04",
+   "title": "Mail infrastructure: mailer, queue, EmailLog, EmailOutbox, attachments",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T003",
+    "T004"
+   ],
+   "deliverables": [
+    "Mail config (SMTP from settings), database queue + `agora-default` worker, `agora.EmailLog`, `agora.EmailOutbox` with retry/backoff, `EmailService::send(code, target, vars, attachments)`, CSV/XLSX attachment support, admin log viewer"
+   ],
+   "acceptance": [
+    "A test send lands in Mailpit locally, is logged with template code + module tag, and a forced SMTP failure is retried and visible in the outbox screen",
+    "phpunit `Email/EmailServiceTest`"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 18,
+   "milestone": "M1"
+  },
+  {
+   "id": "T019",
+   "epic": "E04",
+   "title": "Email templates with module tag, variable registry, admin CRUD, per-module seeders",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T018",
+    "T013"
+   ],
+   "deliverables": [
+    "`agora.EmailTemplate` (§3.7), `VariableRegistry` contract per module, template admin (list filtered by ModuleTag, edit with variable chips, preview with sample values, version history, branch override), `core.password_reset` + `core.welcome` templates seeded; the `EmailTemplateSeeder` pattern every later module follows"
+   ],
+   "acceptance": [
+    "Saving a template with an unknown variable is refused; a branch override wins over the global template for that branch; preview renders the sample; Playwright `email-templates.spec`"
+   ],
+   "notes": "Codes are `{module}.{event}`; ModuleTag equals the module key. Modules in E06–E17 each add their templates in their own seeder — list them in the task that owns the event.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 19,
+   "milestone": "M1"
+  },
+  {
+   "id": "T020",
+   "epic": "E04",
+   "title": "Scheduled sends: ReportSchedule foundation and the scheduler",
+   "priority": "medium",
+   "estimate": "S",
+   "depends_on": [
+    "T018"
+   ],
+   "deliverables": [
+    "`agora.ReportSchedule` (migrated from SS_ReportScheduler, 104 rows, as inactive until the report exists in Agora), scheduler command `agora:send-scheduled`, `reports.scheduled` template, failure log"
+   ],
+   "acceptance": [
+    "A schedule bound to a stub report sends its extract on the cron tick and logs it; failures raise a Loads exception (T058) later"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 20,
+   "milestone": "M1"
+  },
+  {
+   "id": "T021",
+   "epic": "E05",
+   "title": "Branch master: migrate SS_Branch, Region/Brand/Format, status, POS type, admin entities",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T003",
+    "T010",
+    "T013",
+    "T014"
+   ],
+   "deliverables": [
+    "`usp_Migrate_Branch` (31 rows → `agora.Branch` with Region, Brand, Format, Status Trading|Mothballed|Non-trading, POSType BRANCH|NAMOS, IsAdminEntity, ProfitCentres per branch), `agora.Region/Brand/Format` derived and editable, Branch listing + edit screens (Setup → The business → Branches) with audit, the `vw_Branch` view repointed"
+   ],
+   "acceptance": [
+    "31 branches migrated with the mockup's region/brand/format values reviewed against SS_Branch; Total Hluhluwe shows POSType NAMOS; the six admin entities are flagged and excluded from trading lists by default; Playwright `masters-branch.spec`"
+   ],
+   "notes": "`agora.Branch.BranchId` must equal `SS_Branch.SSBranchId` — never re-number. Teds (30) and Wimpy Ladysmith (31) stay two branches here; the Exco pack merges them.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 21,
+   "milestone": "M1"
+  },
+  {
+   "id": "T022",
+   "epic": "E05",
+   "title": "Reference masters: profit centres, standard categories, category GL codes & GP bands, recon areas & criteria, expense codes, transaction types, tills, shifts, fuel types/tanks/pumps, meters, bank accounts, terminals",
+   "priority": "high",
+   "estimate": "L",
+   "depends_on": [
+    "T021"
+   ],
+   "deliverables": [
+    "Screens + procs/CRUD for every master listed in §4 Masters row: Profit Centre listing ('Fuel is five of them, not one'), Standard Category listing (54 + GLs), Category GL Code listing (adopt SDK_CategoryGLCode 815: PC, supplier GL, sales GL, MinGP/MaxGP, MinCover/MaxCover, active — highlights categories with no band), Recon Area master (STK_Area), Recon Criteria, Expense master (BRN_Expenses: GL, VAT, asset flag, approver), Transaction types, Tills/Shifts per branch, Fuel types/tanks/pumps per branch (BRN_Pump.[Order] bracketed), Utility meters (BRN_UtilityMeter), Bank accounts, merchant/terminal numbers",
+    "Reference seeders (upsert from PumpIT, `safe`) and a `masters.*` permission set"
+   ],
+   "acceptance": [
+    "Every master lists with the grid component, filters, extract, and writes an audit row; per-branch masters cannot be listed without a branch in scope; phpunit per proc; Playwright `masters.spec`"
+   ],
+   "notes": "FuelTypeDescription is NOT unique over FuelTypeNo across branches — every fuel-type lookup is per branch. Same for tills and shifts (3 shifts estate-wide; bare ShiftNo joins fan out 21.67×).",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 22,
+   "milestone": "M1"
+  },
+  {
+   "id": "T023",
+   "epic": "E05",
+   "title": "People masters: employees, posts, employee areas",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T021"
+   ],
+   "deliverables": [
+    "Employee master (adopt BRN_Employee: split name fields, NickName, post from the 12 posts, active, branch), Employee areas (BRN_EmployeeArea), `usp_People_NextPost` (port sp_GetNextEmployeePost), list/edit/mobile view"
+   ],
+   "acceptance": [
+    "283 active employees list by branch with post filter; a terminated employee stays visible on historic shifts; Playwright `masters-employee.spec`"
+   ],
+   "notes": "No EmployeeName column exists in PumpIT — compose it in the view; keep the parts in the table.",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 23,
+   "milestone": "M1"
+  },
+  {
+   "id": "T024",
+   "epic": "E05",
+   "title": "Trading partners: suppliers (creditors) and account customers (debtors)",
+   "priority": "medium",
+   "estimate": "M",
+   "depends_on": [
+    "T021"
+   ],
+   "deliverables": [
+    "Supplier master (adopt BRN_Suppliers 74,822: code, name, active, stock/cash flags, contact, dept, location; `usp_Partners_NextSupplierCode`), Customer master (adopt BRN_Customers: limits, cell), list/edit with grid + extract"
+   ],
+   "acceptance": [
+    "Supplier search through the palette; duplicate-code guard; Playwright `masters-partners.spec`"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 24,
+   "milestone": "M1"
+  },
+  {
+   "id": "T025",
+   "epic": "E05",
+   "title": "Product masters: stock master by location, critical lines, virtual stock items, fuel matrix & price history",
+   "priority": "high",
+   "estimate": "L",
+   "depends_on": [
+    "T021",
+    "T022"
+   ],
+   "deliverables": [
+    "Stock master (adopt STK_StockMaster by branch/location WINBRANCH|AURA: UOM, issue multiple, produce flag, area, price, price type, factor, POS code, monitored, pre-production type), Critical lines (STK_StockMasterCritical), POS virtual stock items (BRN_POSVirtualStockItems: airtime/electricity/lotto/vouchers), Fuel matrix (adopt BRN_FuelPrice: per branch/grade/period cost, sell, margin, fleet; DOE matrix) with the price-change log and the mockup's `fmtable` layout"
+   ],
+   "acceptance": [
+    "Fuel matrix shows August's two price moves (05 Aug ULP 25.54→25.02, diesels 27.77→29.01; 13 Aug diesels 29.01→29.10) from the real table; stock master lists 7,186 items with location filter; Playwright `masters-product.spec`"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 25,
+   "milestone": "M1"
+  },
+  {
+   "id": "T026",
+   "epic": "E05",
+   "title": "System defaults & settings (global / per branch) with thresholds",
+   "priority": "high",
+   "estimate": "S",
+   "depends_on": [
+    "T021",
+    "T013"
+   ],
+   "deliverables": [
+    "`agora.Setting` (migrated from SS_SysDefaults + BRN_Config: key, branch or group entity, value, type, description), `Settings` facade with branch fallback, Setup screen; seeded thresholds: pump variance 15 ℓ, drop-safe reason threshold R2,000, cash-short leniency R3.00, Z-read auto-accept confidence, recon amount window 3 days, PR approval bands (T054 fills), exception escalation days"
+   ],
+   "acceptance": [
+    "A branch override beats the group value; every threshold used later reads through `Settings::for($branchId, 'key')` (grep rule); phpunit `Core/SettingsTest`"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 26,
+   "milestone": "M1"
+  },
+  {
+   "id": "T027",
+   "epic": "E05",
+   "title": "Master-data change log wiring and the two audit reports over masters",
+   "priority": "medium",
+   "estimate": "S",
+   "depends_on": [
+    "T010",
+    "T022",
+    "T025"
+   ],
+   "deliverables": [
+    "`Auditable` on every master model; `Master data changes` and `User activity` report definitions stubbed against the audit tables (full engine in T062) shown as grids under Setup → Governance"
+   ],
+   "acceptance": [
+    "Changing a category's MinGP shows in the change log with before/after and the user"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 27,
+   "milestone": "M1"
+  },
+  {
+   "id": "T028",
+   "epic": "E05",
+   "title": "Users & access screens: user list, roles, branches, last sign-in, user types",
+   "priority": "medium",
+   "estimate": "M",
+   "depends_on": [
+    "T008",
+    "T009"
+   ],
+   "deliverables": [
+    "Setup → People and assets → Users and access: user grid (code, name, role, user type HO|Branch, branches, last sign-in, active), create/edit/deactivate, role assignment, branch assignment, password reset trigger, 'switch role' preview for admins"
+   ],
+   "acceptance": [
+    "Deactivating a user ends their sessions; an HO user with no branch grant sees all branches; Playwright `users.spec`"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 28,
+   "milestone": "M1"
+  },
+  {
+   "id": "T029",
+   "epic": "E06",
+   "title": "Day-end spine: DayEnd/EOD dates, DayClose state, calendar, usp_DayEnd_*",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T021",
+    "T022",
+    "T026"
+   ],
+   "deliverables": [
+    "Adopt BRN_DayEnd + BRN_EODDates + ZRP_Calendar; new `agora.DayClose` (BranchId, TradingDate, Step 1–7, Status pending|done|closed-with-reason, Reason, ClosedBy/At); procs `usp_DayEnd_EnsureRecord` (port sp_CheckAndInsertDayEndRecord / sp_CheckBranchEODDates), `usp_DayEnd_GetCloseStatus` (computes each step from the data: POS files loaded, pump readings captured, fuel input captured, Z-reads allocated, areas locked, cashups confirmed, bags collected), `usp_DayEnd_Close`, `usp_DayEnd_Reopen`; `dayend.close_reminder` template + scheduler"
+   ],
+   "acceptance": [
+    "For a real branch/date on the restore the status proc returns the seven steps with the same outstanding counts a manual query gives (paste both in the QA); closing with steps outstanding requires a reason and writes it; phpunit `DayEnd/CloseStatusTest`"
+   ],
+   "notes": "Step definitions come from the mockup's viewConsole steps. A day cannot be closed silently — the reason is the record.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 29,
+   "milestone": "M2"
+  },
+  {
+   "id": "T030",
+   "epic": "E06",
+   "title": "Branch console — 'Today at <branch>' (day-close checklist, KPIs, decisions, open items) desktop + mobile",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T029",
+    "T013",
+    "T016"
+   ],
+   "deliverables": [
+    "`/console` for the Branch workspace and HO users with a branch in scope: page head (region · brand · format), `<x-checklist>` of the seven steps with live status and deep links, KPI strip (banking variance across cashups, Z-reads not allocated, staff shorts awaiting, purchase requests awaiting), 'Needs a decision' list (staff shorts + PRs), 'Open items for this branch' from the exception register (T058 — stub provider until then), actions Branch scorecard / Open daily banking; mobile blade as the primary design"
+   ],
+   "acceptance": [
+    "Every count on the page reconciles to its underlying screen's filtered row count for the same branch/date (QA pastes both); loads in < 1 s on the restore; Playwright `console.spec` desktop + mobile"
+   ],
+   "notes": "This is the first screen a branch manager sees; build the mobile blade first and the desktop from it.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 30,
+   "milestone": "M2"
+  },
+  {
+   "id": "T031",
+   "epic": "E06",
+   "title": "Day close status (head office view) with close-with-reason and live refresh",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T029",
+    "T014"
+   ],
+   "deliverables": [
+    "Today → Day close status: all branches × date grid (steps done/outstanding, holding item, closed-by, reason), filters, extract; HO can close/reopen with reason; optional Reverb push on status change; `Day close status` report definition"
+   ],
+   "acceptance": [
+    "Grid totals match `usp_DayEnd_GetCloseStatus` per branch; reopen writes audit + approval log; Playwright `dayclose.spec`"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 31,
+   "milestone": "M2"
+  },
+  {
+   "id": "T032",
+   "epic": "E07",
+   "title": "Pump reading capture (mechanical / electronic / POS, > 15 ℓ flag) desktop + mobile",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T029",
+    "T022",
+    "T014"
+   ],
+   "deliverables": [
+    "Adopt BRN_PumpReadings; `usp_Fuel_PrepareReadings` (port sp_CaptureMechReading + sp_CheckCaptureMechReading) returning the pump list with previous closing as opening, `usp_Fuel_SaveReadings` (JSON lines, validation: closing ≥ opening unless meter reset flagged, variance vs electronic and vs POS fills from MIST_Import WINBRANCH_FC_TRANS flagged above the Settings threshold), screen with grid + runbar + mobile capture blade (one pump per card, numeric keypad)"
+   ],
+   "acceptance": [
+    "Saving a reading writes the row, the audit, and updates the console step; a 20 ℓ mech-vs-elec gap shows the warn chip; phpunit `Fuel/PumpReadingsTest`; Playwright `pump.spec` desktop + mobile"
+   ],
+   "notes": "Join pumps on (BranchId, PumpNo) — the rejected path BRN_PumpReadings → BRN_Pump on bare PumpNo is the classic fan-out.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 32,
+   "milestone": "M2"
+  },
+  {
+   "id": "T033",
+   "epic": "E07",
+   "title": "Fuel input capture (volume, dip, deliveries → days cover, order flags) + import monitor",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T032"
+   ],
+   "deliverables": [
+    "Adopt BRN_FuelInput; `usp_Fuel_PrepareInput` (port sp_CaptureFuelInput reading DBF_FC_TEOD volumes/dips/deliveries), `usp_Fuel_SaveInput`, `usp_Fuel_DaysCover` (dip ÷ day's draw; Order now < 1.5, Order today < 2.5), screen + mobile blade, Fuel input import log (SS_ImportFuelInputLog) monitor tile"
+   ],
+   "acceptance": [
+    "A site with 1.2 days cover shows 'Order now' and raises a Fuel exception candidate (T058 consumes); phpunit `Fuel/FuelInputTest`; Playwright `fuelinput.spec`"
+   ],
+   "notes": "The legacy form captured the dip and never did the days-cover sum — that sum is the point of this screen.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 33,
+   "milestone": "M2"
+  },
+  {
+   "id": "T034",
+   "epic": "E07",
+   "title": "Fuel price & margin history screens over the fuel matrix",
+   "priority": "medium",
+   "estimate": "S",
+   "depends_on": [
+    "T025"
+   ],
+   "deliverables": [
+    "Fuel and forecourt → Fuel price and margin history: per site/grade/price period cost, pump price, margin, fleet with the multi-line chart (`chartLines`); price-change annotations; report definition `Fuel price and margin history`"
+   ],
+   "acceptance": [
+    "Margin history for a site matches BRN_FuelPrice rows for the period; Playwright `fuelmatrix.spec`"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 34,
+   "milestone": "M2"
+  },
+  {
+   "id": "T035",
+   "epic": "E07",
+   "title": "Wet-stock checks: pump meter check, tank reconciliation, pump readings, fills, slow-to-pay, attendant performance, diesel cashback, taxi litres",
+   "priority": "high",
+   "estimate": "L",
+   "depends_on": [
+    "T032",
+    "T033",
+    "T014"
+   ],
+   "deliverables": [
+    "Procs (report definitions bind in T063; until then each has a screen under Fuel and forecourt): `usp_Report_PumpMeterCheck` (mech vs elec vs POS per nozzle), `TankReconciliation` (opening dip + deliveries − closing dip vs POS; per site / tank / day, FuelSheet DailyDeliveryReconciliation where present), `PumpReadings`, `EveryFillInDetail` (WINBRANCH_FC_TRANS), `SlowToPayFills` (threshold param), `PumpAttendantPerformance` (ℓ and R per car, lube attachment, cars per can), `DieselCashbackRegister` (till journal DIESEL CASHBACK lines tied to the diesel fill within 1 ℓ, band tests below-minimum / rate band / no diesel sale / pass), `TaxiAssociationLitres`"
+   ],
+   "acceptance": [
+    "Each report's totals reconcile to the Exco pack's Meter by Pump / Tank Recon / Cashback Register sheets for the same period (T071 will read the same procs); extract works; phpunit per proc with a known branch/day"
+   ],
+   "notes": "The mockup's SQL panels (lines ~1077–1200 of the HTML) show the intended shape; the real tables are MIST_Import WINBRANCH_FC_TRANS and PumpIT BRN_PumpReadings/BRN_FuelInput, not the invented dbo.PumpTransaction.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 35,
+   "milestone": "M2"
+  },
+  {
+   "id": "T036",
+   "epic": "E08",
+   "title": "Z-read allocation: model, proposer with confidence + evidence, auto-allocate, commit, unallocated queue",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T029",
+    "T023",
+    "T026",
+    "T013",
+    "T014"
+   ],
+   "deliverables": [
+    "`agora.vw_Zread` over MIST_Import DBF_P3TRANS_ZREAD (branch, location ARCH|WINBRANCH|AURA, date, EOD, sales, terminal, log file, operator user, till, shift) + `agora.ZreadAllocation`; `usp_Cash_ProposeZreadAllocation` (history priors: same till+shift+operator ≥ 75 % → certain; same operator ≥ 60 % → likely; usual operator on that till/shift → review; shift from operator's history ≥ 60 %) returning confidence + evidence text, `usp_Cash_AutoAllocate` (accepts ≥ Settings threshold), `usp_Cash_CommitZreadAllocation`; ZREAD Allocation screen (params, runbar Auto-allocate / Clear proposals / Update ZREAD, grid with `<x-proposal>` cells, only the decision column coloured), `Unallocated Z-reads` queue definition, mobile confirm-only blade"
+   ],
+   "acceptance": [
+    "On the restore, for Esikhawini Convenience 21–31 Aug the proposer's 'certain' rows all match the historical allocations where one exists (paste the check); commit writes rows + audit and clears the console step; phpunit `Cash/ZreadProposerTest`; Playwright `zread.spec`"
+   ],
+   "notes": "cashup.ZReading (the 2026 pilot) is NOT the source — 162,870 of its 162,925 rows have NULL AllocatedShiftId. Use MIST_Import's DBF_P3TRANS_ZREAD and, once E08 is live, Agora's own allocation table.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 36,
+   "milestone": "M2"
+  },
+  {
+   "id": "T037",
+   "epic": "E08",
+   "title": "Daily banking / cashups: header + tender legs, Z vs declared, variance, confirm/close, manager's view, open cashups",
+   "priority": "critical",
+   "estimate": "XL",
+   "depends_on": [
+    "T036",
+    "T022",
+    "T024"
+   ],
+   "deliverables": [
+    "Adopt BRN_DailyBanking + the 14 live `BRN_DailyBanking{Channel}` leg tables through `agora.vw_Cashup*` views (ReconBatchNoPumpIT is the recon stamp; plain ReconBatchNo ignored); `usp_Cash_GetCashup` (port sp_GetDailyBankingWithMOPS: Z read, legs, expenses, pump shortages → ActualTotal, Variance), `usp_Cash_SaveCashupLeg` per channel (JSON), `usp_Cash_ConfirmCashup`, `usp_Cash_CloseCashup` (manager), `usp_Cash_LoadCardAmounts` (port sp_Load_BranchCreditCardAmount) ; Daily Banking screen (till/shift/date, legs as tabs, variance chip, confirm), Cashups list with status, `Daily banking — manager's view` report, `Open cashups` and `Z-reads with no cashup` / `disagree` queues; mobile: read + confirm"
+   ],
+   "acceptance": [
+    "For a known branch/day the ActualTotal and Variance equal PumpIT's own figures (paste sp_GetDailyBankingWithMOPS output beside the Agora proc output); confirming updates the console step; phpunit `Cash/CashupTest`; Playwright `banking.spec`"
+   ],
+   "notes": "Eleven detail tables hang off the exact tuple (BranchId, TillNo, ShiftNo, TransactionDate) — every leg join uses all four. Dead channels (Cheques, ManualCard1/2, Zapper=1 row) are hidden by setting.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 37,
+   "milestone": "M2"
+  },
+  {
+   "id": "T038",
+   "epic": "E08",
+   "title": "Till balance & pump shortages by attendant/shift",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T037"
+   ],
+   "deliverables": [
+    "Adopt BRN_TillBalance; `usp_Cash_SaveTillBalance` (port sp_InsertTillBalance + sp_GenerateTillBalanceNo + sp_Insert_TillBalanceTransactions), capture screen (pump attendant short per shift), `Pump shortages` report definition"
+   ],
+   "acceptance": [
+    "A pump short saved here appears on the cashup as PumpShortages and on the deduction schedule (T041) without re-keying; phpunit `Cash/TillBalanceTest`"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 38,
+   "milestone": "M2"
+  },
+  {
+   "id": "T039",
+   "epic": "E08",
+   "title": "Drop safe: bag drop with reason, > R2,000 rule enforced, collection; mobile",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T029",
+    "T026"
+   ],
+   "deliverables": [
+    "Adopt BRN_DropSafe + BRN_DropSafe_Collection; `usp_Cash_SaveDropSafe` (refuses a bag over the threshold without a reason and a manager), `usp_Cash_CollectDropSafe` (collection ref, collected flag); screen + mobile capture; `In the safe` chip; console step"
+   ],
+   "acceptance": [
+    "A R2,500 bag without manager name is refused with the AGORA code shown as a toast; collection clears the console step; Playwright `dropsafe.spec` mobile"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 39,
+   "milestone": "M2"
+  },
+  {
+   "id": "T040",
+   "epic": "E08",
+   "title": "Staff shorts with reason codes, approval trail and posting",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T023",
+    "T026",
+    "T019"
+   ],
+   "deliverables": [
+    "Adopt BRN_StaffShorts; new `agora.StaffShortReason` (seeded: pump short, cashier short, stock loss, other) + free note; `usp_Cash_RaiseStaffShort` (port sp_GenerateStaffShortsNo), `usp_Cash_ApproveStaffShort` / decline with reason, `usp_Cash_PostStaffShort` (port sp_Load_ApprovedStaffShorts); screen (raise, list, approve) + mobile raise; templates `cash.staff_short_raised`, `cash.staff_short_decided`"
+   ],
+   "acceptance": [
+    "Raising sends the approver an email; approving posts to deductions (T041); the 'eleven spellings of pump short' become one code with the note kept; Playwright `staffshorts.spec`"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 40,
+   "milestone": "M2"
+  },
+  {
+   "id": "T041",
+   "epic": "E08",
+   "title": "Deductions: cash-short deductions (R3 leniency), stock loss by employee, non-integrated POS shortfalls, payroll file",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T037",
+    "T038",
+    "T040",
+    "T014"
+   ],
+   "deliverables": [
+    "`agora.Deduction` + `usp_Cash_BuildDeductions` porting sp_DeductionSummaryReport(_Pivot), sp_EmployeeCashLossReport, sp_EmployeeAmountShortReport, sp_EmployeeStockLossReport and sp_RPT_EmployeeStockLossReportPAYROLLDETAIL_LeniencySummary (leniency from Settings; at/inside leniency written off, above deducted in full — no partial rule), non-integrated tender shortfalls (Zapper, Yumbi, Infinity, Smart ATM expected vs settled); Head Office Reports screen with the five tabs (Cash Short Deductions Per Employee, Stock Loss By Employee Summary/Detail, Non-Integrated POS Deductions Summary/Detail) + stat strips; `usp_Cash_PayrollFile` export (CSV in the payroll's layout — confirm with ZP)"
+   ],
+   "acceptance": [
+    "For a month on the restore the five tabs match the legacy procs' output row-for-row (paste both); the payroll file totals equal the Deducted stat; phpunit `Cash/DeductionsTest`"
+   ],
+   "notes": "Stock loss by employee depends on T049 (STK_StockReconEmployees, RCN_ReconArea); stub the tab until then and finish it in T049's acceptance.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 41,
+   "milestone": "M2"
+  },
+  {
+   "id": "T042",
+   "epic": "E08",
+   "title": "Write once, flow everywhere: the till-short event reaches cashup, deduction schedule and payroll from one capture",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T038",
+    "T040",
+    "T041"
+   ],
+   "deliverables": [
+    "A single `TillShortEvent` domain event raised by till balance / staff short capture; listeners update the cashup's PumpShortages/short leg, create the deduction row and mark the payroll line; a shared `TillShortGuard` rule (refuses a purchase request whose supplier is 'Till Balance Expense' — 477 such requests in the period — with a link to the proper capture) that T053 wires into PR submit"
+   ],
+   "acceptance": [
+    "Capturing one short produces exactly one cashup effect, one deduction row and one payroll line (phpunit asserts counts); the PR guard fires with the right message"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 42,
+   "milestone": "M2"
+  },
+  {
+   "id": "T043",
+   "epic": "E09",
+   "title": "Generic import screen: drop file → parser registry → Raw / Stripped / Imported → load proc; import log",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T029",
+    "T014",
+    "T026"
+   ],
+   "deliverables": [
+    "`Imports/ParserRegistry` with one parser class per source (ABSA MarkOff → BRN_ABSAMarkoff, FNB, Zapper, Yumbi → BRN_Yumbi, Infinity → BRN_Infinity, Cash bags / Cash devices / Smart ATM → BRN_CashDevices / BRN_SmartATM, NAMOS day-end → NAMOS_* , Bank statements → RCN_BankStatementLinesPumpIT), `.xls/.xlsx/.csv` support, one screen `/recon/import/{source}` with drop zone, Raw / Stripped / Imported tabs, load via `usp_Recon_Load{Source}` (ports of sp_Load_BankStatement_DirectDeposits, sp_Insert_MIST_Trans_MOPS_{Channel} …), file retention under storage with hash, `agora.vw_ReconImport` over RCN_ReconImports"
+   ],
+   "acceptance": [
+    "Loading last month's ABSA MarkOff file on the restore produces the same row count as PumpIT's own import log for that file; a duplicate file is refused by hash; parse errors show on the Stripped tab with row numbers; phpunit per parser with fixture files"
+   ],
+   "notes": "Get one real sample file per source from ZP before writing a parser (task the request as a subtask). The legacy module has one screen per source — Agora has one screen that knows which parser to use.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 43,
+   "milestone": "M2"
+  },
+  {
+   "id": "T044",
+   "epic": "E09",
+   "title": "Bank statement management: identify to channel, IDState/ReconState, unidentified queue",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T043"
+   ],
+   "deliverables": [
+    "`agora.vw_BankStatementLine` over RCN_BankStatementLinesPumpIT (Type channel FNB|ABSA|SmartATM|CashMachine|Yumbi|Direct|Debtors|CashDeposit|FleetCard|Infinity|Fuel Debit|UnIdentified, IDState 1|2, ReconState 1|2, ReconBatchNo, Bank); `usp_Recon_Identify` (rules from BRN_AutoReconCriteria / SS_ReconCriteria → channel), statement screen with channel/state filters, `Deposits with no home` (unidentified) queue, `Bank charges by site`, `Bank reconciliation summary` definitions"
+   ],
+   "acceptance": [
+    "August 2026 on the restore reproduces the scoping doc's channel × state table (FNB unreconciled 2,701 lines / R88.6m etc. — paste); Fuel Debit is never presented as a failure; channels are never summed into one figure"
+   ],
+   "notes": "Only ABSA is loaded as a bank; FNB card settlements arrive on the ABSA statement. Read docs/exco-cash-banking-scope.md §3 before building the tiles.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 44,
+   "milestone": "M2"
+  },
+  {
+   "id": "T045",
+   "epic": "E09",
+   "title": "Reconcile workbench: two-pane captured vs bank, tick both sides, process batch, unmatch",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T044",
+    "T037",
+    "T013"
+   ],
+   "deliverables": [
+    "`<x-two-pane-recon>` component; `usp_Recon_GetSides` per channel (captured legs from the BRN_DailyBanking{Channel} views with ReconBatchNoPumpIT = 0 vs statement lines with ReconState = 1, filters branch / date range / UnReconciled|Reconciled|All), `usp_Recon_ProcessBatch` (port sp_GenerateReconBatchNo; stamps ReconBatchNoPumpIT on the legs and ReconState/ReconBatchNo on the lines in one transaction, refuses a batch whose two sides differ by more than the tolerance setting), `usp_Recon_Unmatch`, `agora.ReconBatch` + `ReconMatch`; screens `/recon/{absa|fnb|yumbi|infinity|fleetcard}` and `/recon/{cashbags|cashmachine|smartatm|direct}` with stat strip (selected left, selected right, difference), extract; mobile: list + match sheet"
+   ],
+   "acceptance": [
+    "Processing a batch on the restore stamps both sides and the statement screen shows the lines as reconciled; unmatch restores both; phpunit `Recon/ProcessBatchTest` incl. the NULL-safe comparison case; Playwright `recon.spec`"
+   ],
+   "notes": "Findings 2 and 3 of docs/pumpit-auto-recon-findings.md (NULL-unsafe compare routing unmatched lines down the matched path; ABSA comparing a bank line to a whole batch total) are regression tests here.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 45,
+   "milestone": "M2"
+  },
+  {
+   "id": "T046",
+   "epic": "E09",
+   "title": "Auto-match engine: propose on batch number, then amount within the window, with confidence; auto-accept threshold",
+   "priority": "high",
+   "estimate": "L",
+   "depends_on": [
+    "T045"
+   ],
+   "deliverables": [
+    "`usp_Recon_ProposeMatches` per channel (batch/merchant reference first, then amount ± tolerance within the Settings day window, then multi-leg sums; confidence certain|likely|review + evidence), 'Auto recon' runbar action rendering proposals as `<x-proposal>` rows for confirm/override, `usp_Recon_AutoAccept` above threshold, scheduler job per night with a summary email (`recon.auto_summary` template)"
+   ],
+   "acceptance": [
+    "On July–August 2026 ABSA the engine matches ≥ the legacy sp_AUTOReconcile_ABSA_BankRecon count with zero false matches on a hand-checked sample of 50 (QA lists them); phpunit `Recon/AutoMatchTest`"
+   ],
+   "notes": "Rewrite, do not port: the legacy procs are the documentation of intent, not of correctness.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 46,
+   "milestone": "M2"
+  },
+  {
+   "id": "T047",
+   "epic": "E09",
+   "title": "Banking & Reconciliation hub + cash and banking reports",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T044",
+    "T045"
+   ],
+   "deliverables": [
+    "`/recon` hub page (KPIs: imports failed overnight, ABSA lines unreconciled + R, cash bags unreconciled + R, cash short deductions; the 23 functions grouped Import / Banking / Reconcile / Masters / Monitoring / Reporting / Correction); report procs + screens (definitions bind in T062) `Cash declared against cash banked`, `Card takings against settlement`, `Cash devices and Smart ATM`, `Unmatched bank lines` (queue), `Accounts raised at the till`, `Card terminals gone quiet` (ABSA terminals last used)"
+   ],
+   "acceptance": [
+    "Hub tiles reconcile to the queues they open; Playwright `recon-hub.spec`"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 47,
+   "milestone": "M2"
+  },
+  {
+   "id": "T048",
+   "epic": "E10",
+   "title": "Stock count model: recon header/lines/requests/employees, area locks, capture + JSON request procs",
+   "priority": "critical",
+   "estimate": "XL",
+   "depends_on": [
+    "T029",
+    "T022",
+    "T023",
+    "T025",
+    "T014"
+   ],
+   "deliverables": [
+    "Adopt STK_StockRecon, STK_StockReconLine (6.2M), STK_StockReconRequest/LineRequest, STK_StockReconEmployees(+Request), RCN_ReconArea through `agora.vw_StockRecon*`; procs `usp_Stock_PrepareCount` (port sp_CaptureStockRecon, sp_CaptureStockReconRequest, sp_GetAreaStockItems, sp_GetAreaEmployeesAs*), `usp_Stock_SaveCount` (JSON, port of the sp_JSON_ProcessStockReconRequestJSON family with validation), `usp_Stock_AssignAreaEmployees` (port sp_CaptureAreaEmployee), `usp_Stock_LockArea` / unlock with reason, `usp_Stock_QtyVarCheck` (port sp_CheckQtyVarGreaterThanZeroandMoreThanQtyMaxAllowance); Stock count screen (branch/date/shift/area → item grid: opening, issued, closing, computer, variance) and the Area lock dashboard (ref, area, variance, locked/open chip); mobile count capture (area → item cards, keypad)"
+   ],
+   "acceptance": [
+    "A count saved on the restore appears in STK_StockReconLine with the same shape PumpIT writes (compare a legacy row); locking an area freezes its lines; the console step 'Stock recon areas' reflects locks; phpunit `Stock/CountTest`; Playwright `stockcount.spec` desktop + mobile"
+   ],
+   "notes": "STK_StockReconLine's key is (BranchId, TransactionDate, ShiftNo, AreaNo, StockItemNo) — all five, always. StockItemNo alone fans out 11.23×.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 48,
+   "milestone": "M2"
+  },
+  {
+   "id": "T049",
+   "epic": "E10",
+   "title": "Stock count views: overview by department, exceptions (day/night), balancing (amended vs original), per-shift variance, count exceptions (merged), counts by area, high-risk categories, loss by department",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T048"
+   ],
+   "deliverables": [
+    "Procs + screens (definitions bind in T064): `usp_Stock_Overview` (theoretical vs count by branch/department, valued at cost, share of sales), `usp_Stock_Exceptions` (day/night side by side, short/over/balanced), `usp_Stock_Balancing` (amended open/issued/close/computer vs original — every amendment on the same row as what was first counted; reads _SelectStockReconBalancing shape), `usp_Stock_ShiftVariance`, `usp_Stock_CountExceptions` (ran out / no stock / no issue / incorrect issue / no movement / amended qty — one list with a reason filter, replacing seven reports), `usp_Stock_CountsByArea`, `usp_Stock_HighRiskCategories` (lotto/airtime/electricity, bakery & counter), `usp_Stock_LossByDepartment`; screens for overview / exceptions / balancing / shift variance; stock loss by employee tab of T041 completed"
+   ],
+   "acceptance": [
+    "Variance totals equal PumpIT's Stock Variance Summary By Department for a closed count (paste); the balancing screen shows an amended row with its original; phpunit per proc"
+   ],
+   "notes": "Auto-balancing rolls a closing count forward as the next shift's opening — correct default, but every amendment must stay visible or a recon can be balanced into looking correct.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 49,
+   "milestone": "M2"
+  },
+  {
+   "id": "T050",
+   "epic": "E10",
+   "title": "Pre-production and yield (bulk in / used / out, butchery, bakery, chicken)",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T048"
+   ],
+   "deliverables": [
+    "Adopt PREPROD_Type/Product/Recipe/RawMaterial/StockRecon/StockReconLine(+Employees); `usp_Stock_PrepareProduction` (port sp_CapturePREPROD_Product / sp_CapturePREPROD_PrimalStockRecon / sp_CaptureStockReconLine_PreProduction / sp_CheckStockReconPreProductionCaptured), `usp_Stock_SaveProduction`, `usp_Stock_Yield` (produced ÷ used, trended); screen with type filter (Beef, Chicken, Bulk Bakery), yield column and chart; `Production and yield` and `Raw material loss by rand` definitions; mobile capture"
+   ],
+   "acceptance": [
+    "Yield for a week on the restore matches a hand calculation; phpunit `Stock/YieldTest`"
+   ],
+   "notes": "Yield is the number to watch, not production short on its own.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 50,
+   "milestone": "M2"
+  },
+  {
+   "id": "T051",
+   "epic": "E10",
+   "title": "Waste management: capture, reason, approval; mobile",
+   "priority": "high",
+   "estimate": "S",
+   "depends_on": [
+    "T048",
+    "T019"
+   ],
+   "deliverables": [
+    "New `agora.Waste` (BranchId, date, POS code, item, area, qty good/bad, price, value, reason code, captured by, approved by/at) + `usp_Stock_PrepareWaste` (port sp_CaptureWaste), `usp_Stock_SaveWaste`, `usp_Stock_ApproveWaste`; screen + mobile capture; `stock.waste_awaiting` template; console 'Waste to approve' item"
+   ],
+   "acceptance": [
+    "Captured waste reduces the theoretical on the next count (proc test) so it stops reading as theft; Playwright `waste.spec` mobile"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 51,
+   "milestone": "M2"
+  },
+  {
+   "id": "T052",
+   "epic": "E10",
+   "title": "Month end (branch + HO), clear EOD data, manual day-end capture (DBF replay), NAMOS capture",
+   "priority": "medium",
+   "estimate": "M",
+   "depends_on": [
+    "T029",
+    "T048",
+    "T037"
+   ],
+   "deliverables": [
+    "`usp_Stock_MonthEnd` (branch position before close; HO close across the estate once every branch has counted — port sp_InsertCloseOffDayDates / sp_SelectCloseOffDay), `usp_Stock_ClearEod` (port sp_ClearEODData: reverses a day end captured on the wrong date — permission-gated, reason required, audit), manual day-end capture (replay a branch DBF for a failed day; SS_POSDBFZIP), NAMOS day-end capture for Total Hluhluwe (NAMOS_Header/Detail/Payment/Total/Items → the same day-end shape); screens under Today → Capture and Control → Governance"
+   ],
+   "acceptance": [
+    "Clear EOD on the restore reverses exactly the rows sp_ClearEODData would (diff the two); month-end close refuses while a branch has an open count; phpunit `Stock/MonthEndTest`"
+   ],
+   "notes": "Total Hluhluwe on NAMOS is why its shop and fuel margin are missing from the convenience pack — bringing it onto the same day-end shape completes the estate view.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 52,
+   "milestone": "M2"
+  },
+  {
+   "id": "T053",
+   "epic": "E11",
+   "title": "Purchase requests: header + lines, numbering, types (expense cash / credit), quote, justification, new-PR drawer, mobile raise",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T022",
+    "T024",
+    "T026",
+    "T013",
+    "T014",
+    "T042"
+   ],
+   "deliverables": [
+    "Adopt BRN_Transaction / BRN_TransactionLine (TypeCode CA|CR via BRN_TransactionType) through `agora.vw_PurchaseRequest*`; `usp_Purchasing_NextNumber` (port sp_GetNextPurchaseRequestNumber / SS_UniqueNumber), `usp_Purchasing_Save` (JSON lines: expense code, description, qty, amount, VAT via GetVatDetail port), `usp_Purchasing_Submit`, attachments (quote), justification; PR list with status chips, header + detail pane (mockup viewPurchaseRequests), new-PR drawer, mobile raise blade; `purchasing.pr_submitted` template"
+   ],
+   "acceptance": [
+    "Numbering matches the legacy sequence with no gaps/duplicates under concurrent submits (phpunit with parallel transactions); a PR against 'Till Balance Expense' is refused (T042 guard); Playwright `pr.spec` desktop + mobile"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 53,
+   "milestone": "M2"
+  },
+  {
+   "id": "T054",
+   "epic": "E11",
+   "title": "Approval engine: value bands, named delegates, escalation after n days, approval log; PR approval screen",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T053",
+    "T019",
+    "T010"
+   ],
+   "deliverables": [
+    "`agora.ApprovalBand` (module, min/max value, approver role/user), `ApprovalDelegate` (from/to/period), `usp_Purchasing_Decide` (approve/decline with reason; band check; delegate resolution), `usp_Purchasing_Escalate` (scheduler: after Settings days → next band / named escalation; `purchasing.pr_escalated` template), ApprovalLog on every decision; PR approval screen (HO: queue by age and value, approve/decline/send back, batch approve within band); reuse for staff shorts and waste (same engine, module = cash|stock)"
+   ],
+   "acceptance": [
+    "The 607-request backlog on the restore is presented ranked by age × value and can be cleared in batches within band; an approval outside the user's band is refused; escalation fires on the scheduler and emails; `Approvals and overrides` report reads ApprovalLog; phpunit `Purchasing/ApprovalTest`"
+   ],
+   "notes": "All 119 expense codes route to one approver today. Bands with named delegates and automatic escalation clear the queue without weakening the control.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 54,
+   "milestone": "M2"
+  },
+  {
+   "id": "T055",
+   "epic": "E11",
+   "title": "Load approved requests to daily banking expenses + approvals audit report",
+   "priority": "medium",
+   "estimate": "S",
+   "depends_on": [
+    "T054",
+    "T037"
+   ],
+   "deliverables": [
+    "`usp_Purchasing_LoadApprovedToBanking` (port sp_Load_ApprovedPurchaseRequest → BRN_DailyBankingExpenses leg), triggered on approval for cash PRs; `Approvals and overrides` definition"
+   ],
+   "acceptance": [
+    "An approved cash PR appears as an expense leg on that day's cashup with the PR number as reference; phpunit"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 55,
+   "milestone": "M2"
+  },
+  {
+   "id": "T056",
+   "epic": "E12",
+   "title": "Utility meters & readings with zero-usage flag, prepaid units, tariff costing; mobile",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T022",
+    "T029"
+   ],
+   "deliverables": [
+    "Adopt BRN_UtilityTransaction; `usp_Utilities_PrepareReadings` (port sp_CaptureUtilityTransaction / sp_SelectUtilityTransaction), `usp_Utilities_Save`, `usp_Utilities_ZeroUsage` (a run of zero-usage days flagged on capture → exception candidate), tariff per meter type (B/L/R/S) in Settings; screen + mobile capture; `Utility meter readings` definition"
+   ],
+   "acceptance": [
+    "Usage = closing − opening (+ prepaid) and cost at tariff for a month on the restore match a hand check; Playwright `utilities.spec` mobile"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 56,
+   "milestone": "M2"
+  },
+  {
+   "id": "T057",
+   "epic": "E12",
+   "title": "Assets: register (cost, depreciation, NBV, condition), movement, repair job cards with the 30-day comeback rule, asset masters",
+   "priority": "medium",
+   "estimate": "L",
+   "depends_on": [
+    "T021",
+    "T024",
+    "T014"
+   ],
+   "deliverables": [
+    "Adopt ASSET_AssetType and the register tables (verify the full ASSET_* list on the restore — only two appear in the top-200 dump); new tables where absent (`agora.Asset`, `AssetMovement`, `AssetRepair`, `AssetGroup/Type/Owner`); `usp_Assets_Depreciate` (straight-line by group), `usp_Assets_Move` (transfer / disposal / write-off / return from repair), `usp_Assets_Comebacks` (second call on the same asset within 30 days); screens Asset register, Asset movement, Asset repair + masters"
+   ],
+   "acceptance": [
+    "Comeback flag reproduces the 'supplier forensic' logic on the 1,385 reviewed job cards if they exist on the restore; Playwright `assets.spec`"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 57,
+   "milestone": "M2"
+  },
+  {
+   "id": "T058",
+   "epic": "E13",
+   "title": "Exception engine: register, rules, fingerprint upsert, lifecycle, owners, escalation",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T026",
+    "T019",
+    "T010",
+    "T014"
+   ],
+   "deliverables": [
+    "`agora.Exception`, `ExceptionRule`, `ExceptionEvent` (§3.12); `usp_Exception_Upsert` (fingerprint: raise new / keep age / clear-by-data); rule procs for the first eight domains with the mockup's categories and owners: `usp_Exception_Buying` (PRs unanswered > n days; value), `Banking` (cashups not confirmed, unmatched lines by age, declared not banked), `Fuel` (days cover, meter gaps > threshold, mech-off days), `Stock` (departments short > threshold, areas unlocked after close, counts not done in n days), `Margin` (below cost, below MinGP, no cost), `Pricing` (same product different cost across sites), `Masters` (categories with no band, products without cost), `Loads` (failed overnight loads); scheduler; `exceptions.escalation` template; lifecycle actions own/action/clear with note; bell badge provider"
+   ],
+   "acceptance": [
+    "Running the rules on the restore raises the mockup's headline items (607 PRs awaiting worth R2.2m; FNB unreconciled; etc.) with correct values; re-running does not duplicate and clears what the data no longer supports; phpunit `Exceptions/EngineTest`"
+   ],
+   "notes": "An exception exists only as long as somebody has the report open today — that is why 38 % of card lines are still unmatched after two months. Persist it.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 58,
+   "milestone": "M2"
+  },
+  {
+   "id": "T059",
+   "epic": "E13",
+   "title": "Control screens: exception register (KPIs, by owner, control desks), my queue, branch open items; mobile list",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T058",
+    "T030"
+   ],
+   "deliverables": [
+    "`/control` page (page head, KPI strip: open, value at stake, owners, oldest; register list sorted by severity with expand; 'The control desks' links with live counts), `/control/mine`, the branch console 'Open items' provider replaced with the real register, exception detail drawer with lifecycle + link to the source screen filtered; mobile list blade"
+   ],
+   "acceptance": [
+    "Counts on the page equal the register's rows for the scope; clicking an item opens its screen with the filter applied; Playwright `control.spec` desktop + mobile"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 59,
+   "milestone": "M2"
+  },
+  {
+   "id": "T060",
+   "epic": "E14",
+   "title": "Overnight-load status / import dashboard and load errors over MIST_Import + PumpIT logs",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T021",
+    "T014",
+    "T058"
+   ],
+   "deliverables": [
+    "`agora.LoadRun` projection (`usp_Imports_OvernightStatus` reading SS_ErrorLog, SS_ImportFuelInputLog, SS_JobLog, RCN_ReconImports, SS_POSDBFZIP and the `_DASHBOARD_DailyX_{POS}_{SALES|CUSTOMER|SUPPLIER}` occurrence tables for import-vs-EOD-vs-Zread differences), `usp_Imports_LoadErrors` (source, branch, level, message); screens Import dashboard (branch × source, loaded at, rows, status, message) and Import error log; `Overnight load status` (queue) and `Load errors` (queue) definitions; Loads exception rule consumes it; sign-in system-state 'loads failed' provider"
+   ],
+   "acceptance": [
+    "Last night's status on the restore lists every source per branch with the same failures SS_ErrorLog shows (paste); a failed load raises a Loads exception; Playwright `imports.spec`"
+   ],
+   "notes": "A failed load is what makes a report look wrong the next morning — this is where people check first.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 60,
+   "milestone": "M2"
+  },
+  {
+   "id": "T061",
+   "epic": "E15",
+   "title": "Reporting engine: ReportDefinition registry, parameter form, runner, extract, saved views, execution log, library page, legacy catalogue",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T014",
+    "T012",
+    "T020",
+    "T010"
+   ],
+   "deliverables": [
+    "`agora.ReportDefinition`, `ReportSavedView`, `ReportExecutionLog`, `LegacyReport` view over SS_Report; `ReportRegistry` seeder loading the 97 definitions (name, description, category, scope, tags queue|new|merged|renamed, legacy names) from `Modules/Reports/Config/library.php` — content taken verbatim from the mockup's PIT.library; runner `/reports/{code}` (params from ScopeJson → `usp_Report_{Code}` → grid + extract + saved views + default per role); library page (14 categories, lib-cards with scope/desc/was, search), legacy catalogue page (23 categories / 161 reports, 'now called' links), report usage logging"
+   ],
+   "acceptance": [
+    "A definition whose proc is missing renders 'coming' not 500; saved view per role applies on open; palette finds reports by legacy name; Playwright `reports.spec`"
+   ],
+   "notes": "Scope is a parameter, not a report. One definition per question; never a 'Site Select' twin.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 61,
+   "milestone": "M3"
+  },
+  {
+   "id": "T062",
+   "epic": "E15",
+   "title": "Report procs batch 1 — Day end (7) and Cash & banking (10)",
+   "priority": "high",
+   "estimate": "L",
+   "depends_on": [
+    "T061",
+    "T031",
+    "T037",
+    "T044",
+    "T045"
+   ],
+   "deliverables": [
+    "`usp_Report_*` for: Day close status, Unallocated Z-reads, Z-reads with no cashup, Z-reads that disagree with the cashup, Open cashups (FY param), Card terminals gone quiet, Overnight load status; Daily banking — manager's view, Cash declared against cash banked, Card takings against settlement, Deposits with no home, Cash devices and Smart ATM, Pump shortages, Accounts raised at the till, Bank reconciliation summary, Unmatched bank lines, Bank charges by site — each with a phpunit fixture comparing a known branch/period to a hand query"
+   ],
+   "acceptance": [
+    "All 17 definitions run from the library with extract; queues open the working screen filtered"
+   ],
+   "notes": "Where a screen task already built the proc (T031, T037, T044, T045, T047) reuse it — the definition binds to the existing proc.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 62,
+   "milestone": "M3"
+  },
+  {
+   "id": "T063",
+   "epic": "E15",
+   "title": "Report procs batch 2 — Fuel & forecourt (9) and Sales (6)",
+   "priority": "high",
+   "estimate": "L",
+   "depends_on": [
+    "T061",
+    "T035"
+   ],
+   "deliverables": [
+    "Fuel: Tank reconciliation, Pump meter check, Pump readings, Every fill in detail, Slow-to-pay fills, Pump attendant performance, Diesel cashback register, Fuel price and margin history, Taxi association litres (from T035/T034). Sales (MIST_Import sales families + MIST_Trans_Sales, category → PC via SDK_CategoryGLCode with the WINBRANCH mapping gap flagged): Sales by product, Sales by category, Best and worst sellers, Fuel sales by grade, Sales by till, Airtime/lotto/vouchers (virtual, commission)"
+   ],
+   "acceptance": [
+    "Sales by category for a month equals the Exco pack's Shop and GP figures for the same site within the pack's documented corrections; per-proc phpunit"
+   ],
+   "notes": "Item → category mapping is unreliable for WINBRANCH (912 QSR/Virtual items leak into shop views — data issues doc #5). Surface the unmapped count on the report rather than hiding it.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 63,
+   "milestone": "M3"
+  },
+  {
+   "id": "T064",
+   "epic": "E15",
+   "title": "Report procs batch 3 — Margin (6), Products & stock (8), Stock counts (6)",
+   "priority": "high",
+   "estimate": "L",
+   "depends_on": [
+    "T061",
+    "T049",
+    "T025"
+   ],
+   "deliverables": [
+    "Margin: Products under GP floor, Below cost (queue), No cost price, Above band, Margin by product, Category rules. Products & stock: Product master, lubricants (barcode-matched), tobacco, Stock on hand and cover, Out of stock now (queue, critical lines), Lines not counted (days param), Dead and slow-moving stock (L_SOLD not M_SOLD — data issues #4), Same product different cost. Stock counts: Stock count, Loss by department, Count exceptions, Counts by area, High-risk categories, Production and yield"
+   ],
+   "acceptance": [
+    "Below-cost list for a site matches a hand query; dead-stock excludes items with a recent last-sold date; per-proc phpunit"
+   ],
+   "notes": "ARCH product enrichment uses `WHERE baseitem = 1` (1:1); never keep-first dedupe — prices genuinely diverge inside a basecode.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 64,
+   "milestone": "M3"
+  },
+  {
+   "id": "T065",
+   "epic": "E15",
+   "title": "Report procs batch 4 — Convenience (6), OK stores (9), Franchise brands (4), People & shifts (6)",
+   "priority": "medium",
+   "estimate": "L",
+   "depends_on": [
+    "T061",
+    "T041",
+    "T049"
+   ],
+   "deliverables": [
+    "Convenience: Site trading profile, Product profitability, Stock cover and rate of sale, Raw material loss by rand, Count trace header→footer, Franchise kitchen investigation. OK (ARCH): Stock master with rate of sale, Department sales GP & shrinkage, Sales by product per day, Stock variance by product, Loss investigation pack, Till overrides by cashier, Stock movement, Supplier deliveries by line, Price list for KVI review. Franchise (AURA): Brand trading, Menu item performance, Kitchen inputs never relieved, Service and delivery times. People: Roster vs clock-in, Shifts worked, Overtime exceptions, Cash shorts and deductions, Stock loss by person and area, Tender shortfalls by person"
+   ],
+   "acceptance": [
+    "Each runs with extract; the ARCH ones use the (MIST_BranchId, branch) pair and never union the _OLD twins (phpunit asserts row counts against the live table only)"
+   ],
+   "notes": "Roster/clock-in/overtime need a roster source that PumpIT does not hold — mark those three definitions 'needs source' and raise the decision (D-06) rather than inventing data.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 65,
+   "milestone": "M3"
+  },
+  {
+   "id": "T066",
+   "epic": "E15",
+   "title": "Report procs batch 5 — Source data (6) and Audit trail (4)",
+   "priority": "medium",
+   "estimate": "M",
+   "depends_on": [
+    "T061",
+    "T010",
+    "T060"
+   ],
+   "deliverables": [
+    "Source data: Sales extract (source param), Stock master extract, Purchase journal, Fuel volumes extract, Category mapping (source category → Agora category → GL), Load errors. Audit: User activity, Master data changes, Report usage, Approvals and overrides"
+   ],
+   "acceptance": [
+    "Extracts stream to XLSX above the grid limit; audit reports read only the audit tables"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 66,
+   "milestone": "M3"
+  },
+  {
+   "id": "T067",
+   "epic": "E15",
+   "title": "Provenance drill: every total opens its audit (source, load, corrections)",
+   "priority": "medium",
+   "estimate": "M",
+   "depends_on": [
+    "T061",
+    "T060"
+   ],
+   "deliverables": [
+    "`drill_chain` on report definitions: click a figure → the rows behind it → the load run they came from → corrections applied (the Exco pack's nine corrections modelled as `agora.Correction` rows); `<x-provenance>` drawer"
+   ],
+   "acceptance": [
+    "A group turnover figure drills to site rows, then to the load that supplied them, then shows any correction with its reason; Playwright `provenance.spec`"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 67,
+   "milestone": "M3"
+  },
+  {
+   "id": "T068",
+   "epic": "E16",
+   "title": "Group trading position dashboard, site league table, profit-centre contribution, sites not trading",
+   "priority": "high",
+   "estimate": "L",
+   "depends_on": [
+    "T061",
+    "T015",
+    "T063"
+   ],
+   "deliverables": [
+    "`usp_Trade_GroupPosition` (TO/GP vs LY and budget by PC, daily litres + c/ℓ, margin vs budget, mix), `usp_Trade_League` (rank on TO/GP/growth with movement), `usp_Trade_PcContribution`, `usp_Trade_SitesNotTrading`; `/trade` dashboard with the mockup's KPI strip, daily bars, margin line, mix donut, TO→GP bridge, exceptions card; league and mix pages; scope bar drives everything; report definitions Group trading summary, Site league table, Where the profit comes from, Sites not trading, Sites earning below their band, Site rating against incentive threshold (needs audit-score source — D-06)"
+   ],
+   "acceptance": [
+    "Group totals equal the Exco pack's Group Summary for the same period; Playwright `trade.spec`"
+   ],
+   "notes": "Sources: PumpIT MIST_Trans_Sales (+ vw_Rev_RawFuelSales derivation of grade), Alteryx zp_exco_fact/fuel_daily/budget as the pack uses; read-only connections.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 68,
+   "milestone": "M3"
+  },
+  {
+   "id": "T069",
+   "epic": "E16",
+   "title": "Site scorecard",
+   "priority": "medium",
+   "estimate": "M",
+   "depends_on": [
+    "T068"
+   ],
+   "deliverables": [
+    "`/trade/site/{branch}`: trading profile (TO, GP, growth, stock position), PC breakdown, open exceptions, day-close history sparkline, top movers; mobile blade"
+   ],
+   "acceptance": [
+    "Figures match the group dashboard's row for the site; Playwright"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 69,
+   "milestone": "M3"
+  },
+  {
+   "id": "T070",
+   "epic": "E16",
+   "title": "Weekly Exco trading pack ported from ZP-NQL (36 sheets, howto, site tabs, cache, export)",
+   "priority": "critical",
+   "estimate": "XL",
+   "depends_on": [
+    "T061",
+    "T015",
+    "T035",
+    "T044",
+    "T049"
+   ],
+   "deliverables": [
+    "Port `ExcoPackService` / `ExcoSourceService` and the tab blades from ~/Development/ZP/Zulu Petroleum/app/Modules/Exco into `Modules/Exco` (sources unchanged: Alteryx zp_exco_fact / zp_exco_fuel_daily / zp_exco_budget; FuelSheet wet stock; PumpIT cash & banking; MIST_Import stock, WINBRANCH_FC_TRANS); render with `<x-data-grid>`/`<x-chart>` instead of the NQL views; the 36 sheets in PIT.exco.order (Group Summary … Meter by Pump, Exceptions, 9 site tabs) + 'What the pack corrects'; `agora.ExcoSnapshot` cache with CACHE_VERSION; XLSX export of the pack; `view_exco_pack` permission; Executive landing"
+   ],
+   "acceptance": [
+    "Every sheet's figures equal the ZP-NQL pack for the same period (automated diff on the JSON payloads — paste the diff summary); Executive role lands here; Playwright `exco.spec`"
+   ],
+   "notes": "Read the Exco module README's six gotchas first (FUEL money vs litres; TOP(1000) injection; part-day tails; SiteDimension merges Teds+Wimpy). Do not read the cashup schema.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 70,
+   "milestone": "M3"
+  },
+  {
+   "id": "T071",
+   "epic": "E16",
+   "title": "Budgets in their natural home: RCN_SalesBudgets capture/import, pro-rating on trading days, budget vs actual",
+   "priority": "high",
+   "estimate": "M",
+   "depends_on": [
+    "T068",
+    "T014"
+   ],
+   "deliverables": [
+    "Adopt RCN_SalesBudgets (empty today) + `agora.BudgetLine`; import from the Alteryx_Budget paste (Jul-25..Jun-26, 16 of 31 sites) and from XLSX; capture screen per site × category × month (TO, GP targets); `usp_Trade_BudgetVsActual` pro-rating per site on trading days; `Budget against actual` definition; feeds the group dashboard and the pack"
+   ],
+   "acceptance": [
+    "FY2027 budget loaded for every trading site; pro-rated actual vs budget for August matches the pack's EXCO 02 within rounding; data-issues #1 (budget starts Jul-2025) documented on the screen"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 71,
+   "milestone": "M3"
+  },
+  {
+   "id": "T072",
+   "epic": "E17",
+   "title": "Users & access polish: delegation, user types, role landing preferences, 'switch role' for admins",
+   "priority": "low",
+   "estimate": "S",
+   "depends_on": [
+    "T028",
+    "T054"
+   ],
+   "deliverables": [
+    "Delegation UI (approval delegates from T054 surfaced under the user), user type filter, per-user landing override, admin role preview"
+   ],
+   "acceptance": [
+    "Playwright `users.spec` extended"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 72,
+   "milestone": "M3"
+  },
+  {
+   "id": "T073",
+   "epic": "E17",
+   "title": "Audit-trail reports, report usage, approvals & overrides, retention",
+   "priority": "medium",
+   "estimate": "S",
+   "depends_on": [
+    "T066",
+    "T010"
+   ],
+   "deliverables": [
+    "Governance page under Setup with the four audit definitions, retention job for UserActivity per Settings, 'reports not opened in a year' view feeding the library clean-up"
+   ],
+   "acceptance": [
+    "Retention removes only rows older than the setting; Playwright"
+   ],
+   "notes": "",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 73,
+   "milestone": "M3"
+  },
+  {
+   "id": "T074",
+   "epic": "E17",
+   "title": "In-app help: article per screen, report descriptions, the 'why the redesign' page",
+   "priority": "medium",
+   "estimate": "M",
+   "depends_on": [
+    "T011",
+    "T061"
+   ],
+   "deliverables": [
+    "`agora.HelpArticle` + `HelpScreenLink`, `<x-help-button>` on every page head, articles seeded per module (what the screen is for, the rule it enforces, the legacy screen it replaces), the `/design` page rendering PIT.ia principles and the naming note; report descriptions from the library"
+   ],
+   "acceptance": [
+    "Every routed screen has an article (composer check: route list vs HelpScreenLink seed); Playwright"
+   ],
+   "notes": "Article copy comes from the mockup's page blurbs and notes — they were written for exactly this.",
+   "llm_model": "sonnet",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 74,
+   "milestone": "M3"
+  },
+  {
+   "id": "T075",
+   "epic": "E18",
+   "title": "Mobile pass over every capture screen and the console; device test matrix",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T016",
+    "T030",
+    "T032",
+    "T033",
+    "T036",
+    "T037",
+    "T039",
+    "T040",
+    "T048",
+    "T051",
+    "T053",
+    "T056",
+    "T059"
+   ],
+   "deliverables": [
+    "A purpose-built `mobile.*` blade for: console, pump readings, fuel input, Z-read confirm, cashup confirm, drop safe, staff short, waste, utilities, PR raise + approve, stock count, exception list, report card list; shared mobile modes verified on grid/params/KPI/tabs/charts; Playwright mobile project covering each; a device matrix (Android Chrome, iOS Safari, 375 and 768 widths) run once on real devices with screenshots attached to the QA"
+   ],
+   "acceptance": [
+    "No horizontal scroll on any screen at 375 px; every capture completes with the on-screen keypad; desktop toggle works everywhere"
+   ],
+   "notes": "Clean over capable: a screen that does less but works beats a broken affordance.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 75,
+   "milestone": "M3"
+  },
+  {
+   "id": "T076",
+   "epic": "E19",
+   "title": "(Optional) Importers under Agora: WinBranch DBF, ARCH, AURA, Pilot, NAMOS parsers + load procs into MIST_Import; retire PumpIT's importer",
+   "priority": "low",
+   "estimate": "XL",
+   "depends_on": [
+    "T043",
+    "T060"
+   ],
+   "deliverables": [
+    "Parsers per POS family writing the same MIST_Import shapes (or Agora-owned landing tables with views), scheduler, per-run LoadRun rows, cut-over plan per source, PumpIT importer switched off source by source"
+   ],
+   "acceptance": [
+    "A month of parallel loads produces identical row counts and totals per family (diff report attached); only then is a PumpIT importer retired"
+   ],
+   "notes": "Only after M2 is live and only if ZP wants it. GAAP and NAMOS were out of scope for the join map; NAMOS is in scope here because of Total Hluhluwe.",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 76,
+   "milestone": "M3"
+  },
+  {
+   "id": "T077",
+   "epic": "E20",
+   "title": "Parallel run and report parity against PumpIT",
+   "priority": "critical",
+   "estimate": "L",
+   "depends_on": [
+    "T062",
+    "T063",
+    "T064",
+    "T065",
+    "T070"
+   ],
+   "deliverables": [
+    "`agora:parity` command running each ported report and its legacy equivalent (SS_Report SQL where retrievable, or the legacy proc) for the same params and diffing totals; a parity dashboard under Control → Governance; a month of daily parity runs with the differences explained and either fixed or documented as corrections"
+   ],
+   "acceptance": [
+    "Parity ≥ 99.5 % of totals on the 40 most-used reports (SS_Report execution log decides which) for one full month, with every residual explained in the parity dashboard"
+   ],
+   "notes": "",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 77,
+   "milestone": "M3"
+  },
+  {
+   "id": "T078",
+   "epic": "E20",
+   "title": "Cutover: user migration completion, training, go-live checklist, PumpIT screens switched off, decommission plan",
+   "priority": "critical",
+   "estimate": "M",
+   "depends_on": [
+    "T077",
+    "T075"
+   ],
+   "deliverables": [
+    "Go-live runbook (deploy ritual on the live instance, sqlsrv drivers, backups before migration, `migrate --force`, `seed:master` safe only, php-fpm restart, smoke checks), role-by-role training notes from the help articles, a switch-off order for PumpIT functions (branch capture first, HO recon second, reporting last), decommission of SS_ReportScheduler once Agora schedules run, post-go-live exception review cadence"
+   ],
+   "acceptance": [
+    "Live sign-in for the five roles, day-close completed at two pilot branches on Agora, PumpIT capture disabled for those branches, hypercare log kept for two weeks"
+   ],
+   "notes": "Never deploy without Ryan's explicit go-ahead; enumerate users and back up before any destructive step on live (ZP-NQL rule 14 applies).",
+   "llm_model": "opus",
+   "type": "feature",
+   "subtasks": [],
+   "sort_order": 78,
+   "milestone": "M3"
+  }
+ ]
+}
