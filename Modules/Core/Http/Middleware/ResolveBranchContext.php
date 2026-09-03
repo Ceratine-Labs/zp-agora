@@ -36,7 +36,10 @@ class ResolveBranchContext
 
         $workspace = $forced
             ? 'branch'
-            : ($request->query('ws') ?? $request->session()->get('agora.workspace') ?? $role?->Workspace ?? 'ho');
+            // `->` not `?->`: PHP's ?? already suppresses a read on null, so
+            // the nullsafe would be redundant. The `?->` on the line above is
+            // NOT redundant — it is compared, not coalesced.
+            : ($request->query('ws') ?? $request->session()->get('agora.workspace') ?? $role->Workspace ?? 'ho');
 
         $context->setWorkspace($workspace);
         $request->session()->put('agora.workspace', $context->workspace());

@@ -11,6 +11,22 @@ use Illuminate\Support\Facades\Route;
 /**
  * One entry in a mega menu, at any depth.
  *
+ * @property int $BranchId
+ * @property int $Id
+ * @property int $SectionId
+ * @property int|null $ParentId
+ * @property string $Label
+ * @property string|null $RouteName
+ * @property string|null $Url
+ * @property string|null $Hint
+ * @property string|null $PermissionCode
+ * @property string|null $BadgeProvider
+ * @property string|null $Icon
+ * @property int $SortOrder
+ * @property bool $IsMobile
+ * @property bool $IsActive
+ * @property string $Path
+ *
  * Depth is expressed by ParentId alone, so the tree is as deep as the customer
  * wants: a column heading holds links, and a link can itself hold a nested
  * group that expands in place. Nothing here knows how deep it is — the
@@ -36,13 +52,16 @@ class MenuItem extends BaseModel
      * a groupBy whose default for a childless node is a plain collect(), so an
      * Eloquent-only type rejects every leaf.
      */
+    /** @var Collection<int, self>|null */
     public ?Collection $childItems = null;
 
+    /** @return BelongsTo<MenuSection, $this> */
     public function section(): BelongsTo
     {
         return $this->belongsTo(MenuSection::class, 'SectionId', 'Id');
     }
 
+    /** @return HasMany<self, $this> */
     public function children(): HasMany
     {
         return $this->hasMany(self::class, 'ParentId', 'Id');

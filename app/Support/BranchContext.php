@@ -68,9 +68,26 @@ class BranchContext
         return $this->allowed ?? [];
     }
 
+    /**
+     * May this request look at that branch?
+     *
+     * An EMPTY grant list means every branch, not none. Head office users are
+     * granted nothing individually — granting them all 31 rows would have to be
+     * maintained as sites open — so absence of rows is the grant, and
+     * BranchScope reads it the same way.
+     *
+     * Reading empty as "nothing allowed" is the obvious mistake, and it does
+     * not fail loudly: every query still returns rows, because BranchScope
+     * applies no filter, while the scope bar silently refuses every site the
+     * person picks. Caught by tests/e2e/shell.spec.js.
+     */
     public function maySee(int $branchId): bool
     {
-        return $this->allowed === null || in_array($branchId, $this->allowed, true);
+        if ($this->allowed === null || $this->allowed === []) {
+            return true;
+        }
+
+        return in_array($branchId, $this->allowed, true);
     }
 
     /** The group entity's id — what non-branch rows carry instead of NULL. */

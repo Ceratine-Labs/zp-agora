@@ -75,6 +75,7 @@ class MigrationHelper
      * that does not — a unique index on the business columns alone is the bug
      * that let one branch's row block another's.
      */
+    /** @param  array<int, string>  $columns */
     public static function naturalKey(string $table, array $columns): void
     {
         if (! in_array('BranchId', $columns, true)) {

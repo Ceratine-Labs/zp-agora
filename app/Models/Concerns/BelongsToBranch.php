@@ -4,6 +4,7 @@ namespace App\Models\Concerns;
 
 use App\Models\Scopes\BranchScope;
 use App\Support\BranchContext;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Adds the branch global scope and fills BranchId on create.
@@ -34,6 +35,10 @@ trait BelongsToBranch
     }
 
     /** Escape hatch for an estate-wide read; the query does its own scoping. */
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeAcrossBranches($query)
     {
         return $query->withoutGlobalScope(BranchScope::class);

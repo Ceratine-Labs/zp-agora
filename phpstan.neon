@@ -1,0 +1,45 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+
+    # Scoped, not repo-wide. `composer check` analyses these; to look at one
+    # module while you are working on it:
+    #
+    #     vendor/bin/phpstan analyse Modules/Cash --memory-limit=512M
+    #
+    # Ryan is on solar and usually working on the machine at the same time — a
+    # cold pass over every file costs him real power. Keep the scope tight.
+    paths:
+        - app
+        - Modules
+        - database
+        - tests
+
+    excludePaths:
+        analyse:
+            # Generated on demand and never loaded by the application.
+            - stubs/*
+
+    # Migrations return an anonymous class; the models are PascalCase and the
+    # tables are schema-qualified. Larastan cannot introspect the schema of a
+    # database it is not connected to, so property-level model checks would be
+    # noise rather than signal until the models carry @property docblocks.
+    checkModelProperties: false
+
+    # Laravel's own PHPDoc types Seeder::$command as non-nullable, so every
+    # `$this->command?->info()` reads as a redundant nullsafe. It is not: the
+    # property IS null when a seeder is invoked outside the console, and using
+    # `->` there is a fatal. The docblock is wrong, not the code, and this is
+    # the switch documented for exactly that case.
+    treatPhpDocTypesAsCertain: false
+
+    ignoreErrors:
+        # BaseModel deliberately overrides getTable() to schema-qualify, and
+        # models declare $table as the bare name.
+        -
+            message: '#Property .*::\$table \(string\) does not accept#'
+            path: Modules/*/Models/*.php
+
+    reportUnmatchedIgnoredErrors: false

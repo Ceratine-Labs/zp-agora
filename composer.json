@@ -17,6 +17,7 @@
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.11",
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
         "laravel/pint": "^1.27",
@@ -73,7 +74,15 @@
         "check": [
             "@php artisan config:clear --ansi",
             "vendor/bin/pint --test",
+            "vendor/bin/phpstan analyse --memory-limit=512M --no-progress",
+            "scripts/check-migrations.sh",
+            "scripts/check-procs.sh",
             "@php artisan test"
+        ],
+        "check-fast": [
+            "vendor/bin/pint --test",
+            "scripts/check-migrations.sh",
+            "scripts/check-procs.sh"
         ]
     },
     "extra": {

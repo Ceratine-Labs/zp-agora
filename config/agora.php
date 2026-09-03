@@ -46,6 +46,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | The first administrator, and the browser-test account
+    |--------------------------------------------------------------------------
+    |
+    | Read here rather than with env() at the call site: env() returns null once
+    | the config is cached, so a seeder calling it directly works in development
+    | and silently creates a user with no password in a cached environment.
+    |
+    */
+
+    'admin' => [
+        'email' => env('AGORA_ADMIN_EMAIL', 'ryan@ceratine-labs.co.za'),
+        'name' => env('AGORA_ADMIN_NAME', 'Ryan Cruickshank'),
+        'password' => env('AGORA_ADMIN_PASSWORD'),
+    ],
+
+    'e2e' => [
+        'email' => env('AGORA_E2E_EMAIL'),
+        'password' => env('AGORA_E2E_PASSWORD'),
+        'branch_id' => (int) env('AGORA_E2E_BRANCH_ID', 999),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Connections
     |--------------------------------------------------------------------------
     |

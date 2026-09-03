@@ -74,6 +74,13 @@ nav.primary { display: flex; align-items: stretch; flex: 1; min-width: 0; overfl
   background: var(--surface); color: var(--ink);
   border-bottom: 1px solid var(--line);
   box-shadow: var(--shadow-pop);
+  // A panel never grows past the viewport. Setup carries three columns of
+  // links and would otherwise run off the bottom of a short window with no way
+  // to reach the rest.
+  max-height: calc(100vh - var(--appbar-h));
+  max-height: calc(100dvh - var(--appbar-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   &[hidden] { display: none; }
 }
 
@@ -161,4 +168,73 @@ nav.primary { display: flex; align-items: stretch; flex: 1; min-width: 0; overfl
   border-top: 1px solid var(--line); padding: 10px 0; background: var(--surface-2);
   .shell-in { display: flex; gap: 8px; font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
   .grow { margin-left: auto; }
+}
+
+/* ============================================================ narrow screens
+
+   The app bar carries five things that will not fit across 375px: brand,
+   workspace switch, section buttons, tools and avatar. Measured at a Pixel 7
+   viewport the row wants 545px, so the page scrolled sideways — which the
+   mobile Playwright project caught.
+
+   Rather than hide function, the bar becomes two rows below 720px: identity and
+   tools on the first, the section buttons on the second, scrolling horizontally
+   when there are more than fit. `--appbar-h` is redefined with it, because the
+   scope bar sticks to it and the scrim starts below it — leaving that at 52px
+   would put a gap under a 92px bar. The mega panel reads the bar's real height
+   at open time, so it follows on its own.                                    */
+
+@media (max-width: 720px) {
+  :root { --appbar-h: 92px; }
+
+  .appbar { flex-wrap: wrap; height: auto; }
+
+  .brand {
+    flex: 1; min-width: 0; padding: 0 10px; height: 52px;
+    // The strapline is the first thing to go: the wordmark alone still says
+    // whose system this is.
+    .sub { display: none; }
+    .wm { font-size: 17px; }
+  }
+
+  .wsw {
+    order: 1; padding: 0 8px; border-right: 0;
+    a { padding: 4px 8px; font-size: 11px; }
+  }
+
+  .tools { order: 2; padding: 0 8px; height: 52px; }
+
+  nav.primary {
+    order: 3;
+    flex: 0 0 100%;
+    height: 40px;
+    border-top: 1px solid var(--chrome-line);
+    // The buttons themselves may exceed the width; this scrolls them rather
+    // than pushing the document sideways.
+    overflow-x: auto;
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  .navbtn { padding: 0 11px; font-size: 12.5px; }
+
+  // One column on a phone, and the panel deliberately stops short of the
+  // bottom: at full height it covered the entire screen, leaving nowhere to
+  // tap to dismiss it — the scrim was behind the panel rather than beside it.
+  // The 56px strip is the dismiss target. Found by the mobile Playwright
+  // project, which could not close the menu.
+  .mega {
+    max-height: calc(100vh - var(--appbar-h) - 56px);
+    max-height: calc(100dvh - var(--appbar-h) - 56px);
+  }
+  .mega-in { padding: 16px 14px 18px; gap: 18px; grid-template-columns: 1fr; }
+
+  .scope-in { flex-wrap: wrap; gap: 10px; padding: 8px 14px; }
+  .scope-form { flex-wrap: wrap; gap: 10px; }
+  .scope-field { min-width: 0; select, input { max-width: 46vw; } }
+  .scope-note { margin-left: 0; }
+
+  .shell-in { padding: 0 14px; }
+  .page-head { flex-wrap: wrap; h1 { font-size: 25px; } }
+  .shell-foot .shell-in { flex-wrap: wrap; }
 }

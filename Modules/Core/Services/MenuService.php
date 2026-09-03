@@ -22,6 +22,7 @@ use Modules\Core\Models\MenuSection;
 class MenuService
 {
     /** Cache the built tree for the life of the request — the shell asks twice. */
+    /** @var array<string, Collection<int, MenuSection>> */
     protected array $trees = [];
 
     /** Upsert a section (a top-level app bar button). */
@@ -118,6 +119,7 @@ class MenuService
         return $this->trees[$workspace] ??= $this->build($workspace);
     }
 
+    /** @return Collection<int, MenuSection> */
     protected function build(string $workspace): Collection
     {
         $sections = MenuSection::query()

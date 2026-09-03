@@ -24,9 +24,9 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        $email = env('AGORA_ADMIN_EMAIL', 'ryan@ceratine-labs.co.za');
-        $password = env('AGORA_ADMIN_PASSWORD') ?: Str::password(16, symbols: false);
-        $generated = ! env('AGORA_ADMIN_PASSWORD');
+        $email = (string) config('agora.admin.email');
+        $password = config('agora.admin.password') ?: Str::password(16, symbols: false);
+        $generated = ! config('agora.admin.password');
 
         $role = Role::query()->acrossBranches()->where('Code', 'admin')->firstOrFail();
 
@@ -38,7 +38,7 @@ class UserSeeder extends Seeder
         $existed = $user->exists;
 
         $user->fill([
-            'UserName' => env('AGORA_ADMIN_NAME', 'Ryan Cruickshank'),
+            'UserName' => (string) config('agora.admin.name'),
             'RoleId' => $role->Id,
             'IsActive' => true,
             'IsLocked' => false,

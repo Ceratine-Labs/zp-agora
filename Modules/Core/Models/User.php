@@ -8,9 +8,25 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\Access\Authorizable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 
 /**
  * An Agora user.
+ *
+ * @property int $BranchId
+ * @property int $Id
+ * @property string $UserName
+ * @property string $EmailAddress
+ * @property string $PasswordHash
+ * @property int|null $RoleId
+ * @property int|null $HomeBranchId
+ * @property bool $IsActive
+ * @property bool $IsLocked
+ * @property Carbon|null $LastSignInAt
+ * @property string|null $RememberToken
+ * @property int|null $LegacyUserId
+ * @property-read Role|null $role
+ * @property-read Branch|null $homeBranch
  *
  * The estate is PascalCase, so the auth contract is pointed at the real column
  * names rather than the table being bent to Laravel's defaults: the key is
@@ -41,11 +57,13 @@ class User extends BaseModel implements AuthenticatableContract
         'PasswordHash' => 'hashed',
     ];
 
+    /** @return BelongsTo<Role, $this> */
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'RoleId', 'Id');
     }
 
+    /** @return BelongsTo<Branch, $this> */
     public function homeBranch(): BelongsTo
     {
         return $this->belongsTo(Branch::class, 'HomeBranchId', 'BranchId');

@@ -36,6 +36,7 @@ class ModuleManagerTest extends TestCase
         parent::tearDown();
     }
 
+    /** @param  array<string, mixed>  $manifest */
     private function module(string $name, array $manifest = []): void
     {
         mkdir($this->root.'/'.$name);

@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Scope;
  * Rows carrying the GROUP branch id are always visible: menus, settings and
  * reference data live there, and a branch user still needs to see the menu.
  */
+/** @implements Scope<Model> */
 class BranchScope implements Scope
 {
     public function apply(Builder $builder, Model $model): void

@@ -43,7 +43,12 @@ class ProcedureService
 
     public function __construct(protected ?string $connection = null) {}
 
-    /** Read: run a proc and return its FIRST result set as a collection. */
+    /**
+     * Read: run a proc and return its FIRST result set as a collection.
+     *
+     * @param  array<string, mixed>  $params
+     * @return Collection<int, object>
+     */
     public function call(string $procedure, array $params = []): Collection
     {
         $sets = $this->callSets($procedure, $params);
@@ -54,7 +59,8 @@ class ProcedureService
     /**
      * Read: run a proc and return EVERY result set, in order.
      *
-     * @return array<int, Collection>
+     * @param  array<string, mixed>  $params
+     * @return array<int, Collection<int, object>>
      */
     public function callSets(string $procedure, array $params = []): array
     {
@@ -69,6 +75,8 @@ class ProcedureService
      * work in a way it expects the caller to handle, so it is raised as an
      * AgoraProcException exactly like a THROW would be — the caller should not
      * have to remember which of two refusal shapes a given proc uses.
+     *
+     * @param  array<string, mixed>  $params
      */
     public function write(string $procedure, array $params = []): object
     {
@@ -103,7 +111,8 @@ class ProcedureService
     }
 
     /**
-     * @return array<int, Collection>
+     * @param  array<string, mixed>  $params
+     * @return array<int, Collection<int, object>>
      */
     protected function execute(string $procedure, array $params): array
     {
@@ -147,6 +156,7 @@ class ProcedureService
      * Turn a proc's deliberate THROW into an AgoraProcException, and anything
      * else into the QueryException the rest of the application already catches.
      */
+    /** @param  array<string, mixed>  $bindings */
     protected function translate(\Throwable $e, string $procedure, string $sql = '', array $bindings = []): \Throwable
     {
         if (preg_match(self::REFUSAL, $e->getMessage(), $m) === 1) {
@@ -161,6 +171,7 @@ class ProcedureService
     }
 
     /** `EXEC agora.usp_X @A = :A, @B = :B` — schema-qualified, named, no interpolation. */
+    /** @param  array<string, mixed>  $params */
     protected function statement(string $procedure, array $params): string
     {
         $arguments = collect(array_keys($params))

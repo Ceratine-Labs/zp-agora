@@ -24,6 +24,7 @@ class CoreDatabaseSeeder extends Seeder
             RoleSeeder::class,
             MenuSeeder::class,
             UserSeeder::class,
+            E2eFixtureSeeder::class,
         ]);
     }
 }

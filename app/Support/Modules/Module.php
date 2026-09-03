@@ -10,6 +10,10 @@ namespace App\Support\Modules;
  */
 class Module
 {
+    /**
+     * @param  array<int, string>  $providers
+     * @param  array<int, string>  $requires
+     */
     public function __construct(
         public readonly string $name,
         public readonly string $alias,
@@ -21,6 +25,7 @@ class Module
         public readonly int $order,
     ) {}
 
+    /** @param  array<string, mixed>  $manifest */
     public static function fromManifest(string $path, array $manifest): self
     {
         $name = $manifest['name'] ?? basename($path);
