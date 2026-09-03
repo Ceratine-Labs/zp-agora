@@ -1,24 +1,30 @@
 /**
  * Which chromium the suite runs.
  *
- * Playwright wants the exact build it shipped with and downloads it on first
- * use — about 380 MB. Ryan's machine is on solar and already has several
- * earlier builds cached from other projects, so this prefers the matched build
- * when it is there and falls back to the newest cached one when it is not.
+ * Playwright wants the exact build it shipped with. When that build is present
+ * this file gets out of the way entirely — returning undefined lets Playwright
+ * resolve the browser itself, which is what picks the headless shell rather
+ * than full Chrome and is faster.
  *
- * The fallback is a real compromise, not a free lunch: a browser two releases
- * behind can differ on new CSS and new APIs. It is right for a smoke suite and
- * wrong for chasing a rendering bug. To get the matched build:
+ * The fallback exists for the case where it is NOT present: a fresh checkout on
+ * a metered or solar-powered connection should be able to run the suite against
+ * a build already on the machine instead of downloading ~380 MB before it can
+ * do anything. That fallback is a real compromise — a browser a couple of
+ * releases behind can differ on new CSS and new APIs, which is right for a
+ * smoke suite and wrong for chasing a rendering bug — so it announces itself
+ * once rather than applying silently.
+ *
+ * To remove it:
  *
  *     npx playwright install chromium
- *
- * Once that has run, this file finds it and the fallback stops applying. If
- * nothing is cached at all it returns undefined and Playwright behaves
- * normally — including asking you to install.
  */
 import { existsSync, readdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+
+const require = createRequire(import.meta.url);
 
 const CACHE = process.env.PLAYWRIGHT_BROWSERS_PATH || join(homedir(), '.cache', 'ms-playwright');
 
@@ -32,7 +38,33 @@ function executable(dir) {
     return null;
 }
 
+/** The revision this Playwright expects, read from its own manifest. */
+function expectedRevision() {
+    try {
+        // Resolved via package.json, not by requiring browsers.json directly:
+        // playwright-core's exports map does not expose it, so the direct
+        // require fails and the fallback would then apply forever, even once
+        // the matched build was installed.
+        const pkg = require.resolve('playwright-core/package.json');
+        const manifest = require(join(dirname(pkg), 'browsers.json'));
+
+        return manifest.browsers.find((b) => b.name === 'chromium')?.revision ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * undefined  → Playwright's matched build is installed; let it choose.
+ * a path     → the matched build is missing; use the newest one cached.
+ */
 export function cachedChromium() {
+    const expected = expectedRevision();
+
+    if (expected && executable(join(CACHE, `chromium-${expected}`))) {
+        return undefined;
+    }
+
     if (!existsSync(CACHE)) return undefined;
 
     const builds = readdirSync(CACHE)
@@ -42,14 +74,18 @@ export function cachedChromium() {
 
     for (const build of builds) {
         const path = executable(join(CACHE, build.name));
-        if (path) return path;
+        if (path) {
+            // Said once, not per test. A silent substitution is how a rendering
+            // difference gets blamed on the code.
+            console.warn(
+                `\n  Playwright wants chromium ${expected}; using cached ${build.revision} instead.` +
+                '\n  Run `npx playwright install chromium` for the matched build.\n'
+            );
+            return path;
+        }
     }
 
+    // Nothing cached either — let Playwright behave normally, including asking
+    // you to install.
     return undefined;
-}
-
-/** True when Playwright's own matched build is present, so no fallback applies. */
-export function usingMatchedBuild() {
-    const chosen = cachedChromium();
-    return chosen === undefined || !process.env.AGORA_E2E_BROWSER_WARN;
 }

@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { cachedChromium } from './tests/e2e/support/chromium.js';
+import { STATE_FILE } from './tests/e2e/support/fixtures.js';
 import 'dotenv/config';
 
 /**
@@ -44,14 +45,32 @@ export default defineConfig({
 
     projects: [
         {
+            // Signs in once and saves the session. Sign-in is rate limited to
+            // five attempts per address per five minutes — a protection worth
+            // keeping — so a suite that signed in per test tripped it on any
+            // file with more than five tests, intermittently.
+            name: 'setup',
+            testMatch: /.*\.setup\.js/,
+        },
+        {
             name: 'desktop',
-            use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+            use: {
+                ...devices['Desktop Chrome'],
+                viewport: { width: 1440, height: 900 },
+                storageState: STATE_FILE,
+            },
+            dependencies: ['setup'],
         },
         {
             name: 'mobile',
             // A real phone viewport, because "clean over capable" on mobile is
             // a stated requirement and a shell that only works at 1440 fails it.
-            use: { ...devices['Pixel 7'], viewport: { width: 375, height: 812 } },
+            use: {
+                ...devices['Pixel 7'],
+                viewport: { width: 375, height: 812 },
+                storageState: STATE_FILE,
+            },
+            dependencies: ['setup'],
         },
     ],
 

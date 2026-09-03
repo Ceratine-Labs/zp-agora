@@ -69,14 +69,28 @@ up. It deliberately does **not** run Vite: **run `npm run build` yourself** afte
 changing anything under `resources/`, so a stale asset build is visible rather
 than papered over.
 
-### Fixtures
+### Fixtures and the session
 
-`tests/e2e/support/fixtures.js` exports one that matters:
+There are three projects: `setup`, `desktop`, `mobile`. `setup` runs first
+(`desktop` and `mobile` declare it as a dependency), signs in through the real
+form once, and saves the session to `tests/e2e/.auth/user.json`, which is
+gitignored because it is a credential.
 
-- **`signedIn`** — a page already authenticated as the Playwright account. It
-  signs in through the real form rather than injecting a session, because the
-  sign-in path is the thing most likely to break and a fixture that skipped it
-  would hide exactly that.
+- **`signedIn`** — a page carrying that session.
+- **`anonymous`** + **`signInThroughTheForm()`** — for `login.spec.js`, which is
+  *about* signing in and therefore assumes nothing.
+
+**Why once and not per test.** Sign-in is rate limited to five attempts per
+address per five minutes, which is a protection worth keeping. A fixture that
+signed in through the form for every test spent those five attempts on any spec
+file with more than five tests, and then failed — intermittently, depending on
+how fast the previous run had been, which is worse than failing every time.
+So the form is exercised deliberately where it is the subject, and reused
+everywhere else. It is also about three times faster.
+
+If you add a spec that must sign in through the form, count the attempts:
+`login.spec.js` deliberately combines sign-in and sign-out into one test for
+exactly this reason.
 
 Every page, signed in or not, **fails its test on a console error or an uncaught
 exception**. A silent JS error is how a menu stops opening while every assertion
@@ -84,20 +98,16 @@ still passes.
 
 ### The browser build
 
-Playwright wants the exact chromium it shipped with and downloads ~380 MB on
-first use. `tests/e2e/support/chromium.js` prefers that build when it is present
-and otherwise falls back to the newest one already in `~/.cache/ms-playwright`,
-so a fresh checkout on a metered or solar-powered connection is not held up.
+The matched build is installed, so `tests/e2e/support/chromium.js` gets out of
+the way and lets Playwright resolve the browser itself.
 
-That fallback is a real compromise: a browser two releases behind can differ on
-new CSS and new APIs. It is right for a smoke suite and wrong for chasing a
-rendering bug. To get the matched build:
-
-```bash
-npx playwright install chromium
-```
-
-Once it is there the fallback stops applying, with no config change.
+The fallback in that file is for a machine where it is *not* installed: rather
+than making a fresh checkout download ~380 MB before it can run anything, it
+uses the newest chromium already in `~/.cache/ms-playwright` and says so once on
+startup. That is a real compromise — a browser a couple of releases behind can
+differ on new CSS and new APIs, which is right for a smoke suite and wrong for
+chasing a rendering bug — so it announces itself rather than substituting
+silently. `npx playwright install chromium` removes it with no config change.
 
 ## `composer check`
 

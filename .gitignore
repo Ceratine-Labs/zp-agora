@@ -28,3 +28,8 @@ Thumbs.db
 
 # Agora
 /bootstrap/cache/agora-modules.php
+
+# Playwright saves the signed-in session here; it is a credential.
+/tests/e2e/.auth
+/test-results
+/playwright-report

@@ -1,4 +1,4 @@
-import { test, expect, credentials } from './support/fixtures.js';
+import { anonymous, credentials, expect, signInThroughTheForm, test } from './support/fixtures.js';
 
 /**
  * Sign-in.
@@ -12,6 +12,9 @@ import { test, expect, credentials } from './support/fixtures.js';
  * column.
  */
 test.describe('sign-in', () => {
+    // No saved session: these specs are about getting one.
+    test.use(anonymous);
+
     test('the sign-in page renders and asks for both fields', async ({ page }) => {
         await page.goto('/login');
 
@@ -39,10 +42,7 @@ test.describe('sign-in', () => {
     test('a wrong password is refused without saying which half was wrong', async ({ page }) => {
         test.skip(!credentials.password, 'AGORA_E2E_PASSWORD is not set.');
 
-        await page.goto('/login');
-        await page.getByLabel('Email address').fill(credentials.email);
-        await page.getByLabel('Password', { exact: true }).fill('definitely-not-the-password');
-        await page.getByRole('button', { name: 'Sign in' }).click();
+        await signInThroughTheForm(page, { email: credentials.email, password: 'definitely-not-the-password' });
 
         const error = page.locator('.signin-error');
         await expect(error).toBeVisible();
@@ -55,28 +55,31 @@ test.describe('sign-in', () => {
     });
 
     test('an unknown address gets the identical message', async ({ page }) => {
-        await page.goto('/login');
-        await page.getByLabel('Email address').fill('nobody-at-all@agora.local');
-        await page.getByLabel('Password', { exact: true }).fill('whatever-this-is');
-        await page.getByRole('button', { name: 'Sign in' }).click();
+        await signInThroughTheForm(page, { email: 'nobody-at-all@agora.local', password: 'whatever-this-is' });
 
         await expect(page.locator('.signin-error')).toHaveText('Those details do not match an account.');
     });
 
-    test('correct credentials land on the application', async ({ signedIn }) => {
-        await expect(signedIn).toHaveURL(/\/app$/);
-        await expect(signedIn.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+    test('correct credentials land on the application, and signing out closes it again', async ({ page }) => {
+        test.skip(!credentials.password, 'AGORA_E2E_PASSWORD is not set.');
+
+        // Sign-in and sign-out are one test rather than two on purpose: each
+        // sign-in spends one of five attempts allowed per address per five
+        // minutes, and a suite that spends them faster than the window drains
+        // fails on the limiter rather than on the code.
+        await signInThroughTheForm(page);
+        await page.waitForURL('**/app');
+
+        await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
 
         // The footer states who is signed in and which database is behind it.
-        await expect(signedIn.locator('.shell-foot')).toContainText('PumpIT');
-        await expect(signedIn.locator('.shell-foot')).toContainText('TEST Playwright');
-    });
+        await expect(page.locator('.shell-foot')).toContainText('PumpIT');
+        await expect(page.locator('.shell-foot')).toContainText('TEST Playwright');
 
-    test('signing out ends the session and the app is closed again', async ({ signedIn }) => {
-        await signedIn.getByRole('button', { name: 'Sign out' }).click();
-        await signedIn.waitForURL('**/login');
+        await page.getByRole('button', { name: 'Sign out' }).click();
+        await page.waitForURL('**/login');
 
-        await signedIn.goto('/app');
-        await expect(signedIn).toHaveURL(/\/login$/);
+        await page.goto('/app');
+        await expect(page).toHaveURL(/\/login$/);
     });
 });
