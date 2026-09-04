@@ -45,6 +45,19 @@ try to reach the project-manager API, and do not invent task ids.
 
 ### What to run instead
 
+First, in a fresh clone — nothing below works without these, and `.env` is not
+in the repository:
+
+```bash
+composer install
+npm install
+cp .env.example .env && php artisan key:generate
+```
+
+Leave the connection blocks in `.env` empty. You have no database and the
+values would be guesses at a live customer system. The commands below do not
+need them.
+
 ```bash
 composer check-fast              # pint + check-migrations + check-procs — no DB needed
 scripts/check-pm-response.sh     # your pm_response.md entry will replay cleanly
