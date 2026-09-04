@@ -34,7 +34,10 @@ use PDO;
  *
  * `write()` wraps the call in a transaction the proc joins, so a proc that
  * throws half way leaves nothing behind — SET XACT_ABORT ON inside the proc
- * and the transaction here are belt and braces on the same failure.
+ * and the transaction here are belt and braces on the same failure. When the
+ * CALLER already has one open, write() joins that instead of nesting: a
+ * doomed transaction cannot be rolled back to a savepoint, and nesting one
+ * there loses the refusal and strands the connection. See write() itself.
  */
 class ProcedureService
 {
@@ -80,28 +83,61 @@ class ProcedureService
      */
     public function write(string $procedure, array $params = []): object
     {
-        return DB::connection($this->connectionName())->transaction(function () use ($procedure, $params) {
-            $rows = $this->execute($procedure, $params)[0] ?? collect();
-            $row = $rows->first();
+        $connection = DB::connection($this->connectionName());
 
-            if ($row === null) {
-                throw new AgoraProcException(
-                    'NO_STATUS_ROW',
-                    "{$procedure} returned no status row. A writer must return (Ok, Code, Message, Id).",
-                    $procedure,
-                );
-            }
+        /*
+         * A caller that already has a transaction open JOINS it rather than
+         * getting a nested one, and that is not an optimisation.
+         *
+         * Every writer sets XACT_ABORT ON, so a THROW inside one dooms the
+         * WHOLE transaction — SQL Server will not roll a doomed transaction
+         * back to a savepoint. Laravel's nested transaction() creates exactly
+         * that savepoint, so the rollback fails with "Cannot roll back trans2",
+         * the AgoraProcException the proc raised is REPLACED by that
+         * PDOException, and the connection is left at a transaction level
+         * nothing can unwind — the caller's own rollBack() throws too. One
+         * refused write then poisons the connection for the rest of the
+         * request.
+         *
+         * Joining is also the semantics a caller composing two writes wanted:
+         * XACT_ABORT already makes the pair all-or-nothing, and the refusal
+         * now reaches them intact so they can act on its code.
+         */
+        if ($connection->transactionLevel() > 0) {
+            return $this->statusRow($procedure, $params);
+        }
 
-            if (isset($row->Ok) && ! (bool) $row->Ok) {
-                throw new AgoraProcException(
-                    $row->Code ?? 'REFUSED',
-                    $row->Message ?? "{$procedure} declined the work without saying why.",
-                    $procedure,
-                );
-            }
+        return $connection->transaction(fn () => $this->statusRow($procedure, $params));
+    }
 
-            return $row;
-        });
+    /**
+     * Run a writer and return its status row, raising a declined one as a
+     * refusal. The transaction, if there is to be one, belongs to the caller.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    private function statusRow(string $procedure, array $params): object
+    {
+        $rows = $this->execute($procedure, $params)[0] ?? collect();
+        $row = $rows->first();
+
+        if ($row === null) {
+            throw new AgoraProcException(
+                'NO_STATUS_ROW',
+                "{$procedure} returned no status row. A writer must return (Ok, Code, Message, Id).",
+                $procedure,
+            );
+        }
+
+        if (isset($row->Ok) && ! (bool) $row->Ok) {
+            throw new AgoraProcException(
+                $row->Code ?? 'REFUSED',
+                $row->Message ?? "{$procedure} declined the work without saying why.",
+                $procedure,
+            );
+        }
+
+        return $row;
     }
 
     /** Same service bound to a different connection (mist_import, alteryx). */
@@ -204,6 +240,6 @@ class ProcedureService
 
     protected function connectionName(): string
     {
-        return $this->connection ?? config('agora.connections.primary');
+        return $this->connection ?? config('agora.connections.app');
     }
 }

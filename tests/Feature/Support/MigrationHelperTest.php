@@ -60,7 +60,7 @@ class MigrationHelperTest extends TestCase
 
     public function test_the_schema_reports_its_own_version(): void
     {
-        $row = DB::connection(config('agora.connections.primary'))
+        $row = DB::connection(config('agora.connections.app'))
             ->table(config('agora.schema').'.SchemaVersion')
             ->orderByDesc('AppliedAt')
             ->first();
@@ -77,7 +77,7 @@ class MigrationHelperTest extends TestCase
 
         // The baseline is always present — a database that has never been
         // migrated should not pass this file at all.
-        $versions = DB::connection(config('agora.connections.primary'))
+        $versions = DB::connection(config('agora.connections.app'))
             ->table(config('agora.schema').'.SchemaVersion')
             ->pluck('Version')
             ->all();
@@ -89,7 +89,7 @@ class MigrationHelperTest extends TestCase
     {
         // The pattern every legacy table is read through: one name for the
         // branch, whatever the underlying column is called.
-        $row = DB::connection(config('agora.connections.primary'))
+        $row = DB::connection(config('agora.connections.app'))
             ->table(config('agora.schema').'.vw_Branch')
             ->where('BranchId', (int) config('agora.group_branch_id'))
             ->first();

@@ -22,6 +22,9 @@ use Modules\Core\Models\User;
  */
 class UserSeeder extends Seeder
 {
+    /** After RoleSeeder: this one looks the admin role up by code and fails without it. */
+    public int $seedOrder = 40;
+
     public function run(): void
     {
         $email = (string) config('agora.admin.email');

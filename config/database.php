@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'pumpit'),
+    'default' => env('DB_CONNECTION', 'agora'),
 
     /*
     |--------------------------------------------------------------------------
@@ -37,10 +37,19 @@ return [
         | Agora's three customer connections
         |----------------------------------------------------------------------
         |
-        | All three live on one SQL Server 2017 instance and share one login.
-        | `pumpit` is the default: it is the ERP database, and Agora's own
-        | objects are created inside its `agora` schema. Nothing in `dbo` is
-        | ever altered — see CLAUDE.md.
+        | Four connections on one SQL Server instance, sharing one login.
+        |
+        | `agora` is the DEFAULT and the only one Agora writes to: its own
+        | database, holding its own objects in the `agora` schema. The other
+        | three are the customer's, and are READ-ONLY — `pumpit` (the ERP),
+        | `mist_import` (the POS landing zone) and `alteryx` (reporting
+        | extracts). Nothing in their `dbo` is ever altered; the legacy estate
+        | is reached through `agora.vw_*` views, which name it across databases
+        | (`PumpIT.dbo.SS_Branch`) because they now live somewhere else.
+        |
+        | The Agora database is created with `Latin1_General_CI_AS` to match
+        | PumpIT. A different collation makes every cross-database string
+        | comparison throw 'Cannot resolve collation conflict'.
         |
         | encrypt + trust_server_certificate are BOTH required. ODBC Driver 18
         | encrypts by default and validates the server certificate; this
@@ -48,6 +57,20 @@ return [
         | explicitly. Dropping either one fails the connection outright.
         |
         */
+
+        'agora' => [
+            'driver' => 'sqlsrv',
+            'host' => env('AGORA_DB_HOST', '127.0.0.1'),
+            'port' => env('AGORA_DB_PORT', '1433'),
+            'database' => env('AGORA_DB_DATABASE', 'Agora'),
+            'username' => env('AGORA_DB_USERNAME'),
+            'password' => env('AGORA_DB_PASSWORD'),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('AGORA_DB_ENCRYPT', 'yes'),
+            'trust_server_certificate' => env('AGORA_DB_TRUST_SERVER_CERTIFICATE', 'true'),
+        ],
 
         'pumpit' => [
             'driver' => 'sqlsrv',

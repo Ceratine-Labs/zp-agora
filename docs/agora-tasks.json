@@ -247,7 +247,7 @@
    ],
    "deliverables": [
     "`agora.SeedMaster` model + `SeedMaster::seed()` / `seedDemo()` helpers (Ceratine shape), `DatabaseSeeder` with the system → reference-from-PumpIT → demo phases, `App\\Support\\Seeding\\{SeederCatalog,SeedRunner,SeederEntry}` ported from ZP-NQL (auto-discovery, risk classes safe/review/clobbers/destructive, payload fingerprint versions), `php artisan seed:master --status|--allow|--forget`",
-    "`scripts/check-seeder-versions.sh` (a permission/role slug change must bump the seeder version)"
+    "Revised 4 Sep 2026: no versions, no risk classes, no phases, no demo gate — the ledger gates on the class name, like migrations"
    ],
    "acceptance": [
     "Running `seed:master` twice creates nothing the second time and the ledger shows skipped rows with versions; a seeder classified `clobbers` is refused without --allow",
@@ -270,7 +270,7 @@
     "T001"
    ],
    "deliverables": [
-    "`composer check` = pint → phpstan (level 6, module-scoped analyse) → check-migrations → check-seeder-versions → check-procs → targeted phpunit; phpunit.xml pointing at the Docker restore with a `TestBranch` (id 999) created by the test seeder; playwright.config with desktop and mobile (375×812) projects and a login fixture",
+    "`composer check` = pint → phpstan (level 6, module-scoped analyse) → check-migrations → check-procs → targeted phpunit; phpunit.xml pointing at the Docker restore with a `TestBranch` (id 999) created by the test seeder; playwright.config with desktop and mobile (375×812) projects and a login fixture",
     "A `docs/testing.md` page stating the targeted-run rule (Ryan is on solar; never a full suite unless asked)"
    ],
    "acceptance": [

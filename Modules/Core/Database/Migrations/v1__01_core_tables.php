@@ -3,13 +3,28 @@
 use App\Support\Database\MigrationHelper;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Core — the tables everything else stands on (slot 01).
  *
- * Six tables and no more: the schema's own version stamp, the branch spine,
- * identity, and the database-driven menu. Anything that is not needed to sign
- * in and see a navigable shell belongs to a later module.
+ * Ten tables and one view: the schema's own version stamp, the branch spine,
+ * identity, per-user preferences and saved grid columns, the seed ledger, and
+ * the database-driven menu. Anything that is not needed to sign in and see a navigable shell
+ * belongs to a later module.
+ *
+ * **Consolidated 4 Sep 2026.** This file was v1__01 plus four lettered
+ * follow-ons (01a seed ledger and the first view, 01b user preferences, 01c
+ * and 01d reshaping the ledger twice). They were folded back in on Ryan's
+ * instruction so the module has one create and no alters: a schema this young,
+ * whose only rows are ones our own seeders wrote, is cheap to restate and
+ * expensive to read as a pile of diffs. The folded files were removed from
+ * `agora.Migration` on PumpIT at the same time, so the ledger names files that
+ * exist.
+ *
+ * That is a one-time tidy, not a new habit. The rule in CLAUDE.md stands from
+ * here: once a table holds data the business cares about, a change to it is a
+ * new lettered file, never an edit to this one.
  *
  * `agora.Branch` is a MIGRATED copy of `dbo.SS_Branch`, not a view over it —
  * the branch id leads every clustered index in the system, so the one table
@@ -87,6 +102,55 @@ return new class extends Migration
         });
         MigrationHelper::naturalKey('UserBranch', ['BranchId', 'UserId']);
 
+        // What a person has chosen for themselves — the light or dark choice
+        // today, later a saved grid layout or a default report scope. Key and
+        // value rather than a column per preference, because these arrive one
+        // at a time and a column each means a migration against a production
+        // database every time somebody adds a checkbox.
+        //
+        // Business settings do NOT live here. Thresholds, approval bands and
+        // anything else the company decides go in agora.Setting (T026),
+        // because those are the company's rules and must not be per-user.
+        MigrationHelper::table('UserPreference', function (Blueprint $table) {
+            $table->bigInteger('UserId');
+            $table->string('PrefKey', 60);
+            $table->string('PrefValue', 400)->nullable();
+        });
+        MigrationHelper::naturalKey('UserPreference', ['BranchId', 'UserId', 'PrefKey']);
+
+        // Which columns a person chose to see, per grid.
+        //
+        // A grid is addressed by its ROUTE NAME (`app.cash.dropsafe`) rather
+        // than by a controller class: routes are what the menu, the command
+        // palette and every link already use, a controller serves several
+        // screens, and a class rename would silently orphan everyone's saved
+        // choice. A screen carrying two grids qualifies the key with a suffix
+        // (`app.cash.dropsafe:bags`).
+        //
+        // The payload is JSON — the visible columns, their order and their
+        // widths — because it is read and written whole by the grid component
+        // and nothing in the database ever needs to query inside it. A column
+        // per setting would be a migration every time the grid learns a trick.
+        MigrationHelper::table('UserGridColumn', function (Blueprint $table) {
+            $table->bigInteger('UserId');
+            $table->string('GridKey', 160);
+            $table->text('ColumnsJson');
+        });
+        MigrationHelper::naturalKey('UserGridColumn', ['BranchId', 'UserId', 'GridKey']);
+
+        // Which seeders have run here — Laravel's `migrations` table, in this
+        // schema's naming. The gate is the class name and nothing else: logged
+        // means done, absent means run it. A seeder is a one-shot the way a
+        // migration is, so there is no version column; changing what was
+        // seeded means writing another seeder.
+        MigrationHelper::table('SeedMaster', function (Blueprint $table) {
+            $table->string('SeederClass', 200);
+            $table->string('Module', 60);
+            $table->integer('Batch');
+            $table->dateTime('ExecutedAt', 0);
+        });
+        MigrationHelper::naturalKey('SeedMaster', ['BranchId', 'SeederClass']);
+
         // ---- the menu (plan §3.10) ----------------------------------------
         // Sections are the top-level buttons in the app bar: Today, Trade,
         // Control, Setup for head office; Today, Stock, My site, Assets for a
@@ -127,11 +191,60 @@ return new class extends Migration
             $table->string('Path', 300);
         });
         MigrationHelper::naturalKey('MenuItem', ['BranchId', 'SectionId', 'Path']);
+
+        /*
+         * The first legacy view.
+         *
+         * Every legacy table Agora reads is reached through one of these, for
+         * four reasons set out in plan §3.3: alias SSBranchId to BranchId so
+         * one name is used everywhere; hide the _OLD / _DEFUNCT / PREPROD_
+         * twins; bracket reserved-word columns; and apply whatever dedupe rule
+         * the join map recorded for that table.
+         *
+         * Only the first applies to SS_Branch, which is precisely why it is a
+         * good place to establish the pattern — nothing here is load-bearing
+         * yet, so a mistake is cheap.
+         *
+         * The legacy database is NAMED, because Agora's objects no longer live
+         * inside it: `PumpIT.dbo.SS_Branch`, on the same instance. The name
+         * comes from config rather than being written in, so a restore called
+         * something else does not have a view silently reading the wrong
+         * estate.
+         *
+         * CREATE OR ALTER so re-running is safe and a change shows in the diff
+         * as an edit rather than a drop and recreate.
+         */
+        $schema = config('agora.schema');
+        $erp = config('agora.source_databases.erp');
+
+        DB::unprepared("
+            CREATE OR ALTER VIEW [{$schema}].[vw_Branch] AS
+            SELECT
+                b.SSBranchId    AS BranchId,
+                b.BranchName    AS Name,
+                b.BrandId,
+                b.RegionId,
+                b.ClassId,
+                b.IsActive
+            FROM [{$erp}].dbo.SS_Branch b;
+        ");
+
+        MigrationHelper::recordVersion(
+            '1.0',
+            'Core baseline: the version stamp, branches, identity and user preferences, '
+            .'the seed ledger, the database-driven menu, and the first legacy view.'
+        );
     }
 
     public function down(): void
     {
-        foreach (['MenuItem', 'MenuSection', 'UserBranch', 'User', 'Role', 'Branch', 'SchemaVersion'] as $table) {
+        DB::unprepared('DROP VIEW IF EXISTS ['.config('agora.schema').'].[vw_Branch];');
+
+        foreach ([
+            'MenuItem', 'MenuSection', 'SeedMaster', 'UserGridColumn',
+            'UserPreference', 'UserBranch', 'User', 'Role', 'Branch',
+            'SchemaVersion',
+        ] as $table) {
             MigrationHelper::drop($table);
         }
     }

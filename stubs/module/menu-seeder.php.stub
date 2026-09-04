@@ -14,6 +14,13 @@ use Modules\Core\Services\MenuService;
  */
 class MenuSeeder extends Seeder
 {
+    /**
+     * Where this seeder sits in the run. The catalog orders on it, so a seeder
+     * that needs another to have run already says so here rather than in a
+     * list somewhere else. Navigation needs nothing before it.
+     */
+    public int $seedOrder = 30;
+
     public function run(): void
     {
         // MenuService::item('ho', 'today', [

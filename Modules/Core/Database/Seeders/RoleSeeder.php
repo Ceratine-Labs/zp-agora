@@ -15,6 +15,9 @@ use Modules\Core\Models\Role;
  */
 class RoleSeeder extends Seeder
 {
+    /** Before the user that names one. */
+    public int $seedOrder = 20;
+
     public function run(): void
     {
         $roles = [

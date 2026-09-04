@@ -47,7 +47,7 @@
         </form>
     </div>
 
-    <p class="signin-foot">{{ config('database.connections.'.config('agora.connections.primary').'.database') }} · Agora v1.0</p>
+    <p class="signin-foot">{{ config('database.connections.'.config('agora.connections.app').'.database') }} · Agora v1.0</p>
 </main>
 
 </body>

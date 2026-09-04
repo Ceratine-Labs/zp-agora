@@ -34,6 +34,9 @@ class E2eFixtureSeeder extends Seeder
 {
     public const BRANCH_NAME = 'TEST-Playwright';
 
+    /** Last: it is a fixture, not part of the system. */
+    public int $seedOrder = 50;
+
     public function run(): void
     {
         if (app()->isProduction()) {

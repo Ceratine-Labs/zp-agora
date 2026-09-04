@@ -4,6 +4,10 @@ Every screen composes components; no screen writes its own KPI, table or nav
 markup (plan §3.8). **Check this file before building anything** — if what you
 need is not here, build it, then add a row.
 
+This file says what EXISTS. [`feature-rules.md`](feature-rules.md) says what a
+grid, a form and a view screen must DO — read that before scoping a feature, and
+build the component to satisfy it.
+
 Rules that apply to all of them:
 
 - A component owns markup and behaviour. **A component never queries the

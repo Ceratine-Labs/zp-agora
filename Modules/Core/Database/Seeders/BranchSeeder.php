@@ -22,6 +22,9 @@ use Modules\Core\Models\Branch;
  */
 class BranchSeeder extends Seeder
 {
+    /** Branches first: everything else carries a BranchId. */
+    public int $seedOrder = 10;
+
     private const ADMINISTRATIVE = [
         'AJLG Properties',
         'Zululand Petroleum',
@@ -33,7 +36,7 @@ class BranchSeeder extends Seeder
 
     public function run(): void
     {
-        $legacy = DB::connection(config('agora.connections.primary'))
+        $legacy = DB::connection(config('agora.connections.erp'))
             ->table('dbo.SS_Branch')
             ->select('SSBranchId', 'BranchName', 'BrandId', 'RegionId', 'ClassId', 'IsActive')
             ->orderBy('SSBranchId')

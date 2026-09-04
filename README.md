@@ -9,6 +9,11 @@ cashup, the declaration to the bank. 31 branches, 25 of them trading.
 > **Read [`CLAUDE.md`](CLAUDE.md) before you run anything.** Agora's development
 > database is the customer's production database. `migrate:fresh` is forbidden,
 > and nothing in the `dbo` schema is ever altered.
+>
+> Then read [`docs/development.md`](docs/development.md) — clone to running app,
+> and a feature end to end: module, migration, procedure, service, screen, menu,
+> seeder, test — and [`docs/feature-rules.md`](docs/feature-rules.md) before you
+> scope anything, because it is what every screen owes.
 
 ## Stack
 
@@ -22,10 +27,20 @@ composer install
 npm install
 cp .env.example .env && php artisan key:generate
 
-# Fill in the three connection blocks in .env. The passwords live encrypted in
-# ZP-NQL: DatabaseConnection::where('name','PumpIT')->first()->getDecryptedPassword()
+# Set AGORA_DB_PASSWORD to something strong, then bring up the local SQL Server
+# that Agora develops against — it creates the Agora database and a PumpIT stub.
+scripts/local-sql.sh up
 
-php artisan agora:db-check --anchors   # prove all three connections first
+# Fill in the three customer connection blocks in .env. Those passwords live
+# encrypted in ZP-NQL:
+#   DatabaseConnection::where('name','PumpIT')->first()->getDecryptedPassword()
+
+php artisan agora:db-check --anchors        # prove all four connections
+php artisan agora:init-schema               # once: the agora schema
+php artisan migrate
+php artisan agora:sync-local-branches       # real branch rows into the stub
+php artisan seed:master
+
 npm run build
 ./dev.sh
 ```
@@ -60,10 +75,13 @@ docs/                   the build plan, the reference notes, the component index
 |---|---|
 | `php artisan agora:db-check [--anchors]` | Prove every customer connection |
 | `php artisan agora:init-schema` | Create the `agora` schema (once per database) |
+| `scripts/local-sql.sh {up\|down\|status\|destroy}` | The local SQL Server Agora develops against |
+| `php artisan agora:sync-local-branches` | Copy real branch rows into the local PumpIT stub |
 | `php artisan agora:make-module Name --slot=NN` | Scaffold a module in the house shape |
 | `php artisan migrate --pretend` | See the SQL a migration would send, without sending it |
+| `php artisan seed:master [--status]` | Run each seeder that has not run here, recorded in the ledger |
 | `php artisan test --filter=Class::method` | **Targeted** test runs only |
-| `composer check` | pint + the suite |
+| `composer check` | pint → phpstan → migrations → procs → the suite |
 | `./dev.sh` | Serve, Vite, and the log tail together |
 
 ## Adding a module

@@ -79,8 +79,31 @@ return [
     */
 
     'connections' => [
-        'primary' => 'pumpit',
+        'app' => 'agora',
+        'erp' => 'pumpit',
         'pos_landing' => 'mist_import',
         'reporting' => 'alteryx',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | The legacy databases, by name
+    |--------------------------------------------------------------------------
+    |
+    | Agora's objects live in their own database now, so a view over the legacy
+    | estate has to name it across databases — `PumpIT.dbo.SS_Branch` rather
+    | than `dbo.SS_Branch`. The name is config rather than literal because a
+    | restore is commonly called something else (PumpIT_Staging), and a view
+    | that hard-codes it silently reads the wrong estate.
+    |
+    | Same server is assumed, which is how ZP runs it. A linked server would
+    | need four-part naming and is not supported here.
+    |
+    */
+
+    'source_databases' => [
+        'erp' => env('PUMPIT_DB_DATABASE', 'PumpIT'),
+        'pos_landing' => env('MIST_DB_DATABASE', 'MIST_Import'),
+        'reporting' => env('ALTERYX_DB_DATABASE', 'Alteryx'),
     ],
 ];

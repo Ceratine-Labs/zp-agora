@@ -106,11 +106,60 @@ class ProcedureServiceTest extends TestCase
         $this->procedures->write('usp_Core_Refuse', ['Reason' => 'Nope.']);
     }
 
+    public function test_a_refusal_survives_being_called_inside_a_caller_s_transaction(): void
+    {
+        // The failure this pins: a writer sets XACT_ABORT ON, so its THROW
+        // dooms the whole transaction, and SQL Server will not roll a doomed
+        // transaction back to a savepoint. write() used to open a NESTED
+        // transaction here, so the rollback failed with "Cannot roll back
+        // trans2", that PDOException replaced the refusal, and the connection
+        // was left at a transaction level nothing could unwind — the caller's
+        // own rollBack() threw as well. One declined write poisoned the
+        // connection for the rest of the request.
+        $connection = DB::connection(config('agora.connections.app'));
+        $connection->beginTransaction();
+
+        try {
+            $this->procedures->write('usp_Core_Refuse', ['Reason' => 'Inside a transaction.']);
+            $this->fail('The procedure should have refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('CORE_REFUSED', $e->code());
+        } finally {
+            // The point of the fix: this still works. Before it, both this and
+            // the level assertion below failed.
+            $connection->rollBack();
+        }
+
+        $this->assertSame(0, $connection->transactionLevel(), 'A refused write must leave the connection usable.');
+    }
+
+    public function test_a_writer_joins_an_open_transaction_rather_than_nesting_one(): void
+    {
+        $connection = DB::connection(config('agora.connections.app'));
+        $connection->beginTransaction();
+
+        try {
+            // usp_Core_Ping is a reader, but write() is what is under test: it
+            // must not push the level to 2, because a savepoint is exactly what
+            // a doomed transaction cannot return to.
+            try {
+                $this->procedures->write('usp_Core_Ping', ['BranchId' => 2]);
+            } catch (AgoraProcException) {
+                // Ping returns no status row, which is its own refusal — the
+                // level is what this test is about.
+            }
+
+            $this->assertSame(1, $connection->transactionLevel(), 'write() must join the caller\'s transaction, not nest inside it.');
+        } finally {
+            $connection->rollBack();
+        }
+    }
+
     public function test_it_reaches_the_primary_connection_by_default(): void
     {
-        $expected = DB::connection(config('agora.connections.primary'))
+        $expected = DB::connection(config('agora.connections.app'))
             ->selectOne('SELECT DB_NAME() AS db')->db;
 
-        $this->assertSame('PumpIT', $expected);
+        $this->assertSame(config('database.connections.agora.database'), $expected);
     }
 }

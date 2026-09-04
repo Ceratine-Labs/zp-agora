@@ -44,9 +44,17 @@ refuses to run when `APP_ENV=production`:
 | `TEST-playwright@agora.local` | A user on the **read-only auditor** role | No suite signs in as a real person, and this account cannot approve, capture or post |
 | Branch `999` — `TEST-Playwright` | A branch, `IsTrading = false` **and** `IsActive = false` | The scope bar lists trading, active sites only, so it never appears in the UI — but a future write-path test has somewhere safe that is not a real site |
 
+It runs as part of `seed:master` like any other seeder, and it is inert without
+the password — the two guards that matter are its own: it refuses outright when
+`APP_ENV=production`, and it does nothing at all unless `AGORA_E2E_PASSWORD` is
+set.
+
 ```bash
 # Set AGORA_E2E_PASSWORD in .env (16 characters minimum — the seeder refuses less), then:
-php artisan db:seed --class="Modules\Core\Database\Seeders\E2eFixtureSeeder"
+php artisan seed:master
+
+# Or just this one, if the rest of the ledger is already recorded:
+php artisan seed:master --only=E2eFixtureSeeder
 ```
 
 Leave `AGORA_E2E_PASSWORD` unset and the seeder skips; the browser specs skip

@@ -25,6 +25,9 @@ use Modules\Core\Services\MenuService;
  */
 class MenuSeeder extends Seeder
 {
+    /** Sections and items are one seeder because an item addresses its section. */
+    public int $seedOrder = 30;
+
     public function run(): void
     {
         $this->headOffice();

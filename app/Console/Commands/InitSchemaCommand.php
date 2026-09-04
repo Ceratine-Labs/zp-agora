@@ -26,7 +26,7 @@ class InitSchemaCommand extends Command
     public function handle(): int
     {
         $schema = config('agora.schema');
-        $connection = config('agora.connections.primary');
+        $connection = config('agora.connections.app');
         $database = config("database.connections.{$connection}.database");
         $host = config("database.connections.{$connection}.host");
 

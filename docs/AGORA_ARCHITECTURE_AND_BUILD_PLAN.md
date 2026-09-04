@@ -101,7 +101,7 @@ Agora/
 │   └── Help/                 # in-app help articles per screen, report descriptions
 ├── resources/views/{layouts,components,mobile}
 ├── database/{migrations (framework only), seeders/DatabaseSeeder.php (orchestrator)}
-├── scripts/                  # check-migrations.sh, check-seeder-versions.sh, restore-pumpit.sh, deploy/
+├── scripts/                  # check-migrations.sh, check-procs.sh, restore-pumpit.sh, deploy/
 ├── CLAUDE.md · EXTENDED.md   # the project rulebook (this §3, condensed) and recipes
 └── docs/                     # architecture, data model, proc catalogue, join notes carried over from ZP-NQL
 ```
@@ -149,7 +149,7 @@ Module skeleton (Ceratine's, kept verbatim so a Ceratine builder is at home): `C
 
 ### 3.5 Seed master
 
-Ceratine's ledger, unchanged in shape: `agora.SeedMaster (Module, Seeder, Version, Batch, RecordsCreated/Updated/Skipped, Status, ErrorMessage, ExecutedAt, CompletedAt, DurationMs, IsDemoData)`. `SeedMaster::seed($module, $version, fn() => [...], $seederName)` runs a callback at most once per `(Module, Seeder, Version)`; `seedDemo()` versions per company/day. `DatabaseSeeder` is the only orchestrator: phases **system** (permissions, roles, settings, menus, reference lists, email templates, report registry) → **reference data from PumpIT** (branch, profit centre, category, area, expense masters read from the legacy tables — idempotent upserts) → **demo** (only when `app.demo` is true; a `Demo` company that mirrors a real branch shape). ZP-NQL's `seed:master` refinement is adopted on top: auto-discovered catalogue, risk classes (`safe · review · clobbers · destructive`), version = fingerprint of the seeder payload, `--status / --allow / --forget`, and **only `safe` seeders ever run unattended in a deploy**. A commit that adds a permission slug must bump that seeder's version (`scripts/check-seeder-versions.sh`).
+**Revised 4 Sep 2026 (Ryan).** The Ceratine/ZP-NQL ledger — payload-fingerprint versions, risk classes, phases, a demo gate — was built and then cut, because Agora is built on an existing system rather than shipped to fresh installs, so "which version of this seeder ran" is a question nobody asks. What is left is the migrations model: `agora.SeedMaster (Module, SeederClass, Batch, ExecutedAt)` with a unique key on `(BranchId, SeederClass)`. `SeederCatalog` discovers every seeder under `database/seeders` and each module's `Database/Seeders`, sorted by the `public int $seedOrder` each declares (default 50); `SeedRunner` skips any class already in the ledger, runs the rest, and records each one **after** it returns — so a seeder that throws leaves no row and is retried, and the exception surfaces the way a failed migration's does. `DatabaseSeeder` names nothing and delegates to the runner, so `db:seed` and `seed:master` are the same run. `php artisan seed:master --status | --only | --forget | --rollback-batch`. Changing what a seeder wrote means writing another seeder.
 
 ### 3.6 Identity and RBAC
 
@@ -227,7 +227,7 @@ Sources and where they land today: WinBranch DBF (shop POS + stock), ARCH (OK st
 
 ### 3.15 Testing and quality gates
 
-`composer check` = pint → phpstan (module-scoped) → `check-migrations.sh` → `check-seeder-versions.sh` → `check-procs.sh` (every `.sql` under `Database/Procedures` is referenced by a migration and parses) → phpunit **targeted** (`--filter`) → Playwright **targeted** (spec + project). Ryan's standing rule: targeted runs only, never a full suite unless he asks (solar power). Every task's acceptance names the spec it adds. Feature tests run against the local Docker restore; a `TestBranch` (id 999) is created by the test seeder so nothing touches real branches.
+`composer check` = pint → phpstan (module-scoped) → `check-migrations.sh` → `check-procs.sh` (every `.sql` under `Database/Procedures` is referenced by a migration and parses) → phpunit **targeted** (`--filter`) → Playwright **targeted** (spec + project). Ryan's standing rule: targeted runs only, never a full suite unless he asks (solar power). Every task's acceptance names the spec it adds. Feature tests run against the local Docker restore; a `TestBranch` (id 999) is created by the test seeder so nothing touches real branches.
 
 ### 3.16 What Agora does not do in v1
 
@@ -404,15 +404,15 @@ Repo, database conventions, seed master, RBAC, audit, navigation, component libr
 
 **Deliverables**
 
-- `agora.SeedMaster` model + `SeedMaster::seed()` / `seedDemo()` helpers (Ceratine shape), `DatabaseSeeder` with the system → reference-from-PumpIT → demo phases, `App\Support\Seeding\{SeederCatalog,SeedRunner,SeederEntry}` ported from ZP-NQL (auto-discovery, risk classes safe/review/clobbers/destructive, payload fingerprint versions), `php artisan seed:master --status|--allow|--forget`
-- `scripts/check-seeder-versions.sh` (a permission/role slug change must bump the seeder version)
+- `agora.SeedMaster` model (`hasRun` / `record` / `forget` / `rollbackLastBatch`), `App\Support\Seeding\{SeederCatalog,SeedRunner,SeederEntry}` (auto-discovery, `$seedOrder`), `DatabaseSeeder` delegating to the runner, `php artisan seed:master --status|--only|--forget|--rollback-batch`
+- Revised 4 Sep 2026: no versions, no risk classes, no phases, no demo gate — see §3.5
 
 **Acceptance**
 
-- Running `seed:master` twice creates nothing the second time and the ledger shows skipped rows with versions; a seeder classified `clobbers` is refused without --allow
+- Running `seed:master` twice creates nothing the second time and reports every seeder as already recorded; a seeder that throws records nothing and runs again
 - phpunit `Seeding/SeedMasterTest`
 
-**Notes for the builder:** Only `safe` seeders may run in a deploy. Reference-from-PumpIT seeders are upserts keyed on the natural key and are `safe` by construction.
+**Notes for the builder:** Every seeder is an upsert keyed on its natural key, so re-running one is safe by construction. Order is the only thing a seeder declares.
 
 
 ##### T005 · Quality gates: composer check, phpstan, pint, phpunit (sqlsrv), Playwright
@@ -423,7 +423,7 @@ Repo, database conventions, seed master, RBAC, audit, navigation, component libr
 
 **Deliverables**
 
-- `composer check` = pint → phpstan (level 6, module-scoped analyse) → check-migrations → check-seeder-versions → check-procs → targeted phpunit; phpunit.xml pointing at the Docker restore with a `TestBranch` (id 999) created by the test seeder; playwright.config with desktop and mobile (375×812) projects and a login fixture
+- `composer check` = pint → phpstan (level 6, module-scoped analyse) → check-migrations → check-procs → targeted phpunit; phpunit.xml pointing at the Docker restore with a `TestBranch` (id 999) created by the test seeder; playwright.config with desktop and mobile (375×812) projects and a login fixture
 - A `docs/testing.md` page stating the targeted-run rule (Ryan is on solar; never a full suite unless asked)
 
 **Acceptance**
