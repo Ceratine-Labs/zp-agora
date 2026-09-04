@@ -1,44 +1,21 @@
-// Bootstrap first, then the bridge that repoints its variables at Agora's
-// tokens — order matters, or Bootstrap's defaults win.
-@import "bootstrap/scss/bootstrap";
+// Agora's stylesheet.
+//
+// @use, not @import: Dart Sass has deprecated @import ahead of Sass 3, and our
+// own files were the ones still printing warnings — Bootstrap's are silenced by
+// quietDeps in vite.config.js because they are not ours to fix, and silencing
+// ours too would have hidden a real signal behind a dependency's noise.
+//
+// Order is the cascade, so it is deliberate:
+//   bootstrap  → the framework's own defaults
+//   tokens     → Agora's palette, all three theme states
+//   bridge     → repoints Bootstrap's --bs-* at those tokens
+//   base       → element defaults
+//   shell      → app bar, mega menus, scope bar, page frame
+//   components → the shared component library
 
-@import "tokens";
-@import "bootstrap-bridge";
-
-* { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  // The shell is a column so the footer sits at the bottom of a short page
-  // instead of half way down it.
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-text);
-  font-size: 13.5px;
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-}
-
-h1, h2, h3, h4 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: .01em;
-  text-wrap: balance;
-}
-
-button, input, select, textarea { font: inherit; color: inherit; }
-
-a { color: var(--brand); }
-
-:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
-
-@import "shell";
-@import "components";
+@use "bootstrap/scss/bootstrap";
+@use "tokens";
+@use "bootstrap-bridge";
+@use "base";
+@use "shell";
+@use "components";

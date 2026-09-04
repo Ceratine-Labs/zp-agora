@@ -1,0 +1,43 @@
+/*
+ | Element defaults: the ground the components stand on.
+ |
+ | Split out of app.scss when that file moved from @import to @use. With @use a
+ | module's CSS is emitted where it is first used, and all @use rules must come
+ | first — so base rules left inline in the entry file would have landed AFTER
+ | the components instead of before them, quietly inverting the cascade.
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  // The shell is a column so the footer sits at the bottom of a short page
+  // instead of half way down it.
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 13.5px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: .01em;
+  text-wrap: balance;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+a { color: var(--brand); }
+
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
