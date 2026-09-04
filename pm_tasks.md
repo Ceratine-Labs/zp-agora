@@ -18,6 +18,7 @@ try to reach the project-manager API, and do not invent task ids.
 | 2 | `docs/feature-rules.md` | What every screen owes — grids, forms, views. Read before scoping. |
 | 3 | `docs/development.md` | How the work goes, and a feature end to end. |
 | 4 | `docs/components.md` | What exists to build with. |
+| 5 | *Playing back what you did*, below | How your work reaches the project manager. Read before you finish anything. |
 
 ---
 
@@ -45,11 +46,12 @@ try to reach the project-manager API, and do not invent task ids.
 ### What to run instead
 
 ```bash
-composer check-fast          # pint + check-migrations + check-procs — no DB needed
-vendor/bin/pint              # fix formatting
+composer check-fast              # pint + check-migrations + check-procs — no DB needed
+scripts/check-pm-response.sh     # your pm_response.md entry will replay cleanly
+vendor/bin/pint                  # fix formatting
 vendor/bin/phpstan analyse Modules/Core --memory-limit=512M   # scope it, do not sweep the tree
 npm run build
-php artisan route:list       # works without a DB
+php artisan route:list           # works without a DB
 ```
 
 All of the above were run with every connection pointed at a dead port to
@@ -93,6 +95,81 @@ confirm they pass with no database. `php artisan test` was the only casualty.
 16. Conventional, plain commit messages describing the change and how it was
     verified. Say **"not verified against a database"** where that is the case —
     it is expected here, and pretending otherwise is worse than saying it.
+17. **Every finished unit of work gets an entry in `pm_response.md`** before you
+    call it done — see *Playing back what you did* below. That file is the only
+    way what you did reaches the project manager.
+
+---
+
+## Playing back what you did
+
+You cannot reach the project manager from here, so **record what you did in
+`pm_response.md`** and Ryan asks a session with a token to replay it. That
+replay creates the tasks, logs the time, files the QA entries, writes the
+outcomes and posts the comments — so an entry that is thin becomes a PM record
+that is thin, and nobody can reconstruct it later.
+
+### How
+
+* One fenced ```yaml block per **finished unit of work**, appended to
+  `pm_response.md`. Not a diary — write the entry when the work is done.
+* **Append only.** Never edit or renumber an entry that is already there. Got
+  something wrong? Add a new entry that says so.
+* Everything outside the yaml blocks is for humans and is ignored by the replay.
+* The example block in `pm_response.md` is `entry: 0` — copy its shape and
+  delete it when you write your first real one.
+* **Run `scripts/check-pm-response.sh` before you commit the entry.** It parses
+  the file the way the replay will and refuses a missing `outcome` on a done
+  task, a `qa` block with an empty report, zero minutes, a `blocked` with no
+  reason, a duplicate entry number and an invented `pm_task_id`. It needs no
+  database and no network.
+
+### The fields, and why each one is there
+
+| Field | Required | Why the project manager needs it |
+|---|---|---|
+| `entry` | yes | Sequential, never reused. It is how a replay says what it has already done. |
+| `kind` | yes | `task` for work; `note` for something that is not a unit of work. |
+| `title` | yes | Becomes the task title. Write it as the thing you did, not the area you were in. |
+| `type` | yes | `feature` `bug` `improvement` `task` `investigation`. Drives which rules the PM enforces. |
+| `priority` | yes | `low` `medium` `high` `critical`. |
+| `status` | yes | `done` `in_progress` `blocked`. |
+| `covers` | yes | Task numbers from **The work** below that this closes. `[]` if none. |
+| `minutes` | yes | **A done task is refused without a time entry.** Honest wall-clock, not an estimate of what it should have taken. |
+| `outcome` | when done | **A done task is refused without one.** What changed, with paths; how it was verified; what you left behind. |
+| `qa` | when done | Refused without it for `feature`/`bug`/`improvement`/`task`. See below. |
+| `commits` | yes | sha + message per commit, so the PM record points at the diff. |
+| `files` | yes | path + one line of *why*. A manifest, not a diff. |
+| `comments` | no | Anything worth saying that is not the outcome. `internal: true` keeps it off the customer portal — leave it true unless you are certain. |
+| `decisions` | no | Only a real architectural choice, with `title`, `decision`, `rationale`. A naming preference is not a decision. |
+| `follow_ups` | no | Becomes an inbox item for Ryan to triage. Use it for what you noticed and did not do. |
+| `blocked_by` | when blocked | One sentence: what stopped you, what you tried, what would unblock it. |
+
+### The QA entry is evidence, not a claim
+
+`qa.report` carries **the commands you ran and what they printed**. Pasted
+output, not a description of it. "Tested and working" is worth nothing to
+whoever reads it in three months.
+
+**Set `verified_without_database: true` and say so in the report.** It is
+expected here and it is not a failing — but a QA entry that quietly implies a
+full verification is worse than one that admits its limits. `composer
+check-fast`, `npm run build` and `php artisan view:cache` are the evidence
+available to you; the suite is not.
+
+If something did not work, `status: failed` with the real error. A failed QA
+entry that leads to a fix is a good record. A passed one that was not true is
+the thing that costs a day later.
+
+### What not to do
+
+* **Do not invent project-manager task ids.** Leave `pm_task_id` out entirely
+  unless Ryan gave you one; the replay creates the task.
+* **Do not try to reach the project-manager API.** There is no token here, and
+  a 401 loop is not a task.
+* **Do not squash a day into one entry** because it is tidier. One unit of work,
+  one entry — that is what makes the time and the QA mean anything.
+* **Do not write an entry for work you did not finish** unless `status` says so.
 
 ---
 
