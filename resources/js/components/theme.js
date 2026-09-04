@@ -8,7 +8,11 @@
  * for anyone on the system default.
  *
  * The choice is stored in a cookie rather than localStorage so the server can
- * stamp <html> on the way out and the page never flashes the wrong theme.
+ * stamp <html> on the way out and the page never flashes the wrong theme. It
+ * is ALSO sent to the server, where it is kept against the person rather than
+ * the browser — the cookie makes it instant here, the stored row carries it to
+ * their next device. If that request fails the toggle still works; a colour
+ * preference is not worth an error message.
  */
 export default function themeToggle() {
     const button = document.getElementById('themebtn');
@@ -23,5 +27,14 @@ export default function themeToggle() {
         const next = dark ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', next);
         document.cookie = `agora_theme=${next}; path=/; max-age=31536000; samesite=lax`;
+
+        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+        if (!token) return;
+
+        fetch('/app/preferences/theme', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+            body: JSON.stringify({ theme: next }),
+        }).catch(() => {});
     });
 }

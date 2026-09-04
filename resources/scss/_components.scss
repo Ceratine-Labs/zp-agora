@@ -112,3 +112,41 @@
   .btn-primary { margin-top: 4px; }
 }
 .signin-foot { font-family: var(--font-mono); font-size: 11px; color: var(--chrome-muted); margin: 0; }
+
+/* ============================================================ styleguide
+
+   Only used by /dev/theme, which is not registered outside local and testing.
+   It lives here rather than in its own stylesheet so it cannot drift from the
+   tokens it exists to display.                                              */
+
+.sg-group {
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); font-family: var(--font-text); font-weight: 600;
+  margin: 18px 0 8px;
+  &:first-child { margin-top: 0; }
+}
+.sg-swatches { display: flex; flex-wrap: wrap; gap: 12px; }
+.sg-swatch {
+  display: flex; flex-direction: column; gap: 5px; font-size: 11px;
+  code { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+}
+.sg-chip {
+  display: block; width: 92px; height: 46px; border-radius: var(--r);
+  border: 1px solid var(--line-strong);
+}
+.sg-type {
+  display: flex; flex-direction: column; gap: 4px;
+  > * + .sg-spec { margin-top: 14px; }
+}
+.sg-spec {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted); margin: 0;
+}
+#parity {
+  .verdict.ok { color: var(--good-ink); }
+  .verdict.bad { color: var(--crit-ink); font-weight: 600; }
+  // nowrap keeps a grouped figure on one line; the padding stops the two
+  // columns touching, which made "1 234 567.89" and its twin read as one
+  // continuous number.
+  .php-out, .js-out { font-family: var(--font-mono); white-space: nowrap; padding-right: 26px; }
+}

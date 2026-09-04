@@ -6,6 +6,7 @@
 // ours too would have hidden a real signal behind a dependency's noise.
 //
 // Order is the cascade, so it is deliberate:
+//   fonts      → the three self-hosted faces, before anything paints
 //   bootstrap  → the framework's own defaults
 //   tokens     → Agora's palette, all three theme states
 //   bridge     → repoints Bootstrap's --bs-* at those tokens
@@ -13,6 +14,7 @@
 //   shell      → app bar, mega menus, scope bar, page frame
 //   components → the shared component library
 
+@use "fonts";
 @use "bootstrap/scss/bootstrap";
 @use "tokens";
 @use "bootstrap-bridge";

@@ -29,6 +29,47 @@ Rules that apply to all of them:
 | `<x-chip>` | `tone` | Status pill | Tones: `neutral good warn serious crit` |
 | `<x-empty-state>` | `text` | "Nothing here yet" line | |
 
+## Numbers
+
+`App\Support\Format` and `resources/js/format.js` are a matched pair and must
+agree character for character — `/dev/theme` renders every case side by side and
+`tests/e2e/format.spec.js` fails if any row disagrees.
+
+| Call | Output | For |
+|---|---|---|
+| `n(1234567.891, 2)` | `1 234 567.89` | any number |
+| `R(1234.5)` | `R1 234.50` | money in full |
+| `Rk(2208437)` | `R2.21m` | money on a KPI tile |
+| `Lk(847300)` | `847k L` | volume on a tile |
+| `litres(12480.5)` | `12 480.500 L` | a dip or a meter, to the millilitre |
+| `pct(12.44)` | `12.4%` | a percentage |
+| `cpl(175.25)` | `175.2500 c/ℓ` | fuel margin, four places |
+| `delta(4.23)` | `▲ +4.2%` | a movement; under 0.05 reads flat, no arrow |
+| `deltaTone(v, invert)` | `up` / `dn` / `flat` | which direction is good — the caller decides |
+
+**The format is stated, not delegated to a locale.** Asked for `en-ZA` and
+1234567.891, PHP's intl returns `1,234,567.89` and JavaScript's `Intl` returns
+`1 234 567,89` — a different group separator *and* a different decimal
+separator. Using the locale would have produced exactly the inconsistency this
+pair exists to prevent, on screens that mix server- and client-rendered figures.
+
+The grouping character is an ordinary space, not a non-breaking one, so a figure
+copied out of a grid pastes into a spreadsheet as a number. Numeric cells carry
+`white-space: nowrap` instead.
+
+A missing figure is `—`, never `R0.00`.
+
+## Libraries
+
+All three load on first use, not on every page — the sign-in screen needs none
+of them.
+
+| Module | Wraps | Loads when |
+|---|---|---|
+| `components/notify.js` | SweetAlert2 | an alert, confirm or toast actually fires. Exposed as `window.Agora.notify`. Nothing calls native `alert`/`confirm`/`prompt` |
+| `components/select.js` | TomSelect | the page has a `select[data-select]`. A plain `<select>` is left alone — the native control beats a library on a phone |
+| `components/chart.js` | ApexCharts | the page has a `[data-chart]`. Colours are read from the theme tokens at draw time, so a chart follows the light/dark switch |
+
 ## Not built yet
 
 Named here so the next session does not invent a second version of one. Each is
@@ -49,5 +90,7 @@ One module per behaviour under `resources/js/components`, imported by
 
 | Module | What it does |
 |---|---|
+| `format.js` | The number formats, twinned with `App\Support\Format` |
 | `mega-menu.js` | Opens one section panel at a time; Escape, scrim and outside-click close it. Nesting inside a panel is `<details>`, so the browser supplies keyboard behaviour. Hover deliberately does **not** open a panel |
-| `theme.js` | Light/dark toggle. Three states — an unstamped document follows the system. Stored in a cookie so the server can stamp `<html>` and avoid a flash |
+| `theme.js` | Light/dark toggle. Three states — an unstamped document follows the system. Stored in a cookie so the server can stamp `<html>` and avoid a flash, **and** posted to `agora.UserPreference` so the choice follows the person to their next device |
+| `select.js` · `chart.js` · `notify.js` | The three library wrappers above |

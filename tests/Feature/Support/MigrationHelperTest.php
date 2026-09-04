@@ -66,8 +66,23 @@ class MigrationHelperTest extends TestCase
             ->first();
 
         $this->assertNotNull($row, 'The base migration should have stamped a version.');
-        $this->assertSame('1.0', $row->Version);
+
+        // Not pinned to a particular number: every schema change bumps the
+        // minor version, so asserting the current one means this test breaks
+        // on each migration that does its job. What matters is that a version
+        // is recorded, that it is well formed, and that it carries the group
+        // branch rather than a null.
+        $this->assertMatchesRegularExpression('/^\d+\.\d+$/', $row->Version);
         $this->assertSame((int) config('agora.group_branch_id'), (int) $row->BranchId);
+
+        // The baseline is always present — a database that has never been
+        // migrated should not pass this file at all.
+        $versions = DB::connection(config('agora.connections.primary'))
+            ->table(config('agora.schema').'.SchemaVersion')
+            ->pluck('Version')
+            ->all();
+
+        $this->assertContains('1.0', $versions);
     }
 
     public function test_the_legacy_branch_view_aliases_the_branch_column(): void
