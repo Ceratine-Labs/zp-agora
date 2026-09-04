@@ -38,19 +38,9 @@ class MigrationHelper
         $qualified = self::qualify($name);
 
         Schema::create($qualified, function (Blueprint $table) use ($columns) {
-            // BranchId FIRST — it leads the clustered index, and every query
-            // in the system is branch-scoped.
-            $table->integer('BranchId');
-            $table->bigIncrements('Id');
-
+            self::branchKey($table);
             $columns($table);
-
-            // Stamped by the procedure, never by PHP (§3.3). Nullable because
-            // a seeder writing reference data has no user to attribute.
-            $table->dateTime('CreatedAt', 0)->nullable();
-            $table->integer('CreatedBy')->nullable();
-            $table->dateTime('UpdatedAt', 0)->nullable();
-            $table->integer('UpdatedBy')->nullable();
+            self::addAuditColumns($table);
         });
 
         // Laravel's bigIncrements makes Id the primary key on its own. The
@@ -92,6 +82,18 @@ class MigrationHelper
     }
 
     /** ROWVERSION for optimistic concurrency on an editable row. */
+    public static function addRowVersion(string $table): void
+    {
+        self::rowVersion($table);
+    }
+
+    /** Soft-delete columns, under the name plan §3.3 uses. */
+    public static function addSoftDeletes(string $table): void
+    {
+        self::softDeletes($table);
+    }
+
+    /** ROWVERSION for optimistic concurrency on an editable row. */
     public static function rowVersion(string $table): void
     {
         $schema = config('agora.schema');
@@ -113,6 +115,95 @@ class MigrationHelper
     public static function drop(string $name): void
     {
         Schema::dropIfExists(self::qualify($name));
+    }
+
+    /**
+     * The two columns that open every agora table, in this order.
+     *
+     * BranchId first is not cosmetic: it leads the clustered index, so a
+     * branch-scoped read — which is every read in the system — walks one
+     * contiguous run of the table instead of seeking across the whole of it.
+     * Reversing the pair is the difference between a range scan and a scan.
+     */
+    public static function branchKey(Blueprint $table): void
+    {
+        $table->integer('BranchId');
+        $table->bigIncrements('Id');
+    }
+
+    /**
+     * Who wrote the row and when.
+     *
+     * Nullable, because a seeder writing reference data has no user to
+     * attribute and stamping a fake id would be worse than an honest null.
+     * The procedure sets them from its @UserId argument; PHP does not
+     * (plan §3.3).
+     */
+    public static function addAuditColumns(Blueprint $table): void
+    {
+        $table->dateTime('CreatedAt', 0)->nullable();
+        $table->integer('CreatedBy')->nullable();
+        $table->dateTime('UpdatedAt', 0)->nullable();
+        $table->integer('UpdatedBy')->nullable();
+    }
+
+    /** Timestamps without the who — for rows nothing edits. */
+    public static function addTimestamps(Blueprint $table): void
+    {
+        $table->dateTime('CreatedAt', 0)->nullable();
+        $table->dateTime('UpdatedAt', 0)->nullable();
+    }
+
+    /**
+     * Money. DECIMAL(18,2), never float.
+     *
+     * A float cannot hold 0.10 exactly, so a column of them does not add up to
+     * what the till said. On a system whose entire job is making the dip tie to
+     * the pump and the declaration tie to the bank, that is not a rounding
+     * detail, it is the product failing.
+     */
+    public static function money(Blueprint $table, string $column, bool $nullable = false): void
+    {
+        $definition = $table->decimal($column, 18, 2);
+        $nullable ? $definition->nullable() : $definition->default(0);
+    }
+
+    /** Litres. Three decimal places — fuel is dipped and metered to the millilitre. */
+    public static function litres(Blueprint $table, string $column, bool $nullable = false): void
+    {
+        $definition = $table->decimal($column, 18, 3);
+        $nullable ? $definition->nullable() : $definition->default(0);
+    }
+
+    /**
+     * A percentage or a cents-per-litre rate. DECIMAL(9,4).
+     *
+     * Four places because fuel margin is quoted in cents per litre and a
+     * two-place column silently rounds a 1.75c margin into either 1.8 or 1.7,
+     * which across a month of volume is a real number.
+     */
+    public static function pct(Blueprint $table, string $column, bool $nullable = false): void
+    {
+        $definition = $table->decimal($column, 9, 4);
+        $nullable ? $definition->nullable() : $definition->default(0);
+    }
+
+    /**
+     * Record that the schema moved to a new version.
+     *
+     * Called by the migration that introduces the change, so the database can
+     * say what it is running without anyone reading the migrations folder.
+     * Idempotent: re-running a migration does not double-stamp.
+     */
+    public static function recordVersion(string $version, string $note = ''): void
+    {
+        $schema = config('agora.schema');
+        $branchId = (int) config('agora.group_branch_id');
+
+        DB::table("{$schema}.SchemaVersion")->updateOrInsert(
+            ['BranchId' => $branchId, 'Version' => $version],
+            ['Note' => $note !== '' ? $note : null, 'AppliedAt' => now(), 'UpdatedAt' => now()],
+        );
     }
 
     /**

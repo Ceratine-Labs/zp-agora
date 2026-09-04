@@ -43,6 +43,18 @@ for file in $files; do
         fi
     fi
 
+    # A natural key must include BranchId. MigrationHelper::naturalKey() also
+    # refuses one that does not, but only when the migration runs — and against
+    # a production database the first run is the only run, so this is caught
+    # before it gets there. A unique key on the business columns alone is what
+    # let one branch's row block another's in the legacy estate.
+    if grep -qE 'naturalKey\(' "$file"; then
+        # Each naturalKey( ... ) call flattened onto one line, then checked.
+        if tr '\n' ' ' < "$file" | grep -oE "naturalKey\([^)]*\)" | grep -qv 'BranchId'; then
+            say "$file: a naturalKey() call omits BranchId. Every unique key in Agora includes the branch column."
+        fi
+    fi
+
     # No enum columns — a small reference table or TINYINT + a check constraint.
     if grep -qE '\$table->enum\(' "$file"; then
         line=$(grep -nE '\$table->enum\(' "$file" | head -1 | cut -d: -f1)

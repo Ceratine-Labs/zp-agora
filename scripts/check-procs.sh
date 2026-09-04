@@ -38,8 +38,12 @@ for file in $procs; do
         say "$file: $count procedures in one file. One per file — T-SQL needs each in its own batch."
     fi
 
-    # Something in this module must actually deploy it.
-    if ! grep -rqE "Procedures/\*\.sql|Procedures'" "Modules/$module/Database/Migrations" 2>/dev/null; then
+    # Something in this module must actually deploy it — either by extending
+    # ProcedureMigration, which is the normal way, or by globbing the directory
+    # itself. The rule is that the file gets deployed; it is not a rule about
+    # how. Testing for one particular implementation string is what broke this
+    # check the day the base class was introduced.
+    if ! grep -rqE "ProcedureMigration|Procedures/\*\.sql|Procedures'" "Modules/$module/Database/Migrations" 2>/dev/null; then
         say "$file: no migration in Modules/$module deploys the Procedures directory."
     fi
 
