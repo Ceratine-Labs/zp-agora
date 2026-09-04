@@ -33,3 +33,9 @@ Thumbs.db
 /tests/e2e/.auth
 /test-results
 /playwright-report
+
+# Internal working notes — the rulebook and the dispatch API instructions.
+# They carry the customer's host and login name and are not for the repo;
+# they live on the machine and are purged from history.
+/CLAUDE.md
+/CERATINE_API_INSTRUCTIONS.md
