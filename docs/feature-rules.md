@@ -296,6 +296,6 @@ currently all prose.
 |---|---|
 | How the work goes, clone to shipped feature | [`development.md`](development.md) |
 | Which components exist | [`components.md`](components.md) |
-| The rules that cannot be broken | [`../CLAUDE.md`](../CLAUDE.md) |
+| The rules that cannot be broken | [`rules.md`](rules.md) |
 | Full architecture and build order | [`AGORA_ARCHITECTURE_AND_BUILD_PLAN.md`](AGORA_ARCHITECTURE_AND_BUILD_PLAN.md) |
 | ZP's grid, which these rules are drawn from | `~/Development/ZP/Zulu Petroleum` — `app/Support/GridViewState.php`, `app/Models/UserGridPreference.php`, `tests/Feature/UserGridPreferencesTest.php`, `tests/e2e/grid-column-resize.spec.js` |

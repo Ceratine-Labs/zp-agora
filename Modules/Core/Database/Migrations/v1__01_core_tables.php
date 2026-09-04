@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  * `agora.Migration` on PumpIT at the same time, so the ledger names files that
  * exist.
  *
- * That is a one-time tidy, not a new habit. The rule in CLAUDE.md stands from
+ * That is a one-time tidy, not a new habit. The rule in docs/rules.md stands from
  * here: once a table holds data the business cares about, a change to it is a
  * new lettered file, never an edit to this one.
  *

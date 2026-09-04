@@ -14,7 +14,7 @@ try to reach the project-manager API, and do not invent task ids.
 
 | # | File | Why |
 |---|---|---|
-| 1 | `CLAUDE.md` | The rules. The first section is the one that matters. |
+| 1 | `docs/rules.md` | The rules. The first section is the one that matters. |
 | 2 | `docs/feature-rules.md` | What every screen owes — grids, forms, views. Read before scoping. |
 | 3 | `docs/development.md` | How the work goes, and a feature end to end. |
 | 4 | `docs/components.md` | What exists to build with. |
@@ -75,7 +75,7 @@ confirm they pass with no database. `php artisan test` was the only casualty.
     `v1__95_{module}_foreign_keys.php` per module.
 11. **A migration is a create, not a pile of alters.** A change to an existing
     table is a new lettered file (`v1__12a_…`). The conditions under which a
-    follow-on may be folded back are in `CLAUDE.md`; you almost certainly do not
+    follow-on may be folded back are in `docs/rules.md`; you almost certainly do not
     meet them.
 12. **Business rules go in stored procedures**, called through
     `ProcedureService`. A refusal is `THROW 51000, 'AGORA:{Code}:{message}', 1`.

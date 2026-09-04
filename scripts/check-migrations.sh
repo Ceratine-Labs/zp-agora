@@ -2,7 +2,7 @@
 #
 # The migration rules that are mechanical, enforced mechanically.
 #
-# Every one of these is in CLAUDE.md as prose, and prose is not a check. Agora
+# Every one of these is in docs/rules.md as prose, and prose is not a check. Agora
 # migrates a production database on its first run, so "someone will remember"
 # is not a control.
 

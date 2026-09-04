@@ -6,9 +6,10 @@ operations system for **Zululand Retail & Petroleum**, successor to PumpIT.
 The job is the metronomos': the dip must tie to the pump, the Z-read to the
 cashup, the declaration to the bank. 31 branches, 25 of them trading.
 
-> **Read [`CLAUDE.md`](CLAUDE.md) before you run anything.** Agora's development
-> database is the customer's production database. `migrate:fresh` is forbidden,
-> and nothing in the `dbo` schema is ever altered.
+> **Read [`docs/rules.md`](docs/rules.md) before you run anything.** Agora writes
+> to its own database; the customer's three are read-only and live.
+> `migrate:fresh` is forbidden against a real instance, and nothing in the
+> customer's databases is ever written.
 >
 > Then read [`docs/development.md`](docs/development.md) — clone to running app,
 > and a feature end to end: module, migration, procedure, service, screen, menu,

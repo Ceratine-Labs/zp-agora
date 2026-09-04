@@ -3,7 +3,7 @@
 # Serve Agora, run Vite, and tail the log — one terminal, one Ctrl-C.
 #
 # There is no database container to start. Agora talks to the customer's SQL
-# Server directly (see CLAUDE.md), so the only local moving parts are PHP's
+# Server directly (see docs/rules.md), so the only local moving parts are PHP's
 # built-in server and Vite.
 
 set -euo pipefail

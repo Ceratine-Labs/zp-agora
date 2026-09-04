@@ -2,7 +2,7 @@
 
 How the work actually goes: clone to running app, then a feature end to end.
 
-This is the *how*. The rules are in [`CLAUDE.md`](../CLAUDE.md), what every
+This is the *how*. The rules are in [`rules.md`](rules.md), what every
 feature must do is in [`feature-rules.md`](feature-rules.md), and the *what* is
 in [`AGORA_ARCHITECTURE_AND_BUILD_PLAN.md`](AGORA_ARCHITECTURE_AND_BUILD_PLAN.md).
 Nothing here restates any of them — where a rule matters to a step, it is named
@@ -21,7 +21,7 @@ step 6 is how an estimate doubles.
    live.** `Agora` is the primary — everything Agora owns is in it. `PumpIT` is
    the old system being replaced, `MIST_Import` holds POS reports and data, and
    `Alteryx` holds reporting extracts; all three are reads, always. Read
-   CLAUDE.md → *THE RULE ABOVE ALL* before you run anything.
+   [`rules.md`](rules.md) → *THE RULE ABOVE ALL* before you run anything.
 2. **The business rules live in stored procedures, not in PHP.** A service that
    writes calls `agora.usp_*`. If a rule exists in both places, the procedure is
    right and the PHP is the bug.
@@ -122,7 +122,8 @@ is a real file in the house shape.
 php artisan agora:make-module Cash --slot=12 --requires=Core
 ```
 
-`--slot` is the module's place in domain order (CLAUDE.md lists them: Core 01,
+`--slot` is the module's place in domain order ([`rules.md`](rules.md) lists
+them: Core 01,
 Masters 02, … Cash 12). It becomes the migration filename prefix, so slots are
 what keep twenty modules' migrations in a sane order. You get the manifest,
 provider, config, routes, controller, service, migration, menu seeder, view and
@@ -167,7 +168,8 @@ What `MigrationHelper` is doing for you, and why it refuses things:
   cycles SQL Server rejects.
 
 **A change to an existing table is a new lettered file** (`v1__12a_…`), never an
-edit to the create. The one exception, and its conditions, are in CLAUDE.md —
+edit to the create. The one exception, and its conditions, are in
+[`rules.md`](rules.md) —
 it is not a habit.
 
 Before you run it against the real database, look at the SQL:
@@ -471,7 +473,7 @@ immediately.
 
 | Question | Read |
 |---|---|
-| The rules, and the ones that cannot be broken | [`CLAUDE.md`](../CLAUDE.md) |
+| The rules, and the ones that cannot be broken | [`rules.md`](rules.md) |
 | Full architecture, module-by-module data model, build order | [`AGORA_ARCHITECTURE_AND_BUILD_PLAN.md`](AGORA_ARCHITECTURE_AND_BUILD_PLAN.md) |
 | Which components exist | [`components.md`](components.md) |
 | Test layout, fixtures, the browser suite | [`testing.md`](testing.md) |
