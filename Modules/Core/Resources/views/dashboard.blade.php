@@ -5,8 +5,8 @@
         blurb="The work that has to happen before this day can be closed." />
 
     <div class="kpi-strip">
-        <x-kpi label="Trading sites" :value="$branchCount" note="in dbo.SS_Branch" />
-        <x-kpi label="Administrative entities" :value="$entityCount" note="not in a day-close queue" />
+        <x-kpi label="Trading sites" :value="$branchCount" note="from your branch list" />
+        <x-kpi label="Administrative entities" :value="$entityCount" note="no trading day to close" />
         <x-kpi label="Workspace" :value="$context->workspace() === 'branch' ? 'Branch' : 'Head office'"
                :note="$context->id() ? 'branch '.$context->id() : 'all sites in scope'" />
     </div>

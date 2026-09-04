@@ -21,7 +21,15 @@ class DashboardController extends Controller
     {
         return view('core::dashboard', [
             'branchCount' => Branch::query()->trading()->count(),
-            'entityCount' => Branch::query()->acrossBranches()->where('IsTrading', false)->count(),
+            // IsActive as well as IsTrading: the browser-test fixture is a
+            // non-trading branch that is also inactive, and without the second
+            // condition it was counted here — the page reported 7
+            // administrative entities where the estate has 6.
+            'entityCount' => Branch::query()
+                ->acrossBranches()
+                ->where('IsTrading', false)
+                ->where('IsActive', true)
+                ->count(),
             'context' => $context,
         ]);
     }
