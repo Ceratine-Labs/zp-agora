@@ -61,7 +61,8 @@ CREATE OR ALTER PROCEDURE agora.usp_{Module}_Grid{Object}
     @SortColumn  NVARCHAR(80)  = NULL,
     @SortAsc     BIT           = 1,
     @Page        INT           = 1,
-    @PageSize    INT           = 50
+    @PageSize    INT           = 50,
+    @FiltersJson NVARCHAR(MAX) = NULL    -- typed header filters; see below
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -71,6 +72,25 @@ BEGIN
     --               "showing 50 of 12,480" and decide about the export cap.
 END
 ```
+
+**`@FiltersJson` is the ninth parameter, and it is opt-in** (Ryan, 5 Sep 2026).
+Rule 3.1 requires a typed filter on every column header, and the eight
+parameters above have nowhere to put one — `@Search` is the single global
+filter, not a per-column one. So a procedure that wants header filters declares
+`@FiltersJson` and reads it with `OPENJSON`:
+
+```sql
+    SELECT f.[key] AS ColumnKey, JSON_VALUE(f.value, '$.q') AS Q,
+           JSON_VALUE(f.value, '$.eq') AS Eq
+    FROM   OPENJSON(@FiltersJson) f
+```
+
+Two rules come with it. **A procedure without `@FiltersJson` is still valid** —
+it simply cannot carry header filters, and the grid will not offer them. And
+**a grid source constructed for a procedure that lacks the parameter throws**
+rather than dropping the filters or applying them in PHP; filtering in two
+places is exactly the split rule 3.2 exists to prevent. `App\Grid\Sources\
+ProcedureSource` enforces that.
 
 A grid procedure **reads and nothing else**. It carries a header comment saying
 what it is for and who reads it, because the customer opens these in SSMS and a
@@ -237,6 +257,12 @@ I would build 3. It is perhaps a day, and it is the only one where nobody loses
 work silently.
 
 ### B. Where filtering happens
+
+> **Settled 5 Sep 2026.** Ryan accepted the reading below: the grid procedure
+> filters, sorts and pages, and the header sends parameters. `@FiltersJson` in
+> rule 2 is how the header's typed filters reach it. The paragraph stands as
+> written; it is no longer a proposal.
+
 
 Rule 3.1 (typed header filters) and rule 3.2 (100 000-row ceiling) are in
 tension if the grid filters in the browser: at that size the page is already

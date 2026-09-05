@@ -282,10 +282,28 @@ validator says about them, measured rather than eyeballed
 
 A fourth, about the status tokens rather than the series ones:
 **`--warn` (`#fab219`) measures 1.83:1 on white and is outside the lightness
-band.** As a chart *fill* on a light surface it is close to invisible. Charts
-therefore use `--warn` only where a mark is paired with a label, and
-`--warn-ink` for anything textual; `.spark-warn` uses `--warn-ink` for exactly
-this reason. `--good` and `--crit` measure fine in both themes.
+band** (`--serious` is 2.64:1, the same problem one step milder). As a chart
+*fill* on a light surface either is close to invisible.
+
+**Resolved 5 Sep 2026 — Ryan added a `-fill` step to the tokens.**
+`--good-fill` `--warn-fill` `--serious-fill` `--crit-fill` live in
+`resources/scss/_tokens.scss` and each clears **3:1 against both grounds**, the
+threshold for a graphical object, which is why there is one value rather than a
+light and a dark one:
+
+| token | value | on white | on dark surface |
+|---|---|---|---|
+| `--good-fill` | `#0b930b` | 4.04 | 4.30 |
+| `--warn-fill` | `#a97400` | 4.05 | 4.29 |
+| `--serious-fill` | `#c9603a` | 4.02 | 4.32 |
+| `--crit-fill` | `#cc3636` | 5.06 | 3.44 |
+
+**Use `-fill` wherever the colour IS the shape** — a bar, an area, an SVG
+`fill`. The base tokens stay correct for text, borders and chips, which is
+where the mockup put them. The waterfall's positive and negative steps, the
+diverging bar's sign ranges and `.mini-fill` all take `-fill`. `.spark-*`
+deliberately keeps `-ink`: a sparkline is a 1px stroke, where *more* contrast
+is wanted, not less.
 
 Other rules followed, each a deliberate change from what was here before:
 

@@ -18,6 +18,24 @@
   --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
   --good-bg:#e6f6e6; --warn-bg:#fdf3dc; --serious-bg:#fceee7; --crit-bg:#fae8e8;
   --good-ink:#0a6b0a; --warn-ink:#8a6000; --serious-ink:#a1462a; --crit-ink:#9b2626;
+
+  /* Semantic colours as a FILL — a chart area, a bar, an SVG shape (Ryan,
+     5 Sep 2026). The four above are tuned to be read AS TEXT or as a chip
+     against their own -bg, and two of them do not survive being used as a
+     large block of colour: --warn (#fab219) measures 1.83:1 on white and
+     --serious 2.64:1, so a warn-coloured bar on a light surface is close to
+     invisible. These four clear 3:1 — the threshold for a graphical object —
+     against BOTH grounds, which is why there is one value rather than a
+     light and a dark one. Measured, not picked by eye:
+        good #0b930b  4.04 on white / 4.30 on dark
+        warn #a97400  4.05 / 4.29
+        serious #c9603a  4.02 / 4.32
+        crit #cc3636  5.06 / 3.44
+     Use -fill wherever the colour IS the shape; keep the base tokens for
+     text, borders and chips, where they are correct and where the mockup
+     put them. */
+  --good-fill:#0b930b; --warn-fill:#a97400; --serious-fill:#c9603a; --crit-fill:#cc3636;
+
   --grid:#e6ecec; --axis:#c4cfd0;
   --shadow:0 1px 2px rgba(12,20,23,.06), 0 8px 24px -12px rgba(12,20,23,.18);
   --shadow-pop:0 12px 40px -8px rgba(8,33,41,.35);

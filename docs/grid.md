@@ -141,10 +141,10 @@ plan names for T014.
 **In the procedure**, and in the query builder for an Eloquent source. PHP sends
 eight parameters and receives at most one page.
 
-This follows feature-rules **proposed §B** — "the grid procedure does the
-filtering, sorting and paging; the header filter sends parameters and the
-procedure answers" — rather than deciding it. §B is still Ryan's proposal and
-not his ruling.
+This follows feature-rules **§B** — "the grid procedure does the filtering,
+sorting and paging; the header filter sends parameters and the procedure
+answers". Built to it as a proposal; **Ryan settled it on 5 Sep 2026** and it
+is now the rule.
 
 What it costs: the procedure re-runs its whole query for every page. The set is
 built, counted, and one page is taken; page 40 of a 10 000-row answer costs the
@@ -315,14 +315,17 @@ redo rather than toggle.
 
 ## Open questions
 
-1. **Proposed §B is still a proposal.** The grid is built to it — procedure
-   filters, sorts and pages — but it has not been ruled on.
+1. ~~**Proposed §B is still a proposal.**~~ **Settled 5 Sep 2026** — the
+   procedure filters, sorts and pages. feature-rules §B carries the ruling.
 2. **XLSX at the ceiling.** ~12 s projected for 100 000 rows. CSV streams fine at
    that size; XLSX probably wants a lower threshold of its own, or to go to the
    export centre earlier. Needs a number from Ryan rather than a guess.
-3. **`@FiltersJson` is an extension to the eight-parameter template.** §3.1
-   requires per-column filters and the template has nowhere to put them. Opt-in,
-   so nothing existing changes — but it is a change to a documented contract.
+3. ~~**`@FiltersJson` is an extension to the eight-parameter template.**~~
+   **Accepted 5 Sep 2026.** The template in feature-rules §2 is now nine
+   parameters, with `@FiltersJson` documented as opt-in there. A procedure
+   without it stays valid and simply carries no header filters; a source built
+   for one that lacks it throws. Still unexercised end to end — no procedure in
+   the repo declares it yet.
 4. **`<x-reports::cell>` should be repointed at `App\Grid\StatusTone`.** The
    keyword→tone table now exists in both; the Reports copy came first and this
    one was lifted from it. That file belongs to another lane, so it is named

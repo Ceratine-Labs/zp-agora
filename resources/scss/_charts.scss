@@ -176,8 +176,11 @@
   .mini-fill { fill: var(--muted); }
   .mini-clamp { fill: var(--ink-2); }
 
-  &.tone-good .mini-fill { fill: var(--good); }
-  &.tone-crit .mini-fill { fill: var(--crit); }
+  // A filled bar, so the -fill step rather than the base token. The
+  // sparkline above keeps -ink deliberately: it is a 1px stroke, where more
+  // contrast is better, not less.
+  &.tone-good .mini-fill { fill: var(--good-fill); }
+  &.tone-crit .mini-fill { fill: var(--crit-fill); }
 }
 
 .mini-bar-none { color: var(--muted); font-size: 12px; }

@@ -91,6 +91,12 @@ export function tokens() {
         good: read('--good'),
         warn: read('--warn'),
         crit: read('--crit'),
+        // The -fill steps. Semantic colour used as a SHAPE rather than as
+        // text needs its own value: --warn is 1.83:1 on white and vanishes
+        // as a bar. See resources/scss/_tokens.scss.
+        goodFill: read('--good-fill'),
+        warnFill: read('--warn-fill'),
+        critFill: read('--crit-fill'),
         font: read('--font-text') || 'sans-serif',
     };
 }
@@ -468,8 +474,8 @@ function mix(spec) {
  * and the library draws the connectors between the steps that make it read as
  * one walk rather than five unrelated columns.
  *
- * The fills are semantic, not categorical: a step that helped is `--good`, one
- * that hurt is `--crit`, and the two ends are `--s1`. That is the one place a
+ * The fills are semantic, not categorical: a step that helped is `--good-fill`,
+ * one that hurt is `--crit-fill`, and the two ends are `--s1`. That is the one place a
  * status token belongs on a mark — the colour means good or bad here, it is not
  * an identity.
  *
@@ -507,8 +513,8 @@ function bridge(spec) {
             bar: { maxWidth: 64, borderRadius: 3, borderRadiusApplication: 'end' },
             waterfall: {
                 colors: {
-                    positive: 'token:--good',
-                    negative: 'token:--crit',
+                    positive: 'token:--good-fill',
+                    negative: 'token:--crit-fill',
                     total: 'token:--s1',
                     subtotal: 'token:--s1',
                 },
@@ -552,8 +558,8 @@ function bridge(spec) {
  *    nothing to diverge from, so it becomes an ordinary bar chart, and the
  *    caption still says what the baseline is.
  *
- * Colour is semantic and doubled by position: over the baseline is `--good` and
- * sits right of the line, under is `--crit` and sits left. Never colour alone.
+ * Colour is semantic and doubled by position: over the baseline is `--good-fill`
+ * and sits right of the line, under is `--crit-fill` and sits left. Never colour alone.
  */
 function diverging(spec) {
     const value = formatter(spec.format);
@@ -579,8 +585,8 @@ function diverging(spec) {
                 // computing it row by row where a later edit can get it wrong.
                 colors: {
                     ranges: [
-                        { from: -Number.MAX_VALUE, to: -Number.MIN_VALUE, color: 'token:--crit' },
-                        { from: 0, to: Number.MAX_VALUE, color: 'token:--good' },
+                        { from: -Number.MAX_VALUE, to: -Number.MIN_VALUE, color: 'token:--crit-fill' },
+                        { from: 0, to: Number.MAX_VALUE, color: 'token:--good-fill' },
                     ],
                 },
             },
