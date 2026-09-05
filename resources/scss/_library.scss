@@ -1,0 +1,473 @@
+/*
+ | The component library, part two.
+ |
+ | _components.scss carries the pieces that were already shipped — page head,
+ | card, KPI, chip, table, field, notice, sign-in. This file carries the rest of
+ | plan §3.8, and everything in it is lifted from
+ | docs/reference/agoraretailconsole.html with the mockup's own class names, so
+ | the design sheet ports across rather than being re-derived.
+ |
+ | Two rules hold everywhere below:
+ |
+ |   * **No colour is named here.** Every one comes from _tokens.scss, which is
+ |     what makes both themes work without a second stylesheet.
+ |   * **Every block ends at 375px.** The narrow-screen rules are at the bottom
+ |     of the file rather than scattered, so "what does this look like on a
+ |     phone" is one place to read instead of twenty.
+ */
+
+/* ============================================================ utilities
+
+   Small classes the mockup uses everywhere and that belong to no single
+   component. `.eyebrow` was previously scoped inside .page-head, which meant
+   the styleguide's own `<p class="eyebrow">` rendered as plain body text —
+   promoting it is a fix, not just a convenience.                            */
+
+.eyebrow {
+  font-size: 10.5px; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600; margin: 0;
+}
+.mono { font-family: var(--font-mono); }
+.num  { font-variant-numeric: tabular-nums; }
+
+/* The mockup's quiet secondary line — a date, a source, a count under a
+   heading. Named for the "as at" line it started as. */
+.asat { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.grid2 {
+  display: grid; gap: 14px; margin-bottom: 14px;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+}
+.grid3 {
+  display: grid; gap: 14px; margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+/* ============================================================ buttons
+
+   `.btn` is the mockup's own button, and it is an element class rather than a
+   component because it is what a caller puts INTO the `actions` slot of a
+   card, a runbar or a proposal. `.btn-primary` and `.btn-ghost` in
+   _components.scss are the older pair and still in use; this is the compact
+   one the toolbars are drawn with.                                          */
+
+.btn {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 5px 11px; font: inherit; font-size: 12.5px; font-weight: 500;
+  color: var(--ink); cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+
+  &:hover { border-color: var(--brand); color: var(--brand-ink); }
+  &.primary {
+    background: var(--brand); border-color: var(--brand); color: var(--surface);
+    &:hover { border-color: var(--brand-ink); background: var(--brand-ink); color: var(--surface); }
+  }
+  &.sm { padding: 3px 8px; font-size: 11.5px; }
+  &[disabled] { opacity: .45; cursor: not-allowed; &:hover { border-color: var(--line); color: var(--ink); } }
+}
+
+/* ============================================================ crumb */
+
+.crumb {
+  display: flex; align-items: center; min-width: 0;
+  font-size: 12px; color: var(--muted);
+
+  ol { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
+  b { color: var(--ink); font-weight: 600; }
+  a { color: inherit; text-decoration: none; &:hover { color: var(--brand-ink); } }
+  .sep { opacity: .5; }
+}
+
+/* ============================================================ tabs */
+
+.tabs {
+  display: flex; gap: 2px; flex-wrap: wrap;
+  padding: 0 12px; background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+
+  button, a {
+    background: none; border: 0; border-bottom: 2px solid transparent;
+    padding: 9px 12px; font: inherit; font-size: 12.5px; font-weight: 500;
+    color: var(--ink-2); cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+
+    &:hover { color: var(--ink); }
+    &.on { color: var(--brand-ink); border-bottom-color: var(--brand); font-weight: 600; }
+  }
+  .ct { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .on .ct { color: var(--brand-ink); }
+}
+
+/* The panes themselves are unstyled: a tab is a container, and what goes in it
+   is the screen's business.
+
+   The one rule is that `hidden` must win. `!important` is used sparingly in
+   this codebase and deliberately not at all in _select.scss — it earns its
+   place here because an attribute selector and a class have the same
+   specificity, so a later `.tabpane { display: flex }` on some screen would
+   silently beat it and show every pane at once. Bootstrap's reboot ships the
+   same rule for the same reason; this does not rely on it staying there. */
+.tabpane[hidden] { display: none !important; }
+
+/* ============================================================ params + runbar */
+
+.params {
+  display: grid; gap: 11px 14px; align-items: end;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+
+  .f {
+    display: flex; flex-direction: column; gap: 3px; min-width: 0;
+
+    label {
+      font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+      color: var(--muted); font-weight: 600;
+    }
+    select, input {
+      background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r);
+      padding: 5px 7px; font: inherit; font-size: 12.5px; width: 100%; color: var(--ink);
+      &:hover { border-color: var(--brand); }
+    }
+    /* Greyed rather than hidden: a report library where every screen shows the
+       same parameter set, dimmed where it does not apply, tells the reader
+       which parameters exist. Hiding them makes each report look like a
+       different application. */
+    &.dis {
+      label { opacity: .45; }
+      select, input { opacity: .45; pointer-events: none; }
+    }
+    .f-help  { font-size: 10.5px; color: var(--muted); }
+    .f-error { font-size: 11px; color: var(--crit-ink); }
+  }
+}
+
+.params-fold {
+  > summary {
+    cursor: pointer; list-style: none; padding: 4px 0 10px;
+    font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+    &::marker, &::-webkit-details-marker { display: none; }
+    &::before { content: '▸'; margin-right: 7px; }
+    &:hover { color: var(--brand-ink); }
+    &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  }
+  &[open] > summary::before { content: '▾'; }
+}
+
+.runbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 14px; background: var(--surface-2);
+  border-top: 1px solid var(--line-soft);
+
+  .status { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  /* The procedure name, per feature-rules §3.4. Pushed to the right so the
+     controls stay together on the left and the provenance sits at the end of
+     the line, where it is available without competing with them. */
+  .proc { margin-left: auto; font-size: 11px; color: var(--brand-ink); }
+  &[aria-busy="true"] .status { color: var(--ink-2); }
+}
+/* Without a procedure name there is nothing to push, so the status takes the
+   job of ending the line. */
+.runbar:not(:has(.proc)) .status { margin-left: auto; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 9px 12px; border-bottom: 1px solid var(--line-soft);
+  .count { margin-left: auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+}
+
+/* ============================================================ delta */
+
+.delta {
+  font-variant-numeric: tabular-nums; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 3px;
+  &.up   { color: var(--good-ink); }
+  &.dn   { color: var(--crit-ink); }
+  &.flat { color: var(--muted); }
+}
+
+/* ============================================================ note
+
+   The mockup's one-line brand-tinted note. There is no <x-note> component:
+   <x-notice tone="info"> is that thing, and a second component for it would be
+   a second version of one idea. The class is kept because the design sheet
+   uses it and because a caller writing a bare line inside a card body should
+   not have to reach for a component with a title slot.                      */
+
+.note {
+  background: var(--brand-soft);
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  border-radius: var(--r); padding: 9px 12px;
+  font-size: 12px; color: var(--brand-ink); margin-bottom: 12px;
+}
+
+/* ============================================================ checklist */
+
+.checklist {
+  list-style: none; margin: 0; padding: 0;
+
+  .step { border-bottom: 1px solid var(--line-soft); &:last-child { border-bottom: 0; } }
+
+  .step-in {
+    display: flex; align-items: center; gap: 12px; padding: 11px 14px;
+    color: inherit; text-decoration: none;
+  }
+  a.step-in:hover { background: var(--surface-2); }
+
+  .step-mark {
+    width: 22px; height: 22px; border-radius: 50%; flex: none;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; color: var(--surface);
+    background: var(--warn);
+  }
+  .is-done .step-mark { background: var(--good); }
+
+  .step-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+  .step-text .t { font-weight: 600; }
+  .chip { margin-left: auto; }
+}
+
+/* ============================================================ exceptions */
+
+.exlist { display: flex; flex-direction: column; }
+.exlist-scroll { max-height: 340px; overflow-y: auto; }
+
+.ex {
+  display: grid; grid-template-columns: 4px 1fr; gap: 0;
+  border-bottom: 1px solid var(--line-soft);
+  &:last-child { border-bottom: 0; }
+
+  .bar { background: var(--muted); }
+  &.critical .bar { background: var(--crit); }
+  &.serious  .bar { background: var(--serious); }
+  &.warning  .bar { background: var(--warn); }
+  &.good     .bar { background: var(--good); }
+
+  /* The mockup toggled a class on click and hid `.d` with CSS. This is a
+     <details>, so the browser hides it, opens it on Enter and Space, and
+     announces it as a disclosure. The visual result is the same and the
+     keyboard result is not. */
+  .body {
+    > summary {
+      padding: 10px 13px; cursor: pointer; list-style: none;
+      &::marker, &::-webkit-details-marker { display: none; }
+      &:hover { background: var(--surface-2); }
+      &:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+    }
+  }
+  .t { font-weight: 600; font-size: 13px; margin: 2px 0; }
+  .m { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .v { font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+  .d {
+    padding: 0 13px 12px; font-size: 12px; color: var(--ink-2);
+    p { margin: 0 0 8px; }
+  }
+}
+
+/* ============================================================ decisions */
+
+.decisions { display: flex; flex-direction: column; }
+
+.decision {
+  display: flex; align-items: center; gap: 12px; padding: 10px 13px;
+  border-bottom: 1px solid var(--line-soft); color: inherit; text-decoration: none;
+  &:last-child { border-bottom: 0; }
+
+  .decision-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .who { font-weight: 600; }
+  .amount { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+}
+a.decision:hover { background: var(--surface-2); }
+
+/* ============================================================ proposal */
+
+.proposal {
+  border: 1px solid var(--line); border-left: 3px solid var(--muted);
+  border-radius: var(--r); background: var(--surface-2); padding: 12px 14px;
+
+  &.conf-certain { border-left-color: var(--good); }
+  &.conf-likely  { border-left-color: var(--warn); }
+  &.conf-review  { border-left-color: var(--serious); }
+  &.conf-manual  { border-left-color: var(--crit); }
+
+  .proposal-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .proposal-val {
+    font-family: var(--font-display); font-size: 20px; font-weight: 600;
+    line-height: 1.15; margin-top: 6px;
+  }
+  /* The evidence is the point of the component, so it is body text rather than
+     a footnote: a proposal a person cannot audit is one they will rubber-stamp
+     or ignore, and both are worse than no proposal. */
+  .evidence {
+    margin: 8px 0 0; padding-left: 18px;
+    font-size: 12px; color: var(--ink-2);
+    li { margin-bottom: 3px; }
+  }
+  .proposal-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+}
+
+/* ============================================================ tooltip */
+
+.tip {
+  position: fixed; z-index: 95; max-width: 250px;
+  background: var(--chrome); color: var(--chrome-ink);
+  border-radius: var(--r); padding: 8px 10px;
+  font-size: 11.5px; line-height: 1.5;
+  box-shadow: var(--shadow-pop); pointer-events: none;
+
+  b { color: var(--surface); font-weight: 600; }
+  .r { display: flex; gap: 10px; justify-content: space-between; }
+  .r span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+}
+
+/* ============================================================ report library */
+
+.libcard {
+  display: block; padding: 14px 16px; border-bottom: 1px solid var(--line-soft);
+  color: inherit; text-decoration: none;
+  &:last-child { border-bottom: 0; }
+
+  .libcard-h { display: flex; align-items: flex-start; gap: 12px; }
+  .libcard-text { flex: 1; min-width: 0; }
+  .libcard-name { font-weight: 600; font-size: 14.5px; }
+  .libcard-desc { color: var(--ink-2); margin-top: 2px; max-width: 86ch; }
+  .libcard-tags { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; flex: none; }
+}
+a.libcard:hover { background: var(--surface-2); }
+
+.libmeta {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-top: 7px;
+  font-size: 11px; color: var(--muted);
+}
+
+/* ============================================================ sign in extras */
+
+.rolebtn {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 14px 16px; margin-bottom: 9px; cursor: pointer;
+  color: inherit; text-decoration: none; font: inherit;
+
+  &:hover { border-color: var(--brand); background: var(--brand-soft); }
+
+  .rolebtn-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+  .rolebtn-label { font-weight: 600; font-size: 15px; }
+  .rolebtn-detail { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  .rolebtn-go { font-size: 18px; flex: none; }
+}
+
+.signin-state {
+  margin-top: 10px; padding-top: 18px; border-top: 1px solid var(--chrome-line);
+  .eyebrow { color: var(--chrome-muted); margin-bottom: 10px; }
+}
+.signin-state-row {
+  display: flex; align-items: center; gap: 10px; padding: 5px 0;
+  font-size: 13px; color: var(--chrome-ink); text-decoration: none;
+}
+a.signin-state-row:hover { color: var(--sand); }
+.sdot {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: var(--muted);
+  &.good { background: var(--good); }
+  &.warn { background: var(--warn); }
+  &.crit { background: var(--crit); }
+}
+
+/* ============================================================ sqlbox */
+
+.sqlwrap {
+  > summary {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    cursor: pointer; list-style: none; padding: 8px 0;
+    &::marker, &::-webkit-details-marker { display: none; }
+    &::before { content: '▸'; color: var(--muted); }
+    &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  }
+  &[open] > summary::before { content: '▾'; }
+  .sqlwrap-proc { font-size: 11px; color: var(--brand-ink); }
+}
+
+.sqlbox {
+  background: var(--chrome); color: var(--chrome-ink);
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6;
+  padding: 14px; border-radius: var(--r);
+  overflow: auto; max-height: 300px; white-space: pre; margin: 0;
+  code { font: inherit; color: inherit; background: none; padding: 0; }
+}
+
+/* ============================================================ the gallery
+
+   /dev/components only, and not registered outside local and testing. It lives
+   here rather than in a stylesheet of its own so that it cannot drift from the
+   components it exists to display.                                          */
+
+.gal-nav {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px;
+  a {
+    font-size: 11.5px; padding: 4px 10px; border-radius: 100px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--ink-2); text-decoration: none;
+    &:hover { border-color: var(--brand); color: var(--brand-ink); }
+  }
+}
+.gal-variant {
+  padding: 14px; border-bottom: 1px solid var(--line-soft);
+  &:last-child { border-bottom: 0; }
+  > .eyebrow { margin-bottom: 10px; }
+}
+.gal-slot {
+  border: 2px dashed var(--line); border-radius: 8px;
+  padding: 26px 18px; text-align: center; color: var(--muted); font-size: 12.5px;
+  .gal-slot-name { font-family: var(--font-display); font-size: 18px; color: var(--ink-2); }
+}
+table.gal-props {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+  th, td { text-align: left; padding: 5px 9px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th {
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line);
+  }
+  td:first-child { font-family: var(--font-mono); white-space: nowrap; color: var(--brand-ink); }
+  td.gal-type { font-family: var(--font-mono); color: var(--muted); white-space: nowrap; }
+}
+
+/* ============================================================ narrow screens
+
+   375px is a target, not an afterthought. Everything above either already
+   reflows on its own (the grids are all auto-fit) or is corrected here.     */
+
+@media (max-width: 720px) {
+  .grid2, .grid3 { grid-template-columns: 1fr; }
+
+  /* Two across rather than one: four KPI tiles stacked is four screens of
+     scrolling before the work starts. */
+  .kpis, .kpi-strip { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi { padding: 11px 12px 9px; .val, .kpi-value { font-size: 26px; } }
+
+  .statstrip { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  .statstrip .s, .statstrip .stat { padding: 9px 12px; }
+
+  /* One column, so a label and its control are never squeezed to 60px. */
+  .params { grid-template-columns: 1fr; }
+
+  /* The buttons wrap above the status rather than pushing it off the row. */
+  .runbar { align-items: stretch; }
+  .runbar .btn { justify-content: center; }
+  .runbar .proc, .runbar:not(:has(.proc)) .status { margin-left: 0; }
+
+  /* Horizontal scroll for the tab strip beats wrapping to four rows and
+     pushing the pane below the fold. */
+  .tabs {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  .libcard .libcard-h { flex-direction: column; gap: 8px; }
+  .decision { flex-wrap: wrap; }
+  .checklist .step-in { flex-wrap: wrap; }
+  .checklist .chip { margin-left: 34px; }
+
+  /* A fixed tooltip on a phone is a box over the thing it describes. The
+     content is always duplicated somewhere permanent, so dropping it costs
+     nothing and stops it covering the answer. */
+  .tip { display: none; }
+}

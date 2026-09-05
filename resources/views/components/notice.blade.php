@@ -19,7 +19,7 @@
 @php($class = 'notice notice-'.$tone.($collapsible ? ' notice-fold' : ''))
 
 @if ($collapsible && $title)
-    <details {{ $attributes->merge(['class' => $class]) }} @open($open)>
+    <details {{ $attributes->merge(['class' => $class]) }} @if ($open) open @endif>
         <summary><h3>{{ $title }}</h3></summary>
         <div class="notice-body">{{ $slot }}</div>
     </details>
