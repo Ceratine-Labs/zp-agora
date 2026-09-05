@@ -16,6 +16,7 @@
 //   library    → the rest of plan §3.8, in the mockup's own class names
 //   select     → the TomSelect skin, over the bootstrap5 CSS select.js loads
 //   reports    → the Reports module's screens, which build on the above
+//   grid       → <x-data-grid> and <x-drawer>, which compose .dt above
 
 @use "fonts";
 @use "bootstrap/scss/bootstrap";
@@ -28,3 +29,4 @@
 @use "select";
 @use "charts";
 @use "reports";
+@use "grid";

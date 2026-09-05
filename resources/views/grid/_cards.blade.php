@@ -1,0 +1,60 @@
+{{--
+    The grid on a phone: a card per row, three columns on the face, the rest
+    behind an expand (plan §3.9, "clean over capable").
+
+    Rendered alongside the table rather than instead of it, and the stylesheet
+    shows one or the other. Two reasons, and the second is the one that decided
+    it: server-side device detection is T016 and does not exist yet, so a
+    server-rendered choice would have to guess; and a viewport is a spectrum —
+    a narrow desktop window is the same problem as a phone and a media query
+    answers both without a preference to set.
+
+    The cost is duplicated markup for the rows on the page. That is fifty rows
+    of three fields, not fifty rows of twenty, and it is bounded by the page
+    size rather than by the answer.
+
+    Three columns because that is what fits at 375px without the card becoming
+    a table with rounded corners. WHICH three is the user's: the chooser sets
+    the order and the visibility, and the cards take the first three of what
+    survives.
+
+    Props: $grid, $slug
+--}}
+@php
+    $face = $grid->cardColumns();
+    $rest = $grid->cardRest();
+    $definition = $grid->definition;
+@endphp
+
+<ul class="dg-cards" data-cards>
+    @foreach ($grid->rows as $index => $row)
+        <li class="dg-card">
+            <div class="dg-card-face">
+                @foreach ($face as $view)
+                    @php($column = $view->column)
+                    <div @class(['dg-card-field', 'is-lead' => $loop->first, 'num' => $column->isNumeric()])>
+                        <span class="dg-card-label">{{ $column->label }}</span>
+                        <span class="dg-card-value">
+                            @include($definition->cellsPartial(), ['row' => $row, 'column' => $column, 'grid' => $grid])
+                        </span>
+                    </div>
+                @endforeach
+            </div>
+
+            @if ($rest !== [])
+                <details class="dg-card-more">
+                    <summary>{{ count($rest) }} more</summary>
+                    <dl>
+                        @foreach ($rest as $view)
+                            @php($column = $view->column)
+                            <dt>{{ $column->label }}</dt>
+                            <dd @class(['num' => $column->isNumeric()])>
+                                @include($definition->cellsPartial(), ['row' => $row, 'column' => $column, 'grid' => $grid])
+                            </dd>
+                        @endforeach
+                    </dl>
+                </details>
+            @endif
+        </li>
+    @endforeach
+</ul>

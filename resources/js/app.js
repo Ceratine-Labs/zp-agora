@@ -10,6 +10,7 @@ import tabs from './components/tabs';
 import disclosure from './components/disclosure';
 import runbar from './components/runbar';
 import tip from './components/tip';
+import dataGrid from './components/data-grid';
 import * as format from './format';
 
 megaMenu();
@@ -45,3 +46,7 @@ window.Agora = { notify, format, tip: tip() };
 // After the global exists — it asks through window.Agora.notify, so that the
 // dialog is the same one every other confirmation in the application uses.
 confirmForm();
+
+// Same reason: the column chooser's reset asks before it forgets a layout, and
+// the drawer's copy button reports through the shared toast.
+dataGrid();
