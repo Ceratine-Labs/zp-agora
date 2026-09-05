@@ -15,6 +15,7 @@
 //   components → the shared component library
 //   select     → the TomSelect skin, over the bootstrap5 CSS select.js loads
 //   reports    → the Reports module's screens, which build on the above
+//   grid       → <x-data-grid> and <x-drawer>, which compose .dt above
 
 @use "fonts";
 @use "bootstrap/scss/bootstrap";
@@ -25,3 +26,4 @@
 @use "components";
 @use "select";
 @use "reports";
+@use "grid";

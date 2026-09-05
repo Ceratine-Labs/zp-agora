@@ -1,0 +1,312 @@
+// The data grid, and the drawer.
+//
+// It composes <x-table>'s .dt rather than restating it: the scroll container,
+// the sticky header, the .num / .mono / .pick cells and the footer that names
+// the procedure are all already there and already right. What is here is the
+// part a grid has and a table does not — the toolbar, the filter row, the
+// chooser, the resize handle, the totals row, the mobile cards and the drawer.
+//
+// Every colour is a token. There is no hex in this file, which is the rule for
+// every component and the only way a screen renders correctly in both themes
+// without being checked in both by hand.
+
+.data-grid {
+  margin-bottom: 18px;
+
+  // The scope form sits above the grid rather than in a card of its own: the
+  // grid IS the answer to the parameters, and putting a border between them
+  // makes them read as two things.
+  .dg-scope { padding: 0 0 14px; }
+  .dg-scope .form-actions { margin-top: 12px; }
+}
+
+/* ------------------------------------------------------------------ toolbar */
+
+.dg-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line); border-bottom: 0;
+  border-radius: var(--r) var(--r) 0 0;
+  font-size: 12px; color: var(--muted);
+
+  .dg-bar-gap { margin-left: auto; }
+  .dg-shown { font-variant-numeric: tabular-nums; }
+  .dg-ms { opacity: .7; }
+
+  // The buttons in the bar are the ghost button at a smaller size. Restating
+  // the whole button here would be a second button that drifts.
+  .btn-ghost, > summary { padding: 5px 11px; font-size: 12px; }
+}
+
+.dg-selection {
+  display: flex; align-items: center; gap: 10px;
+  padding: 3px 10px; border-radius: 100px;
+  background: var(--brand-soft); color: var(--brand-ink);
+  strong { font-variant-numeric: tabular-nums; }
+  .btn-ghost { border-color: transparent; color: inherit; }
+}
+
+/* ------------------------------------------------------------------ chooser */
+
+.dg-chooser {
+  position: relative;
+
+  > summary {
+    // The <details> marker is removed and the summary is styled as the button
+    // it reads as. The browser still supplies the keyboard behaviour.
+    list-style: none; cursor: pointer; display: inline-block;
+    background: transparent; color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: var(--r);
+    &::marker, &::-webkit-details-marker { display: none; }
+    &:hover { border-color: var(--brand); color: var(--brand-ink); }
+  }
+
+  &[open] > summary { border-color: var(--brand); color: var(--brand-ink); }
+}
+
+.dg-chooser-panel {
+  position: absolute; z-index: 20; right: 0; top: calc(100% + 6px);
+  width: 272px; max-height: 60vh; overflow: auto;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--shadow-pop);
+  padding: 10px;
+}
+
+.dg-chooser-note { font-size: 11px; color: var(--muted); margin: 0 0 8px; line-height: 1.45; }
+
+.dg-chooser-list {
+  list-style: none; margin: 0; padding: 0;
+
+  li {
+    display: flex; align-items: center; gap: 4px;
+    padding: 3px 2px; border-radius: 4px;
+    &:hover { background: var(--surface-2); }
+    label { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; font-size: 12.5px; cursor: pointer; }
+    span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+}
+
+.dg-nudge {
+  background: none; border: 0; cursor: pointer; color: var(--muted);
+  font-size: 12px; line-height: 1; padding: 3px 4px; border-radius: 3px;
+  &:hover { background: var(--surface-3); color: var(--brand-ink); }
+}
+
+.dg-chooser-foot {
+  display: flex; align-items: end; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line-soft);
+
+  .btn-ghost { padding: 5px 11px; font-size: 12px; margin-left: auto; }
+}
+
+.dg-chooser-size {
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+
+  select {
+    background: var(--surface); color: var(--ink); font: inherit; font-size: 12px;
+    text-transform: none; letter-spacing: 0;
+    border: 1px solid var(--line); border-radius: var(--r); padding: 4px 6px;
+  }
+}
+
+/* -------------------------------------------------------------------- table */
+
+table.dg {
+  // The header is a link, so it must not also inherit the anchor colour — the
+  // heading is a heading first and a control second.
+  thead th a { color: inherit; text-decoration: none; display: inline-block;
+                &:hover { color: var(--brand-ink); } }
+  thead th[aria-sort] { color: var(--brand-ink); }
+
+  // A resize handle in the header's right-hand edge. It can be absolutely
+  // positioned without adding a containing block: .dt already makes every
+  // thead th `position: sticky`, and a sticky element is a positioned one.
+  .dg-resize {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 7px;
+    cursor: col-resize; touch-action: none;
+    &:hover { background: var(--brand); opacity: .35; }
+  }
+
+  // A prose column wraps and claims room; everything else stays on one line so
+  // the eye can run down a column of figures. `num` and `mono` are already
+  // styled by table.dt, which this composes.
+  td.wide, th.wide { white-space: normal; min-width: 220px; }
+
+  tr.dg-total td {
+    background: var(--surface-3); font-weight: 600;
+    border-top: 1px solid var(--line); border-bottom: 0;
+    position: sticky; bottom: 0;
+  }
+}
+
+.dg-filters {
+  th { background: var(--surface-2); padding: 4px 8px 7px; border-bottom: 1px solid var(--line); }
+
+  input, select {
+    width: 100%; min-width: 0;
+    background: var(--surface); color: var(--ink); font: inherit; font-size: 12px;
+    border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px;
+    text-transform: none; letter-spacing: 0;
+    &:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+  }
+}
+
+// Comparator then value, with the comparator only as wide as a glyph needs.
+.dg-filter { display: flex; gap: 3px; align-items: center;
+  select { flex: 0 0 46px; text-align: center; } }
+
+/* ------------------------------------------------------------- text sizes */
+
+.dg-text-compact table.dg { font-size: 12px; th, td { padding: 4px 9px; } }
+.dg-text-normal  table.dg { font-size: 13px; }
+.dg-text-large   table.dg { font-size: 14.5px; th, td { padding: 9px 13px; } }
+
+// The loading state. It sits above the table and the rows below it dim rather
+// than disappear — the figures the person was reading stay readable while the
+// next page is fetched, which is the difference between "working" and "broken".
+.dg-busy {
+  margin: 0; padding: 7px 12px;
+  background: var(--brand-soft); color: var(--brand-ink);
+  border: 1px solid var(--line); border-bottom: 0;
+  font-size: 12px;
+
+  &::after {
+    content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 7px;
+    border-radius: 50%; background: currentColor;
+    animation: dg-pulse 1s ease-in-out infinite;
+  }
+}
+
+@keyframes dg-pulse { 0%, 100% { opacity: .25 } 50% { opacity: 1 } }
+
+@media (prefers-reduced-motion: reduce) {
+  .dg-busy::after { animation: none; opacity: .8; }
+}
+
+.data-grid.is-busy {
+  .table-scroll, .dg-cards { opacity: .55; transition: opacity .12s linear; }
+  .pager, .dg-bar { pointer-events: none; opacity: .55; }
+}
+
+// Fixed layout is what makes a saved pixel width mean anything: under auto
+// layout the browser re-divides the space and the width is only a suggestion.
+// Applied from the server when the user has saved any width at all.
+table.dg.is-fixed { table-layout: fixed; }
+
+.dg-limit {
+  margin: 0; padding: 9px 12px; font-size: 12px; color: var(--muted);
+  background: var(--surface-2); border: 1px solid var(--line); border-top: 0;
+}
+
+// The grid's own pager sits under the table it belongs to and reuses the
+// Reports pager, so the two screens do not disagree about what a pager is.
+.data-grid .pager { border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--r) var(--r); }
+
+.data-grid.is-resizing { cursor: col-resize; user-select: none; }
+
+/* ------------------------------------------------------------ mobile cards */
+
+// Rendered alongside the table; one of the two shows. See grid/_cards.blade.php
+// for why it is a media query and not a device decision.
+.dg-cards { display: none; }
+
+@media (max-width: 720px) {
+  .data-grid .table-scroll { display: none; }
+
+  .dg-cards {
+    display: block; list-style: none; margin: 0; padding: 0;
+    border: 1px solid var(--line); border-top: 0;
+  }
+
+  .dg-card {
+    padding: 10px 12px; border-bottom: 1px solid var(--line-soft);
+    background: var(--surface);
+    &:last-child { border-bottom: 0; }
+  }
+
+  .dg-card-face { display: flex; flex-direction: column; gap: 2px; }
+
+  .dg-card-field {
+    display: flex; align-items: baseline; gap: 10px; font-size: 13px;
+    .dg-card-label { font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+                     color: var(--muted); flex: 0 0 34%; }
+    .dg-card-value { flex: 1; min-width: 0; }
+    &.num .dg-card-value { text-align: right; font-variant-numeric: tabular-nums; }
+    &.is-lead .dg-card-value { font-family: var(--font-display); font-size: 16px; }
+  }
+
+  .dg-card-more {
+    margin-top: 7px;
+    > summary { cursor: pointer; font-size: 11.5px; color: var(--brand-ink); }
+    dl { display: grid; grid-template-columns: 34% 1fr; gap: 3px 10px; margin: 7px 0 0; font-size: 12.5px; }
+    dt { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+    dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+    dd.num { text-align: right; font-variant-numeric: tabular-nums; }
+  }
+
+  // The toolbar's shown-count and the chooser still make sense on a phone; the
+  // panel does not want to be 272px pinned to the right of a 375px screen.
+  .dg-chooser-panel { position: fixed; right: 8px; left: 8px; width: auto; top: auto; bottom: 8px; }
+}
+
+/* ------------------------------------------------------------------ drawer */
+
+.drawer {
+  position: fixed; inset: 0; z-index: 80;
+
+  .drawer-scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--chrome) 55%, transparent); }
+
+  .drawer-panel {
+    position: absolute; right: 0; top: 0; bottom: 0;
+    width: min(620px, 94vw);
+    background: var(--surface); color: var(--ink);
+    border-left: 1px solid var(--line); box-shadow: var(--shadow-pop);
+    display: flex; flex-direction: column;
+  }
+
+  &.is-wide .drawer-panel { width: min(980px, 96vw); }
+}
+
+.drawer-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 13px 16px; border-bottom: 1px solid var(--line);
+
+  h3 { font-family: var(--font-display); font-size: 19px; font-weight: 600; margin: 0; }
+  .drawer-meta { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .drawer-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-ghost { padding: 5px 11px; font-size: 12px; }
+}
+
+.drawer-body {
+  flex: 1; overflow: auto; padding: 14px 16px;
+
+  textarea {
+    width: 100%; background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: var(--r); padding: 10px;
+    font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55;
+    white-space: pre; resize: vertical;
+  }
+}
+
+.drawer-note {
+  background: var(--brand-soft); color: var(--brand-ink);
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  border-radius: var(--r); padding: 9px 12px; font-size: 12px; margin: 0 0 12px; line-height: 1.5;
+}
+
+.dg-extract-facts {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 14px;
+  margin: 0 0 14px; font-size: 12.5px;
+  dt { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+  dd { margin: 0; }
+}
+
+.dg-extract-actions { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 12px; }
+.dg-extract-note { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 0 0 14px; }
+.dg-extract-label {
+  display: block; font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 4px;
+}

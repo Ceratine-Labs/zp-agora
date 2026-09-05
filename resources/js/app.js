@@ -6,6 +6,7 @@ import notify from './components/notify';
 import rowDetail from './components/row-detail';
 import confirmForm from './components/confirm-form';
 import checkAll from './components/check-all';
+import dataGrid from './components/data-grid';
 
 megaMenu();
 themeToggle();
@@ -24,3 +25,7 @@ window.Agora = { notify };
 // After the global exists — it asks through window.Agora.notify, so that the
 // dialog is the same one every other confirmation in the application uses.
 confirmForm();
+
+// Same reason: the column chooser's reset asks before it forgets a layout, and
+// the drawer's copy button reports through the shared toast.
+dataGrid();
