@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\Auth\LoginController;
+use Modules\Core\Http\Controllers\ChartGalleryController;
 use Modules\Core\Http\Controllers\StyleguideController;
 
 // Outside /app: these are the only pages reachable without a session.
@@ -20,6 +21,7 @@ Route::post('logout', [LoginController::class, 'destroy'])->middleware('auth')->
  */
 if (app()->environment('local', 'testing')) {
     Route::get('dev/theme', StyleguideController::class)->name('dev.theme');
+    Route::get('dev/charts', ChartGalleryController::class)->name('dev.charts');
 }
 
 Route::redirect('/', '/app');
