@@ -44,3 +44,6 @@ Thumbs.db
 # the customer's instance. They hold live credentials.
 .env.local-stub.bak
 .env.zp-live.bak
+
+# Agent worktrees and local Claude Code state. Never committed.
+/.claude/

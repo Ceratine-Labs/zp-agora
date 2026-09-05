@@ -185,9 +185,18 @@ class GridComponentTest extends TestCase
     {
         $html = $this->render($this->grid($this->rows()));
 
-        $this->assertStringContainsString('chip tone-good', $html, '"Balanced" is good');
-        $this->assertStringContainsString('chip tone-warn', $html, '"Still open" is a warning');
-        $this->assertStringContainsString('chip tone-serious', $html, '"does not agree" is serious');
+        // <x-chip> carries the mockup's bare tone name AND the longer tone-
+        // alias, so the two are no longer adjacent in the class attribute.
+        // Assert on both spellings rather than on their order: the alias is
+        // what the existing Recon and Reports screens style against, and the
+        // bare name is what the mockup's CSS ports to.
+        foreach (['good' => '"Balanced" is good',
+            'warn' => '"Still open" is a warning',
+            'serious' => '"does not agree" is serious'] as $tone => $why) {
+            $this->assertMatchesRegularExpression('/class="[^"]*\bchip\b[^"]*"/', $html, $why);
+            $this->assertMatchesRegularExpression('/class="[^"]*\b'.$tone.'\b[^"]*"/', $html, $why);
+            $this->assertStringContainsString('tone-'.$tone, $html, $why);
+        }
     }
 
     public function test_numeric_and_wide_columns_carry_their_classes(): void
