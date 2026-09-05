@@ -4,12 +4,12 @@
         title="Today"
         blurb="The work that has to happen before this day can be closed." />
 
-    <div class="kpi-strip">
+    <x-kpi-strip>
         <x-kpi label="Trading sites" :value="$branchCount" note="from your branch list" />
         <x-kpi label="Administrative entities" :value="$entityCount" note="no trading day to close" />
         <x-kpi label="Workspace" :value="$context->workspace() === 'branch' ? 'Branch' : 'Head office'"
                :note="$context->id() ? 'branch '.$context->id() : 'all sites in scope'" />
-    </div>
+    </x-kpi-strip>
 
     <x-card title="The shell is up" sub="What this page proves, and what it does not">
         <p>The menu above is read from <code>agora.MenuSection</code> and <code>agora.MenuItem</code> — no

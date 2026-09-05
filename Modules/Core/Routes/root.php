@@ -31,12 +31,20 @@ Route::middleware('guest')->group(function () {
 Route::post('logout', [LoginController::class, 'destroy'])->middleware('auth')->name('logout');
 
 /*
- | The styleguide. Not registered outside local and testing: it is a
+ | The component gallery. Not registered outside local and testing: it is a
  | development surface, and shipping a page that enumerates the whole design to
  | a production URL invites it to be treated as documentation for people who
  | should be looking at the real screens.
+ |
+ | Two URLs, one controller, one view — deliberately not two galleries.
+ | /dev/components is the name the work is filed under; /dev/theme is kept
+ | because tests/e2e/format.spec.js loads it five times and is the only guard
+ | on App\Support\Format agreeing with resources/js/format.js. Retiring that
+ | URL would mean editing that guard, and a guard edited without a browser to
+ | prove the edit is a guard nobody should trust.
  */
 if (app()->environment('local', 'testing')) {
+    Route::get('dev/components', StyleguideController::class)->name('dev.components');
     Route::get('dev/theme', StyleguideController::class)->name('dev.theme');
     Route::get('dev/charts', ChartGalleryController::class)->name('dev.charts');
 }

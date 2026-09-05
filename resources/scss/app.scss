@@ -12,7 +12,8 @@
 //   bridge     → repoints Bootstrap's --bs-* at those tokens
 //   base       → element defaults
 //   shell      → app bar, mega menus, scope bar, page frame
-//   components → the shared component library
+//   components → the shared component library, part one
+//   library    → the rest of plan §3.8, in the mockup's own class names
 //   select     → the TomSelect skin, over the bootstrap5 CSS select.js loads
 //   reports    → the Reports module's screens, which build on the above
 
@@ -23,6 +24,7 @@
 @use "base";
 @use "shell";
 @use "components";
+@use "library";
 @use "select";
 @use "charts";
 @use "reports";

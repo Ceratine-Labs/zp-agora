@@ -77,12 +77,14 @@
             "vendor/bin/phpstan analyse --memory-limit=512M --no-progress",
             "scripts/check-migrations.sh",
             "scripts/check-procs.sh",
+            "scripts/check-components.sh",
             "@php artisan test"
         ],
         "check-fast": [
             "vendor/bin/pint --test",
             "scripts/check-migrations.sh",
-            "scripts/check-procs.sh"
+            "scripts/check-procs.sh",
+            "scripts/check-components.sh"
         ]
     },
     "extra": {
