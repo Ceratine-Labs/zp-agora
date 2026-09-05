@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\Access\Authorizable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Route;
 
 /**
  * An Agora user.
@@ -25,6 +26,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $LastSignInAt
  * @property string|null $RememberToken
  * @property int|null $LegacyUserId
+ * @property string|null $UserCode
+ * @property string|null $UserType
+ * @property string|null $LegacyUserType
+ * @property bool $MustChangePassword
+ * @property Carbon|null $PasswordChangedAt
  * @property-read Role|null $role
  * @property-read Branch|null $homeBranch
  *
@@ -32,17 +38,28 @@ use Illuminate\Support\Carbon;
  * names rather than the table being bent to Laravel's defaults: the key is
  * `Id`, the password is `PasswordHash`, the remember token is `RememberToken`.
  *
- * `LegacyUserId` links back to dbo.SS_Users. The 88 legacy rows carry
+ * `LegacyUserId` links back to dbo.SS_Users. Those 85 legacy rows carry
  * `Password varchar(50)` — plaintext or a legacy hash, either way not
- * something to import as a credential. Migrating those users (T007) means
- * creating Agora rows and making everyone set a password, not copying that
- * column across.
+ * something to import as a credential. `agora.usp_Core_MigrateUsers` therefore
+ * creates Agora rows and makes everyone set a password: it never selects that
+ * column, and every user it writes arrives with PasswordHash =
+ * self::UNUSABLE_PASSWORD and MustChangePassword set.
  */
 class User extends BaseModel implements AuthenticatableContract
 {
     use Authorizable;
     use Notifiable;
     use SoftDeletes;
+
+    /**
+     * What a migrated user's PasswordHash is set to.
+     *
+     * Not a hash of anything. No bcrypt digest can equal it, so
+     * `password_verify()` refuses every attempt — which is what makes
+     * "passwords reset on first login" a property of the data rather than a
+     * rule somebody has to remember to apply.
+     */
+    public const UNUSABLE_PASSWORD = '!reset-required';
 
     protected $table = 'User';
 
@@ -54,6 +71,8 @@ class User extends BaseModel implements AuthenticatableContract
         'IsActive' => 'boolean',
         'IsLocked' => 'boolean',
         'LastSignInAt' => 'datetime',
+        'PasswordChangedAt' => 'datetime',
+        'MustChangePassword' => 'boolean',
         'PasswordHash' => 'hashed',
     ];
 
@@ -89,6 +108,54 @@ class User extends BaseModel implements AuthenticatableContract
     public function canSignIn(): bool
     {
         return $this->IsActive && ! $this->IsLocked;
+    }
+
+    /**
+     * True when this account has no password anyone could use.
+     *
+     * Read off the stored value rather than off MustChangePassword: the flag
+     * is a policy and the sentinel is a fact, and it is the fact that decides
+     * whether "Forgot your password?" is the only way in.
+     */
+    public function hasUnusablePassword(): bool
+    {
+        return ($this->attributes['PasswordHash'] ?? null) === self::UNUSABLE_PASSWORD;
+    }
+
+    /**
+     * Put this account beyond signing in until somebody resets it.
+     *
+     * Written straight into the attribute bag, PAST the `hashed` cast, and
+     * that is the whole reason this method exists. The cast hashes anything
+     * that is not already a hash — so `$user->PasswordHash =
+     * User::UNUSABLE_PASSWORD` would store bcrypt('!reset-required') and the
+     * literal string '!reset-required' would then BE the password. A sentinel
+     * that can be typed is not a sentinel.
+     *
+     * usp_Core_MigrateUsers writes the same value in T-SQL, where no cast can
+     * reach it; this is the PHP-side equivalent for T008's user editor.
+     */
+    public function makePasswordUnusable(): self
+    {
+        $this->attributes['PasswordHash'] = self::UNUSABLE_PASSWORD;
+        $this->attributes['MustChangePassword'] = true;
+
+        return $this;
+    }
+
+    /**
+     * Where this person lands after signing in.
+     *
+     * The route is on the ROLE row, so "where does Finance land" is data the
+     * business changes without a deploy. A route that does not exist yet — and
+     * most of them do not, since the epics behind them are unbuilt — falls back
+     * to the dashboard rather than 500ing on the one page everybody uses.
+     */
+    public function landingRoute(): string
+    {
+        $route = $this->role?->LandingRoute;
+
+        return $route && Route::has($route) ? $route : 'app.dashboard';
     }
 
     // ---- Authenticatable, pointed at the estate's column names -------------
