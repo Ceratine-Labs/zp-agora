@@ -186,26 +186,34 @@
              --------------------------------------------------------------- --}}
         <x-card title="Sparkline"
                 sub="Inline SVG, no library — four elements. It goes in a KPI card and, one day, in a grid cell, where a chart library per instance would be absurd. By default it takes the colour of the text around it.">
-            <div class="kpi-strip">
-                <div class="kpi tone-neutral">
-                    <span class="kpi-label">Litres dispensed</span>
-                    <span class="kpi-value">{{ \App\Support\Format::lk(array_sum($dailyLitres)) }}</span>
-                    <span class="kpi-note">31 days · group</span>
-                    <x-sparkline :values="$dailyLitres" tone="s1" label="Litres dispensed per day, August 2026" />
-                </div>
-                <div class="kpi tone-good">
-                    <span class="kpi-label">Blended margin</span>
-                    <span class="kpi-value">{{ \App\Support\Format::cpl(collect($daily)->avg('cpl')) }}</span>
-                    <span class="kpi-note">Inherits the card's colour</span>
-                    <x-sparkline :values="collect($daily)->pluck('cpl')->all()" label="Blended fuel margin per day" />
-                </div>
-                <div class="kpi tone-neutral">
-                    <span class="kpi-label">Fuel gross profit</span>
-                    <span class="kpi-value">{{ \App\Support\Format::rk(collect($daily)->sum('gp')) }}</span>
-                    <span class="kpi-note">31 days · group</span>
-                    <x-sparkline :values="collect($daily)->pluck('gp')->all()" tone="s3" label="Fuel gross profit per day" />
-                </div>
-            </div>
+            {{-- The sparkline goes in <x-kpi>'s `spark` slot, which is what
+                 that slot is for. This block hand-wrote the tiles while the
+                 two lanes were separate; check-components.sh caught it on
+                 merge, which is the rule working. --}}
+            <x-kpi-strip>
+                <x-kpi label="Litres dispensed"
+                       :value="\App\Support\Format::lk(array_sum($dailyLitres))"
+                       note="31 days · group">
+                    <x-slot:spark>
+                        <x-sparkline :values="$dailyLitres" tone="s1" label="Litres dispensed per day, August 2026" />
+                    </x-slot:spark>
+                </x-kpi>
+                <x-kpi label="Blended margin"
+                       :value="\App\Support\Format::cpl(collect($daily)->avg('cpl'))"
+                       tone="good"
+                       note="Inherits the card's colour">
+                    <x-slot:spark>
+                        <x-sparkline :values="collect($daily)->pluck('cpl')->all()" label="Blended fuel margin per day" />
+                    </x-slot:spark>
+                </x-kpi>
+                <x-kpi label="Fuel gross profit"
+                       :value="\App\Support\Format::rk(collect($daily)->sum('gp'))"
+                       note="31 days · group">
+                    <x-slot:spark>
+                        <x-sparkline :values="collect($daily)->pluck('gp')->all()" tone="s3" label="Fuel gross profit per day" />
+                    </x-slot:spark>
+                </x-kpi>
+            </x-kpi-strip>
 
             <h3 class="sg-group">The cases that break a hand-rolled sparkline</h3>
             <div class="chart-cases">
