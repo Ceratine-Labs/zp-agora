@@ -1,0 +1,11 @@
+{
+    "name": "Reports",
+    "alias": "reports",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 22,
+    "requires": ["Core"],
+    "providers": [
+        "Modules\\Reports\\Providers\\ReportsServiceProvider"
+    ]
+}

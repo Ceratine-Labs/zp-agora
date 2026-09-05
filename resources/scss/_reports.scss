@@ -1,0 +1,38 @@
+// The Reports module's own screens.
+//
+// Almost everything they need is already in the shared library — the catalogue
+// reuses .area-grid / .area-card from the recon hub, the scope form reuses
+// .field-row and .form-actions. What is here is the handful of things a
+// procedure-backed report needs and nothing else does yet.
+//
+// It lives beside the shared partials because there is no module-stylesheet
+// convention in the build; when there is one, this file moves into
+// Modules/Reports and this comment goes with it.
+
+// A report card carries two extra lines the recon hub's does not: what the
+// report replaces, and — where it applies — what it honestly cannot tell you.
+.report-was {
+  font-size: 11px; color: var(--muted); margin: 0; line-height: 1.45;
+}
+.report-caveat {
+  font-size: 11.5px; line-height: 1.5; margin: 0;
+  color: var(--warn-ink); border-left: 2px solid var(--warn);
+  padding-left: 8px;
+}
+
+// The sort direction on a column header. A glyph rather than an icon: it costs
+// nothing and it inherits the header's colour, which a fixed-fill icon cannot.
+.sort-arrow { margin-left: 5px; font-size: 9px; opacity: .8; }
+
+.pager {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 14px; border-top: 1px solid var(--line-soft);
+  .pager-at { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  // The end of the range is rendered as text, not as a disabled link — see the
+  // comment in show.blade.php.
+  .is-off { opacity: .45; cursor: default; }
+}
+
+// The sites multi-select is taller than a one-line field and should take the
+// width it needs rather than be squeezed into an auto-fit column with a date.
+.field-wide { grid-column: 1 / -1; }
