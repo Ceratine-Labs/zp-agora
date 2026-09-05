@@ -40,8 +40,10 @@
     {{ \App\Support\Format::pct($value) }}
 @elseif ($column->format === 'delta')
     {{-- The caller decides which direction is good; the column cannot know
-         whether a rise in this figure is the good news. --}}
-    <span class="delta {{ \App\Support\Format::deltaTone($value) }}">{{ \App\Support\Format::delta($value) }}</span>
+         whether a rise in this figure is the good news. GridColumn carries no
+         `invert` yet, so this is the uninverted reading — a column where down
+         is the good news needs that flag before it renders honestly. --}}
+    <x-delta :value="$value" :invert="$column->options['invert'] ?? false" />
 @elseif ($column->format === 'number')
     {{-- Whole numbers stay whole; a quantity carrying decimals keeps three,
          which is the millilitre / gram the rest of the system works to. --}}
