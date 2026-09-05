@@ -29,35 +29,59 @@ test.describe('shell', () => {
         await expect(root).toHaveAttribute('data-theme', chosen);
     });
 
-    test('the scope bar lists sites and excludes the administrative entities', async ({ signedIn }) => {
-        const branch = signedIn.locator('.scope-field select[name="branch"]');
+    test('the branch workspace lets the user say which site', async ({ signedIn }) => {
+        // The branch workspace IS "I am working at one site", so saying which
+        // one is the whole job of the bar. Head office is the estate-wide
+        // workspace and carries no branch control at all.
+        await signedIn.goto('/app?ws=branch');
+
+        const site = signedIn.locator('.scope-field select[name="branch"]');
+        await expect(site).toBeVisible();
+        await site.selectOption({ label: 'Caltex Ulundi' });
+
+        await signedIn.waitForURL(/branch=8/);
+        await expect(site).toHaveValue('8');
+
+        // And back out, so the rest of the file runs in head office.
+        await signedIn.goto('/app?ws=ho');
+    });
+
+    test('head office carries no branch selector in the chrome', async ({ signedIn }) => {
+        // Feature-rules 3.3 puts the branches component on the RESULT SET, not
+        // in the bar. Having it in both is not two ways to say the same thing;
+        // it is two answers that disagree, and on the recon workbench the form
+        // silently won while the bar showed a different site.
+        await expect(signedIn.locator('.scope-field select[name="branch"]')).toHaveCount(0);
+
+        // The scope bar still exists and still carries the "as at" date.
+        await expect(signedIn.locator('.scope-field input[name="asat"]')).toBeVisible();
+        await expect(signedIn.locator('.scope-note')).toContainText('sites in scope');
+    });
+
+    test('a screen that needs one site offers the trading sites itself', async ({ signedIn }) => {
+        await signedIn.goto('/app/recon/auto/ABSA');
+
+        const branch = signedIn.locator('select[name="branch_id"]');
         await expect(branch).toBeVisible();
 
         const options = await branch.locator('option').allTextContents();
 
-        // 25 trading sites plus the "All sites" entry. The six administrative
-        // entities keep no trading day and must not be selectable.
-        expect(options).toContain('All sites');
+        // Trading sites only. The six administrative entities keep no trading
+        // day and have no bank statement to reconcile.
+        expect(options).toContain('Caltex Ulundi');
         expect(options).not.toContain('Zululand Petroleum');
         expect(options).not.toContain('AJLG Properties');
-        expect(options).toContain('Caltex Ulundi');
 
         // And the inactive test fixture is invisible to a person.
         expect(options).not.toContain('TEST-Playwright');
     });
 
-    test('choosing a site puts it in the URL so a link carries its scope', async ({ signedIn }) => {
-        const branch = signedIn.locator('.scope-field select[name="branch"]');
-        await branch.selectOption({ label: 'Caltex Ulundi' });
-
-        await signedIn.waitForURL(/branch=8/);
-        await expect(branch).toHaveValue('8');
-    });
-
     test('the page reports which database is behind it', async ({ signedIn }) => {
         // On a system whose dev target is production, "which database am I
         // looking at" is not a detail.
-        await expect(signedIn.locator('.shell-foot')).toContainText('PumpIT');
+        // Agora owns its own database now; the estate it reads is PumpIT's,
+        // reached through agora.vw_*. The footer names the one it writes to.
+        await expect(signedIn.locator('.shell-foot')).toContainText('Agora');
     });
 
     test('nothing scrolls sideways', async ({ signedIn }) => {

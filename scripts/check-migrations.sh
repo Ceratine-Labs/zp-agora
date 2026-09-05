@@ -23,8 +23,15 @@ for file in $files; do
     name=$(basename "$file")
 
     # v1__01_core_tables.php · v1__12a_cash_drop_safe.php · v1__01p_core_procs.php
-    if ! echo "$name" | grep -qE '^v[0-9]+__[0-9]{2}[a-z]?_[a-z0-9_]+\.php$'; then
-        say "$file: name does not match v{N}__{NN}[letter]_{module}_{what}.php"
+    #
+    # Two letters, not one, because the procedure slot needs follow-ons of its
+    # own: v1__13p deploys Recon's procedures, and the day a procedure is ADDED
+    # that migration has already run, so a new one has to sit beside it —
+    # v1__13pa, v1__13pb. The same lettered rule the tables obey, one level
+    # down. Without the second letter the convention had no way to say "another
+    # procedure", which is a thing every module does for the life of the project.
+    if ! echo "$name" | grep -qE '^v[0-9]+__[0-9]{2}[a-z]{0,2}_[a-z0-9_]+\.php$'; then
+        say "$file: name does not match v{N}__{NN}[letter][letter]_{module}_{what}.php"
     fi
 
     # A create must go through MigrationHelper, which is what refuses to build

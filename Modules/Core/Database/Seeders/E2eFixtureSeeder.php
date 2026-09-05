@@ -23,12 +23,20 @@ use RuntimeException;
  *    the UI — but it gives a future write-path test somewhere safe to write
  *    that is not a real site's data.
  *
- * Three guards, because this seeder creates a working credential:
+ * Four guards, because this seeder creates a working credential:
  *
  *  1. It refuses outright when APP_ENV is production.
- *  2. It does nothing at all unless AGORA_E2E_PASSWORD is set, so a checkout
+ *  2. **It refuses when the app connection is not a local database**, whatever
+ *     APP_ENV says. Added 4 Sep 2026, when Agora got a database of its own on
+ *     the customer's instance and a LOCAL checkout could be pointed straight
+ *     at it — at which point APP_ENV=local stopped being any kind of proxy for
+ *     "a database it is safe to write fixtures into". This seeder would
+ *     otherwise have put a working sign-in credential and a fake branch 999
+ *     into Zululand Petroleum's production database, and both would have
+ *     looked entirely normal afterwards.
+ *  3. It does nothing at all unless AGORA_E2E_PASSWORD is set, so a checkout
  *     without the variable simply has no test account.
- *  3. It rejects a short password rather than creating a weak one.
+ *  4. It rejects a short password rather than creating a weak one.
  */
 class E2eFixtureSeeder extends Seeder
 {
@@ -43,6 +51,27 @@ class E2eFixtureSeeder extends Seeder
             throw new RuntimeException(
                 'E2eFixtureSeeder refuses to run with APP_ENV=production. It creates a working sign-in credential.'
             );
+        }
+
+        /*
+         * Which database, not which APP_ENV.
+         *
+         * A local checkout pointed at the customer's instance is the dangerous
+         * case and it looks exactly like development from inside the process.
+         * Skipping rather than throwing is deliberate: `seed:master` runs the
+         * whole catalogue, and a remote deploy must not be stopped by a
+         * fixture it was never going to want.
+         */
+        $connection = config('agora.connections.app');
+        $host = config("database.connections.{$connection}.host");
+
+        if (! in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
+            $this->command?->warn(
+                "  E2E fixtures: [{$connection}] points at [{$host}], not a local database — skipped. "
+                .'This seeder creates a working credential and a fake branch, and neither belongs on a real instance.'
+            );
+
+            return;
         }
 
         $email = config('agora.e2e.email');

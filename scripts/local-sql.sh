@@ -91,6 +91,19 @@ up)
         );
     " >/dev/null && echo "Stub [PumpIT].dbo.SS_Branch ready."
 
+    # The recon estate: the ten tables the five agora.usp_Recon_Preview*
+    # procedures read through agora.vw_*. Shape only — see the file's header.
+    #
+    # Order matters: pumpit-reports.sql widens SS_Branch and the two drop-safe
+    # tables rather than redefining them, so both of the files above it must
+    # have run first.
+    for stub in database/stubs/pumpit-recon.sql database/stubs/pumpit-reports.sql; do
+        docker exec -i "$NAME" /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "$(sa_password)" -C -b -d PumpIT \
+            -i /dev/stdin < "$stub" >/dev/null \
+            && echo "Stub [PumpIT] $(basename "$stub" .sql | cut -d- -f2) tables ready."
+    done
+
     echo
     echo "  php artisan agora:init-schema   # once, creates the agora schema"
     echo "  php artisan migrate"

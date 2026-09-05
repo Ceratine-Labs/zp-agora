@@ -6,6 +6,7 @@ use App\Support\BranchContext;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Modules\Core\Models\Branch;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -61,6 +62,46 @@ class ResolveBranchContext
             $context->set($user->HomeBranchId ? (int) $user->HomeBranchId : null);
         }
 
+        /*
+         * The branch workspace is never contextless.
+         *
+         * It means "I am working at one site", and the scope bar's site
+         * selector is how you say which. A user with no home branch — an
+         * administrator dropping into a site to look at something — would
+         * otherwise land with a null context while the selector displayed the
+         * first option, so the bar would name a site the request was not
+         * actually scoped to. Falling back to the first site they may see
+         * makes the two agree.
+         */
+        if ($context->isBranchWorkspace() && $context->id() === null) {
+            $first = $this->firstVisibleBranch($context);
+
+            if ($first !== null) {
+                $context->set($first);
+                $request->session()->put('agora.branch', $first);
+            }
+        }
+
         return $next($request);
+    }
+
+    /**
+     * The first trading site this caller may see, in the order the scope bar
+     * lists them — so "the first option" and "the branch in context" are the
+     * same site rather than two guesses that happen to agree.
+     */
+    protected function firstVisibleBranch(BranchContext $context): ?int
+    {
+        $id = Branch::query()
+            ->acrossBranches()
+            ->when(
+                $context->allowed() !== [],
+                fn ($query) => $query->whereIn('BranchId', $context->allowed())
+            )
+            ->trading()
+            ->ordered()
+            ->value('BranchId');
+
+        return $id === null ? null : (int) $id;
     }
 }

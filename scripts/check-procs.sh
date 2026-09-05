@@ -48,7 +48,13 @@ for file in $procs; do
     fi
 
     # A writer that never opens a transaction is a rule with no atomicity.
-    if grep -qiE 'INSERT +INTO|UPDATE +\[?agora|DELETE +FROM' "$file"; then
+    #
+    # `INSERT INTO @Something` is not a write — it fills a table variable, which
+    # is how a read-only reporting procedure stages its two sides before it
+    # compares them. Counting those as writes flagged all five recon previews,
+    # which touch nothing, and the fix for that is not to make them declare a
+    # transaction they have no use for.
+    if grep -qiE 'INSERT +INTO +(\[?agora|\[?dbo|[A-Za-z#])|UPDATE +\[?agora|DELETE +FROM' "$file"; then
         if ! grep -qiE 'XACT_ABORT' "$file"; then
             say "$file: writes but does not SET XACT_ABORT ON."
         fi

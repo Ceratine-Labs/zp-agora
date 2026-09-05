@@ -13,6 +13,8 @@
 //   base       → element defaults
 //   shell      → app bar, mega menus, scope bar, page frame
 //   components → the shared component library
+//   select     → the TomSelect skin, over the bootstrap5 CSS select.js loads
+//   reports    → the Reports module's screens, which build on the above
 
 @use "fonts";
 @use "bootstrap/scss/bootstrap";
@@ -21,3 +23,5 @@
 @use "base";
 @use "shell";
 @use "components";
+@use "select";
+@use "reports";

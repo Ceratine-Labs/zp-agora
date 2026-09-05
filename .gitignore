@@ -39,3 +39,8 @@ Thumbs.db
 # they live on the machine and are purged from history.
 /CLAUDE.md
 /CERATINE_API_INSTRUCTIONS.md
+
+# Environment snapshots taken when switching between the local container and
+# the customer's instance. They hold live credentials.
+.env.local-stub.bak
+.env.zp-live.bak
