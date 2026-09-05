@@ -1,0 +1,11 @@
+{
+    "name": "Recon",
+    "alias": "recon",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 13,
+    "requires": ["Core"],
+    "providers": [
+        "Modules\\Recon\\Providers\\ReconServiceProvider"
+    ]
+}
