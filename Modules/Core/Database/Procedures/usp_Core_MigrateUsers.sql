@@ -31,10 +31,14 @@
    Refusals:
      AGORA:CORE_UNKNOWN_BRANCH  @BranchId is not a row in agora.Branch
 
-   The head-office / branch mapping is derived from SS_UserType's TEXT and is
-   the one rule in here that has not been checked against the customer's own
-   data — the report prints LegacyUserType beside the derived UserType for
-   exactly that reason. If the real rows say something else, the CASE in
+   The head-office / branch mapping comes from the COUNT of SS_UserBranches
+   grants, not from SS_UserType's text: exactly one branch is a site, more than
+   one is head office, none leaves it NULL for a person to decide. The old rule
+   read the type text for '%branch%' and could never have worked — that table
+   holds Super User / Standard User / Read Only User / User and contains
+   neither word, so every user came out as head office. The report prints
+   BranchGrantCount and LegacyUserType beside the derived UserType so the
+   classification shows its own evidence.
    agora.vw_LegacyUser is the single place to correct it.
    ---------------------------------------------------------------------------- */
 CREATE OR ALTER PROCEDURE agora.usp_Core_MigrateUsers
@@ -63,6 +67,7 @@ BEGIN
         EmailAddress   NVARCHAR(160) NULL,
         LegacyUserType NVARCHAR(50)  NULL,
         UserType       NVARCHAR(10)  NOT NULL,
+        BranchGrantCount INT        NOT NULL DEFAULT(0),
         IsActive       BIT           NOT NULL,
         IsLocked       BIT           NOT NULL,
         LastSignInAt   DATETIME2(0)  NULL,
@@ -78,7 +83,7 @@ BEGIN
        the instance collates case-insensitively, so 'TEST-Shared@' and
        'test-shared@' are one address and must be reported as one. */
     INSERT INTO @candidate
-        (LegacyUserId, UserCode, UserName, EmailAddress, LegacyUserType, UserType,
+        (LegacyUserId, UserCode, UserName, EmailAddress, LegacyUserType, UserType, BranchGrantCount,
          IsActive, IsLocked, LastSignInAt, DuplicateRank, DuplicateCount)
     SELECT
         v.LegacyUserId,
@@ -87,6 +92,7 @@ BEGIN
         LOWER(v.EmailAddress),
         v.LegacyUserType,
         ISNULL(v.UserType, 'ho'),
+        ISNULL(v.BranchGrantCount, 0),
         v.IsActive,
         v.IsLocked,
         v.LastSignInAt,
@@ -212,6 +218,7 @@ BEGIN
         c.EmailAddress,
         c.LegacyUserType,
         c.UserType,
+        c.BranchGrantCount,
         c.IsActive,
         c.IsLocked,
         c.LastSignInAt,

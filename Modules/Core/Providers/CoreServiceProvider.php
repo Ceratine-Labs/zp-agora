@@ -5,6 +5,7 @@ namespace Modules\Core\Providers;
 use App\Support\Badges\BadgeRegistry;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Kernel as FoundationKernel;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Badges\ExceptionsOpenBadge;
 use Modules\Core\Badges\LoadsFailedBadge;
@@ -13,7 +14,9 @@ use Modules\Core\Badges\ZReadsUnallocatedBadge;
 use Modules\Core\Console\MigrateUsersCommand;
 use Modules\Core\Http\Middleware\RequirePasswordChange;
 use Modules\Core\Http\Middleware\ResolveBranchContext;
+use Modules\Core\Models\User;
 use Modules\Core\Services\MenuService;
+use Modules\Core\Services\PermissionService;
 use Modules\Core\View\Composers\ShellComposer;
 
 class CoreServiceProvider extends ServiceProvider
@@ -32,6 +35,13 @@ class CoreServiceProvider extends ServiceProvider
          | register itself.
          */
         $this->app->singleton(BadgeRegistry::class);
+
+        /*
+         | One PermissionService per request. It memoises a user's pattern set
+         | in memory on top of the cache, and a screen that renders forty
+         | @can checks should hit the database once, not forty times.
+         */
+        $this->app->singleton(PermissionService::class);
     }
 
     public function boot(): void
@@ -52,6 +62,27 @@ class CoreServiceProvider extends ServiceProvider
             ResolveBranchContext::class,
             RequirePasswordChange::class,
         ]);
+
+        /*
+         | RBAC through Laravel's own Gate, so `can:` middleware, `@can` in a
+         | blade and $user->can() all resolve the same way and nothing has to
+         | learn an Agora-specific spelling.
+         |
+         | Gate::before short-circuits: a user holding a matching pattern is
+         | allowed and no ability-specific callback runs. Returning null rather
+         | than false when there is no match is deliberate — false here would
+         | veto every other gate in the application, including ones a module
+         | defines for itself.
+         */
+        Gate::before(function ($user, string $ability): ?bool {
+            if (! $user instanceof User) {
+                return null;
+            }
+
+            return $this->app->make(PermissionService::class)->userHas($user, $ability)
+                ? true
+                : null;
+        });
 
         // The shell needs the menu tree and the branch list on every page.
         // A composer keeps that out of 40 controllers.

@@ -104,6 +104,21 @@ class MigrateUsersTest extends TestCase
         $this->assertSame(1, (int) $row->IsLocked);
     }
 
+    public function test_head_office_and_branch_come_from_grant_count_not_from_the_type_text(): void
+    {
+        // 903 is a "Branch Manager" with one grant and 910 is a "Branch
+        // Manager" with four. Under the old rule both matched '%branch%' and
+        // both were called branch users. Only the first one is.
+        $site = $this->report->firstWhere('LegacyUserId', 903);
+        $office = $this->report->firstWhere('LegacyUserId', 910);
+
+        $this->assertSame('Branch Manager', $site->LegacyUserType);
+        $this->assertSame('Branch Manager', $office->LegacyUserType);
+
+        $this->assertSame('branch', $site->UserType, 'One grant is a site.');
+        $this->assertSame('ho', $office->UserType, 'Four grants is head office, whatever the type is called.');
+    }
+
     public function test_an_unmapped_user_type_is_kept_and_flagged_rather_than_dropped(): void
     {
         // The LEFT JOIN is the point: an INNER JOIN would silently lose this
@@ -112,8 +127,16 @@ class MigrateUsersTest extends TestCase
 
         $this->assertNotNull($row, 'A user whose UserTypeId matches nothing must still appear.');
         $this->assertNull($row->LegacyUserType);
-        $this->assertSame('ho', $row->UserType, 'An unmapped type falls back to head office.');
         $this->assertSame(1, (int) $this->summary->UnmappedUserType);
+
+        // UserType is NOT derived from the legacy type text any more, so an
+        // unmapped type says nothing about where a person works. 911 holds
+        // exactly one branch grant, and one grant is a site — see
+        // v1__01c_core_legacy_user_type for why the old rule could never have
+        // worked: SS_UserType is a privilege level and contains neither the
+        // word "branch" nor "site", so every user came out as head office.
+        $this->assertSame('branch', $row->UserType, 'One branch grant is a site, whatever the legacy type says.');
+        $this->assertSame(1, (int) $row->BranchGrantCount);
     }
 
     public function test_the_summary_counts_agree_with_the_report(): void

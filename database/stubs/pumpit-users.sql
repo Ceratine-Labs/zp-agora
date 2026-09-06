@@ -110,3 +110,53 @@ VALUES
     -- A UserTypeId that is not in SS_UserType. The LEFT JOIN keeps the row and
     -- the report flags the unmapped type rather than dropping the person.
     (911, 'TEST-Unknown Type',     'test-unknown@zp.invalid', 'plaintextB', NULL,         9, 0, NULL);
+
+/*
+ * SS_UserBranches — which branches a person may see.
+ *
+ * Added 6 September 2026. This is where head-office-vs-branch actually lives,
+ * and the real table was read for the first time that day: 1,189 grants across
+ * 86 of the customer's 88 users. Twenty-seven of them hold exactly one branch
+ * and are sites; the rest hold between two and all thirty-one and are head
+ * office. Two users hold none at all.
+ *
+ * vw_LegacyUser derives UserType from the COUNT of these rows. It used to
+ * derive it from SS_UserType's text, which cannot answer the question — that
+ * table is a privilege level (Super User / Standard User / Read Only User /
+ * User) and contains neither the word "branch" nor "site", so every user came
+ * out as head office. See v1__01c_core_legacy_user_type.
+ *
+ * The column spelling is the estate's: Userid and Branchid, not UserId and
+ * BranchId. It only works locally because the collation is case-insensitive;
+ * the stub keeps the real spelling so a query written against it is a query
+ * that will run against production.
+ */
+IF OBJECT_ID('dbo.SS_UserBranches') IS NULL
+CREATE TABLE dbo.SS_UserBranches (
+    Autoidx  INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    Userid   INT NULL,
+    Branchid INT NULL,
+    MIST_EOD VARCHAR(10) NULL
+);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.SS_UserBranches)
+INSERT INTO dbo.SS_UserBranches (Userid, Branchid) VALUES
+    -- 901: every branch in the stub -> head office.
+    (901, 1), (901, 2), (901, 3), (901, 4),
+    -- 902: several -> head office.
+    (902, 1), (902, 2), (902, 3),
+    -- 903: exactly one -> a branch user. This is the case the whole
+    -- derivation exists to get right.
+    (903, 2),
+    -- 904: exactly one -> a branch user.
+    (904, 3),
+    -- 905 and 906 share an email; give them different shapes so the
+    -- duplicate report is not also a UserType tie.
+    (905, 1), (905, 2),
+    (906, 1),
+    -- 910 and 911 have grants; 907, 908 and 909 have NONE, so their
+    -- UserType comes out NULL rather than being guessed.
+    (910, 1), (910, 2), (910, 3), (910, 4),
+    (911, 4);
+GO
