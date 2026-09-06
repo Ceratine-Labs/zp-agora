@@ -71,6 +71,7 @@ rsync -az --delete \
   --exclude 'storage/framework/cache/data/*' \
   --exclude 'storage/framework/sessions/*' \
   --exclude 'storage/framework/views/*' \
+  --exclude 'bootstrap/cache/*' \
   ./ root@agora.ceratine.com:/var/www/agora/
 
 # 3. On the server.
@@ -89,6 +90,27 @@ php artisan route:cache
 php artisan view:cache
 systemctl restart php8.3-fpm
 ```
+
+**`bootstrap/cache/*` must never be rsynced, and this one takes the site down.**
+It holds `packages.php`, Laravel's discovered-package manifest. A local checkout
+has dev dependencies installed and the server runs `composer install --no-dev`,
+so shipping the local manifest tells the server to register providers whose
+classes are not there. The whole application then fails to boot with
+`Class "Laravel\Pail\PailServiceProvider" not found` — every page, a 500, and
+`artisan` itself refuses to run, which also means the usual fix commands do not
+work until the files are deleted by hand:
+
+```bash
+rm -f bootstrap/cache/{packages,services,config,routes-v7}.php
+php artisan package:discover
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+chown -R www-data:www-data bootstrap/cache
+systemctl restart php8.3-fpm
+```
+
+Took agora.ceratine.com down on 6 September 2026 for about a minute. The
+exclude above is the guard; the caches are always rebuilt on the server anyway,
+so there was never a reason to ship them.
 
 **`CLAUDE.md` and `CERATINE_API_INSTRUCTIONS.md` must never reach the server.**
 They carry the customer's database host and login and the dispatch API's working
@@ -158,3 +180,9 @@ on every request, and only the log showed it.
 
 Hit `/login` three times, not once. The bug that got through was on the cache
 *hit*, not the miss, so a single request looked perfect.
+
+And check the status code, not just that something came back. The second deploy
+returned a 500 on every page because of the `bootstrap/cache` mistake above, and
+the deploy script's own output said nothing was wrong — `rsync` succeeded, the
+migrations were up to date, and the failure only appeared in `curl` and the
+log.
