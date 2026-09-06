@@ -2,6 +2,7 @@
 
 use App\Grid\Definitions\BranchGrid;
 use App\Grid\Definitions\DayCloseGrid;
+use Modules\Core\Grids\UserGrid;
 
 /*
 |--------------------------------------------------------------------------
@@ -66,6 +67,8 @@ return [
     | registered outside local and testing.
     */
     'grids' => [
+        'app.setup.users' => UserGrid::class,
+
         'app.dev.grids:dayclose' => DayCloseGrid::class,
         'app.dev.grids:branches' => BranchGrid::class,
     ],

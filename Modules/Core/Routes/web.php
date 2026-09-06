@@ -8,6 +8,7 @@ use Modules\Core\Http\Controllers\GridExtractController;
 use Modules\Core\Http\Controllers\GridStateController;
 use Modules\Core\Http\Controllers\LandingStubController;
 use Modules\Core\Http\Controllers\PreferenceController;
+use Modules\Core\Http\Controllers\UserAdminController;
 
 // Registered under /app with the web stack by ModuleServiceProvider.
 Route::middleware('auth')->group(function () {
@@ -25,6 +26,27 @@ Route::middleware('auth')->group(function () {
      */
     Route::get('password/change', [ChangePasswordController::class, 'edit'])->name('password.change');
     Route::put('password/change', [ChangePasswordController::class, 'update'])->name('password.change.update');
+
+    /*
+     | ---- T028: users and access ------------------------------------------
+     |
+     | Setup -> People and assets -> Users and access. Each route carries its
+     | own permission: `view` reads the list and one person's roles, `edit`
+     | changes them. The roles matrix is a separate resource because seeing
+     | what a role may do and being able to change who holds it are different
+     | questions with different answers.
+     */
+    Route::prefix('setup')->name('setup.')->group(function () {
+        Route::get('users', [UserAdminController::class, 'index'])
+            ->middleware('can:setup.users.view')->name('users.index');
+        Route::get('users/{user}', [UserAdminController::class, 'show'])
+            ->middleware('can:setup.users.view')->whereNumber('user')->name('users.show');
+        Route::put('users/{user}', [UserAdminController::class, 'update'])
+            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.update');
+
+        Route::get('roles', [UserAdminController::class, 'roles'])
+            ->middleware('can:setup.roles.view')->name('roles.index');
+    });
 
     Route::get('console', [LandingStubController::class, 'console'])->name('console');
     Route::get('exco', [LandingStubController::class, 'exco'])->name('exco');

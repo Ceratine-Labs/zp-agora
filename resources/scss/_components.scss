@@ -509,3 +509,51 @@ tr.is-expandable > td.pick { position: relative; }
   background: var(--warn-bg); border-radius: var(--r); padding: 7px 9px;
   code { font-family: var(--font-mono); }
 }
+
+/* ---------------------------------------------------------------------------
+   Users and access (T028)
+   --------------------------------------------------------------------------- */
+
+.two-col {
+  display: grid;
+  gap: var(--gap, 16px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+@media (max-width: 900px) { .two-col { grid-template-columns: minmax(0, 1fr); } }
+
+.role-list { display: flex; flex-direction: column; gap: 2px; }
+
+.role-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.role-row:hover { background: var(--surface-2); }
+.role-row.on { border-color: var(--brand); background: var(--brand-soft); }
+.role-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.role-primary {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+
+.perm-module {
+  margin: 14px 0 6px; font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted);
+}
+.perm-list { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.perm-list code { font-size: 12px; }
+
+/* The matrix scrolls in its own container — six roles and a long slug do not
+   fit a phone, and the page body must never scroll sideways. */
+.matrix .matrix-perm { min-width: 260px; }
+.matrix .matrix-role { text-align: center; white-space: nowrap; font-size: 12px; }
+.matrix .matrix-cell { text-align: center; font-variant-numeric: tabular-nums; }
+.matrix .matrix-cell.yes { color: var(--good-fill); font-weight: 700; }
+.matrix .matrix-cell.no  { color: var(--muted); }
+.matrix .matrix-hint { display: block; font-size: 11px; color: var(--muted); }
