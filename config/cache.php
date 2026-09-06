@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Badges\Badge;
 use Illuminate\Support\Str;
 
 return [
@@ -129,8 +130,30 @@ return [
     | storage. By default, no PHP classes will be unserialized from your
     | cache to prevent gadget chain attacks if your APP_KEY is leaked.
     |
+    | Agora keeps that default and names its exceptions one at a time. The
+    | list is an ALLOWLIST, not a convenience: anything on it is a class an
+    | attacker who could write to the cache store would be able to
+    | instantiate, so a type only belongs here if it is an inert value object
+    | with no behaviour in its constructor or destructor.
+    |
+    | Badge is exactly that — five scalars and no logic — and it is cached by
+    | App\Support\Badges\BadgeRegistry for 60 seconds per key, branch and
+    | workspace. Without it here, `false` means NO class deserialises, every
+    | cache hit returns __PHP_Incomplete_Class, and the registry's own guard
+    | swallows the TypeError as a failed provider: the sign-in panel and the
+    | menu badges silently show an em dash instead of a figure, on every
+    | request after the first.
+    |
+    | This does not reproduce under `php artisan test`. phpunit.xml sets
+    | CACHE_STORE=array, and the array store holds live objects in memory and
+    | never serialises at all — so the whole class of bug is invisible to the
+    | suite by construction. Tests\Feature\Core\BadgeCacheRoundTripTest
+    | pins it against the file store on purpose.
+    |
     */
 
-    'serializable_classes' => false,
+    'serializable_classes' => [
+        Badge::class,
+    ],
 
 ];
