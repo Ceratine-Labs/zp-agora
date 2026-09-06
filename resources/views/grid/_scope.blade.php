@@ -66,8 +66,12 @@
         @endif
     </div>
 
+    {{-- The label and the emphasis both come from the definition. This form
+         is a GET and on most grids it only re-reads with different filters, so
+         it says so and stays out of the way of the controls that do change
+         something. A grid that genuinely starts work overrides both. --}}
     <div class="form-actions">
-        <button type="submit" class="btn-primary">Run</button>
+        <button type="submit" class="{{ $definition->submitIsPrimary() ? 'btn-primary' : 'btn' }}">{{ $definition->submitLabel() }}</button>
         <a class="btn-ghost" href="{{ $grid->baseUrl }}">Reset</a>
     </div>
 </form>

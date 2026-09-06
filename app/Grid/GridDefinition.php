@@ -103,6 +103,36 @@ abstract class GridDefinition
         return $filters;
     }
 
+    /**
+     * The label on the scope form's submit button.
+     *
+     * "Apply filters" by default, because that is what the button does on
+     * almost every grid: it puts the search box and the dates into the query
+     * string and reloads. It said "Run" on all of them, which is a promise of
+     * consequence the control does not keep — a list of user accounts under a
+     * bright button labelled Run reads as though something is about to happen
+     * to those accounts. A control says exactly what it does.
+     *
+     * A grid whose submit genuinely starts work overrides this AND
+     * submitIsPrimary(), so the two travel together.
+     */
+    public function submitLabel(): string
+    {
+        return 'Apply filters';
+    }
+
+    /**
+     * Whether that button is the page's primary action.
+     *
+     * False by default. On a read-only grid the submit is housekeeping, and
+     * painting it as the primary action makes it compete with the controls
+     * that do change something. A grid that really does run a job says so.
+     */
+    public function submitIsPrimary(): bool
+    {
+        return false;
+    }
+
     /** Whether a person may type into the column headers at all. */
     public function filterable(): bool
     {

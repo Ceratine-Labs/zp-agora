@@ -181,6 +181,23 @@ class GridComponentTest extends TestCase
         $this->assertStringNotContainsString('R0.00', $html);
     }
 
+    public function test_the_scope_submit_says_what_it_does_and_does_not_shout(): void
+    {
+        $html = $this->render($this->grid($this->rows()));
+
+        // The button is a GET submit that re-reads with different filters. It
+        // used to say "Run" in btn-primary on every grid, which promises a
+        // consequence it does not deliver — on a list of user accounts that
+        // reads as though something is about to happen to them.
+        $this->assertStringContainsString('Apply filters', $html);
+        $this->assertStringNotContainsString('>Run<', $html);
+        $this->assertMatchesRegularExpression(
+            '/<button type="submit" class="btn">/',
+            $html,
+            'A read-only grid must not paint its filter submit as the primary action.'
+        );
+    }
+
     public function test_a_chip_column_takes_its_tone_from_the_wording(): void
     {
         $html = $this->render($this->grid($this->rows()));
