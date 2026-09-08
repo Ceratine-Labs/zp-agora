@@ -60,8 +60,9 @@ cd ~/Development/ZP/Agora
 rm -rf public/build public/hot
 npm run build
 
-# 2. Ship it. Every exclusion below is load-bearing.
-rsync -az --delete \
+# 2. Ship it. Every exclusion below is load-bearing, and so is --no-owner
+#    --no-group — see "the ownership window" below.
+rsync -az --no-owner --no-group --delete \
   --exclude '.git' --exclude 'node_modules' --exclude 'vendor' \
   --exclude '.env' --exclude '.env.*' --exclude 'public/hot' \
   --exclude '.claude' --exclude 'test-results' \
@@ -90,6 +91,41 @@ php artisan route:cache
 php artisan view:cache
 systemctl restart php8.3-fpm
 ```
+
+## ⚠️ The ownership window — `--no-owner --no-group` is not optional
+
+`rsync -a` implies `-o -g`, and run as root it applies the SOURCE's numeric
+owner and group. Your laptop's uid is not `www-data`, so for the duration of a
+deploy every file rsync touched is owned by a user that does not exist on the
+box. The `chown -R` in step 3 is the repair, but the site is live while the
+files are in that state, and anything requested in between fails.
+
+It is not a theoretical window. On 8 September 2026 a deploy that changed six
+Blade files produced three 500s for one signed-in user across thirteen seconds,
+all of them:
+
+```
+production.ERROR: tempnam(): file created in the system's temporary directory
+(View: /var/www/agora/Modules/Recon/Resources/views/panes/match.blade.php)
+```
+
+That is not a template error, which is what it looks like and what it will cost
+you an hour to chase. A changed Blade has to be recompiled on first request;
+the compiler writes through `tempnam()` into `storage/framework/views`, and
+with the ownership mid-flight it cannot, so PHP falls back to the system temp
+directory and warns — and Laravel turns that warning into a `ViewException`
+naming the innocent template.
+
+`--no-owner --no-group` closes it: rsync leaves whatever ownership the file
+already had on the server, so no file is ever momentarily un-writable. The
+`chown -R` in step 3 stays, because a genuinely NEW file still arrives owned by
+root.
+
+If a deploy ever changes enough to matter, `php artisan down` before the rsync
+and `php artisan up` after is the honest alternative — a stated outage rather
+than a handful of 500s that look like a bug in the feature you just shipped.
+
+---
 
 **`bootstrap/cache/*` must never be rsynced, and this one takes the site down.**
 It holds `packages.php`, Laravel's discovered-package manifest. A local checkout
@@ -177,6 +213,18 @@ Expect `/` → 302 to `/app`, `/login` → 200, `/app` → 302 to `/login` when
 signed out. Then check `storage/logs/laravel.log` is **empty** — the first
 deploy passed every status check while quietly logging a broken badge provider
 on every request, and only the log showed it.
+
+If it is not empty, read the TIMESTAMPS before you read the stack trace. The
+log is UTC and the shell is SAST, so an entry two hours "old" may be two
+minutes old. An error stamped inside the deploy window and not repeated
+afterwards is almost certainly the ownership window above, not the change you
+just shipped — confirm it by checking that nothing is logged after
+`view:cache` completed, and that the compiled view exists:
+
+```bash
+grep -oE "^\[2026[^]]*\]" storage/logs/laravel.log | tail -1   # last entry
+grep -rl "<a marker from your change>" storage/framework/views/ | wc -l
+```
 
 Hit `/login` three times, not once. The bug that got through was on the cache
 *hit*, not the miss, so a single request looked perfect.
