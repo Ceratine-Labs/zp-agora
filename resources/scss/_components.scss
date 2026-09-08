@@ -418,18 +418,45 @@ table.dt thead th.is-filtered::after {
   }
 }
 
+/* THE FILTER ROW WAS SETTING EVERY COLUMN WIDTH, which is not what a filter
+   row is for and is the reason this block is so fussy.
+
+   An <input> carries an intrinsic width — about 161px here, the browser's
+   twenty-character default. Under `table-layout: auto` a column is at least
+   as wide as its widest cell wants to be, and the filter cell wanted 161px
+   plus the comparator plus the picker. So a BANK LINES column holding a
+   single digit rendered at 249px, the whole table came out 2590px inside a
+   1514px frame, and it scrolled sideways with acres of nothing in it.
+   Measured on run 244: every column's width was EXACTLY its filter cell's
+   width. The data had nothing to do with it.
+
+   The fix is an explicit `width` rather than `min-width` or the `size`
+   attribute: `width` is what a flex item's `auto` basis resolves to, so it is
+   also what the column's max-content contribution sums from — and unlike
+   `size` it works on a number input, which ignores that attribute entirely.
+   `flex: 1 1 auto` then lets the box grow into whatever width the column
+   actually ends up with, so a wide column still gets a wide filter.
+
+   46px is a floor chosen to stay usable: enough for a few digits or a short
+   word, which is what a column filter takes. A date input keeps a real width
+   because the native picker cannot shrink and a 46px date field is unusable. */
 .tt-filter {
   display: flex; gap: 3px; align-items: center;
 
   input, select {
-    min-width: 0; flex: 1;
+    min-width: 0;
     background: var(--surface); color: var(--ink); font: inherit; font-size: 12px;
     border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px;
     text-transform: none; letter-spacing: 0;
     &:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
   }
 
-  .tt-op { flex: 0 0 44px; text-align: center; }
+  input { width: 46px; flex: 1 1 auto; }
+  input[type="date"] { width: 118px; }
+
+  // A single glyph and the browser's arrow. 44 was generous for = ≠ > ≥ < ≤,
+  // and it was costing 10px on every numeric column in the grid.
+  .tt-op { flex: 0 0 34px; width: 34px; text-align: center; padding-left: 2px; padding-right: 0; }
 
   /* The tick list opener. Sized to the glyph so it never takes room from the
      box beside it, which is the control most columns actually use. */

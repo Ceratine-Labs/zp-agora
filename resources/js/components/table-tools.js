@@ -329,7 +329,14 @@ class TableTools {
         input.type = column.type === 'date' ? 'date' : (column.type === 'number' ? 'number' : 'search');
         input.step = 'any';
         input.className = 'tt-q';
-        input.placeholder = column.type === 'text' ? 'contains…' : '';
+        // Short, because the box is now sized to the COLUMN rather than to the
+        // browser's twenty-character default — "contains…" rendered as
+        // "conta" in a narrow one. The full semantics live in the title and
+        // the aria-label, which are not truncated by anything.
+        input.placeholder = column.type === 'text' ? 'find…' : '';
+        input.title = column.type === 'text'
+            ? `Show rows where ${column.label} contains this`
+            : `Compare ${column.label}`;
         input.setAttribute('aria-label', `Filter ${column.label}`);
 
         let timer = null;
