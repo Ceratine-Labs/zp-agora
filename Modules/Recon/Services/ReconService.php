@@ -205,6 +205,43 @@ class ReconService
     }
 
     /**
+     * Tick everything on a run that could actually reconcile.
+     *
+     * The group screen ticks SITES, not lines: its checkbox is per branch, its
+     * button says "Post N sites", and the figure beside each row is "would
+     * reconcile". So the selection a group post means is "everything this site
+     * would reconcile" — there is no per-line screen behind it to have ticked
+     * anything.
+     *
+     * Without this the group post could not work at all, and did not: every
+     * line is written by the preview with `Selected` at its column default of
+     * 0, `usp_Recon_Commit` requires `Selected = 1`, and ReconGroupService went
+     * straight to commit. Nine sites and 814 reconcilable proposals came back
+     * as nine identical AGORA:NOTHING_SELECTED refusals on 8 Sep 2026.
+     *
+     * Set-based rather than select($run, $ids): a busy branch-month is a few
+     * hundred lines, and SQL Server caps a statement at 2 100 parameters — so
+     * pulling the ids into PHP to send them straight back is both wasteful and
+     * a ceiling waiting to be hit.
+     */
+    public function selectAll(ReconRun $run): int
+    {
+        $lines = fn () => $run->lines()->getRelated()->newQuery()
+            ->where('BranchId', $run->BranchId)
+            ->where('RunId', $run->Id);
+
+        // Cleared first, exactly as select() does, so a re-post after a
+        // partial commit cannot carry a stale tick on a row that has since
+        // been committed or blocked.
+        $lines()->update(['Selected' => false]);
+
+        return $lines()
+            ->where('WouldReconcile', true)
+            ->where('CommitState', 'pending')
+            ->update(['Selected' => true]);
+    }
+
+    /**
      * Throw away previews, and say how many.
      *
      * The rule that a committed run is never discarded lives in the procedure,

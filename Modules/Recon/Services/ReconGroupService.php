@@ -178,6 +178,13 @@ class ReconGroupService
             }
 
             try {
+                // The group screen ticks sites, not lines, so nothing has
+                // marked this run's proposals as selected — and the commit
+                // procedure requires it. Without this every site refuses with
+                // AGORA:NOTHING_SELECTED no matter how much it would have
+                // reconciled. See ReconService::selectAll().
+                $this->service->selectAll($run);
+
                 $result = $this->service->commit($run);
                 $committed = $run->fresh();
 

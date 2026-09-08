@@ -133,6 +133,62 @@ class ExecuteReconciliationTest extends TestCase
         $this->assertSame('pending', ReconRunLine::query()->acrossBranches()->find($line->Id)->CommitState);
     }
 
+    /**
+     * The group post's selection, which nothing was making.
+     *
+     * The group screen ticks SITES. Its checkbox is per branch, its button
+     * says "Post N sites", and there is no per-line screen behind it — so the
+     * only selection it can mean is "everything this site would reconcile".
+     * ReconGroupService went straight to commit without making one, and every
+     * line is written by the preview with `Selected` at its column default of
+     * 0, so `usp_Recon_Commit` refused every site with AGORA:NOTHING_SELECTED.
+     * On live that was nine sites and 814 reconcilable proposals, all refused,
+     * every time, since the group screen shipped.
+     *
+     * The second half is the part that would have caught it: selecting is not
+     * the claim, committing after selecting is. This is exactly the pair of
+     * calls ReconGroupService now makes.
+     */
+    public function test_select_all_ticks_what_would_reconcile_and_the_commit_then_goes_through(): void
+    {
+        $run = $this->previewed();
+
+        $reconcilable = $run->lines->where('WouldReconcile', true)->where('CommitState', 'pending');
+        $orphan = $run->lines->firstWhere('KeyRef', '300');
+
+        $this->assertGreaterThan(0, $reconcilable->count(), 'The fixture must offer something to reconcile.');
+        $this->assertNotNull($orphan);
+        $this->assertFalse((bool) $orphan->WouldReconcile, 'KeyRef 300 is the bank-only row.');
+
+        // Nothing has ticked anything: this is the state a group post starts in.
+        $this->assertSame(
+            0,
+            ReconRunLine::query()->acrossBranches()->where('RunId', $run->Id)->where('Selected', true)->count(),
+            'A previewed run must start with nothing selected, or this test proves nothing.'
+        );
+
+        $ticked = $this->service->selectAll($run);
+
+        $this->assertSame($reconcilable->count(), $ticked);
+        $this->assertSame(
+            $reconcilable->count(),
+            ReconRunLine::query()->acrossBranches()->where('RunId', $run->Id)->where('Selected', true)->count()
+        );
+
+        // And only those: a tick on a row that cannot reconcile would be a
+        // promise the commit has to break.
+        $this->assertFalse(
+            (bool) ReconRunLine::query()->acrossBranches()->find($orphan->Id)->Selected,
+            'A bank-only row must never be selected by selectAll().'
+        );
+
+        $result = $this->service->commit($run->fresh());
+
+        $this->assertSame('COMMITTED', $result['status']->Code);
+
+        $this->service->reverse($run->fresh(), 'Test reversal');
+    }
+
     /** A row that cannot reconcile cannot be ticked, so it can never be committed. */
     public function test_an_unreconcilable_row_cannot_be_selected(): void
     {
