@@ -181,9 +181,12 @@ table.dg {
 
 /* ------------------------------------------------------------- text sizes */
 
-.dg-text-compact table.dg { font-size: 12px; th, td { padding: 4px 9px; } }
+.dg-text-compact table.dg { font-size: 12px; th, td { padding: 2px 8px; } }
 .dg-text-normal  table.dg { font-size: 13px; }
-.dg-text-large   table.dg { font-size: 14.5px; th, td { padding: 9px 13px; } }
+// Large is the one that must NOT follow the default down: it exists for
+// somebody who cannot comfortably read the normal size, and tightening it
+// would take away the only setting that helps them.
+.dg-text-large   table.dg { font-size: 14.5px; th, td { padding: 9px 13px; line-height: 1.5; } }
 
 // The loading state. It sits above the table and the rows below it dim rather
 // than disappear — the figures the person was reading stay readable while the

@@ -308,8 +308,21 @@ div.emptystate { padding: 44px 20px; text-align: center; }
 
 table.dt {
   width: 100%; border-collapse: collapse; font-size: 13px;
+
+  /* THE ROW HEIGHT IS TWO NUMBERS, and only one of them is the padding.
+     Measured on a recon run before touching it: a 33.8px row was an 18.85px
+     line box (the body's 1.45 line-height, inherited) plus 14px of padding.
+     The chip in the outcome cell is 17.2px and was never the driver, which is
+     where the eye goes first and where the time would have gone.
+
+     A table is scanned down a column, not read as prose, so 1.45 is looser
+     than it needs to be — 1.35 still clears the chip and the mono figures and
+     takes 1.3px off every row for nothing. With the padding at 4px that is a
+     26px row against 34px: a fifth more rows on a screen, which on a
+     twenty-two proposal run is the difference between scrolling and not. */
   th, td {
-    padding: 7px 12px; text-align: left; border-bottom: 1px solid var(--line-soft);
+    padding: 4px 10px; line-height: 1.35;
+    text-align: left; border-bottom: 1px solid var(--line-soft);
     vertical-align: top;
   }
   thead th {
@@ -330,7 +343,9 @@ table.dt {
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   td.mono { font-family: var(--font-mono); font-size: 12px; }
   td.muted, .muted { color: var(--muted); }
-  &.dense { th, td { padding: 5px 10px; } }
+  /* Kept a step below the default, which moved down with it. A dense table
+     that was looser than a normal one would be a ladder with a rung missing. */
+  &.dense { th, td { padding: 2px 8px; } }
   tr.is-matched td:first-child { box-shadow: inset 3px 0 0 var(--good); }
   tr.is-warn    td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
   tr.is-serious td:first-child { box-shadow: inset 3px 0 0 var(--serious); }
@@ -397,7 +412,7 @@ table.dt thead th.is-filtered::after {
 
 .tt-filters {
   th {
-    background: var(--surface-2); padding: 4px 8px 7px;
+    background: var(--surface-2); padding: 3px 7px 5px;
     border-bottom: 1px solid var(--line);
     &.is-filtered { box-shadow: inset 0 -2px 0 var(--brand); }
   }
@@ -409,7 +424,7 @@ table.dt thead th.is-filtered::after {
   input, select {
     min-width: 0; flex: 1;
     background: var(--surface); color: var(--ink); font: inherit; font-size: 12px;
-    border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px;
+    border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px;
     text-transform: none; letter-spacing: 0;
     &:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
   }
