@@ -253,9 +253,15 @@ class ReconController extends Controller
      * SSMS without telling us, and a form that showed only the effective value
      * would make the divergence invisible.
      */
-    public function configEdit(string $area, int $branch, int $order, Request $request, BranchContext $context): View
+    public function configEdit(string $area, int $branch, int $rule, Request $request, BranchContext $context): View
     {
         abort_unless($context->maySee($branch), 403, 'You may not look at that branch.');
+
+        $resolved = $this->criteria->rule($branch, $rule);
+
+        // A rule id that names nothing on this site is a 404, not an empty
+        // form — somebody following a stale link should be told so.
+        abort_if($resolved['effective'] === null && $resolved['override'] === null, 404);
 
         $data = [
             'area' => $this->service->area($area),
@@ -265,9 +271,18 @@ class ReconController extends Controller
             // excludes them is why this page said "Site 1" instead of
             // "AJLG Properties" when Ryan opened it on live.
             'branch' => $this->branch($branch),
-            'order' => $order,
+            'rule' => $rule,
+            // The process order comes off the rule itself, not the URL — the
+            // URL names the rule and the rule knows its own order.
+            // The abort above establishes that at least one of the two is
+            // there, so by the time the second operand is reached the first
+            // was null and the second cannot be.
+            'order' => (int) ($resolved['effective']->ProcessOrder ?? $resolved['override']->ProcessOrder),
+            'legacyId' => $resolved['override'] !== null
+                ? $resolved['override']->LegacyAutoReconId
+                : ($rule > 0 ? $rule : null),
             'mayEdit' => (bool) $request->user()?->can('recon.criteria.edit'),
-            ...$this->criteria->rule($branch, $area, $order),
+            ...$resolved,
         ];
 
         /*
@@ -306,17 +321,24 @@ class ReconController extends Controller
         $order = max(1, $request->integer('process_order'));
         $reason = trim((string) $request->input('reason'));
         $action = (string) $request->input('action', 'save');
+        // Which of the customer's rules this is about. Absent means it adds
+        // one; the procedure refuses that where a rule already sits at this
+        // process order rather than picking between two.
+        $legacyId = $request->filled('legacy_auto_recon_id')
+            ? $request->integer('legacy_auto_recon_id')
+            : null;
 
         try {
             $status = match ($action) {
-                'park' => $this->criteria->park($branchId, $definition['key'], $order, $reason),
-                'unpark' => $this->criteria->park($branchId, $definition['key'], $order, $reason, on: true),
+                'park' => $this->criteria->park($branchId, $definition['key'], $order, $reason, legacyAutoReconId: $legacyId),
+                'unpark' => $this->criteria->park($branchId, $definition['key'], $order, $reason, on: true, legacyAutoReconId: $legacyId),
                 default => $this->criteria->save(
                     $branchId,
                     $definition['key'],
                     $order,
                     $request->only([...array_keys(ReconCriteriaService::POSITIONS), 'FilterValue']),
                     $reason,
+                    legacyAutoReconId: $legacyId,
                 ),
             };
         } catch (AgoraProcException $e) {

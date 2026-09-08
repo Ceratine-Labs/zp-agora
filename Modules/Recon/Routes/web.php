@@ -69,8 +69,12 @@ Route::middleware('auth')->prefix('recon')->name('recon.')->group(function () {
     Route::get('auto/{area}/config', [ReconController::class, 'configuration'])->middleware('can:recon.criteria.view')->name('config');
     // One rule's edit form, as the fragment the modal opens onto. Looking is
     // `view`; the form inside it renders its controls only for `edit`.
-    Route::get('auto/{area}/config/{branch}/{order}', [ReconController::class, 'configEdit'])
-        ->whereNumber('branch')->whereNumber('order')
+    // {rule} is the view's AutoReconId — POSITIVE for one of the customer's
+    // rules, NEGATIVE for one of Agora's, so the pattern allows a sign. It is
+    // NOT (branch, area, process order): that triple does not identify a rule,
+    // and one site has two FNB rules sharing a process order.
+    Route::get('auto/{area}/config/{branch}/{rule}', [ReconController::class, 'configEdit'])
+        ->whereNumber('branch')->where('rule', '-?[0-9]+')
         ->middleware('can:recon.criteria.view')->name('config.edit');
     // Both writes go to agora.ReconCriteria and nowhere else. Agora does not
     // write to the customer's BRN_AutoReconCriteria, ever.

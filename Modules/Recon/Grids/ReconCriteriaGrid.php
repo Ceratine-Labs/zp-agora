@@ -8,7 +8,6 @@ use App\Grid\GridFilter;
 use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
 use App\Support\BranchContext;
-use Illuminate\Support\Facades\Gate;
 
 /**
  * The extraction configuration — the Configuration tab of the area workbench.
@@ -136,47 +135,25 @@ class ReconCriteriaGrid extends GridDefinition
     }
 
     /**
-     * A row opens its edit form.
+     * A row opens its edit form, and the site name IS the link.
      *
-     * A modal rather than in-cell editing — Ryan, 8 September 2026: "showing a
-     * modal instead is also fine". It keeps the grid framework read-and-export
-     * only, and it is the only shape that can show the customer's row beside
-     * the override while the person types.
+     * There was a "Change" button in a trailing column as well, and it was one
+     * control too many: the row already opened, so the button opened the same
+     * thing a second way and cost a column on a table that already has
+     * fourteen. Ryan cut it on 8 September 2026. What it used to do — open the
+     * rule in a dialog over the list — is not lost so much as folded into the
+     * link, which now renders a real page.
      */
     public function rowUrl(object $row): ?string
     {
         return route('app.recon.config.edit', [
             'area' => $row->BankReconArea,
             'branch' => $row->BranchId,
-            'order' => $row->ProcessOrder,
+            // The rule's own id, positive for the customer's and negative for
+            // ours — not the process order, which one site shares between two
+            // rules.
+            'rule' => $row->AutoReconId,
         ]);
-    }
-
-    /**
-     * The row's action opens the editor in a dialog.
-     *
-     * `rowUrl()` above returns a real address and the site name is an anchor to
-     * it, so a rule is a place you can send someone and the screen works with
-     * no JavaScript at all. That address renders a PAGE — the controller gives
-     * the bare fragment only to an XHR, which is what the dialog makes. Until
-     * 8 September 2026 it gave the fragment to everyone, so following the link
-     * landed on unstyled text with no way back.
-     *
-     * The action is what makes it a dialog when scripting is there.
-     *
-     * @return array<int, array{label: string, url: string, primary?: bool, attributes?: array<string, string>}>
-     */
-    public function rowActions(object $row): array
-    {
-        return [[
-            'label' => Gate::allows('recon.criteria.edit') ? 'Change' : 'Open',
-            'url' => $this->rowUrl($row) ?? '#',
-            'primary' => ($row->Source ?? '') !== 'Customer',
-            'attributes' => [
-                'data-modal-open' => 'rule-editor',
-                'data-modal-url' => $this->rowUrl($row) ?? '',
-            ],
-        ]];
     }
 
     /** Whether the caller asked for the narrative check on this request. */

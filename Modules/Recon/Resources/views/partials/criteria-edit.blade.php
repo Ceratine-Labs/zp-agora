@@ -78,6 +78,12 @@
         @csrf
         <input type="hidden" name="branch_id" value="{{ $branchId }}">
         <input type="hidden" name="process_order" value="{{ $order }}">
+        {{-- WHICH of the customer's rules this is about. Absent means it adds
+             one — the procedure refuses that where a rule already sits at this
+             process order, because one site has two sharing one. --}}
+        @if ($legacyId)
+            <input type="hidden" name="legacy_auto_recon_id" value="{{ $legacyId }}">
+        @endif
 
         <div class="field-row">
             @foreach ($fields as $name => [$label, $column])

@@ -171,7 +171,11 @@ class ReconGroupTest extends TestCase
         $this->actingAs($this->admin())->get(route('app.recon.group', $group->GroupRef))
             ->assertOk()
             ->assertSee('every site')
-            ->assertSee('still to preview')
+            // A fresh group says it is starting, and carries the flag that
+            // makes it start — asking for a second press on the page the first
+            // press landed on is what read as a hang on live.
+            ->assertSee('to preview, one at a time')
+            ->assertSee('data-group-auto="1"', false)
             ->assertSee('Waiting…');
     }
 

@@ -41,8 +41,15 @@ class ReconCriteriaService
      *
      * @param  array<string, scalar|null>  $values  keyed by the argument names in POSITIONS, plus FilterValue
      */
-    public function save(int $branchId, string $area, int $processOrder, array $values, string $reason, ?int $copiedFrom = null): object
-    {
+    public function save(
+        int $branchId,
+        string $area,
+        int $processOrder,
+        array $values,
+        string $reason,
+        ?int $legacyAutoReconId = null,
+        ?int $copiedFrom = null,
+    ): object {
         return $this->procedures->write('usp_Recon_SaveCriteria', [
             'BranchId' => $branchId,
             'ReconArea' => $area,
@@ -51,6 +58,10 @@ class ReconCriteriaService
             ...$this->arguments($values),
             'Reason' => $reason,
             'CopiedFromBranchId' => $copiedFrom,
+            // WHICH of the customer's rules this replaces. Null adds one; the
+            // procedure refuses a null where the site already has a rule at
+            // that process order rather than picking one of two.
+            'LegacyAutoReconId' => $legacyAutoReconId,
             'UserId' => auth()->id(),
         ]);
     }
@@ -62,14 +73,21 @@ class ReconCriteriaService
      * made and who made it, and the view stops seeing it — so what is back in
      * force is the customer's own rule, or nothing where they have none.
      */
-    public function park(int $branchId, string $area, int $processOrder, string $reason, bool $on = false): object
-    {
+    public function park(
+        int $branchId,
+        string $area,
+        int $processOrder,
+        string $reason,
+        bool $on = false,
+        ?int $legacyAutoReconId = null,
+    ): object {
         return $this->procedures->write('usp_Recon_SaveCriteria', [
             'BranchId' => $branchId,
             'ReconArea' => $area,
             'ProcessOrder' => $processOrder,
             'Action' => $on ? 'unpark' : 'park',
             'Reason' => $reason,
+            'LegacyAutoReconId' => $legacyAutoReconId,
             'UserId' => auth()->id(),
         ]);
     }
@@ -108,30 +126,43 @@ class ReconCriteriaService
     }
 
     /**
-     * One rule as the edit form needs it: the override if there is one, the
-     * customer's row if there is not, and both when they differ.
+     * One rule, by the id the grid showed for it.
+     *
+     * NOT by (branch, area, process order). That triple does not identify a
+     * rule: branch 23 has two FNB rules, ids 283 and 293, both at process
+     * order 1. Addressing on it meant one screen, one form and one override
+     * standing for two of the customer's rules, with nothing saying so.
+     * `AutoReconId` is unique across all 133 and is what the view returns —
+     * POSITIVE for one of the customer's rules, NEGATIVE for one of ours.
      *
      * @return array{override: ReconCriteria|null, legacy: object|null, effective: object|null}
      */
-    public function rule(int $branchId, string $area, int $processOrder): array
+    public function rule(int $branchId, int $ruleId): array
     {
         $connection = DB::connection(config('agora.connections.app'));
         $schema = config('agora.schema');
 
-        $where = fn (string $view) => $connection->table("{$schema}.{$view}")
+        // whereKey()->first() rather than find(): find() is typed as returning
+        // the model, and a nullable it does not admit to is a null-property
+        // fatal waiting for the first stale link.
+        $override = ReconCriteria::query()
             ->where('BranchId', $branchId)
-            ->where('BankReconArea', $area)
-            ->where('ProcessOrder', $processOrder)
+            ->when($ruleId < 0, fn ($query) => $query->whereKey(-$ruleId))
+            ->when($ruleId > 0, fn ($query) => $query->where('LegacyAutoReconId', $ruleId))
             ->first();
 
+        // The customer's rule: the one this override names, or the one the id
+        // IS where nothing has overridden it.
+        $legacyId = $override !== null
+            ? $override->LegacyAutoReconId
+            : ($ruleId > 0 ? $ruleId : null);
+
         return [
-            'override' => ReconCriteria::query()
-                ->where('BranchId', $branchId)
-                ->where('BankReconArea', $area)
-                ->where('ProcessOrder', $processOrder)
-                ->first(),
-            'legacy' => $where('vw_LegacyReconCriteria'),
-            'effective' => $where('vw_AutoReconCriteria'),
+            'override' => $override,
+            'legacy' => $legacyId === null ? null : $connection->table("{$schema}.vw_LegacyReconCriteria")
+                ->where('BranchId', $branchId)->where('AutoReconId', $legacyId)->first(),
+            'effective' => $connection->table("{$schema}.vw_AutoReconCriteria")
+                ->where('BranchId', $branchId)->where('AutoReconId', $ruleId)->first(),
         ];
     }
 

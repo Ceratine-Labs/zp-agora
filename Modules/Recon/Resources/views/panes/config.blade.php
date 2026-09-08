@@ -74,13 +74,6 @@
     <x-data-grid :grid="$grid" :branches="$pinned ? null : $branches" />
 </x-card>
 
-{{-- One dialog for the whole tab: the row that opened it comes in through the
-     fetched body, so a rule is never edited from a form that was rendered
-     before somebody else changed it. --}}
-<x-modal id="rule-editor" title="Extraction rule" wide>
-    <p class="muted">Pick a rule from the table.</p>
-</x-modal>
-
 @can('recon.criteria.edit')
     <x-modal id="copy-config" title="Copy a site's configuration">
         <form method="POST" action="{{ route('app.recon.config.copy', $area['key']) }}">

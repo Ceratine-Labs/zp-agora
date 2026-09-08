@@ -29,7 +29,8 @@
  * time somebody runs a reconciliation.
  *
  * Refusals: REASON_REQUIRED · UNKNOWN_AREA · BAD_PROCESS_ORDER ·
- *           BAD_START · BAD_LENGTH · NOT_FOUND · NOTHING_TO_PARK
+ *           BAD_START · BAD_LENGTH · NOTHING_TO_PARK · RULE_NOT_FOUND ·
+ *           RULE_NOT_NAMED
  */
 CREATE OR ALTER PROCEDURE [agora].[usp_Recon_SaveCriteria]
     @BranchId            int,
@@ -47,6 +48,7 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_SaveCriteria]
     @FilterEndPosition   int           = NULL,
     @Reason              nvarchar(300) = NULL,
     @CopiedFromBranchId  int           = NULL,
+    @LegacyAutoReconId   int           = NULL,
     @UserId              int           = NULL
 AS
 BEGIN
@@ -64,9 +66,37 @@ BEGIN
         THROW 51000, 'AGORA:UNKNOWN_AREA:That is not a reconciliation area.', 1;
 
     DECLARE @Now datetime2(0) = SYSDATETIME();
+
+    /*
+     * AN OVERRIDE SHADOWS A RULE, AND A RULE IS AN AutoReconId.
+     *
+     * (BranchId, BankReconArea, ProcessOrder) does not identify one: branch 23
+     * has two FNB rules, ids 283 and 293, both at ProcessOrder 1. Keying on
+     * the triple meant one override would have shadowed BOTH — silently
+     * replacing two of the customer's rules with one, and nothing on the
+     * screen would have said so.
+     *
+     * So an override that REPLACES a rule is found by the id it names, and one
+     * that ADDS a rule — the twenty-four-branches case — by the triple, which
+     * is unambiguous precisely because no legacy row is there to collide with.
+     */
+    IF @LegacyAutoReconId IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM agora.vw_LegacyReconCriteria l
+                        WHERE l.AutoReconId = @LegacyAutoReconId AND l.BranchId = @BranchId)
+        THROW 51000, 'AGORA:RULE_NOT_FOUND:That rule does not exist on this site. It may have been changed in PumpIT since this screen was drawn — reload and try again.', 1;
+
+    IF @LegacyAutoReconId IS NULL
+       AND EXISTS (SELECT 1 FROM agora.vw_LegacyReconCriteria l
+                    WHERE l.BranchId = @BranchId AND l.BankReconArea = @ReconArea
+                      AND l.ProcessOrder = @ProcessOrder)
+        THROW 51000, 'AGORA:RULE_NOT_NAMED:This site already has a rule at that process order, so say WHICH one is being overridden. A process order is not unique — one site has two rules sharing one.', 1;
+
     DECLARE @Existing bigint = (
         SELECT TOP 1 Id FROM agora.ReconCriteria
-        WHERE BranchId = @BranchId AND BankReconArea = @ReconArea AND ProcessOrder = @ProcessOrder
+        WHERE BranchId = @BranchId
+          AND ((@LegacyAutoReconId IS NOT NULL AND LegacyAutoReconId = @LegacyAutoReconId)
+            OR (@LegacyAutoReconId IS NULL AND LegacyAutoReconId IS NULL
+                AND BankReconArea = @ReconArea AND ProcessOrder = @ProcessOrder))
     );
 
     /* ---- park / unpark ---------------------------------------------------- */
@@ -124,12 +154,16 @@ BEGIN
              FILTER_Value, FILTER_StartPosition, FILTER_EndPosition,
              IsActive, Reason, CopiedFromBranchId, CreatedAt, CreatedBy)
         SELECT @BranchId, @ReconArea, @ProcessOrder,
-               /* Which of the customer's rows this replaces, when it replaces
-                  one. Null means it ADDS a rule the branch never had, which is
-                  the case for most of the estate (finding 1). */
-               (SELECT TOP 1 l.AutoReconId FROM agora.vw_LegacyReconCriteria l
-                 WHERE l.BranchId = @BranchId AND l.BankReconArea = @ReconArea
-                   AND l.ProcessOrder = @ProcessOrder),
+               /* Which of the customer's rules this replaces, when it
+                  replaces one. Null means it ADDS a rule the branch never had,
+                  which is the case for most of the estate (finding 1).
+                  @LegacyAutoReconId when the caller named one — the screen
+                  always does, because the row it opened came from the view and
+                  carries the id. Falling back to the triple is for a caller
+                  that did not, and it is NOT unique: branch 23 has two FNB
+                  rules both at ProcessOrder 1, so TOP 1 would pick one of them
+                  arbitrarily. Refused below rather than guessed. */
+               @LegacyAutoReconId,
                @BankStartPosition, @BankEndPosition, @BankStartPosition2, @BankEndPosition2,
                @MopsStartPosition, @MopsEndPosition,
                @FilterValue, @FilterStartPosition, @FilterEndPosition,

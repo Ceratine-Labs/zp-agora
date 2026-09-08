@@ -1,4 +1,17 @@
-@props(['title' => 'Agora'])
+{{--
+    `wide` lets a screen use the whole window rather than the reading measure.
+
+    1560px is right for a page somebody READS — prose past about that width is
+    harder to follow, and every form and report on the site wants it. A grid is
+    not read, it is scanned across: the configuration table carries fourteen
+    columns, and at 1560 the site name — the column that says which row you are
+    looking at — was pushed off the left into a horizontal scroll. Ryan hit
+    that on live on 8 September 2026.
+
+    So it is opt-in per screen rather than a new default: the pages that want
+    it are the ones whose content is a wide table.
+--}}
+@props(['title' => 'Agora', 'wide' => false])
 
 <!doctype html>
 @php
@@ -32,7 +45,7 @@
     :workspace="$shellWorkspace"
     :granted="$shellBranchesGranted" />
 
-<main class="shell-main">
+<main class="shell-main{{ $wide ? ' is-wide' : '' }}">
     <div class="shell-in">
         {{ $slot }}
     </div>

@@ -94,7 +94,7 @@ class ReconCriteriaTest extends TestCase
         $this->save((int) $legacy->BranchId, $legacy->BankReconArea, (int) $legacy->ProcessOrder, [
             'BankStartPosition' => 11,
             'BankEndPosition' => 4,
-        ]);
+        ], (int) $legacy->AutoReconId);
 
         $row = collect($this->rowsOf())->firstWhere('BranchId', $legacy->BranchId);
 
@@ -124,12 +124,13 @@ class ReconCriteriaTest extends TestCase
 
         $this->save((int) $legacy->BranchId, $legacy->BankReconArea, (int) $legacy->ProcessOrder, [
             'BankStartPosition' => 11, 'BankEndPosition' => 4,
-        ]);
+        ], (int) $legacy->AutoReconId);
 
         $this->procedures->write('usp_Recon_SaveCriteria', [
             'BranchId' => (int) $legacy->BranchId,
             'ReconArea' => $legacy->BankReconArea,
             'ProcessOrder' => (int) $legacy->ProcessOrder,
+            'LegacyAutoReconId' => (int) $legacy->AutoReconId,
             'Action' => 'park',
             'Reason' => self::REASON.' parked',
             'UserId' => 1,
@@ -186,6 +187,12 @@ class ReconCriteriaTest extends TestCase
     /** Every refusal the save procedure owns, and it owns all of them. */
     public function test_the_procedure_refuses_what_a_preview_would_refuse(): void
     {
+        $named = collect($this->rowsOf('vw_LegacyReconCriteria'))->first();
+
+        if ($named === null) {
+            $this->markTestSkipped('The stub holds no criteria row.');
+        }
+
         $base = [
             'BranchId' => 18, 'ReconArea' => 'FNB', 'ProcessOrder' => 1, 'Action' => 'save',
             'BankStartPosition' => 28, 'BankEndPosition' => 5,
@@ -202,6 +209,12 @@ class ReconCriteriaTest extends TestCase
             // while looking at the form.
             'BAD_LENGTH' => ['BankEndPosition' => 0],
             'NOTHING_TO_PARK' => ['Action' => 'park'],
+            // A site that already has a rule at that order must say WHICH one
+            // is being overridden — one site has two sharing a process order,
+            // so there is nothing safe to assume.
+            'RULE_NOT_NAMED' => ['BranchId' => $named->BranchId, 'ReconArea' => $named->BankReconArea,
+                'ProcessOrder' => $named->ProcessOrder],
+            'RULE_NOT_FOUND' => ['LegacyAutoReconId' => 99999999],
         ];
 
         foreach ($cases as $code => $override) {
@@ -281,7 +294,7 @@ class ReconCriteriaTest extends TestCase
         }
 
         $this->actingAs($this->admin())
-            ->get("/app/recon/auto/{$legacy->BankReconArea}/config/{$legacy->BranchId}/{$legacy->ProcessOrder}")
+            ->get("/app/recon/auto/{$legacy->BankReconArea}/config/{$legacy->BranchId}/{$legacy->AutoReconId}")
             ->assertOk()
             ->assertSee("The customer's row")
             ->assertSee("Agora's override")
@@ -289,7 +302,7 @@ class ReconCriteriaTest extends TestCase
     }
 
     /** @param array<string, int|string|null> $values */
-    private function save(int $branchId, string $area, int $order, array $values): void
+    private function save(int $branchId, string $area, int $order, array $values, ?int $legacyId = null): void
     {
         $this->procedures->write('usp_Recon_SaveCriteria', array_merge([
             'BranchId' => $branchId,
@@ -297,6 +310,7 @@ class ReconCriteriaTest extends TestCase
             'ProcessOrder' => $order,
             'Action' => 'save',
             'Reason' => self::REASON,
+            'LegacyAutoReconId' => $legacyId,
             'UserId' => 1,
         ], $values));
     }
@@ -316,7 +330,7 @@ class ReconCriteriaTest extends TestCase
             $this->markTestSkipped('The stub holds no criteria row.');
         }
 
-        $url = "/app/recon/auto/{$legacy->BankReconArea}/config/{$legacy->BranchId}/{$legacy->ProcessOrder}";
+        $url = "/app/recon/auto/{$legacy->BankReconArea}/config/{$legacy->BranchId}/{$legacy->AutoReconId}";
 
         $page = $this->actingAs($this->admin())->get($url)->assertOk();
 
@@ -362,7 +376,7 @@ class ReconCriteriaTest extends TestCase
         }
 
         $this->actingAs($this->admin())
-            ->get("/app/recon/auto/{$rule->BankReconArea}/config/{$rule->BranchId}/{$rule->ProcessOrder}")
+            ->get("/app/recon/auto/{$rule->BankReconArea}/config/{$rule->BranchId}/{$rule->AutoReconId}")
             ->assertOk()
             ->assertSee($branch->Name)
             ->assertDontSee('Site '.$branch->BranchId);

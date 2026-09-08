@@ -28,7 +28,9 @@
  * in bulk, and the copy is the thing that should give way.
  *
  * Returns one row per rule considered — Verdict is 'would create' /
- * 'would replace' / 'kept' / 'created' / 'replaced' — then a status row.
+ * 'would replace' / 'kept' / 'ambiguous' / 'created' / 'replaced' — then a
+ * status row. 'ambiguous' means the TARGET has more than one rule at that
+ * process order, so which of them to shadow is a choice, not a default.
  *
  * Refusals: REASON_REQUIRED · SAME_BRANCH · UNKNOWN_AREA · SOURCE_EMPTY
  */
@@ -85,12 +87,20 @@ BEGIN
         BankStart int, BankEnd int, BankStart2 int, BankEnd2 int,
         MopsStart int, MopsEnd int,
         FilterValue nvarchar(50), FilterStart int, FilterEnd int,
-        TargetBankStart int, TargetBankEnd int, TargetSource nvarchar(20)
+        TargetBankStart int, TargetBankEnd int, TargetSource nvarchar(20),
+        /* Which of the TARGET's rules this would shadow. Null where the target
+           has none at that process order, which is the ordinary case. */
+        TargetLegacyId int
     );
 
     INSERT INTO @Plan
     SELECT s.BankReconArea, s.ProcessOrder,
            CASE
+               /* A process order is not unique. Branch 23 has two FNB rules
+                  sharing one, and copying onto a site in that position would
+                  mean choosing which of the two to shadow — which is the
+                  operator's call, not a TOP 1. Reported and skipped. */
+               WHEN tgt.Rules > 1                       THEN 'ambiguous'
                /* An override the target already has is only replaced when the
                   operator has said so twice. */
                WHEN o.Id IS NOT NULL AND @Overwrite = 0 THEN 'kept'
@@ -101,17 +111,27 @@ BEGIN
            s.MopsStart, s.MopsEnd, s.FilterValue, s.FilterStart, s.FilterEnd,
            /* What the target resolves to today, so the preview can show what
               is being changed and not merely what it is being changed to. */
-           t.BANK_StartPosition, t.BANK_EndPosition,
+           tgt.BankStart, tgt.BankEnd,
            CASE WHEN o.Id IS NOT NULL AND o.IsActive = 1 THEN 'Agora override'
-                WHEN t.AutoReconId IS NOT NULL           THEN 'Customer rule'
-                ELSE 'nothing' END
+                WHEN tgt.Rules > 0                       THEN 'Customer rule'
+                ELSE 'nothing' END,
+           tgt.OnlyId
     FROM @Source s
+    /* The target's own rules at this process order: how many, and which one
+       if there is exactly one. COUNT before MIN, so "two" is a fact the plan
+       carries rather than a coin toss. */
+    OUTER APPLY (
+        SELECT COUNT(*) AS Rules, MIN(l.AutoReconId) AS OnlyId,
+               MIN(l.BANK_StartPosition) AS BankStart, MIN(l.BANK_EndPosition) AS BankEnd
+        FROM agora.vw_LegacyReconCriteria l
+        WHERE l.BranchId = @ToBranchId AND l.BankReconArea = s.BankReconArea
+          AND l.ProcessOrder = s.ProcessOrder
+    ) tgt
     LEFT JOIN agora.ReconCriteria o
-           ON o.BranchId = @ToBranchId AND o.BankReconArea = s.BankReconArea
-          AND o.ProcessOrder = s.ProcessOrder
-    LEFT JOIN agora.vw_AutoReconCriteria t
-           ON t.BranchId = @ToBranchId AND t.BankReconArea = s.BankReconArea
-          AND t.ProcessOrder = s.ProcessOrder;
+           ON o.BranchId = @ToBranchId
+          AND ((tgt.Rules = 1 AND o.LegacyAutoReconId = tgt.OnlyId)
+            OR (tgt.Rules = 0 AND o.LegacyAutoReconId IS NULL
+                AND o.BankReconArea = s.BankReconArea AND o.ProcessOrder = s.ProcessOrder));
 
     DECLARE @Created int = 0, @Replaced int = 0;
 
@@ -137,7 +157,10 @@ BEGIN
             o.UpdatedAt            = @Now,
             o.UpdatedBy            = @UserId
         FROM agora.ReconCriteria o
-        JOIN @Plan p ON p.BankReconArea = o.BankReconArea AND p.ProcessOrder = o.ProcessOrder
+        JOIN @Plan p
+          ON (p.TargetLegacyId IS NOT NULL AND o.LegacyAutoReconId = p.TargetLegacyId)
+          OR (p.TargetLegacyId IS NULL AND o.LegacyAutoReconId IS NULL
+              AND o.BankReconArea = p.BankReconArea AND o.ProcessOrder = p.ProcessOrder)
         WHERE o.BranchId = @ToBranchId AND p.Verdict = 'replace';
 
         SET @Replaced = @@ROWCOUNT;
@@ -149,9 +172,7 @@ BEGIN
              FILTER_Value, FILTER_StartPosition, FILTER_EndPosition,
              IsActive, Reason, CopiedFromBranchId, CreatedAt, CreatedBy)
         SELECT @ToBranchId, p.BankReconArea, p.ProcessOrder,
-               (SELECT TOP 1 l.AutoReconId FROM agora.vw_LegacyReconCriteria l
-                 WHERE l.BranchId = @ToBranchId AND l.BankReconArea = p.BankReconArea
-                   AND l.ProcessOrder = p.ProcessOrder),
+               p.TargetLegacyId,
                p.BankStart, p.BankEnd, p.BankStart2, p.BankEnd2,
                p.MopsStart, p.MopsEnd, p.FilterValue, p.FilterStart, p.FilterEnd,
                1, @Reason, @FromBranchId, @Now, @UserId
@@ -174,7 +195,7 @@ BEGIN
     SELECT BankReconArea, ProcessOrder, Verdict,
            BankStart, BankEnd, BankStart2, BankEnd2,
            MopsStart, MopsEnd, FilterValue, FilterStart, FilterEnd,
-           TargetBankStart, TargetBankEnd, TargetSource
+           TargetBankStart, TargetBankEnd, TargetSource, TargetLegacyId
     FROM @Plan
     ORDER BY BankReconArea, ProcessOrder;
 

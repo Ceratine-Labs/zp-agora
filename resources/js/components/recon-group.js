@@ -41,6 +41,25 @@ export default function reconGroup() {
     if (!button) return;
 
     button.addEventListener('click', () => run(panel, button, status), { once: true });
+
+    /*
+     * A FRESH GROUP STARTS ITSELF.
+     *
+     * The press that created it said "Preview every site", so asking for a
+     * second press on the next page is asking twice for one decision — and
+     * the page it lands on shows a stat strip of zeros above a button that is
+     * easy to miss, which reads as a screen that has hung. Ryan reported
+     * exactly that on live on 8 September 2026, on a group where the driver
+     * was working perfectly and simply had not been told to go.
+     *
+     * `data-group-auto` is set only when NOTHING has been previewed yet. A
+     * group somebody left half-done waits for the button instead: coming back
+     * to a page and having it start moving on its own is the other failure,
+     * and a resume is a decision rather than a continuation.
+     */
+    if (panel.dataset.groupAuto === '1') {
+        run(panel, button, status);
+    }
 }
 
 async function run(panel, button, status) {

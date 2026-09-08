@@ -163,6 +163,12 @@ nav.primary { display: flex; align-items: stretch; flex: 1; min-width: 0; overfl
 /* ============================================================ page frame */
 
 .shell-in { max-width: 1560px; margin: 0 auto; padding: 0 22px; }
+
+/* A screen whose content is a wide table uses the window instead of the
+   reading measure. Opt-in — <x-app-shell wide> — because 1560 is right for
+   everything that is read rather than scanned across. The cap is still there
+   so the table does not stretch to absurdity on an ultrawide. */
+.shell-main.is-wide .shell-in { max-width: min(2200px, calc(100vw - 44px)); }
 .shell-main { padding: 22px 0 40px; flex: 1; }
 .shell-foot {
   border-top: 1px solid var(--line); padding: 10px 0; background: var(--surface-2);

@@ -61,14 +61,24 @@
                  data-group-total="{{ $group->BranchCount }}"
                  data-group-done="{{ $group->CompletedCount + $group->FailedCount }}"
                  data-group-branches="{{ implode(',', $outstanding) }}"
+                 {{-- Nothing previewed yet means this is the page the press
+                      landed on, so it goes on its own; a half-done group waits
+                      for the button, because resuming is a decision. --}}
+                 data-group-auto="{{ $group->CompletedCount + $group->FailedCount === 0 ? '1' : '0' }}"
                  data-group-url="{{ route('app.recon.group.branch', [$group->GroupRef, 0]) }}"
                  style="margin:12px 14px 0">
                 <p class="field-help" data-group-status>
-                    {{ count($outstanding) }} {{ Str::plural('site', count($outstanding)) }} still to preview.
+                    @if ($group->CompletedCount + $group->FailedCount === 0)
+                        Starting — {{ count($outstanding) }} {{ Str::plural('site', count($outstanding)) }} to preview, one at a time.
+                    @else
+                        {{ count($outstanding) }} {{ Str::plural('site', count($outstanding)) }} still to preview.
+                    @endif
                 </p>
-                <button type="button" class="btn-primary" data-group-start>Preview the remaining sites</button>
-                <span class="field-help">One site at a time. You can leave this page and come back — the
-                      group remembers what it has done.</span>
+                <button type="button" class="btn-primary" data-group-start>
+                    {{ $group->CompletedCount + $group->FailedCount === 0 ? 'Start again' : 'Preview the remaining sites' }}
+                </button>
+                <span class="field-help">One site at a time, about two seconds each. You can leave this page
+                      and come back — the group remembers what it has done.</span>
             </div>
         @endif
 

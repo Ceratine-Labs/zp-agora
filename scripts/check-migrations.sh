@@ -55,11 +55,30 @@ for file in $files; do
     # a production database the first run is the only run, so this is caught
     # before it gets there. A unique key on the business columns alone is what
     # let one branch's row block another's in the legacy estate.
-    if grep -qE 'naturalKey\(' "$file"; then
+    #
+    # WITH THE COMMENTS STRIPPED FIRST. A migration that EXPLAINS a natural key
+    # in prose names the function to do it, and `naturalKey()` written in a
+    # sentence is an empty argument list with no BranchId in it — so the check
+    # fired on a file whose only mention of it was a comment saying why it was
+    # no longer the right key. Caught on 8 September 2026, hours after the same
+    # trap was fixed in check-procs.sh, where a docblock explaining a bug
+    # contained the exact string that check was grepping for. Any anchor you
+    # can name in prose will occur in the prose that names it.
+    code=$(perl -0pe 's{/\*.*?\*/}{}gs; s{^\s*(//|\#).*$}{}gm' "$file")
+
+    if printf '%s' "$code" | grep -qE 'naturalKey\('; then
         # Each naturalKey( ... ) call flattened onto one line, then checked.
-        if tr '\n' ' ' < "$file" | grep -oE "naturalKey\([^)]*\)" | grep -qv 'BranchId'; then
+        if printf '%s' "$code" | tr '\n' ' ' | grep -oE "naturalKey\([^)]*\)" | grep -qv 'BranchId'; then
             say "$file: a naturalKey() call omits BranchId. Every unique key in Agora includes the branch column."
         fi
+    fi
+
+    # A hand-written unique index must lead with BranchId for the same reason.
+    # MigrationHelper::naturalKey() is the normal way and enforces it; raw DDL
+    # bypasses that, and the recon override table needed two FILTERED unique
+    # indexes, which the helper has no vocabulary for.
+    if printf '%s' "$code" | tr '\n' ' ' | grep -oiE "CREATE +UNIQUE +INDEX[^;]*" | grep -qv 'BranchId'; then
+        say "$file: a hand-written UNIQUE INDEX omits BranchId. Every unique key in Agora includes the branch column."
     fi
 
     # No enum columns — a small reference table or TINYINT + a check constraint.

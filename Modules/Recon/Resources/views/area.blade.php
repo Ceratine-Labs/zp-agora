@@ -1,4 +1,7 @@
-<x-app-shell :title="$area['label'].' — auto reconciliation'">
+{{-- The two tabs whose content is a wide grid use the window; the ones
+     that are a form keep the reading measure. --}}
+<x-app-shell :title="$area['label'].' — auto reconciliation'"
+             :wide="in_array($tab, ['config', 'runs'], true)">
     <x-page-head
         eyebrow="Auto reconciliation"
         :title="$area['label']"

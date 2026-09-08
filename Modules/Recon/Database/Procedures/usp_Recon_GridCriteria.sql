@@ -27,6 +27,14 @@
  *   Parked           an override exists but is switched off; the legacy row —
  *                    or nothing at all — is back in effect
  *
+ * ONE ROW PER RULE, KEYED ON AutoReconId. Not on (BranchId, BankReconArea,
+ * ProcessOrder) — that triple does NOT identify a rule, and the customer's own
+ * data says so: branch 23 has two FNB rules, both ProcessOrder 1, ids 283 and
+ * 293, identical in every column. Keying on the triple deduplicated 133 rules
+ * to 132 and then met each side of the join twice, so this screen reported 135
+ * rows for an estate of 133. Caught by reading the count against the view's,
+ * which is the whole reason that check is a habit here.
+ *
  * @WithNarrativeCheck IS OFF BY DEFAULT AND THAT IS DELIBERATE.
  * `RCN_BankStatementLinesPumpIT` is a table inside a 249 GB database people
  * are trading on. Asking it how long its narratives actually are is the single
@@ -134,26 +142,27 @@ BEGIN
                v.FILTER_Value, v.FILTER_StartPosition, v.FILTER_EndPosition
         FROM agora.vw_AutoReconCriteria v
     ),
-    keys AS (
-        /* Every (site, area, order) either side knows about. A parked
-           override still earns a row: "there is a change here that is switched
-           off" is something the reader has to be able to see. */
-        SELECT BranchId, BankReconArea, ProcessOrder FROM effective
-        UNION
-        SELECT BranchId, BankReconArea, ProcessOrder FROM agora.ReconCriteria
-    ),
     rows AS (
+        /*
+         * One row per rule in force, plus one for every override that is
+         * switched OFF — a parked change is something the reader has to be
+         * able to see, and by definition it is not in the view.
+         *
+         * AutoReconId is the identity on both sides: positive for one of the
+         * customer's rules, negative for one of Agora's. The joins below are
+         * therefore one-to-one, which is what the earlier keying on
+         * (site, area, order) was not.
+         */
         SELECT
-            k.BranchId,
+            e.BranchId,
             b.Name AS BranchName,
-            k.BankReconArea,
-            k.ProcessOrder,
+            e.BankReconArea,
+            e.ProcessOrder,
             o.Id                       AS OverrideId,
             e.AutoReconId,
 
-            CASE WHEN o.Id IS NOT NULL AND o.IsActive = 1 AND lg.AutoReconId IS NOT NULL THEN 'Overridden'
-                 WHEN o.Id IS NOT NULL AND o.IsActive = 1                                THEN 'Added by Agora'
-                 WHEN o.Id IS NOT NULL                                                   THEN 'Parked'
+            CASE WHEN o.Id IS NOT NULL AND lg.AutoReconId IS NOT NULL THEN 'Overridden'
+                 WHEN o.Id IS NOT NULL                                THEN 'Added by Agora'
                  ELSE 'Customer' END   AS Source,
 
             e.BANK_StartPosition, e.BANK_EndPosition,
@@ -176,32 +185,64 @@ BEGIN
             lg.MOPS_EndPosition        AS LegacyMopsEnd,
             lg.FILTER_Value            AS LegacyFilterValue,
 
-            o.Reason,
-            o.IsActive,
-            o.CopiedFromBranchId,
+            o.Reason, o.IsActive, o.CopiedFromBranchId,
             o.UpdatedAt                AS ChangedAt,
             u.UserName                 AS ChangedBy,
-
             n.MaxLen                   AS NarrativeMaxLen,
             n.Lines                    AS NarrativeLines
-        FROM keys k
-        LEFT JOIN effective e
-               ON e.BranchId = k.BranchId AND e.BankReconArea = k.BankReconArea
-              AND e.ProcessOrder = k.ProcessOrder
-        LEFT JOIN agora.ReconCriteria o
-               ON o.BranchId = k.BranchId AND o.BankReconArea = k.BankReconArea
-              AND o.ProcessOrder = k.ProcessOrder
-        LEFT JOIN agora.vw_LegacyReconCriteria lg
-               ON lg.BranchId = k.BranchId AND lg.BankReconArea = k.BankReconArea
-              AND lg.ProcessOrder = k.ProcessOrder
-        LEFT JOIN agora.Branch b ON b.BranchId = k.BranchId AND b.DeletedAt IS NULL
+        FROM effective e
+        /* Ours, when the effective row IS ours: the view gives an override the
+           negative of its own id, so this is exact. */
+        LEFT JOIN agora.ReconCriteria o ON o.Id = -e.AutoReconId AND e.AutoReconId < 0
+        /* The rule this override replaces, by the id it names. */
+        LEFT JOIN agora.vw_LegacyReconCriteria lg ON lg.AutoReconId = o.LegacyAutoReconId
+        LEFT JOIN agora.Branch b ON b.BranchId = e.BranchId AND b.DeletedAt IS NULL
         LEFT JOIN agora.[User] u ON u.Id = ISNULL(o.UpdatedBy, o.CreatedBy)
         LEFT JOIN @Narrative n
-               ON n.BranchId = k.BranchId
-              AND n.BankType = CASE WHEN k.BankReconArea = 'CashBags' THEN 'CashDeposit' ELSE k.BankReconArea END
-        WHERE (@ReconArea IS NULL OR k.BankReconArea = @ReconArea)
-          AND (@AllBranches = 1 OR k.BranchId IN (SELECT BranchId FROM @Branch))
-          AND (@AllAllowed  = 1 OR k.BranchId IN (SELECT BranchId FROM @Allowed))
+               ON n.BranchId = e.BranchId
+              AND n.BankType = CASE WHEN e.BankReconArea = 'CashBags' THEN 'CashDeposit' ELSE e.BankReconArea END
+        WHERE (@ReconArea IS NULL OR e.BankReconArea = @ReconArea)
+          AND (@AllBranches = 1 OR e.BranchId IN (SELECT BranchId FROM @Branch))
+          AND (@AllAllowed  = 1 OR e.BranchId IN (SELECT BranchId FROM @Allowed))
+
+        UNION ALL
+
+        /* Parked overrides. Not in the view — that is what parked means — so
+           what is shown beside them is the rule that is back in force. */
+        SELECT
+            o.BranchId,
+            b.Name,
+            o.BankReconArea,
+            o.ProcessOrder,
+            o.Id,
+            CONVERT(int, -o.Id),
+            'Parked',
+            ISNULL(lg.BANK_StartPosition, o.BANK_StartPosition),
+            ISNULL(lg.BANK_EndPosition, o.BANK_EndPosition),
+            lg.BANK_StartPosition2, lg.BANK_EndPosition2,
+            lg.MOPS_StartPosition, lg.MOPS_EndPosition,
+            lg.FILTER_Value, lg.FILTER_StartPosition, lg.FILTER_EndPosition,
+            CASE WHEN lg.BANK_EndPosition >= lg.BANK_StartPosition
+                 THEN lg.BANK_EndPosition - lg.BANK_StartPosition + 1
+                 ELSE lg.BANK_EndPosition END,
+            lg.AutoReconId,
+            lg.BANK_StartPosition, lg.BANK_EndPosition,
+            lg.MOPS_StartPosition, lg.MOPS_EndPosition, lg.FILTER_Value,
+            o.Reason, o.IsActive, o.CopiedFromBranchId,
+            o.UpdatedAt,
+            u.UserName,
+            n.MaxLen, n.Lines
+        FROM agora.ReconCriteria o
+        LEFT JOIN agora.vw_LegacyReconCriteria lg ON lg.AutoReconId = o.LegacyAutoReconId
+        LEFT JOIN agora.Branch b ON b.BranchId = o.BranchId AND b.DeletedAt IS NULL
+        LEFT JOIN agora.[User] u ON u.Id = ISNULL(o.UpdatedBy, o.CreatedBy)
+        LEFT JOIN @Narrative n
+               ON n.BranchId = o.BranchId
+              AND n.BankType = CASE WHEN o.BankReconArea = 'CashBags' THEN 'CashDeposit' ELSE o.BankReconArea END
+        WHERE o.IsActive = 0
+          AND (@ReconArea IS NULL OR o.BankReconArea = @ReconArea)
+          AND (@AllBranches = 1 OR o.BranchId IN (SELECT BranchId FROM @Branch))
+          AND (@AllAllowed  = 1 OR o.BranchId IN (SELECT BranchId FROM @Allowed))
     )
 
     SELECT *
