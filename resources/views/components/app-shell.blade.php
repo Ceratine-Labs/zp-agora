@@ -32,7 +32,14 @@
     <title>{{ $title }} · Agora</title>
     @vite(['resources/scss/app.scss', 'resources/js/app.js'])
 </head>
-<body>
+{{-- The wide mode belongs on the BODY, not on <main>.
+
+     Put on <main> alone it widened the content and left the app bar and the
+     scope bar on the reading measure, so the page head began about 150px to
+     the LEFT of the "As at" control directly above it. Ryan read that as the
+     content sitting too close to the edge, and he was right — a left edge that
+     moves down the page is worse than either width on its own. --}}
+<body class="{{ $wide ? 'is-wide' : '' }}">
 
 <x-app-bar
     :sections="$shellSections"
@@ -45,7 +52,7 @@
     :workspace="$shellWorkspace"
     :granted="$shellBranchesGranted" />
 
-<main class="shell-main{{ $wide ? ' is-wide' : '' }}">
+<main class="shell-main">
     <div class="shell-in">
         {{ $slot }}
     </div>

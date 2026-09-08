@@ -16,7 +16,25 @@
   // The scope form sits above the grid rather than in a card of its own: the
   // grid IS the answer to the parameters, and putting a border between them
   // makes them read as two things.
-  .dg-scope { padding: 0 0 14px; }
+  .dg-scope {
+    /* The 12px matches .dg-bar and the table's own cell padding, so the filter
+       form, the "Showing N of N" bar and the first column all begin on one
+       line. It had no left padding at all, which only showed once a page was
+       wide enough for the eye to travel down the edge. */
+    padding: 0 12px 14px;
+    /* A FILTER BAR IS NOT A TABLE. .field-row lays fields out as
+       repeat(auto-fit, minmax(190px, 1fr)), so on a wide page the search box
+       collapsed to a 190px sliver with its help text wrapping to three lines
+       while the sites selector — which spans every track — ran the full width
+       beside it. Capping the form keeps the controls the shape they are on
+       every other screen; the table below still uses the whole window. */
+    max-width: 1180px;
+
+    /* Wider tracks than the global .field-row: four across this form rather
+       than six, so the search box is a box and its help text is two lines
+       instead of three. */
+    .field-row { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  }
   .dg-scope .form-actions { margin-top: 12px; }
 }
 

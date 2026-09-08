@@ -62,7 +62,7 @@
     </x-slot:actions>
 
     @unless ($checked)
-        <p class="field-help" style="margin:12px 14px 0">
+        <p class="field-help" style="margin:12px 12px 18px">
             <strong>Positions only.</strong> Whether a rule actually reaches anything can only be answered
             by reading the site's real narratives, which is a query across the customer's live statement
             table — so it is a button rather than something this page does every time it loads. Branch 7's
