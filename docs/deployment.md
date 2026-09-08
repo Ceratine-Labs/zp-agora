@@ -121,6 +121,13 @@ already had on the server, so no file is ever momentarily un-writable. The
 `chown -R` in step 3 stays, because a genuinely NEW file still arrives owned by
 root.
 
+**It is in `scripts/deploy.sh` as of 8 September 2026, and it was not before.**
+This section was written the same day the incident happened and the flags went
+into the manual procedure above — but not into the script, which is what
+anybody actually runs. The next deploy through the script would have reproduced
+it exactly. If you add a flag here, add it there, or the doc is describing a
+deploy nobody performs.
+
 If a deploy ever changes enough to matter, `php artisan down` before the rsync
 and `php artisan up` after is the honest alternative — a stated outage rather
 than a handful of 500s that look like a bug in the feature you just shipped.

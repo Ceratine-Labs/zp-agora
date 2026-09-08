@@ -786,6 +786,28 @@ tr.is-expandable > td.pick { position: relative; }
   code { font-family: var(--font-mono); }
 }
 
+/* The one-column drill: a whole chain, rather than two sides of one row.
+
+   Stock recon's row detail is not a comparison, it is a sequence — every shift
+   of one item in order, counted beside balanced — so it wants the full width of
+   the grid rather than the two halves `.drill` divides it into. Same padding,
+   same rules, one column. */
+.drill-chain {
+  padding: 12px 14px; min-width: 0;
+
+  > header {
+    margin: 0 0 10px;
+    h4 {
+      font-family: var(--font-display); font-size: 14px; margin: 0 0 2px;
+    }
+    p { margin: 0; font-size: 11.5px; }
+  }
+
+  .statstrip { margin-bottom: 10px; }
+  > .notice { margin-bottom: 10px; }
+  > .field-help { margin: 8px 0 0; }
+}
+
 /* ---------------------------------------------------------------------------
    Users and access (T028)
    --------------------------------------------------------------------------- */

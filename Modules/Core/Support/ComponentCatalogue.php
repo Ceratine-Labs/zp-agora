@@ -390,7 +390,7 @@ class ComponentCatalogue
                 'group' => 'Parameters',
                 'summary' => 'One labelled control with its explanation attached.',
                 'mockup' => 'form',
-                'notes' => '`type="bool"` renders a checkbox with a hidden 0 beside it. A plain `<select>` stays plain — `select.js` only claims `select[data-select]`. This is the full-size form field; `<x-param>` is the compact one that goes in a parameter grid.',
+                'notes' => '`type="bool"` renders a checkbox with a hidden 0 beside it. A plain `<select>` stays plain — `select.js` only claims `select[data-select]`. This is the full-size form field; `<x-param>` is the compact one that goes in a parameter grid. **`choices` also takes a LIST** of `[value, label, when]` rows, for the case a value-keyed map cannot express: two options with the same value. Counting areas are numbered per site, so the stock recon centre renders every site\'s at once and `linked` + `linked-select.js` narrow them in the browser rather than costing a page load per site. **`step` is not optional on a decimal**: a number input steps by 1 unless told otherwise, so a control declared `min="0.01" max="1.0"` holding the value 1 is invalid to the browser, and Chrome then refuses the whole form with "an invalid form control is not focusable" and no visible message — silently, if the field sits inside a closed `<details>`. That is exactly how the stock recon Preview button did nothing on 8 September 2026.',
                 'props' => [
                     ['name', 'string', '—', 'Field name, and the id it derives'],
                     ['label', 'string', "''", 'Above the control'],
@@ -400,6 +400,8 @@ class ComponentCatalogue
                     ['value', 'mixed', 'null', 'Current value'],
                     ['min', 'mixed', 'null', 'Input min'],
                     ['max', 'mixed', 'null', 'Input max'],
+                    ['step', 'mixed', 'null', 'Input step — required on a decimal, or 1 is assumed'],
+                    ['linked', '?string', 'null', 'Name of the select this one follows; needs `when` on the choices'],
                 ],
             ],
             [
