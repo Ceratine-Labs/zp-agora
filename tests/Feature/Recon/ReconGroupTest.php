@@ -224,4 +224,56 @@ class ReconGroupTest extends TestCase
 
         return collect($sites)->first(fn (int $id) => ! in_array($id, $configured, true));
     }
+
+    /**
+     * The RELATION returns the runs, not just the query.
+     *
+     * This is the assertion that was missing when a lowercase accessor on
+     * GroupRef emptied it. Eloquent matches a HasMany to its parent in PHP,
+     * comparing the parent's local key to the child's foreign key as strings —
+     * so an accessor that changes the case of one of them breaks the match
+     * while the DATABASE, whose collation is case-insensitive, keeps agreeing.
+     *
+     * `$group->runs()->count()` returned 25 the whole time. `$group->runs` —
+     * which is what every row of the group screen renders from — returned 0,
+     * so twenty-five previewed sites all read "Waiting…" under a stat strip
+     * that correctly said 21 previewed and 4 refused. Ryan caught it on live.
+     *
+     * Both forms are asserted, and they have to agree.
+     */
+    public function test_the_runs_relation_finds_what_the_query_finds(): void
+    {
+        $group = $this->startGroup();
+        $site = $this->siteWithoutCriteria($group) ?? 18;
+
+        $this->actingAs($this->admin())
+            ->post(route('app.recon.group.branch', [$group->GroupRef, $site]))
+            ->assertOk();
+
+        $byQuery = $group->runs()->count();
+        $this->assertSame(1, $byQuery, 'The branch POST should have recorded exactly one run.');
+
+        // Freshly loaded, the way the screen loads it.
+        $reloaded = ReconRunGroup::query()->acrossBranches()
+            ->where('GroupRef', $group->GroupRef)->firstOrFail()->load('runs');
+
+        $this->assertCount($byQuery, $reloaded->runs,
+            'The relation must return what the query returns — a case-shifting accessor on GroupRef breaks the PHP-side match while SQL keeps agreeing.');
+
+        $this->assertArrayHasKey($site, $reloaded->runsByBranch()->all(),
+            'The group screen keys its rows by branch off this.');
+    }
+
+    /**
+     * The reference is spelled the same before and after a round trip, so one
+     * group never has two addresses.
+     */
+    public function test_the_group_reference_is_stable_across_a_reload(): void
+    {
+        $group = $this->startGroup();
+
+        $reloaded = ReconRunGroup::query()->acrossBranches()->findOrFail($group->Id);
+
+        $this->assertSame($group->GroupRef, $reloaded->GroupRef);
+    }
 }

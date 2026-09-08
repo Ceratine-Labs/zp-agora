@@ -61,7 +61,7 @@ class ReconGroupService
         // written, rather than leaving an empty group behind.
         $this->service->area($area);
 
-        return ReconRunGroup::create([
+        $group = ReconRunGroup::create([
             // Never one of the sites: a group is not about a site. See the
             // migration's header.
             'BranchId' => (int) config('agora.group_branch_id', 2),
@@ -76,6 +76,17 @@ class ReconGroupService
             'CreatedBy' => auth()->id(),
             'CreatedAt' => now(),
         ]);
+
+        /*
+         * Read back, so GroupRef is the value the DATABASE holds.
+         *
+         * Str::uuid() is lowercase and SQL Server returns a UNIQUEIDENTIFIER
+         * uppercase, so without this the redirect after creating a group used
+         * one spelling and every link after it used the other. The model used
+         * to paper over that with an accessor, and the accessor emptied the
+         * runs relation — see the header of ReconRunGroup.
+         */
+        return $group->fresh() ?? $group;
     }
 
     /**

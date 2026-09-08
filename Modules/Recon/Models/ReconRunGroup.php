@@ -3,7 +3,6 @@
 namespace Modules\Recon\Models;
 
 use App\Models\BaseModel;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -56,6 +55,30 @@ class ReconRunGroup extends BaseModel
     ];
 
     /**
+     * NO ACCESSOR ON GroupRef, AND THAT IS LOAD-BEARING.
+     *
+     * There was one, lowercasing it, because SQL Server hands a
+     * UNIQUEIDENTIFIER back uppercase while Str::uuid() makes it lowercase —
+     * so a freshly created group and the same group read back produced two
+     * different URLs. Cosmetic, and the fix for it silently emptied the
+     * relation below.
+     *
+     * Eloquent matches a HasMany to its parent IN PHP: it builds a dictionary
+     * keyed on the child's foreign key — uppercase, straight from the column —
+     * and looks it up by the parent's local key, which the accessor had
+     * lowercased. The DATABASE never disagreed, because the collation is
+     * case-insensitive and `$group->runs()->count()` returned 25 all along.
+     * Only `$group->runs` came back empty, which is what every row on the
+     * group screen renders from: twenty-five sites that had all previewed,
+     * every one of them reading "Waiting…", above a stat strip that correctly
+     * said 21 previewed and 4 refused. Ryan caught it on live.
+     *
+     * The URL is uppercase now, consistently, because ReconGroupService::start()
+     * returns the model as the database has it. A cosmetic inconsistency is
+     * worth less than a relation that works.
+     */
+
+    /**
      * The runs launched under this press.
      *
      * acrossBranches(), and it has to be: the group row carries the GROUP
@@ -71,23 +94,6 @@ class ReconRunGroup extends BaseModel
         return $this->hasMany(ReconRun::class, 'GroupRef', 'GroupRef')
             ->acrossBranches()
             ->orderBy('BranchId');
-    }
-
-    /**
-     * The group's reference, always in one case.
-     *
-     * SQL Server hands a UNIQUEIDENTIFIER back UPPERCASE, and Str::uuid()
-     * produces it lowercase — so the URL of a group differed depending on
-     * whether the model had just been created or read back, and one group had
-     * two addresses in a person's history. The comparison is unaffected
-     * (the database collation is case-insensitive); this is about the string
-     * Agora puts in a link.
-     *
-     * @return Attribute<string, never>
-     */
-    protected function groupRef(): Attribute
-    {
-        return Attribute::make(get: fn (?string $value) => strtolower((string) $value));
     }
 
     /** @return array<string, scalar|null> */
