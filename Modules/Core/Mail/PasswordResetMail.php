@@ -7,6 +7,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Modules\Core\Models\PasswordReset;
 use Modules\Core\Models\User;
 use Modules\Core\Services\PasswordResetService;
 
@@ -31,6 +32,7 @@ class PasswordResetMail extends Mailable
     public function __construct(
         public User $user,
         public string $token,
+        public string $otp,
     ) {}
 
     public function envelope(): Envelope
@@ -46,7 +48,9 @@ class PasswordResetMail extends Mailable
                 'name' => $this->user->UserName,
                 'url' => route('password.reset', ['token' => $this->token])
                     .'?email='.urlencode((string) $this->user->EmailAddress),
+                'otp' => $this->otp,
                 'minutes' => PasswordResetService::LIFETIME_MINUTES,
+                'attempts' => PasswordReset::MAX_ATTEMPTS,
             ],
         );
     }

@@ -140,6 +140,20 @@ BEGIN
         UsedProcessOrder int, UsedBankStart int, UsedBankLen int,
         ReconState int, ReconBatchNo int
     );
+    /* Bank lines the drill returned that are ALREADY reconciled.
+     *
+     * They are evidence, not part of the batch. Every Preview* procedure
+     * builds its proposal from ReconState = 1 only, so a reconciled line was
+     * never in the batch the user ticked — it merely shares the key and the
+     * window. Keeping the two sets apart is the whole of the fix below. */
+    DECLARE @BankClaimed TABLE (
+        RunLineId bigint, BankStatementLineID bigint, LineDate datetime,
+        Description nvarchar(400), Amount money,
+        ExtractedRef nvarchar(50), ExtractedRef2 nvarchar(50), Leg nvarchar(2),
+        UsedProcessOrder int, UsedBankStart int, UsedBankLen int,
+        ReconState int, ReconBatchNo int
+    );
+
     DECLARE @Mops TABLE (
         RunLineId bigint, SourceRef nvarchar(50), SourceDate datetime,
         Amount money, Detail nvarchar(200),
@@ -197,18 +211,56 @@ BEGIN
 
     /* ---- 3. Re-check. A row that moved is skipped, never stamped over ------ */
 
+    /*
+     * SPLIT THE DRILL BEFORE JUDGING IT. Run 38 on branch 18 (7 Sep 2026)
+     * skipped 127 of 130 batches saying "a bank line has been reconciled by
+     * something else", and it was not true: re-drilling those same batches
+     * with @IncludeReconciled = 0 returned the preview's line count and the
+     * preview's total to the cent, with nothing claimed. What the guard had
+     * found were OTHER lines sharing the key and the window — lines reconciled
+     * by run 19 three days earlier — which were never part of the batch,
+     * because every Preview* procedure matches ReconState = 1 only.
+     *
+     * The widened drill still earns its place: without it a batch whose own
+     * lines were claimed would come back as "no longer on the statement",
+     * which is true but useless. So the reconciled rows move out of @Bank and
+     * into @BankClaimed — visible for the explanation, invisible to the
+     * arithmetic and to the stamp.
+     */
+    INSERT INTO @BankClaimed
+    SELECT * FROM @Bank WHERE ReconState <> 1;
+
+    DELETE FROM @Bank WHERE ReconState <> 1;
+
+    /* Nothing left on either side: the statement itself has moved. */
     UPDATE r SET Outcome = 'The bank lines behind this are no longer on the statement in this period.'
-    FROM @Rows r WHERE NOT EXISTS (SELECT 1 FROM @Bank b WHERE b.RunLineId = r.RunLineId);
+    FROM @Rows r
+    WHERE NOT EXISTS (SELECT 1 FROM @Bank b WHERE b.RunLineId = r.RunLineId)
+      AND NOT EXISTS (SELECT 1 FROM @BankClaimed b WHERE b.RunLineId = r.RunLineId);
+
+    /* Everything this batch needs HAS been claimed. Now the message is true. */
+    UPDATE r SET Outcome = 'A bank line has been reconciled by something else since the preview.'
+    FROM @Rows r WHERE r.Outcome IS NULL
+      AND NOT EXISTS (SELECT 1 FROM @Bank b WHERE b.RunLineId = r.RunLineId);
 
     UPDATE r SET Outcome = 'The deposit rows behind this are no longer outstanding.'
     FROM @Rows r WHERE r.Outcome IS NULL
       AND NOT EXISTS (SELECT 1 FROM @Mops m WHERE m.RunLineId = r.RunLineId);
 
-    UPDATE r SET Outcome = 'A bank line has been reconciled by something else since the preview.'
-    FROM @Rows r WHERE r.Outcome IS NULL
-      AND EXISTS (SELECT 1 FROM @Bank b WHERE b.RunLineId = r.RunLineId AND b.ReconState <> 1);
-
-    UPDATE r SET Outcome = 'The two sides no longer balance — the data has changed since the preview.'
+    /*
+     * Balance over the OUTSTANDING side only — the same set the preview added
+     * up. Summing the widened set was wrong for exactly the same reason as the
+     * guard above, and only escaped notice because the guard fired first.
+     *
+     * When part of a batch has been claimed the sum will not reach the
+     * deposit, and the reader is told which of the two things happened rather
+     * than being left to infer it from a number.
+     */
+    UPDATE r SET Outcome = CASE
+            WHEN EXISTS (SELECT 1 FROM @BankClaimed b WHERE b.RunLineId = r.RunLineId)
+            THEN 'Part of this was reconciled by something else since the preview, and what is left no longer balances.'
+            ELSE 'The two sides no longer balance — the data has changed since the preview.'
+        END
     FROM @Rows r WHERE r.Outcome IS NULL
       AND (SELECT SUM(b.Amount) FROM @Bank b WHERE b.RunLineId = r.RunLineId)
        <> (SELECT SUM(m.Amount) FROM @Mops m WHERE m.RunLineId = r.RunLineId);

@@ -7,6 +7,7 @@ use App\Grid\GridDefinition;
 use App\Grid\GridFilter;
 use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Setup → People and assets → Users and access (T028).
@@ -38,7 +39,9 @@ class UserGrid extends GridDefinition
     {
         return [
             new GridColumn(key: 'UserCode', label: 'Code', sort: 'UserCode', mono: true),
-            new GridColumn(key: 'UserName', label: 'Name', sort: 'UserName', wide: true),
+            // link: the name IS the person, so it opens them. Without this the
+            // list rendered 90 names as plain text and there was no way in.
+            new GridColumn(key: 'UserName', label: 'Name', sort: 'UserName', wide: true, link: true),
             new GridColumn(key: 'EmailAddress', label: 'Email', sort: 'EmailAddress', wide: true),
             new GridColumn(key: 'UserType', label: 'Type', sort: 'UserType'),
             new GridColumn(key: 'PrimaryRole', label: 'Primary role', sort: 'PrimaryRole'),
@@ -94,5 +97,33 @@ class UserGrid extends GridDefinition
     public function rowUrl(object $row): ?string
     {
         return route('app.setup.users.show', ['user' => $row->Id]);
+    }
+
+    /**
+     * Open, and — where the caller may change things — edit.
+     *
+     * The permission check is here rather than in a blade because it guards a
+     * ROUTE, and the route's own `can:` middleware is the thing that actually
+     * refuses. Leaving the action out of the array is the other half of
+     * feature-rules §4: a control the user cannot use is not rendered.
+     *
+     * @return array<int, array{label: string, url: string, primary?: bool}>
+     */
+    public function rowActions(object $row): array
+    {
+        $actions = [[
+            'label' => 'Open',
+            'url' => route('app.setup.users.show', ['user' => $row->Id]),
+        ]];
+
+        if (Gate::allows('setup.users.edit')) {
+            $actions[] = [
+                'label' => 'Edit',
+                'url' => route('app.setup.users.edit', ['user' => $row->Id]),
+                'primary' => true,
+            ];
+        }
+
+        return $actions;
     }
 }

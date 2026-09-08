@@ -24,9 +24,22 @@
             The grid emits the contract and does not reimplement it.
       §3.6  column order, widths and text size are the user's and persist —
             data-grid.js posts them to agora.UserGridColumn.
-      §3.7  a title or reference value navigates. From the CELLS partial, not
-            from here: which values name another record is the screen's
-            business and the shell does not know.
+      §3.7  a title or reference value navigates. TWO halves, because they are
+            two different jobs. The row's OWN resource is the shell's: the
+            definition declares which column carries the name (`link: true`)
+            and where the row lives (`rowUrl()`), and the shell draws the
+            anchor — every list needs this and nothing about it is
+            screen-specific. A value naming some OTHER record (a bag number to
+            the drop-safe screen) stays in the CELLS partial, because which
+            values do that is the screen's business and the shell cannot know.
+
+            Until 7 Sep 2026 only the second half existed: `rowUrl()` was
+            declared on GridDefinition, overridden on UserGrid, and read by
+            nothing at all — so the user list rendered 90 people as plain text
+            with no way to open any of them.
+
+      —     what a row lets you DO is `rowActions()`, a trailing column the
+            shell renders when the first row on the page offers any.
 
     A component never queries the database (plan §3.8). Everything arrives as
     one prop: `$grid`, a GridResult that GridService built.
@@ -48,7 +61,11 @@
     $definition = $grid->definition;
     $columns = $grid->visibleColumns();
     $selectable = $definition->selectable();
-    $span = count($columns) + ($selectable ? 1 : 0);
+    // Asked of the first row, once: actions vary by the caller's permissions,
+    // not row by row, and a column that came and went down the page would give
+    // the table a ragged edge. GridDefinition::rowActions() says so too.
+    $hasActions = $grid->rows->isNotEmpty() && $definition->rowActions($grid->rows->first()) !== [];
+    $span = count($columns) + ($selectable ? 1 : 0) + ($hasActions ? 1 : 0);
     // The GridKey carries dots and a colon; an id and a CSS selector do not
     // want either. One slug, used for every handle on the grid.
     $slug = \Illuminate\Support\Str::slug($grid->key());
@@ -162,6 +179,12 @@
                         <span class="dg-resize" data-resize="{{ $column->key }}" aria-hidden="true"></span>
                     </th>
                 @endforeach
+
+                @if ($hasActions)
+                    {{-- No resize handle and no sort: it is not a value, so
+                         there is nothing to order by and nothing to widen. --}}
+                    <th class="dg-actions-head"><span class="sr-only">Actions</span></th>
+                @endif
             </tr>
 
             @if ($definition->filterable())
@@ -171,6 +194,7 @@
 
         @foreach ($grid->rows as $index => $row)
             @php($url = $expands ? $definition->detailUrl($row) : null)
+            @php($rowUrl = $definition->rowUrl($row))
             <tr @if ($url) data-detail-url="{{ $url }}" @endif>
                 @if ($selectable)
                     <td class="pick">
@@ -183,9 +207,34 @@
                 @foreach ($columns as $view)
                     @php($column = $view->column)
                     <td @class($column->cellClasses()) data-column="{{ $column->key }}">
-                        @include($definition->cellsPartial(), ['row' => $row, 'column' => $column, 'grid' => $grid])
+                        {{-- The anchor wraps the cell rather than replacing it,
+                             so a linked column keeps whatever format it
+                             declared — a linked date is still a formatted
+                             date. A null rowUrl renders the value bare: a
+                             reference that leads nowhere must not look like a
+                             link. --}}
+                        @if ($column->link && $rowUrl)
+                            <a class="dg-row-link" href="{{ $rowUrl }}">@include($definition->cellsPartial(), ['row' => $row, 'column' => $column, 'grid' => $grid])</a>
+                        @else
+                            @include($definition->cellsPartial(), ['row' => $row, 'column' => $column, 'grid' => $grid])
+                        @endif
                     </td>
                 @endforeach
+
+                @if ($hasActions)
+                    <td class="dg-actions">
+                        @foreach ($definition->rowActions($row) as $action)
+                            {{-- `attributes` is how an action opts into
+                                 behaviour the shell knows nothing about — a
+                                 dialog, a confirmation. The href stays real, so
+                                 the action works with scripting off. --}}
+                            <a class="{{ ($action['primary'] ?? false) ? 'btn-primary sm' : 'btn sm' }}"
+                               href="{{ $action['url'] }}"
+                               @foreach (($action['attributes'] ?? []) as $name => $value) {{ $name }}="{{ $value }}" @endforeach
+                            >{{ $action['label'] }}</a>
+                        @endforeach
+                    </td>
+                @endif
             </tr>
         @endforeach
 
@@ -210,6 +259,7 @@
                         @endif
                     </td>
                 @endforeach
+                @if ($hasActions)<td class="dg-actions"></td>@endif
             </tr>
         @endif
     </x-table>
@@ -225,44 +275,5 @@
 
     @include('grid._pager', ['grid' => $grid])
 
-    <x-drawer :id="'dg-'.$slug.'-extract'" title="Extract" copy
-              note="The file is what you are looking at — your filters, your sort, your visible columns, in your order. It is produced by re-running the same source with the page opened up, so the numbers cannot disagree with the ones above.">
-
-        @if ($grid->overCeiling())
-            <x-notice tone="stop" title="Too big for a download">
-                <p>This answer is {{ \App\Support\Format::n($grid->total) }} rows and the grid extracts up to
-                   {{ \App\Support\Format::n($definition->exportCeiling()) }}. Narrow it above, or send it to the
-                   export centre, which produces the same file out of the request cycle.</p>
-            </x-notice>
-        @else
-            <dl class="dg-extract-facts">
-                <dt>Rows</dt><dd>{{ \App\Support\Format::n($grid->total) }}</dd>
-                <dt>Columns</dt><dd>{{ collect($columns)->map(fn ($v) => $v->column->label)->implode(', ') }}</dd>
-                <dt>Sort</dt>
-                <dd>{{ $grid->sort() ?? 'the source’s own order' }}@if ($grid->sort()), {{ $grid->ascending() ? 'ascending' : 'descending' }}@endif</dd>
-            </dl>
-
-            <div class="dg-extract-actions">
-                <a class="btn-primary" href="{{ $grid->extractUrl('xlsx') }}" data-extract>Download .xlsx</a>
-                <a class="btn-ghost" href="{{ $grid->extractUrl('csv') }}" data-extract>Download .csv</a>
-            </div>
-
-            <p class="dg-extract-note">
-                Numbers come down as numbers and dates as dates, not as the formatted text on the screen —
-                so the receiving column adds up and sorts without being cleaned first.
-            </p>
-
-            {{-- The copy button copies this. A textarea rather than a <pre>
-                 because select-all inside one is a single keystroke, and on a
-                 locked-down desktop where the download is blocked this is the
-                 way the data still gets out. --}}
-            <label class="dg-extract-label" for="dg-{{ $slug }}-csv">The first rows, as comma-separated text</label>
-            <textarea id="dg-{{ $slug }}-csv" readonly spellcheck="false" rows="12">{{ collect($columns)->map(fn ($v) => $v->column->label)->implode(',') }}
-@foreach ($grid->rows as $row){{ collect($columns)->map(function ($v) use ($row) {
-    $value = $row->{$v->column->key} ?? '';
-    return str_contains((string) $value, ',') ? '"'.str_replace('"', '""', (string) $value).'"' : $value;
-})->implode(',') }}
-@endforeach</textarea>
-        @endif
-    </x-drawer>
+    @include('grid._extract', ['grid' => $grid, 'columns' => $columns, 'definition' => $definition, 'slug' => $slug])
 </div>

@@ -3,6 +3,11 @@
 use App\Grid\Definitions\BranchGrid;
 use App\Grid\Definitions\DayCloseGrid;
 use Modules\Core\Grids\UserGrid;
+use Modules\Recon\Grids\ReconBankSideGrid;
+use Modules\Recon\Grids\ReconCriteriaGrid;
+use Modules\Recon\Grids\ReconMopsSideGrid;
+use Modules\Recon\Grids\ReconRunGrid;
+use Modules\Recon\Grids\ReconRunLineGrid;
 
 /*
 |--------------------------------------------------------------------------
@@ -68,6 +73,30 @@ return [
     */
     'grids' => [
         'app.setup.users' => UserGrid::class,
+
+        // The extraction configuration, ours beside the customer's. A row
+        // opens a modal edit form rather than editing in place — the grid
+        // framework stays read-and-export only.
+        'app.recon.config' => ReconCriteriaGrid::class,
+
+        // The runs made in one area — the workbench's Runs tab. Scoped to
+        // the person who made them unless they ask for everyone's, and the
+        // area comes off the request the same way the run does below.
+        'app.recon.runs' => ReconRunGrid::class,
+
+        // The recon run screen keeps its own table — it carries tick boxes, an
+        // execute form and a row-expand panel the grid shell cannot express —
+        // and registers here only so the standard extract endpoint serves it.
+        // See Modules/Recon/Grids/ReconRunLineGrid.
+        'app.recon.run' => ReconRunLineGrid::class,
+
+        // The two SIDES of those proposals — the bank lines and the deposits
+        // behind them. Registered for the extract only; nothing renders them
+        // as a grid, because on screen they belong next to each other inside
+        // the expand panel. The `:side` qualification is the convention this
+        // file's header describes.
+        'app.recon.run:bank' => ReconBankSideGrid::class,
+        'app.recon.run:mops' => ReconMopsSideGrid::class,
 
         'app.dev.grids:dayclose' => DayCloseGrid::class,
         'app.dev.grids:branches' => BranchGrid::class,

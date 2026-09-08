@@ -33,101 +33,18 @@
         </x-notice>
     @endif
 
-    <x-card title="Preview"
-            :sub="'Reads '.$area['legacy'].'\'s two sides and compares them. Writes nothing.'">
-            <form method="POST" action="{{ route('app.recon.preview') }}">
-                @csrf
-                <input type="hidden" name="area" value="{{ $area['key'] }}">
+    {{--
+        Four faces of one area, and they are LINKS.
 
-                <div class="field-row">
-                    {{-- The branches component lives on the result set, not in
-                         the chrome (feature-rules §3.3). In the branch
-                         workspace the site is already pinned, so it states it
-                         rather than offering a choice that does not exist. --}}
-                    @if ($pinned)
-                        <div class="field">
-                            <label>Site</label>
-                            <p class="field-fixed">{{ $branches->firstWhere('BranchId', $branchId)?->Name ?? 'Not set' }}</p>
-                            <p class="field-help">Your workspace is pinned to this site.</p>
-                        </div>
-                        <input type="hidden" name="branch_id" value="{{ $branchId }}">
-                    @else
-                        <x-field name="branch_id" label="Branch"
-                                 :choices="$branches->pluck('Name', 'BranchId')->all()"
-                                 :value="old('branch_id', $branchId)"
-                                 help="The site whose bank statement is being reconciled. Trading sites only — the administrative entities keep no banking." />
-                    @endif
+        Link mode, not panel mode: each pane is its own result set with its own
+        scope, so a tab is somewhere you can send someone — the rule everywhere
+        else in Agora and the reason <x-tabs> has the mode at all. No
+        JavaScript is involved.
 
-                    <x-field name="from" label="From" type="date" :value="old('from', $from)"
-                             help="Bank line date and deposit date, inclusive." />
+        The strip is built in the controller so it can drop a tab the person
+        may not open, rather than offering a door that answers 403.
+    --}}
+    <x-tabs :items="$tabs" :active="$tab" label="Reconciliation area" style="margin-bottom:16px" />
 
-                    <x-field name="to" label="To" type="date" :value="old('to', $to)" />
-                </div>
-
-                @if ($options)
-                    <details class="params-extra" @if (old('options')) open @endif>
-                        <summary>Rules and readings ({{ count($options) }})</summary>
-                        <p class="field-help" style="margin:8px 0 12px">
-                            Each of these exists because something in
-                            <code>BRN_AutoReconCriteria</code> or in the data is ambiguous and we would not
-                            guess on the customer's behalf. The defaults are the reading the live system uses.
-                        </p>
-                        <div class="field-row">
-                            @foreach ($options as $name => $option)
-                                <x-field :name="'options['.$name.']'"
-                                         :label="$option['label']"
-                                         :help="$option['help']"
-                                         :type="$option['type'] ?? 'text'"
-                                         :choices="$option['choices'] ?? null"
-                                         :min="$option['min'] ?? null"
-                                         :max="$option['max'] ?? null"
-                                         :value="old('options.'.$name, $option['default'])" />
-                            @endforeach
-                        </div>
-                    </details>
-                @endif
-
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary">Preview</button>
-                    <span class="field-help">Read-only. Nothing in PumpIT changes.</span>
-                </div>
-            </form>
-    </x-card>
-
-    <x-card title="Recent previews here" sub="Runs in this area, newest first" collapsible flush>
-        @if ($recent->isNotEmpty())
-            <x-slot:actions>
-                {{-- A clerk previews the same month several times while
-                     narrowing the dates. The list of attempts is not the work. --}}
-                <form method="POST" action="{{ route('app.recon.clear') }}"
-                      data-confirm="Discard the previews for {{ $area['label'] }}?"
-                      data-confirm-text="Nothing in PumpIT is affected — a preview is a record of a read. Any run that has been executed is kept."
-                      data-confirm-action="Discard previews" data-confirm-danger>
-                    @csrf
-                    @method('DELETE')
-                    <input type="hidden" name="area" value="{{ $area['key'] }}">
-                    <button type="submit" class="btn-ghost">Clear previews</button>
-                </form>
-            </x-slot:actions>
-        @endif
-
-        <x-table :count="$recent->count()" empty="No preview has been run for this area yet.">
-            <x-slot:head>
-                <tr>
-                    <th>Run</th><th>Period</th><th class="num">Rows</th>
-                    <th class="num">Would reconcile</th><th class="num">Bank only</th><th>Run at</th>
-                </tr>
-            </x-slot:head>
-            @foreach ($recent as $past)
-                <tr>
-                    <td><a href="{{ route('app.recon.run', $past) }}">#{{ $past->Id }}</a></td>
-                    <td class="mono">{{ $past->FromDate?->toDateString() }} → {{ $past->ToDate?->toDateString() }}</td>
-                    <td class="num">{{ \App\Support\Format::n($past->TotalRows) }}</td>
-                    <td class="num">{{ \App\Support\Format::n($past->MatchedRows) }}</td>
-                    <td class="num">{{ \App\Support\Format::n($past->BankOnlyRows) }}</td>
-                    <td class="muted">{{ $past->CreatedAt?->diffForHumans() }}</td>
-                </tr>
-            @endforeach
-        </x-table>
-    </x-card>
+    @include('recon::panes.'.$tab)
 </x-app-shell>

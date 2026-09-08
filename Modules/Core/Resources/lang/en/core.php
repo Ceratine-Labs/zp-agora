@@ -56,5 +56,13 @@ return [
         'send' => 'Send me a link',
         'save' => 'Save it',
         'back' => 'Back to sign in',
+
+        // The one-time code on the link (7 Sep 2026).
+        'otp_heading' => 'Enter your code',
+        'otp_blurb' => 'The mail with this link also carries a :length-character code. '
+            .'The link says which request this is; the code says it is you.',
+        'otp_label' => 'Code from the mail',
+        'otp_submit' => 'Continue',
+        'otp_expired' => 'Ask for a new link',
     ],
 ];

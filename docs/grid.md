@@ -178,6 +178,79 @@ the trap §3.2 says ZP paid for.
 The JSON is an array of `{column, type, op, value}` or `{column, type, in: […]}`.
 An Eloquent source answers the same shapes in the query builder.
 
+**The column name is inside each element, at `$.column`.** Over a JSON *array*,
+`OPENJSON`'s `[key]` is the index — `0`, `1`, `2` — not the column, and there is
+no `$.q` anywhere in the payload. A procedure that reads it the other way
+compiles, runs, returns rows, and filters nothing at all; that is how the Users
+grid shipped with inert header filters. Parse it like this:
+
+```sql
+DECLARE @Filter    TABLE ([Column] nvarchar(80), [Op] nvarchar(20), [Value] nvarchar(400));
+DECLARE @FilterSet TABLE ([Column] nvarchar(80), [Value] nvarchar(400));
+
+INSERT INTO @Filter ([Column], [Op], [Value])
+SELECT JSON_VALUE(f.value, '$.column'),
+       ISNULL(JSON_VALUE(f.value, '$.op'), 'contains'),
+       JSON_VALUE(f.value, '$.value')
+FROM OPENJSON(@FiltersJson) f
+WHERE JSON_VALUE(f.value, '$.value') IS NOT NULL;
+
+/* A tick list is an array inside the element, so it needs its own pass. */
+INSERT INTO @FilterSet ([Column], [Value])
+SELECT JSON_VALUE(f.value, '$.column'), v.value
+FROM OPENJSON(@FiltersJson) f
+CROSS APPLY OPENJSON(f.value, '$.in') v
+WHERE JSON_VALUE(f.value, '$.type') = 'set';
+```
+
+`agora.usp_Recon_GridRuns` is the worked example. **Test a filter that matches
+nothing** — a test that filters on a value which is present passes whether or
+not the filter does anything. `scripts/check-procs.sh` now refuses a procedure
+that declares `@FiltersJson` and never reads `$.column`, or that keys it on
+OPENJSON's `[key]`; it strips comments before looking, because the first cut of
+that check was defeated by the header explaining the bug using the very string
+it was grepping for.
+
+**A set filter has no `$.value` at all.** It arrives as `{column, type: 'set',
+in: [...]}`, so a procedure that reads only `$.value` drops every tick list
+silently even once the rest of the parse is right. That was the second half of
+the Users-grid bug.
+
+**Count the same set the page came from.** The second result set is the size of
+the whole filtered answer, and repeating the predicates by hand to get it is how
+they drift — `usp_Core_GridUsers` had two filters applied to the page and not to
+the count, so filtering on either gave a footer that disagreed with its own rows
+and a pager offering empty pages. Build into a `#temp` table, or count the same
+CTE.
+
+## Scope the template cannot carry
+
+Some grids are *about* something the nine parameters have no room for. The recon
+run list is one area's runs, and whose they are: the person did not type either
+and cannot clear them, so they are not header filters, and they are not a
+search. A source may pass named arguments on top of the template:
+
+```php
+new ProcedureSource('agora.usp_Recon_GridRuns', acceptsFilters: true, extra: [
+    'ReconArea' => $this->area(),
+    'MineOnly' => (int) self::wantsOwnRunsOnly(),
+    'UserId' => request()->user()?->Id,
+])
+```
+
+`source()` is called per request, so a definition resolves these off the request
+the way `ReconRunLineGrid` resolves its run. `extra` may **not** overwrite one of
+the nine — a grid quietly redefining `@PageSize` would break paging in a way
+nothing reports — and `ProcedureSource` throws on a collision rather than
+letting it win.
+
+Two things belong in `extra` rather than in `@BranchIds`: **who** the caller is
+(never from the query string — a user id in a URL is a user id somebody can
+change) and **which branches they may see at all**, which is a different
+question from the branches they have selected. `@BranchIds` is empty for a
+head-office user who has selected none, and a procedure that reads that as "the
+whole estate" hands a partially-granted user everything.
+
 ## The extract
 
 `GridExtract::run()` re-calls **the same source with the same `GridQuery`**, page

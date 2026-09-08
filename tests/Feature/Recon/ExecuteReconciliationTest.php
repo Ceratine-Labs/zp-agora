@@ -206,6 +206,249 @@ class ExecuteReconciliationTest extends TestCase
         $this->assertSame(0, $this->reconciledBankLines(0));
     }
 
+    public function test_a_reconciled_line_that_merely_shares_the_key_does_not_block_the_batch(): void
+    {
+        config(['recon.stamp_mode' => 'live']);
+
+        /*
+         * RUN 38, BRANCH 18, 7 SEPTEMBER 2026 — 127 of 130 batches skipped
+         * saying "a bank line has been reconciled by something else", and it
+         * was not true. Re-drilling those batches without reconciled rows
+         * returned the preview's line count and its total to the cent.
+         *
+         * The cause is here: the preview matches ReconState = 1 only, and the
+         * commit re-drilled with @IncludeReconciled = 1 and then blocked on
+         * ANY reconciled row it got back — including lines that merely share
+         * the key and the window and were never in the batch.
+         *
+         * So: a third line on batch 125, already reconciled to somebody
+         * else's batch. The preview cannot see it. The batch it proposed is
+         * untouched and still balances. It must commit.
+         */
+        $narrative = str_repeat('X', 48).'02026318 125 CC';
+
+        $this->db()->table('PumpIT.dbo.RCN_BankStatementLinesPumpIT')->insert([
+            'SSBranchId' => self::BRANCH, 'LineDate' => '2026-07-09', 'Description' => $narrative,
+            'Amount' => 6543.21, 'Type' => 'ABSA', 'IDState' => 2,
+            'ReconState' => 2, 'ReconBatchNo' => 8888,
+        ]);
+
+        $run = $this->previewed();
+        $line = $run->lines->firstWhere('KeyRef', '125');
+
+        // The preview is unchanged by a line it cannot see.
+        $this->assertNotNull($line, 'Batch 125 should still be proposed.');
+        $this->assertEqualsWithDelta(15137.40, (float) $line->BankTotal, 0.005);
+        $this->assertEqualsWithDelta(15137.40, (float) $line->MopsTotal, 0.005);
+
+        $this->service->select($run, [$line->Id]);
+        $result = $this->service->commit($run->fresh());
+
+        $this->assertSame(
+            1,
+            (int) $result['status']->Id,
+            'The batch is intact — a reconciled line sharing its key is not a reason to skip it.'
+        );
+
+        // The two lines the batch actually needed were stamped...
+        $this->assertSame(2, $this->reconciledBankLines($this->batchNo()));
+
+        // ...and the bystander was left exactly as it was found.
+        $this->assertSame(
+            8888,
+            (int) $this->db()->table('PumpIT.dbo.RCN_BankStatementLinesPumpIT')
+                ->where('SSBranchId', self::BRANCH)->where('ReconBatchNo', 8888)->value('ReconBatchNo')
+        );
+    }
+
+    public function test_a_committed_row_still_shows_both_sides_when_it_is_expanded(): void
+    {
+        config(['recon.stamp_mode' => 'live']);
+
+        $run = $this->previewed();
+        $line = $run->lines->firstWhere('KeyRef', '125');
+        $this->service->select($run, [$line->Id]);
+        $this->service->commit($run->fresh());
+
+        $line = $line->fresh();
+        $this->assertTrue($line->isCommitted(), 'The fixture batch should have committed.');
+
+        /*
+         * Reported by Ryan, 7 September 2026. The drill filters both sides to
+         * what is still OUTSTANDING — ReconState = 1 and ReconBatchNoPumpIT = 0
+         * — and committing sets exactly those columns, so expanding a row that
+         * had just reconciled perfectly returned nothing on both sides and the
+         * panel said "Nothing on the statement carries this reference".
+         */
+        $sides = $this->service->sides($run->fresh(), $line);
+
+        $this->assertCount(2, $sides['bank'], 'Both bank legs were stamped and both must still show.');
+        $this->assertCount(1, $sides['mops'], 'The deposit that was stamped must still show.');
+        $this->assertEqualsWithDelta(15137.40, (float) $sides['bank']->sum('Amount'), 0.005);
+        $this->assertEqualsWithDelta(15137.40, (float) $sides['mops']->sum('Amount'), 0.005);
+
+        // The narrative comes back too — it is what carries the marked
+        // extraction window, and ReconMatch has no column for it.
+        $this->assertNotEmpty($sides['bank']->first()->Description);
+        $this->assertSame(
+            (int) $line->UsedBankStart,
+            (int) $sides['bank']->first()->UsedBankStart,
+            'The marked characters must be the ones this proposal matched on.'
+        );
+
+        // And the rendered panel says which of the two sources it read.
+        $html = $this->actingAs($this->auditor())
+            ->get(route('app.recon.line', ['run' => $run->Id, 'line' => $line->Id]))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('agora.ReconMatch', (string) $html);
+        $this->assertStringNotContainsString('Nothing on the statement carries this reference', (string) $html);
+        $this->assertStringNotContainsString('Nothing was declared against this reference', (string) $html);
+    }
+
+    public function test_the_run_screen_offers_the_same_extract_every_other_grid_does(): void
+    {
+        $run = $this->previewed();
+
+        $html = (string) $this->actingAs($this->auditor())
+            ->get(route('app.recon.run', $run))
+            ->assertOk()
+            ->getContent();
+
+        // The drawer, the two downloads and the copy box — the same partial
+        // the grid shell includes, not a second implementation of it.
+        $this->assertStringContainsString('data-drawer-open="dg-recon-'.$run->Id.'-extract"', $html);
+        $this->assertStringContainsString('Download .xlsx', $html);
+        $this->assertStringContainsString('Download .csv', $html);
+        $this->assertStringContainsString('as comma-separated text', $html);
+
+        // CSV comes back as a file, with the run's own rows in it.
+        $csv = $this->actingAs($this->auditor())
+            ->get(route('app.grids.extract', ['grid' => 'app.recon.run', 'run' => $run->Id, 'format' => 'csv']));
+
+        $csv->assertOk();
+        $body = $csv->streamedContent();
+
+        $this->assertStringContainsString('Reference', $body, 'The header row is the column labels.');
+        $this->assertStringContainsString('125', $body, 'The fixture batch should be in the file.');
+        $this->assertStringContainsString('15137.4', $body, 'Money exports as a number, not as R15 137.40.');
+
+        // XLSX comes back as a real workbook rather than a renamed CSV.
+        $xlsx = $this->actingAs($this->auditor())
+            ->get(route('app.grids.extract', ['grid' => 'app.recon.run', 'run' => $run->Id, 'format' => 'xlsx']));
+        $xlsx->assertOk();
+        $this->assertSame('PK', substr($xlsx->streamedContent(), 0, 2), 'An .xlsx is a zip.');
+    }
+
+    public function test_an_extract_without_a_run_returns_nothing_rather_than_everything(): void
+    {
+        // The endpoint is reachable by anyone who may open the recon screen,
+        // and a missing parameter must not widen it to every proposal ever
+        // made. The source turns an absent run into RunId = 0.
+        $body = $this->actingAs($this->auditor())
+            ->get(route('app.grids.extract', ['grid' => 'app.recon.run', 'format' => 'csv']))
+            ->assertOk()
+            ->streamedContent();
+
+        // Header row only.
+        $this->assertSame(1, substr_count(trim($body), "\n") + 1);
+    }
+
+    public function test_either_side_of_a_proposal_can_be_exported_on_its_own(): void
+    {
+        $run = $this->previewed();
+        $line = $run->lines->firstWhere('KeyRef', '125');
+
+        // The panel offers both, per side, scoped to this proposal.
+        $panel = (string) $this->actingAs($this->auditor())
+            ->get(route('app.recon.line', ['run' => $run->Id, 'line' => $line->Id]))
+            ->assertOk()
+            ->getContent();
+
+        // The grid key carries a colon and the route pattern allows it, so it
+        // appears in the URL as itself rather than percent-encoded.
+        foreach (['app.recon.run:bank', 'app.recon.run:mops'] as $grid) {
+            $this->assertStringContainsString($grid.'/extract', $panel, "The panel should offer {$grid}.");
+        }
+        $this->assertStringContainsString('line='.$line->Id, $panel, 'Scoped to this proposal, not the run.');
+
+        // Bank side: the two legs of batch 125, each stamped with the proposal
+        // they belong to — that is what makes the file answer "which lines
+        // settled this batch" rather than being a list of statement rows.
+        $bank = $this->actingAs($this->auditor())
+            ->get(route('app.grids.extract', ['grid' => 'app.recon.run:bank', 'line' => $line->Id, 'format' => 'csv']))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertSame(3, substr_count(trim($bank), "\n") + 1, 'Header plus the two legs.');
+        $this->assertStringContainsString('14937.4', $bank);
+        $this->assertStringContainsString('200', $bank);
+        // Reference is the first column, so a row STARTS with it. That column
+        // is the point of the file: without it these are just statement lines.
+        $this->assertSame(2, substr_count($bank, "\n125,"), 'Every row carries its proposal reference.');
+
+        // Deposit side: the one deposit behind it.
+        $mops = $this->actingAs($this->auditor())
+            ->get(route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'line' => $line->Id, 'format' => 'csv']))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertSame(2, substr_count(trim($mops), "\n") + 1, 'Header plus the one deposit.');
+        $this->assertStringContainsString('15137.4', $mops);
+    }
+
+    public function test_a_whole_run_can_be_exported_a_side_at_a_time(): void
+    {
+        $run = $this->previewed();
+
+        $bank = $this->actingAs($this->auditor())
+            ->get(route('app.grids.extract', ['grid' => 'app.recon.run:bank', 'run' => $run->Id, 'format' => 'csv']))
+            ->assertOk()
+            ->streamedContent();
+
+        // Every bank line the fixture put in the window, across BOTH
+        // proposals: the two legs of batch 125 and the orphan on 300. Header
+        // plus three.
+        $this->assertSame(4, substr_count(trim($bank), "\n") + 1);
+        $this->assertStringContainsString('300,"Bank only', $bank, 'The bank-only proposal contributes its line too.');
+        $this->assertStringContainsString('14937.4', $bank);
+        $this->assertStringContainsString('900', $bank);
+
+        // And the run screen offers both, with the whole-run scope.
+        $screen = (string) $this->actingAs($this->auditor())
+            ->get(route('app.recon.run', $run))
+            ->assertOk()
+            ->getContent();
+
+        // All four: both sides, both formats, whole run.
+        $this->assertStringContainsString('All rows, both sides', $screen);
+
+        foreach (['bank', 'mops'] as $side) {
+            foreach (['xlsx', 'csv'] as $format) {
+                $this->assertStringContainsString(
+                    'app.recon.run:'.$side.'/extract?run='.$run->Id.'&amp;format='.$format,
+                    $screen,
+                    "The run screen should offer the {$side} side as .{$format}."
+                );
+            }
+        }
+    }
+
+    public function test_a_side_export_naming_neither_a_run_nor_a_line_returns_nothing(): void
+    {
+        // Same guard as the proposals extract, and it matters more here: these
+        // are the individual statement lines.
+        foreach (['app.recon.run:bank', 'app.recon.run:mops'] as $grid) {
+            $body = $this->actingAs($this->auditor())
+                ->get(route('app.grids.extract', ['grid' => $grid, 'format' => 'csv']))
+                ->assertOk()
+                ->streamedContent();
+
+            $this->assertSame(1, substr_count(trim($body), "\n") + 1, "{$grid} should return the header only.");
+        }
+    }
+
     private function previewed(): ReconRun
     {
         return $this->service->preview(

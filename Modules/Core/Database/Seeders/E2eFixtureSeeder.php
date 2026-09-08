@@ -6,6 +6,8 @@ use Illuminate\Database\Seeder;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Modules\Core\Models\UserRole;
+use Modules\Core\Services\PermissionService;
 use RuntimeException;
 
 /**
@@ -131,6 +133,30 @@ class E2eFixtureSeeder extends Seeder
         // the whole point is that it matches what is in .env right now.
         $user->PasswordHash = $password;
         $user->save();
+
+        /*
+         * THE ROLE HAS TO BE IN agora.UserRole, not only in User.RoleId.
+         *
+         * `RoleId` is the legacy single-role column carried over from PumpIT.
+         * PermissionService reads the PIVOT — `UserRole` joined to
+         * `RolePermission` — and nothing else, so a fixture with `RoleId` set
+         * and no pivot row is a user who can sign in and then do nothing at
+         * all: every `can:` middleware answers 403.
+         *
+         * It only showed up when E2eFixtureGuardTest force-deleted this user
+         * and re-seeded it, which is what that test exists to do. Before that
+         * the pivot row happened to survive from however the account was first
+         * made, so the browser suite and four ExecuteReconciliationTest cases
+         * passed on a row this seeder had never written. They failed the moment
+         * the account was genuinely rebuilt from this code.
+         */
+        UserRole::query()->acrossBranches()->updateOrCreate(
+            ['BranchId' => $user->BranchId, 'UserId' => $user->Id, 'RoleId' => $role->Id],
+            ['IsPrimary' => true, 'UpdatedAt' => now()]
+        );
+
+        // Whatever this process had cached about that user is now wrong.
+        app(PermissionService::class)->forget($user);
 
         $this->command?->info("  E2E fixtures: user {$email} on the read-only auditor role.");
     }

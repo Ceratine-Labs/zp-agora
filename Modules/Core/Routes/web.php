@@ -41,8 +41,29 @@ Route::middleware('auth')->group(function () {
             ->middleware('can:setup.users.view')->name('users.index');
         Route::get('users/{user}', [UserAdminController::class, 'show'])
             ->middleware('can:setup.users.view')->whereNumber('user')->name('users.show');
+
+        /*
+         | The edit screen and its four saves. One route per card, because each
+         | card REPLACES the whole set it owns and a single endpoint would have
+         | no way to tell "the sites card was not on this form" from "grant no
+         | sites" — and granting no sites means granting every site.
+         */
+        Route::get('users/{user}/edit', [UserAdminController::class, 'edit'])
+            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.edit');
         Route::put('users/{user}', [UserAdminController::class, 'update'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.update');
+        Route::put('users/{user}/details', [UserAdminController::class, 'updateDetails'])
+            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.details.update');
+        Route::put('users/{user}/branches', [UserAdminController::class, 'updateBranches'])
+            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.branches.update');
+        Route::put('users/{user}/permissions', [UserAdminController::class, 'updatePermissions'])
+            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.permissions.update');
+
+        // POST, not PUT: mailing a link and minting a credential are things
+        // that HAPPEN rather than a resource being replaced, and neither is
+        // safe to repeat by refreshing.
+        Route::post('users/{user}/password', [UserAdminController::class, 'updatePassword'])
+            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.password.update');
 
         Route::get('roles', [UserAdminController::class, 'roles'])
             ->middleware('can:setup.roles.view')->name('roles.index');

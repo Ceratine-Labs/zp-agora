@@ -18,6 +18,10 @@
     the order and the visibility, and the cards take the first three of what
     survives.
 
+    A linked column and the row's actions are rendered here too, from the same
+    GridDefinition hooks the table uses. A phone is where "how do I open this
+    person" is hardest to answer, so it is the last place to leave them out.
+
     Props: $grid, $slug
 --}}
 @php
@@ -28,6 +32,8 @@
 
 <ul class="dg-cards" data-cards>
     @foreach ($grid->rows as $index => $row)
+        @php($rowUrl = $definition->rowUrl($row))
+        @php($rowActions = $definition->rowActions($row))
         <li class="dg-card">
             <div class="dg-card-face">
                 @foreach ($face as $view)
@@ -35,7 +41,11 @@
                     <div @class(['dg-card-field', 'is-lead' => $loop->first, 'num' => $column->isNumeric()])>
                         <span class="dg-card-label">{{ $column->label }}</span>
                         <span class="dg-card-value">
-                            @include($definition->cellsPartial(), ['row' => $row, 'column' => $column, 'grid' => $grid])
+                            @if ($column->link && $rowUrl)
+                                <a class="dg-row-link" href="{{ $rowUrl }}">@include($definition->cellsPartial(), ['row' => $row, 'column' => $column, 'grid' => $grid])</a>
+                            @else
+                                @include($definition->cellsPartial(), ['row' => $row, 'column' => $column, 'grid' => $grid])
+                            @endif
                         </span>
                     </div>
                 @endforeach
@@ -54,6 +64,20 @@
                         @endforeach
                     </dl>
                 </details>
+            @endif
+
+            {{-- Below the expand, not above it: the actions are what you do
+                 AFTER reading the row, and on a phone a row of buttons between
+                 the values and "3 more" pushes the values off the top. --}}
+            @if ($rowActions !== [])
+                <div class="dg-card-actions">
+                    @foreach ($rowActions as $action)
+                        <a class="{{ ($action['primary'] ?? false) ? 'btn-primary sm' : 'btn sm' }}"
+                           href="{{ $action['url'] }}"
+                           @foreach (($action['attributes'] ?? []) as $name => $value) {{ $name }}="{{ $value }}" @endforeach
+                        >{{ $action['label'] }}</a>
+                    @endforeach
+                </div>
             @endif
         </li>
     @endforeach

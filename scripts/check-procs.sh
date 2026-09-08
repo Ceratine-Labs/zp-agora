@@ -47,6 +47,38 @@ for file in $procs; do
         say "$file: no migration in Modules/$module deploys the Procedures directory."
     fi
 
+    # A procedure that declares @FiltersJson must actually read the shape the
+    # grid sends.
+    #
+    # GridQuery::filtersJson() sends a JSON ARRAY of {column, type, op, value}
+    # objects. The column name is INSIDE each element at $.column — it is NOT
+    # the OPENJSON key, which over an array is the index 0, 1, 2. A procedure
+    # that reads it the other way compiles, runs, returns rows, and filters
+    # NOTHING: every variable stays NULL and every predicate short-circuits to
+    # true. That is how agora.usp_Core_GridUsers shipped with header filters
+    # that had never narrowed anything, on a live screen, past review and a
+    # passing suite — because any test that filters on a value which IS present
+    # passes either way.
+    #
+    # Prose in a comment did not catch it. This does — but only with the
+    # COMMENTS STRIPPED FIRST. The first cut of this check grepped the whole
+    # file, and the header it was written alongside explains the bug using the
+    # very string being looked for, so the check passed on a file that had been
+    # deliberately broken to test it. Any anchor you can name in prose will
+    # occur in the prose that names it.
+    if grep -qiE '@FiltersJson' "$file"; then
+        code=$(perl -0pe 's{/\*.*?\*/}{}gs; s{--[^\n]*}{}g' "$file")
+
+        if ! printf '%s' "$code" | grep -qF '$.column'; then
+            say "$file: declares @FiltersJson but never reads \$.column — over a JSON array OPENJSON's [key] is the index, so the filters silently do nothing. See docs/grid.md."
+        fi
+
+        # The broken idiom itself, named so the message can point at it.
+        if printf '%s' "$code" | grep -qE '\.\[key\] *='; then
+            say "$file: keys @FiltersJson on OPENJSON's [key], which over a JSON array is the index (0, 1, 2), not the column name. The column is at \$.column. See docs/grid.md."
+        fi
+    fi
+
     # A writer that never opens a transaction is a rule with no atomicity.
     #
     # `INSERT INTO @Something` is not a write — it fills a table variable, which

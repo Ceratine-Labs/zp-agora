@@ -29,15 +29,25 @@ class ShellComposer
             'shellWorkspace' => $this->context->workspace(),
             'shellWorkspaces' => config('core.workspaces'),
             'shellBranchId' => $this->context->id(),
+
+            /*
+             * The nav's branch filter, narrowed to what this person is granted
+             * in agora.UserBranch. Setup -> Users and access writes those
+             * grants, so a site taken away there disappears from here on the
+             * person's next request — no cache, because the grants are read
+             * per request and the scope bar is rendered from the same array
+             * BranchContext refuses unauthorised ids with.
+             */
             'shellBranches' => Branch::query()
                 ->acrossBranches()
-                ->when(
-                    $this->context->allowed() !== [],
-                    fn ($q) => $q->whereIn('BranchId', $this->context->allowed())
-                )
-                ->trading()
+                ->visibleTo($this->context->allowed())
                 ->ordered()
                 ->get(['BranchId', 'Name']),
+
+            // Whether that list is a grant or the whole estate. The bar says
+            // which, because "31 sites" and "31 sites, and there are 31" are
+            // different facts and only one of them is reassuring.
+            'shellBranchesGranted' => $this->context->allowed() !== [],
         ]);
     }
 }

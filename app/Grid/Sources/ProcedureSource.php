@@ -45,18 +45,41 @@ use Illuminate\Support\Collection;
  * reads it with OPENJSON; a source constructed with `acceptsFilters: false`
  * refuses to be given any, rather than quietly dropping them or — worse —
  * applying them in PHP where the semantics would then exist twice.
+ *
+ * SCOPE THE TEMPLATE CANNOT CARRY. Some grids are ABOUT something the nine
+ * parameters have no room for: the recon run list is one area's runs, and
+ * whose they are. That is not a header filter — the user did not type it and
+ * cannot clear it — so it does not belong in @FiltersJson, and it is not a
+ * search either. `extra` is the escape hatch: named arguments the definition
+ * resolves per request and hands over, on top of the template.
+ *
+ * It is deliberately narrow. `extra` may not overwrite a template parameter —
+ * a grid quietly redefining @PageSize would break paging in a way nothing
+ * reports — so a collision throws rather than wins.
  */
 final class ProcedureSource implements GridSource
 {
+    /** @param array<string, scalar|null> $extra */
     public function __construct(
         private string $procedure,
         private bool $acceptsFilters = false,
         private ?string $connection = null,
+        private array $extra = [],
     ) {}
 
     public function page(GridQuery $query): GridPage
     {
         $parameters = $query->procedureParameters();
+
+        if ($collisions = array_intersect_key($this->extra, $parameters)) {
+            throw new \LogicException(
+                "[{$this->procedure}] passes ".implode(', ', array_keys($collisions))
+                .' as an extra argument, but the grid template already sends it. '
+                .'Rename the procedure\'s parameter — the template owns those nine names.'
+            );
+        }
+
+        $parameters += $this->extra;
 
         if ($this->acceptsFilters) {
             $parameters['FiltersJson'] = $query->filtersJson();

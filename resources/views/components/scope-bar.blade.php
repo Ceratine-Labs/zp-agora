@@ -1,4 +1,4 @@
-@props(['branches' => collect(), 'branchId' => null, 'workspace' => 'ho'])
+@props(['branches' => collect(), 'branchId' => null, 'workspace' => 'ho', 'granted' => false])
 
 {{--
     Scope is a parameter, not a report (plan §2), and the URL carries it so a
@@ -18,6 +18,14 @@
                    one is the whole job of this bar. A user granted several
                    sites switches between them here; one granted a single site
                    sees a select with one option in it, which is honest.
+
+    EITHER WAY THE LIST IS THE PERSON'S GRANTS. Setup -> Users and access
+    writes agora.UserBranch, ShellComposer narrows this list to it, and
+    BranchContext refuses an id outside it — so the sites offered here and the
+    sites a query will actually return are the same set, by construction rather
+    than by both being written correctly. `granted` says whether that narrowing
+    happened, because "31 sites in scope" reads very differently depending on
+    whether the estate has 31 or 60.
 --}}
 <div class="scopebar">
     <div class="shell-in scope-in">
@@ -38,10 +46,11 @@
             </label>
             @if (request('ws'))<input type="hidden" name="ws" value="{{ request('ws') }}">@endif
         </form>
-        <span class="scope-note">
-            {{ $workspace === 'branch'
-                ? $branches->count().' '.\Illuminate\Support\Str::plural('site', $branches->count()).' granted'
-                : $branches->count().' sites in scope' }}
-        </span>
+        {{-- One expression, not three: the note is read as a sentence and
+             three interpolations on three lines put newlines through the
+             middle of it. --}}
+        <span class="scope-note">{{ $branches->count().' '
+            .\Illuminate\Support\Str::plural('site', $branches->count())
+            .($granted ? ' granted to you' : ' in scope — every trading site') }}</span>
     </div>
 </div>

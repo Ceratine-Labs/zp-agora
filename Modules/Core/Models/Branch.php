@@ -61,4 +61,33 @@ class Branch extends BaseModel
     {
         return $query->orderBy('SortOrder')->orderBy('Name');
     }
+
+    /**
+     * The sites one person may see, given their grants in agora.UserBranch.
+     *
+     * AN EMPTY GRANT LIST MEANS EVERY TRADING SITE, not none — head office
+     * people are granted nothing individually, so absence of rows is the
+     * grant. `BranchContext::maySee()` reads it the same way.
+     *
+     * A grant, when there IS one, is honoured whether or not the branch
+     * trades. The trading filter exists to keep the group, the property
+     * companies and the trusts out of a list nobody would pick them from; an
+     * administrator who granted one has said the opposite in the clearest way
+     * available, and silently dropping it would leave that person's scope bar
+     * empty with nothing on screen to explain why.
+     *
+     * The nav and ResolveBranchContext both go through here, because the site
+     * the scope bar OFFERS FIRST and the site the request is SCOPED TO have to
+     * be the same one. Two copies of this rule is how they stop agreeing.
+     *
+     * @param  Builder<static>  $query
+     * @param  array<int, int>  $allowed
+     * @return Builder<static>
+     */
+    public function scopeVisibleTo($query, array $allowed)
+    {
+        return $allowed === []
+            ? $query->trading()
+            : $query->whereIn('BranchId', $allowed);
+    }
 }

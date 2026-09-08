@@ -95,12 +95,18 @@ class ComponentCatalogue
                 'group' => 'Chrome',
                 'summary' => 'Branch and "as at" selector, submitted into the URL.',
                 'mockup' => 'ctx',
-                'notes' => 'Scope is a parameter, not a report — the URL carries it so a link travels.',
+                'notes' => 'Scope is a parameter, not a report — the URL carries it so a link travels. '
+                    .'`branches` arrives already narrowed to the person\'s grants in `agora.UserBranch`: '
+                    .'`ShellComposer` builds it through `Branch::visibleTo()`, the same scope '
+                    .'`ResolveBranchContext` picks the pinned site with, so what the bar OFFERS and what a '
+                    .'query RETURNS cannot drift apart. `granted` says whether that narrowing happened, so '
+                    .'the note can read "2 sites granted to you" rather than a count with no provenance.',
                 'gallery' => false,
                 'props' => [
                     ['branches', 'Collection', 'collect()', 'Sites this user may see'],
                     ['branchId', '?int', 'null', 'The one in scope'],
                     ['workspace', 'string', "'ho'", 'Hides "All sites" in the branch workspace'],
+                    ['granted', 'bool', 'false', 'True when the list is the user\'s own grants rather than the whole trading estate'],
                 ],
             ],
             [
@@ -216,6 +222,90 @@ class ComponentCatalogue
                 'notes' => 'Takes `active` off the parent `<x-tabs>` with `@aware`, so a page lists its panes without repeating the selection. The inactive ones carry `hidden` from the server — that is what makes the first paint correct with no JavaScript.',
                 'props' => [
                     ['key', 'string', '—', 'Matches an item key on the parent'],
+                ],
+            ],
+            [
+                'name' => 'x-data-grid',
+                'group' => 'Data',
+                'summary' => 'Every user-facing result set: filters, export, column persistence, links and row actions.',
+                'mockup' => 'dg',
+                'notes' => 'Feature-rules §3 in one component, and a screen gets all of it by passing `$grid`. '
+                    .'**Everything it draws is declared on the GridDefinition, never in the screen.** '
+                    .'A column with `link: true` is rendered as an anchor to `rowUrl($row)` — that is §3.7 for the row\'s OWN resource, and the two together are what makes a list openable. '
+                    .'`rowActions($row)` adds a trailing column of buttons, and an action the caller may not perform is simply absent from the array, which is §4\'s "a control the user cannot use is not rendered". '
+                    .'A value naming some OTHER record stays in the grid\'s own `_cells` partial, because only the screen knows which values do that. '
+                    .'Both the table and the phone cards read the same two hooks. '
+                    .'**Until 7 Sep 2026 `rowUrl()` was declared and called by nothing**, so the shipped user list rendered 90 people as plain text with no way to open any of them — which is also why this component sat in "not built yet" while every list screen used it.',
+                'js' => 'data-grid.js, row-detail.js',
+                // NOT in the gallery, and it cannot be: it takes a GridResult,
+                // which GridService builds from a procedure or a query — and a
+                // gallery component never touches the database (plan §3.8).
+                // Faking one here would be a second GridResult that drifts from
+                // the real thing. It has its own dev surface, /dev/grids, which
+                // renders it over two real definitions.
+                'gallery' => false,
+                'props' => [
+                    ['grid', 'GridResult', '—', 'What GridService built. The only data the component takes'],
+                    ['branches', '?Collection', 'null', 'Sites the head-office selector offers (§3.3), or null for none'],
+                    ['actions', 'slot', '—', 'Toolbar buttons, right of Extract'],
+                    ['bulk', 'slot', '—', 'What to offer when rows are ticked'],
+                ],
+            ],
+            [
+                'name' => 'x-compare',
+                'group' => 'Data',
+                'summary' => 'Two readings of the same thing, side by side, with one of them in force.',
+                'notes' => 'Built for the extraction configuration, where Agora SHADOWS the customer\'s '
+                    .'`BRN_AutoReconCriteria` rather than writing it — so the configuration has two sources of '
+                    .'truth and a screen showing only the effective value would hide a divergence. '
+                    .'`live` says which side is actually in force and is carried as a class rather than only in '
+                    .'the heading, because "which of these two is real" is the question the reader arrives with. '
+                    .'The moment anything else in Agora shadows a legacy value it wants this same shape.',
+                'props' => [
+                    ['left', 'slot', '—', 'The first reading'],
+                    ['right', 'slot', '—', 'The second'],
+                    ['leftTitle', '?string', 'null', 'Heading above the first'],
+                    ['rightTitle', '?string', 'null', 'Heading above the second'],
+                    ['live', '?string', 'null', "'left' or 'right' — which one is in force"],
+                ],
+            ],
+            [
+                'name' => 'x-modal',
+                'group' => 'Structure',
+                'summary' => 'A dialog: a form or a confirmation that needs the page kept behind it.',
+                'notes' => 'Native `<dialog>`, so the browser owns the top layer, the backdrop, the focus trap, '
+                    .'Escape and returning focus. `modal.js` adds only what it does not: opening from a '
+                    .'`data-modal-open` control anywhere on the page, and fetching the body from `data-modal-url` '
+                    .'when the content depends on which row was clicked. '
+                    .'**Fetched EVERY open**, unlike `row-detail.js`\'s fetch-once — the reason to open an edit '
+                    .'form is that what you saw last time may no longer be there. '
+                    .'**When not to use it:** a modal interrupts. A row that merely wants to show more of itself '
+                    .'belongs in `data-row-detail`, which expands in place and keeps the list visible.',
+                'js' => 'modal.js',
+                'props' => [
+                    ['id', 'string', '—', 'The handle data-modal-open refers to'],
+                    ['title', '?string', 'null', 'Heading, and the dialog\'s accessible name'],
+                    ['wide', 'bool', 'false', 'For a form with two columns to compare'],
+                ],
+            ],
+            [
+                'name' => 'x-two-pane-recon',
+                'group' => 'Data',
+                'summary' => 'The reconcile workbench: outstanding bank at the left, undeclared deposits at the right, paired by hand.',
+                'notes' => 'Fed by `agora.usp_Recon_GetSides`. '
+                    .'**The colour is earned, not decorative** — a row is coloured only where the reference it resolves to appears on BOTH sides, so a hue means "there is something over there carrying this". '
+                    .'Colouring every row by its own key would mean nothing and would cost the reader the same attention. '
+                    .'**Never colour alone**: the reference travels beside it as a chip, because a colour cannot be read out, searched for, or seen by everybody. '
+                    .'Rows arrive in colour order, so the two sides line up beside each other on first paint and the work is half done before anybody scrolls. '
+                    .'Ten hues, cycled — the procedure\'s ColourIndex is a dense rank, and wrapping is honest: two distant groups sharing a hue is a smaller problem than a group with no hue. '
+                    .'Drawn as a left rail plus a wash rather than a fill, because a filled row fights the theme\'s own striping and loses in dark mode. '
+                    .'It opens NO form of its own: the totals bar, the reason field and the Match button belong to one submission, and a component that opened its own form would put them in two.',
+                'js' => 'recon-match.js',
+                'props' => [
+                    ['bank', 'Collection', '[]', 'Bank rows — result set 1 of usp_Recon_GetSides'],
+                    ['mops', 'Collection', '[]', 'Deposit rows — result set 2'],
+                    ['summary', '?object', 'null', 'Result set 3: the counts, the totals and whether the branch is configured'],
+                    ['keyLabel', 'string', "'Reference'", 'What this area calls its reference — Batch, Bag, Slip'],
                 ],
             ],
             [
@@ -495,7 +585,12 @@ class ComponentCatalogue
         ];
 
         return self::$cache = collect($components)
-            ->map(fn (array $c) => $c + ['notes' => '', 'js' => null, 'gallery' => true, 'props' => []])
+            // `mockup` defaults too, and it has to: a component built here rather
+            // than lifted from ZP's design has no mockup to name, and the
+            // gallery reads the key unguarded — so an entry without one took
+            // /dev/components down with an undefined-array-key 500 rather than
+            // rendering without the label.
+            ->map(fn (array $c) => $c + ['mockup' => null, 'notes' => '', 'js' => null, 'gallery' => true, 'props' => []])
             ->keyBy('name')
             ->all();
     }
@@ -512,13 +607,11 @@ class ComponentCatalogue
     public static function pending(): array
     {
         return [
-            ['name' => 'x-data-grid', 'owner' => 'T014', 'what' => 'The grid with header filters, CSV export to the 100 000-row ceiling, a row-click detail panel and per-user column order, widths and text size. `<x-table>` is the interim; a screen needing any of those waits for the grid rather than growing them there.'],
             ['name' => 'x-drawer', 'owner' => 'T014', 'what' => 'The extract panel — the CSV and the copy-to-clipboard that every grid opens.'],
             ['name' => 'x-chart', 'owner' => 'T015', 'what' => 'ApexCharts behind one component: daily bars, line, donut, bridge, diverging. Colours read from the theme tokens at draw time, so a chart follows the light/dark switch.'],
             ['name' => 'x-sparkline', 'owner' => 'T015', 'what' => 'The 30px trend inside a KPI tile. `<x-kpi>` already has the `spark` slot it goes in.'],
             ['name' => 'x-mini-bar', 'owner' => 'T015', 'what' => 'The in-cell bar with a zero line, for a variance column.'],
             ['name' => 'x-palette', 'owner' => 'T012', 'what' => 'Ctrl-K search over every screen, report and master.'],
-            ['name' => 'x-two-pane-recon', 'owner' => 'T045', 'what' => 'The reconcile workbench: captured against bank, tick both sides, auto-match, process the batch.'],
         ];
     }
 }

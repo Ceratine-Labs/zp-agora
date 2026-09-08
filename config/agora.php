@@ -56,7 +56,7 @@ return [
     */
 
     'admin' => [
-        'email' => env('AGORA_ADMIN_EMAIL', 'ryan@ceratine-labs.co.za'),
+        'email' => env('AGORA_ADMIN_EMAIL', 'ryan@revvtech.co.za'),
         'name' => env('AGORA_ADMIN_NAME', 'Ryan Cruickshank'),
         'password' => env('AGORA_ADMIN_PASSWORD'),
     ],

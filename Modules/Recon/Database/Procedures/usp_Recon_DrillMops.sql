@@ -49,7 +49,15 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_DrillMops]
        populated where a near-reference pairing was inferred (bank `69744`,
        deposit `697440`), and from then on it is what the deposits are found
        by. Looking for them under the bank's reference would return nothing. */
-    @MopsKeyRef        nvarchar(50)  = NULL
+    @MopsKeyRef        nvarchar(50)  = NULL,
+    /* The deposit's OWN id, where its table has one — only CashBags does.
+       It names one bag exactly, which a reference cannot: two orphans on run
+       53 shared the DBagNo 304822859458, so matching on that would have shown
+       both deposits under each of them and doubled the money on screen. Null
+       everywhere else, and null on a run previewed before agora.ReconRunLine
+       carried the column — in which case the reference paths below behave
+       exactly as they always have. */
+    @MopsSourceId      bigint        = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -205,15 +213,25 @@ BEGIN
             GROUP BY a.DailyBankingCashBagID, a.TransactionDate, a.CashBagNo, a.CashBagAmount
         ) g
         CROSS APPLY (SELECT ISNULL(g.DBagNo, g.CashBagNo) AS Ref) r
-        WHERE (@MatchMode = 'position' AND LTRIM(RTRIM(SUBSTRING(r.Ref, @MopsStart, @MopsLen))) = @Ref)
-           OR (@MatchMode <> 'position' AND @BankLineId IS NOT NULL
-               AND EXISTS (
-                   SELECT 1 FROM @Bank b
-                   WHERE b.BankStatementLineID = @BankLineId
-                     AND LEN(REPLACE(REPLACE(REPLACE(REPLACE(RTRIM(r.Ref), '-', ''), '/', ''), ' ', ''), '_', '')) >= 4
-                     AND CHARINDEX(
-                           REPLACE(REPLACE(REPLACE(REPLACE(RTRIM(r.Ref), '-', ''), '/', ''), ' ', ''), '_', ''),
-                           b.NarrKey) > 0))
+        WHERE
+            /* By id, and nothing else, when the caller can name the bag. This
+               is how a "Deposit only - no bank line" proposal is drilled:
+               'contains' finds deposits by looking for the reference inside a
+               bank NARRATIVE, and an orphan has no bank line to look in — so
+               before this branch existed every orphan drilled to nothing and
+               the panel showed two empty columns. */
+            (@MopsSourceId IS NOT NULL AND g.DailyBankingCashBagID = @MopsSourceId)
+
+            OR (@MopsSourceId IS NULL AND (
+                   (@MatchMode = 'position' AND LTRIM(RTRIM(SUBSTRING(r.Ref, @MopsStart, @MopsLen))) = @Ref)
+                OR (@MatchMode <> 'position' AND @BankLineId IS NOT NULL
+                    AND EXISTS (
+                        SELECT 1 FROM @Bank b
+                        WHERE b.BankStatementLineID = @BankLineId
+                          AND LEN(REPLACE(REPLACE(REPLACE(REPLACE(RTRIM(r.Ref), '-', ''), '/', ''), ' ', ''), '_', '')) >= 4
+                          AND CHARINDEX(
+                                REPLACE(REPLACE(REPLACE(REPLACE(RTRIM(r.Ref), '-', ''), '/', ''), ' ', ''), '_', ''),
+                                b.NarrKey) > 0))))
         ORDER BY g.TransactionDate;
 
     ELSE IF @ReconArea = 'SmartATM'

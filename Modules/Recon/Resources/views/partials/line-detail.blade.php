@@ -9,9 +9,24 @@
 <div class="drill">
     <div class="drill-side">
         <h4>Bank {{ Str::plural('line', $bank->count()) }}
-            <span class="muted">{{ $bank->count() }} · {{ \App\Support\Format::r($bank->sum('Amount')) }}</span></h4>
+            <span class="muted">{{ $bank->count() }} · {{ \App\Support\Format::r($bank->sum('Amount')) }}</span>
+            @if ($bank->isNotEmpty())
+                {{-- This proposal's own rows, not the run's. Scoped by `line`,
+                     so it costs one drill and comes back immediately. --}}
+                <span class="drill-export">
+                    <a href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:bank', 'line' => $line->Id, 'format' => 'xlsx']) }}"
+                       data-extract title="This proposal's bank lines as .xlsx">.xlsx</a>
+                    <a href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:bank', 'line' => $line->Id, 'format' => 'csv']) }}"
+                       data-extract title="This proposal's bank lines as .csv">.csv</a>
+                </span>
+            @endif
+        </h4>
 
-        @if ($bank->isEmpty())
+        @if ($bank->isEmpty() && $line->isCommitted())
+            <p class="drill-none">This batch was stamped, but no bank lines were recorded against it
+               in <code>agora.ReconMatch</code>. That should not happen — the commit writes both
+               sides together — so it is worth reporting rather than reading as "nothing settled".</p>
+        @elseif ($bank->isEmpty())
             <p class="drill-none">Nothing on the statement carries this reference in the period —
                the deposit was captured but the bank has not settled it, or it settled under a
                reference the configured extraction does not produce.</p>
@@ -61,9 +76,23 @@
                <code>{{ $line->KeyRef }}</code> — {{ $line->NearRefNote }}</p>
         @endif
         <h4>{{ Str::plural('Deposit', $mops->count()) }}
-            <span class="muted">{{ $mops->count() }} · {{ \App\Support\Format::r($mops->sum('Amount')) }}</span></h4>
+            <span class="muted">{{ $mops->count() }} · {{ \App\Support\Format::r($mops->sum('Amount')) }}</span>
+            @if ($mops->isNotEmpty())
+                <span class="drill-export">
+                    <a href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'line' => $line->Id, 'format' => 'xlsx']) }}"
+                       data-extract title="This proposal's deposits as .xlsx">.xlsx</a>
+                    <a href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'line' => $line->Id, 'format' => 'csv']) }}"
+                       data-extract title="This proposal's deposits as .csv">.csv</a>
+                </span>
+            @endif
+        </h4>
 
-        @if ($mops->isEmpty())
+        @if ($mops->isEmpty() && $line->isCommitted())
+            <p class="drill-none">This batch was stamped, but no deposit rows were recorded against
+               it in <code>agora.ReconMatch</code>. That should not happen — the commit writes both
+               sides together — so it is worth reporting rather than reading as "nothing was
+               declared".</p>
+        @elseif ($mops->isEmpty())
             <p class="drill-none">
                 <strong>Nothing was declared against this reference.</strong>
                 The live procedure reaches its matched branch here — its comparison against a
@@ -102,6 +131,11 @@
                   the lines added together may not carry the same kind of reference</span>
         @endif
         <span>·</span>
-        <span class="table-proc">agora.usp_Recon_DrillProposal</span>
+        {{-- feature-rules §3.4: name the source, and the source is not the
+             same one on a stamped row. A committed line is read back out of
+             agora.ReconMatch — what the commit RECORDED it touched — because
+             the drill only ever returns what is still outstanding, and
+             committing is precisely what makes it not. --}}
+        <span class="table-proc">{{ $line->isCommitted() ? 'agora.ReconMatch' : 'agora.usp_Recon_DrillProposal' }}</span>
     </footer>
 </div>

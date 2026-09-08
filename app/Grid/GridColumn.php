@@ -18,6 +18,14 @@ namespace App\Grid;
  * header filter the column gets. A column is numeric because of its format,
  * never because a view remembered to add a class.
  *
+ * `link` is feature-rules §3.7 for the row's OWN resource: the column whose
+ * value is the thing's name, rendered as a link to it. The URL comes from
+ * `GridDefinition::rowUrl()`, so the definition says both WHICH column carries
+ * the name and WHERE the row lives, and the shell renders it. That is a
+ * different job from the cells partial, which links a value that names some
+ * OTHER record (a bag number to the drop-safe screen) and which the shell
+ * genuinely cannot know about. Both exist; this is the one every list needs.
+ *
  * `sort` is the value handed to the procedure as @SortColumn, or the column to
  * ORDER BY for an Eloquent source. It is deliberately separate from `key`: a
  * result set commonly exposes one name while the procedure sorts on another,
@@ -48,6 +56,7 @@ final class GridColumn
      * @param  array<int, string>  $options  the tick-list for a set filter, capped at GridFilter::MAX_SET
      * @param  bool  $total  carried into the footer total row
      * @param  string|null  $title  the header's tooltip, where the label alone is not enough
+     * @param  bool  $link  this column's value opens the row's own resource, via GridDefinition::rowUrl()
      */
     public function __construct(
         public string $key,
@@ -61,6 +70,7 @@ final class GridColumn
         public array $options = [],
         public bool $total = false,
         public ?string $title = null,
+        public bool $link = false,
     ) {
         if (! in_array($format, self::FORMATS, true)) {
             throw new \InvalidArgumentException(

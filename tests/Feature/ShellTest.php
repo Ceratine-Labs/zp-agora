@@ -20,7 +20,7 @@ class ShellTest extends TestCase
 {
     private function admin(): User
     {
-        $user = User::query()->acrossBranches()->where('EmailAddress', 'ryan@ceratine-labs.co.za')->first();
+        $user = User::query()->acrossBranches()->where('EmailAddress', 'ryan@revvtech.co.za')->first();
 
         if (! $user) {
             $this->markTestSkipped('No seeded administrator — run db:seed first.');
@@ -67,7 +67,7 @@ class ShellTest extends TestCase
     public function test_wrong_credentials_are_refused_without_saying_which_half_was_wrong(): void
     {
         $this->post('/login', [
-            'email' => 'ryan@ceratine-labs.co.za',
+            'email' => 'ryan@revvtech.co.za',
             'password' => 'not-the-password',
         ])->assertSessionHasErrors('email');
 

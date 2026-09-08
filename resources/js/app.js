@@ -11,6 +11,9 @@ import disclosure from './components/disclosure';
 import runbar from './components/runbar';
 import tip from './components/tip';
 import dataGrid from './components/data-grid';
+import reconGroup from './components/recon-group';
+import reconMatch from './components/recon-match';
+import modal from './components/modal';
 import * as format from './format';
 
 megaMenu();
@@ -25,6 +28,10 @@ checkAll();
 tabs();
 disclosure();
 runbar();
+// Does nothing on a page with no group in flight, which is every page but one.
+reconGroup();
+reconMatch();
+modal();
 
 // Reachable from an inline handler in a blade view without importing anything
 // there. This is the only global the application defines.

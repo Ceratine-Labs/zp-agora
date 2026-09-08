@@ -81,6 +81,53 @@
           @if ($stampMode === 'live') data-confirm-danger @endif>
     @csrf
 
+    @isset($extract)
+        {{-- The same bar the grid shell puts above its table, and the same
+             drawer behind the button. This screen cannot BE an <x-data-grid> —
+             the tick boxes decide what a commit stamps and the rows expand —
+             but the answer to "get me this in Excel" should not depend on
+             that. See Modules/Recon/Grids/ReconRunLineGrid. --}}
+        <div class="dg-bar" style="margin:12px 14px 0">
+            <span class="dg-shown">{{ \App\Support\Format::n($run->lines->count()) }}
+                {{ Str::plural('proposal', $run->lines->count()) }}</span>
+            <span class="dg-bar-gap"></span>
+
+            {{-- The two SIDES, for the whole run: every bank line behind every
+                 proposal, and every deposit. Instant on a committed run, which
+                 reads agora.ReconMatch; on a preview each proposal has to be
+                 drilled, so the button says how long that is likely to take
+                 rather than looking broken while it does it. --}}
+            @php($drilled = $run->Status !== 'committed')
+            @php($seconds = (int) ceil($run->lines->count() * 0.2))
+            @php($sideNote = $drilled ? ' — about '.$seconds.' seconds, because each proposal is re-read' : '')
+            <span class="dg-sides">
+                <span class="dg-sides-label">All rows, both sides</span>
+
+                <span class="dg-side-pair">
+                    <span class="dg-side-name">Bank</span>
+                    <a class="btn-ghost sm" data-extract
+                       href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:bank', 'run' => $run->Id, 'format' => 'xlsx']) }}"
+                       title="Every bank line behind every proposal on this run{{ $sideNote }}">.xlsx</a>
+                    <a class="btn-ghost sm" data-extract
+                       href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:bank', 'run' => $run->Id, 'format' => 'csv']) }}"
+                       title="Every bank line behind every proposal on this run{{ $sideNote }}">.csv</a>
+                </span>
+
+                <span class="dg-side-pair">
+                    <span class="dg-side-name">Deposits</span>
+                    <a class="btn-ghost sm" data-extract
+                       href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'run' => $run->Id, 'format' => 'xlsx']) }}"
+                       title="Every deposit behind every proposal on this run{{ $sideNote }}">.xlsx</a>
+                    <a class="btn-ghost sm" data-extract
+                       href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'run' => $run->Id, 'format' => 'csv']) }}"
+                       title="Every deposit behind every proposal on this run{{ $sideNote }}">.csv</a>
+                </span>
+            </span>
+
+            <button type="button" class="btn-ghost" data-drawer-open="dg-recon-{{ $run->Id }}-extract">Extract</button>
+        </div>
+    @endisset
+
     <x-table :count="$run->lines->count()"
              :procedure="$run->ProcedureName"
              data-row-detail
@@ -176,6 +223,15 @@
     </x-table>
 
     </form>
+
+    @isset($extract)
+        @include('grid._extract', [
+            'grid' => $extract,
+            'columns' => $extract->visibleColumns(),
+            'definition' => $extract->definition,
+            'slug' => 'recon-'.$run->Id,
+        ])
+    @endisset
 
     <footer class="run-actions">
         @if ($run->Status === 'previewed')

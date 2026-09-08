@@ -50,6 +50,27 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    /*
+     * THE AREA IS NOT THE BANK STATEMENT'S TYPE, and for one area they differ.
+     *
+     * RCN_BankStatementLinesPumpIT.Type carries the customer's own vocabulary,
+     * and usp_Recon_PreviewCashBags filters it on 'CashDeposit' — not on
+     * 'CashBags', which is what Agora calls the area. Every other area happens
+     * to use the same word for both, which is exactly why this went unnoticed:
+     * `l.Type = @ReconArea` is right four times out of five.
+     *
+     * The fifth cost more than a wrong drill. This procedure is also how
+     * usp_Recon_Commit re-reads the bank side, so for CashBags it found no
+     * lines and every batch was skipped as "no longer on the statement in this
+     * period". agora.ReconRun showed it plainly: five CashBags runs, all still
+     * `previewed`, not one committed row — against 187 for ABSA and 191 for
+     * FNB. The area could not be reconciled at all, and nothing said so.
+     *
+     * Reported by Ryan on 7 September 2026 as "run 53 exported no bank rows".
+     */
+    DECLARE @BankType nvarchar(50) =
+        CASE WHEN @ReconArea = 'CashBags' THEN 'CashDeposit' ELSE @ReconArea END;
+
     /* ---- 1. Criteria, resolved exactly as the previews resolve them -------- */
 
     DECLARE @Crit TABLE (
@@ -137,7 +158,7 @@ BEGIN
                  c.AutoReconId ASC
     ) x
     WHERE l.BranchId = @BranchId
-      AND l.Type = @ReconArea AND l.IDState = 2
+      AND l.Type = @BankType AND l.IDState = 2
       AND (@IncludeReconciled = 1 OR l.ReconState = 1)
       AND l.LineDate >= @FromDate AND l.LineDate <= @ToDate
       AND (@BankLineId IS NULL OR l.BankStatementLineID = @BankLineId);

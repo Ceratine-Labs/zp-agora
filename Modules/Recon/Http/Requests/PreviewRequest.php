@@ -19,13 +19,35 @@ class PreviewRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
+        return [
+            'branch_id' => ['required', 'integer', 'min:1'],
+            ...$this->sharedRules(),
+        ];
+    }
+
+    /**
+     * Everything a preview needs except the site.
+     *
+     * Shared with GroupPreviewRequest, which is the same form with the site
+     * taken out — the master controller runs every site, so asking for one is
+     * the question it exists to remove. Duplicating twelve option rules to
+     * drop one line would be the copy that drifts.
+     *
+     * @return array<string, mixed>
+     */
+    protected function sharedRules(): array
+    {
         $options = config('recon.options');
 
         return [
             'area' => ['required', Rule::in(array_keys(config('recon.areas')))],
-            'branch_id' => ['required', 'integer', 'min:1'],
             'from' => ['required', 'date'],
             'to' => ['required', 'date', 'after_or_equal:from'],
+
+            // A name on the run. Optional, and capped at the column — 300 in
+            // the migration, so a longer one is a refusal here rather than a
+            // truncation the person never sees.
+            'note' => ['nullable', 'string', 'max:300'],
 
             'options' => ['array'],
             'options.RuleOrder' => ['nullable', Rule::in(array_keys($options['RuleOrder']['choices']))],
@@ -61,6 +83,20 @@ class PreviewRequest extends FormRequest
     public function to(): Carbon
     {
         return Carbon::parse($this->date('to'))->startOfDay();
+    }
+
+    /**
+     * What to call this run, or null.
+     *
+     * Blank and absent are the same thing: a person who cleared the field did
+     * not name the run, and storing an empty string would make "has a name"
+     * two checks everywhere instead of one.
+     */
+    public function note(): ?string
+    {
+        $note = trim((string) $this->input('note', ''));
+
+        return $note === '' ? null : $note;
     }
 
     /**

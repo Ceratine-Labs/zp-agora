@@ -86,19 +86,16 @@ class ResolveBranchContext
     }
 
     /**
-     * The first trading site this caller may see, in the order the scope bar
-     * lists them — so "the first option" and "the branch in context" are the
-     * same site rather than two guesses that happen to agree.
+     * The first site this caller may see, in the order the scope bar lists
+     * them — so "the first option" and "the branch in context" are the same
+     * site rather than two guesses that happen to agree. Both go through
+     * Branch::visibleTo() for exactly that reason.
      */
     protected function firstVisibleBranch(BranchContext $context): ?int
     {
         $id = Branch::query()
             ->acrossBranches()
-            ->when(
-                $context->allowed() !== [],
-                fn ($query) => $query->whereIn('BranchId', $context->allowed())
-            )
-            ->trading()
+            ->visibleTo($context->allowed())
             ->ordered()
             ->value('BranchId');
 

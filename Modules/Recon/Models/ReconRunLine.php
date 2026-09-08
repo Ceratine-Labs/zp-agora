@@ -43,6 +43,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $NearRefLineId
  * @property string|null $NearRefNote
  * @property string|null $MopsKeyRef
+ * @property int|null $MopsSourceId the deposit's own id — only CashBags has one
  * @property int|null $PairedFromLineId
  * @property-read ReconRun $run
  */
@@ -70,6 +71,7 @@ class ReconRunLine extends BaseModel
         'UsedBankLen' => 'integer',
         'RulesInGroup' => 'integer',
         'BankLineId' => 'integer',
+        'MopsSourceId' => 'integer',
         'NearRefLineId' => 'integer',
         'PairedFromLineId' => 'integer',
         'ReconBatchNo' => 'integer',
@@ -153,6 +155,18 @@ class ReconRunLine extends BaseModel
      * rule, so the reference they were grouped under may not mean the same
      * thing on each of them.
      */
+    /**
+     * Has this line actually been stamped?
+     *
+     * The line's own state, not the run's: a committed run can carry lines it
+     * skipped, and those still have to drill live because nothing was written
+     * for them.
+     */
+    public function isCommitted(): bool
+    {
+        return $this->CommitState === 'committed';
+    }
+
     public function mixedRules(): bool
     {
         return ($this->RulesInGroup ?? 1) > 1;

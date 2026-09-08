@@ -177,6 +177,37 @@ abstract class GridDefinition
         return null;
     }
 
+    /**
+     * What a row lets you DO, beyond opening it — rendered as a trailing
+     * column of links.
+     *
+     * Each entry is `['label' => …, 'url' => …, 'primary' => bool]`. An action
+     * the caller may not perform is simply left out of the array, so the
+     * permission check lives here beside the route it guards rather than being
+     * repeated in a blade.
+     *
+     * An optional `attributes` map is rendered onto the anchor, which is how an
+     * action opts into behaviour the shell knows nothing about — a dialog
+     * (`data-modal-open`), a confirmation (`data-confirm`). The `url` stays a
+     * real address either way, so the action still works with no JavaScript and
+     * is still somewhere you can send a person. The shell writes the attributes
+     * and interprets none of them.
+     *
+     * ACTIONS VARY BY PERMISSION, NOT BY ROW. The shell asks the first row on
+     * the page whether the column should exist at all, because a column that
+     * appeared and vanished down the page would be a table with a ragged edge.
+     * A grid that genuinely needs per-row actions — a Reverse that only a
+     * committed run offers — should return the action disabled rather than
+     * absent, or it will not get a column at all on a page whose first row
+     * has none.
+     *
+     * @return array<int, array{label: string, url: string, primary?: bool, attributes?: array<string, string>}>
+     */
+    public function rowActions(object $row): array
+    {
+        return [];
+    }
+
     /** Whether rows carry a tick box for a bulk action. */
     public function selectable(): bool
     {

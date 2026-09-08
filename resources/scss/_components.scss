@@ -29,6 +29,10 @@
   background: var(--surface); border: 1px solid var(--line);
   border-radius: 8px; box-shadow: var(--shadow); margin-bottom: 18px;
 }
+/* A card a save redirects back to (#roles, #branches) must not land under the
+   app bar and the scope bar, which are both sticky. Without this the anchor
+   works and the reader still cannot see the card they pressed Save on. */
+.card[id] { scroll-margin-top: calc(var(--appbar-h) + 64px); }
 .card-collapsible {
   > summary {
     cursor: pointer; list-style: none;
@@ -168,11 +172,22 @@ div.emptystate { padding: 44px 20px; text-align: center; }
 .signin-form {
   display: flex; flex-direction: column; gap: 12px;
   label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--muted); }
-  input[type="email"], input[type="password"] {
+  // type="text" included for the one-time code field: without it the OTP
+  // input renders as a bare browser default in the middle of a styled form.
+  input[type="email"], input[type="password"], input[type="text"] {
     background: var(--surface-2); color: var(--ink);
     border: 1px solid var(--line); border-radius: var(--r);
     padding: 8px 10px; font-size: 14px; font-family: inherit;
     &:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+  }
+
+  // The code is five characters read off another screen. Big, spaced and
+  // upper-cased as it is typed, so a transcription error is visible before it
+  // is submitted — the field accepts any case, this is only what it shows.
+  .otp-input {
+    font-family: var(--font-mono);
+    font-size: 24px; letter-spacing: .34em; text-transform: uppercase;
+    text-align: center; padding: 12px 10px;
   }
   .signin-remember { flex-direction: row; align-items: center; gap: 7px; color: var(--ink-2); }
   .btn-primary {
@@ -542,6 +557,26 @@ tr.is-expandable > td.pick { position: relative; }
   font-size: 12px; color: var(--muted); white-space: nowrap;
 }
 
+/* The three ways into an account, side by side — each a button with the one
+   sentence that says when you would press it. A row of bare buttons would
+   need the admin to already know the difference. */
+.pw-actions {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  align-items: start;
+}
+.pw-choice .field-help { margin-top: 6px; }
+
+/* Shown once, so it has to be readable down a phone at a glance. */
+.temp-password {
+  margin: 10px 0 0;
+  code {
+    font-size: 19px; letter-spacing: .06em; user-select: all;
+    padding: 8px 12px; border-radius: 6px;
+    background: var(--surface); border: 1px solid var(--line);
+  }
+}
+
 .perm-module {
   margin: 14px 0 6px; font-size: 12px; letter-spacing: .06em;
   text-transform: uppercase; color: var(--muted);
@@ -557,3 +592,165 @@ tr.is-expandable > td.pick { position: relative; }
 .matrix .matrix-cell.yes { color: var(--good-fill); font-weight: 700; }
 .matrix .matrix-cell.no  { color: var(--muted); }
 .matrix .matrix-hint { display: block; font-size: 11px; color: var(--muted); }
+
+/*
+| Two-pane manual reconciliation
+|--------------------------------------------------------------------------
+|
+| The bank at the left and the deposits at the right, with a colour joining
+| the references that appear on both sides. Ten hues, cycled: the procedure's
+| ColourIndex is a dense rank, so a long answer wraps rather than running out.
+| Wrapping is honest — two distant groups sharing a hue is a smaller problem
+| than a group with no hue at all — and the reference is on the row as text
+| either way, because colour is not a label anybody can read out or search for.
+|
+| The hues are set as a left rail plus a wash rather than a background fill:
+| a filled row fights the theme's own zebra striping and, in dark mode, either
+| the text or the tint has to lose. A rail is legible in both.
+*/
+.twopane {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding: 0 14px 14px;
+
+    // Below the fold on a phone the two panes stack, and the left one comes
+    // first — a clerk reads the statement and then goes looking for what
+    // settles it, not the other way round.
+    @media (max-width: 900px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.twopane-side {
+    min-width: 0; // so a long narrative scrolls its own table instead of the page
+    border: 1px solid var(--line);
+    border-radius: var(--radius, 8px);
+    overflow: hidden;
+}
+
+.twopane-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+
+    h3 {
+        margin: 0;
+        font-size: 13px;
+        letter-spacing: .02em;
+    }
+
+    .muted { font-size: 11px; }
+}
+
+.twopane tbody tr.pk {
+    // The rail carries the colour; the row keeps the theme's own background so
+    // striping, hover and the selected state all still work.
+    box-shadow: inset 3px 0 0 0 var(--pk);
+    background: color-mix(in srgb, var(--pk) 7%, transparent);
+}
+
+.twopane tbody tr.pk:hover {
+    background: color-mix(in srgb, var(--pk) 14%, transparent);
+}
+
+.pk-1  { --pk: #6aa5e0; }
+.pk-2  { --pk: #e6c15c; }
+.pk-3  { --pk: #7fbf8a; }
+.pk-4  { --pk: #d08a6a; }
+.pk-5  { --pk: #a58ad0; }
+.pk-6  { --pk: #5fb8b0; }
+.pk-7  { --pk: #d97f9e; }
+.pk-8  { --pk: #9db35c; }
+.pk-9  { --pk: #8aabb4; }
+.pk-10 { --pk: #c07fd0; }
+
+/*
+| Modal
+|--------------------------------------------------------------------------
+|
+| A native <dialog>, so the browser owns the top layer, the backdrop, the
+| focus trap and Escape. What is styled here is only what it looks like.
+|
+| ::backdrop cannot read a CSS custom property inherited from :root in every
+| engine, so its colour is written literally — a translucent black works on
+| both grounds and is the one place in the sheet where a token would buy
+| nothing.
+*/
+.modal {
+    width: min(560px, calc(100vw - 32px));
+    max-height: min(80vh, 760px);
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius, 8px);
+    background: var(--surface);
+    color: var(--ink);
+    overflow: auto;
+
+    &.modal-wide { width: min(880px, calc(100vw - 32px)); }
+
+    &::backdrop { background: rgba(0, 0, 0, .55); }
+}
+
+.modal-x {
+    position: sticky;
+    top: 0;
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 8px 0;
+    background: var(--surface);
+}
+
+.modal-title {
+    margin: -18px 18px 0;
+    font-size: 15px;
+    letter-spacing: .01em;
+}
+
+.modal-body {
+    padding: 12px 18px 18px;
+
+    // A dialog is a scroll container of its own, so a wide table inside one
+    // must scroll itself rather than widening the dialog past the viewport.
+    .table-wrap, .tablewrap { overflow-x: auto; }
+}
+
+/*
+| Compare — two readings of the same thing, one of them in force
+|--------------------------------------------------------------------------
+|
+| Named `compare`, not `cmp`: `cmp` is <x-kpi>'s own class and check-components
+| guards it, which is the gate working exactly as intended.
+*/
+.compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+
+    @media (max-width: 620px) { grid-template-columns: 1fr; }
+}
+
+.compare-side {
+    border: 1px solid var(--line);
+    border-radius: var(--radius, 8px);
+    padding: 10px 12px;
+
+    h4 {
+        margin: 0 0 6px;
+        font-size: 11px;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; }
+    dt { color: var(--muted); font-size: 11px; }
+    dd { margin: 0; font-family: var(--mono); font-size: 11px; }
+}
+
+/* The half that is in force reads louder than the half that is not. */
+.compare-side.is-live { border-color: var(--line-strong); }

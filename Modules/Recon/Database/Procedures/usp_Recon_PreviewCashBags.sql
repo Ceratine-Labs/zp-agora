@@ -506,6 +506,11 @@ BEGIN
                    p.ProcessOrder                        AS UsedProcessOrder,
                    p.UsedStart                           AS UsedBankStart,
                    p.UsedLen                             AS UsedBankLen,
+                   /* NULL here on purpose: a bank line in 'contains' mode can
+                      carry several bags, so there is no single deposit id to
+                      name. The orphan branch below is the one case where there
+                      is exactly one, and it is the case that needs it. */
+                   CONVERT(bigint, NULL)                 AS MopsSourceId,
                    CASE WHEN p.MopsBags = 0 AND p.HasDigitRun = 0 THEN 5
                         WHEN p.AmbiguousBag = 1                   THEN 4
                         WHEN p.MopsBags = 0                       THEN 2
@@ -513,10 +518,16 @@ BEGIN
                         ELSE 1 END                       AS SortRank
             FROM PerLine p
             UNION ALL
+            /* The bag's own id travels with the row. Without it an orphan
+               cannot be drilled at all: 'contains' finds deposits by looking
+               for the bag reference inside a bank NARRATIVE, and an orphan has
+               no bank line to look in. The reference alone will not do —
+               two orphans can share a DBagNo, and matching on it shows both
+               deposits under each of them. */
             SELECT 'CashBags', 'contains', NULL, o.TransactionDate, o.DBagNo,
                    0, 0, 1, o.Amount, o.Amount,
                    'Deposit only - no bank line', CONVERT(bit, 0),
-                   NULL, NULL, NULL, 3
+                   NULL, NULL, NULL, o.DailyBankingCashBagID, 3
             FROM Orphan o
         ) AS r
         ORDER BY r.SortRank, r.BankDate, r.BankLineID;

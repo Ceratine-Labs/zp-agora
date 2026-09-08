@@ -141,6 +141,20 @@
             </div>
         </x-core::gallery-entry>
 
+        <x-core::gallery-entry name="x-modal">
+            <div class="gal-variant">
+                <p class="eyebrow">A native dialog. The button is the whole API — <code>data-modal-open</code></p>
+                <p><button type="button" class="btn-ghost" data-modal-open="gallery-modal">Open the dialog</button></p>
+                <x-modal id="gallery-modal" title="Extraction rule">
+                    <p>A modal interrupts, so it is for a form somebody must finish or abandon. A row that
+                       merely wants to show more of itself belongs in <code>data-row-detail</code>, which
+                       expands in place and keeps the list visible.</p>
+                    <p class="field-help">Escape closes it, so does the backdrop, and focus goes back where
+                       it came from — all of that is the browser, not us.</p>
+                </x-modal>
+            </div>
+        </x-core::gallery-entry>
+
         <x-core::gallery-entry name="x-kpi-strip">
             <div class="gal-variant">
                 <p class="eyebrow">Four tiles, with stripes and comparisons — and one figure the system does not have</p>
@@ -276,6 +290,63 @@
             </div>
         </x-core::gallery-entry>
 
+        <x-core::gallery-entry name="x-table">
+            <div class="gal-variant">
+                <p class="eyebrow">A result set with its procedure named and its count stated</p>
+                <x-table :procedure="'agora.usp_Cash_GridDailyBanking'" :count="3" :total="41">
+                    <x-slot:head>
+                        <tr><th>Site</th><th>Reference</th><th class="num">Declared</th><th class="num">Banked</th></tr>
+                    </x-slot:head>
+                    @foreach ($fixtures['tableRows'] as $row)
+                        <tr>
+                            <td>{{ $row['site'] }}</td>
+                            <td class="mono">{{ $row['ref'] }}</td>
+                            <td class="num">{{ \App\Support\Format::r($row['declared']) }}</td>
+                            <td class="num">{{ \App\Support\Format::r($row['banked']) }}</td>
+                        </tr>
+                    @endforeach
+                </x-table>
+            </div>
+            <div class="gal-variant">
+                <p class="eyebrow">Empty — a designed answer, not a gap</p>
+                <x-table :count="0" empty="The procedure ran and found nothing in this period. That is an answer, not a failure." />
+            </div>
+        </x-core::gallery-entry>
+
+        <x-core::gallery-entry name="x-compare">
+            <div class="gal-variant">
+                <p class="eyebrow">Two readings, and which one is actually in force</p>
+                <x-compare live="right"
+                           left-title="The customer's row"
+                           right-title="Agora's override — in force">
+                    <x-slot:left>
+                        <dl>
+                            <dt>Bank</dt><dd>43 / 47</dd>
+                            <dt>Deposit</dt><dd>1 / 10</dd>
+                            <dt>Filter</dt><dd>—</dd>
+                        </dl>
+                    </x-slot:left>
+                    <x-slot:right>
+                        <dl>
+                            <dt>Bank</dt><dd>28 / 32</dd>
+                            <dt>Deposit</dt><dd>1 / 10</dd>
+                            <dt>Why</dt><dd>Started past the end of every narrative</dd>
+                        </dl>
+                    </x-slot:right>
+                </x-compare>
+            </div>
+        </x-core::gallery-entry>
+
+        <x-core::gallery-entry name="x-two-pane-recon">
+            <div class="gal-variant">
+                <p class="eyebrow">Coloured only where the reference is on BOTH sides — 125 and 200 pair, 300 and 400 do not</p>
+                <x-two-pane-recon :bank="$fixtures['recon']['bank']"
+                                  :mops="$fixtures['recon']['mops']"
+                                  :summary="$fixtures['recon']['summary']"
+                                  key-label="Batch" />
+            </div>
+        </x-core::gallery-entry>
+
         <x-core::gallery-entry name="x-sqlbox">
             <div class="gal-variant">
                 <p class="eyebrow">Closed by default — on a screen that has an answer, the SQL is provenance</p>
@@ -285,6 +356,17 @@
 
         {{-- ============================================================ Parameters --}}
         <h2 id="g-parameters" class="sg-group">Parameters</h2>
+
+        <x-core::gallery-entry name="x-param">
+            <div class="gal-variant">
+                <p class="eyebrow">The compact form of the same control, for a run bar</p>
+                <div class="field-row">
+                    <x-param name="branch" label="Site" :choices="['' => 'Every site', '18' => 'Elephant Coast']" />
+                    <x-param name="from" label="From" type="date" value="2026-08-01" />
+                    <x-param name="to" label="To" type="date" value="2026-08-31" />
+                </div>
+            </div>
+        </x-core::gallery-entry>
 
         <x-core::gallery-entry name="x-field">
             <div class="gal-variant">

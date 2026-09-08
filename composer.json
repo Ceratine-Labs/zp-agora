@@ -78,13 +78,17 @@
             "scripts/check-migrations.sh",
             "scripts/check-procs.sh",
             "scripts/check-components.sh",
+            "scripts/check-blades.sh",
+            "scripts/check-recon-types.sh",
             "@php artisan test"
         ],
         "check-fast": [
             "vendor/bin/pint --test",
             "scripts/check-migrations.sh",
             "scripts/check-procs.sh",
-            "scripts/check-components.sh"
+            "scripts/check-components.sh",
+            "scripts/check-blades.sh",
+            "scripts/check-recon-types.sh"
         ]
     },
     "extra": {

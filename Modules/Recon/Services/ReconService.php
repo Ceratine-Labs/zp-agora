@@ -91,6 +91,8 @@ class ReconService
      * answer at all, because it keeps nothing.
      *
      * @param  array<string, scalar|null>  $options
+     * @param  string|null  $note  what the person called this run, so they can
+     *                             find it again — "August ABSA, second attempt"
      */
     public function preview(
         string $area,
@@ -99,6 +101,7 @@ class ReconService
         Carbon $to,
         array $options = [],
         ?string $groupRef = null,
+        ?string $note = null,
     ): ReconRun {
         $definition = $this->area($area);
         $params = $this->parameters($area, $branchId, $from, $to, $options);
@@ -111,7 +114,7 @@ class ReconService
 
         $lines = $rows->values()->map(fn (object $row, int $i) => $this->line($area, $row, $i + 1));
 
-        return $this->record($area, $branchId, $from, $to, $definition, $params, $lines, $elapsed, $groupRef);
+        return $this->record($area, $branchId, $from, $to, $definition, $params, $lines, $elapsed, $groupRef, $note);
     }
 
     /**
@@ -263,6 +266,9 @@ class ReconService
             // deposits are actually under, and looking for them under the
             // bank's would return nothing.
             'MopsKeyRef' => $line->MopsKeyRef,
+            // Only CashBags fills this, and only on a proposal that IS one
+            // deposit. It is what lets an orphan be drilled at all.
+            'MopsSourceId' => $line->MopsSourceId,
         ];
 
         foreach (array_intersect_key($run->params(), array_flip($replayed)) as $name => $value) {
@@ -281,11 +287,92 @@ class ReconService
         // DrillBank has no use for the deposit-side reference and would reject
         // an argument it does not declare.
         $bankParams = $params;
-        unset($bankParams['MopsKeyRef']);
+        unset($bankParams['MopsKeyRef'], $bankParams['MopsSourceId']);
 
         return [
             'bank' => $this->procedures->call('usp_Recon_DrillBank', $bankParams),
             'mops' => $this->procedures->call('usp_Recon_DrillMops', $params),
+        ];
+    }
+
+    /**
+     * The two sides of one proposal, whatever state it is in.
+     *
+     * A COMMITTED line cannot be drilled. The drill is how a PROPOSAL is
+     * derived, so both halves filter to what is still outstanding —
+     * `ReconState = 1` on the bank and `ReconBatchNoPumpIT = 0` on the
+     * deposit — and committing sets exactly those columns. Expanding a row
+     * that reconciled perfectly therefore returned nothing on both sides, and
+     * the panel said "Nothing on the statement carries this reference" and
+     * "Nothing was declared against this reference" about a batch that had
+     * just been stamped successfully. Reported by Ryan, 7 September 2026.
+     *
+     * So a committed line is read from `agora.ReconMatch` instead, which is
+     * the record the commit wrote of exactly which rows it touched and for how
+     * much. That is better than widening the drill to include reconciled rows:
+     * the drill would return everything sharing the key and the window — the
+     * same confusion that made usp_Recon_Commit skip 127 batches — whereas
+     * ReconMatch names the batch's own rows and cannot drift as the estate
+     * moves underneath it.
+     *
+     * The shapes match the drill's exactly, so the panel renders unchanged.
+     *
+     * @return array{bank: Collection<int, object>, mops: Collection<int, object>}
+     */
+    public function sides(ReconRun $run, ReconRunLine $line): array
+    {
+        if (! $line->isCommitted()) {
+            return $this->drill($run, $line);
+        }
+
+        $schema = config('agora.schema');
+        $connection = DB::connection(config('agora.connections.app'));
+
+        /*
+         * Joined back to the bank view for the narrative, which ReconMatch has
+         * no column for. The view is a plain read over the table and carries
+         * no ReconState filter of its own, so it still returns a line that has
+         * since been stamped — which is the whole point here.
+         *
+         * The extraction window comes off the RUN LINE rather than being
+         * recomputed, so the marked characters in the narrative are the ones
+         * this proposal actually matched on.
+         */
+        $bank = $connection->select("
+            SELECT l.BankStatementLineID,
+                   l.LineDate,
+                   l.Description,
+                   m.Amount,
+                   CASE WHEN ? = 'ABSA' THEN RIGHT(RTRIM(l.Description), 2) END AS Leg,
+                   ? AS UsedBankStart,
+                   ? AS UsedBankLen
+            FROM [{$schema}].[ReconMatch] m
+            JOIN [{$schema}].[vw_BankStatementLine] l
+              ON l.BankStatementLineID = m.SourceId AND l.BranchId = m.BranchId
+            WHERE m.RunLineId = ? AND m.Side = 'bank'
+            ORDER BY l.LineDate, l.BankStatementLineID
+        ", [$run->ReconArea, $line->UsedBankStart, $line->UsedBankLen, $line->Id]);
+
+        /*
+         * The deposit side has no single id across the family, so the commit
+         * stored its key as JSON. Read back out of it here rather than
+         * re-querying the source table, which would have to guess which of the
+         * BRN_DailyBanking* tables and would find nothing anyway now that
+         * ReconBatchNoPumpIT is set.
+         */
+        $mops = $connection->select("
+            SELECT m.SourceDate,
+                   JSON_VALUE(m.SourceKeyJson, '$.ref') AS SourceRef,
+                   JSON_VALUE(m.SourceKeyJson, '$.key') AS Detail,
+                   m.Amount
+            FROM [{$schema}].[ReconMatch] m
+            WHERE m.RunLineId = ? AND m.Side = 'mops'
+            ORDER BY m.SourceDate, m.Id
+        ", [$line->Id]);
+
+        return [
+            'bank' => collect($bank),
+            'mops' => collect($mops),
         ];
     }
 
@@ -393,6 +480,7 @@ class ReconService
             'BankNarrative' => $this->text($get('BankNarrative'), 400),
             'DeviceRefs' => $this->text($get('DeviceRefs'), 400),
             'BankLineId' => $get('BankLineID', 'BankLineId'),
+            'MopsSourceId' => $get('MopsSourceId'),
 
             'BankLines' => (int) ($row->BankLines ?? 0),
             'BankTotal' => $row->BankTotal ?? 0,
@@ -448,9 +536,10 @@ class ReconService
         Collection $lines,
         int $elapsed,
         ?string $groupRef,
+        ?string $note = null,
     ): ReconRun {
         return DB::transaction(function () use (
-            $area, $branchId, $from, $to, $definition, $params, $lines, $elapsed, $groupRef
+            $area, $branchId, $from, $to, $definition, $params, $lines, $elapsed, $groupRef, $note
         ) {
             $counts = $this->counts($lines);
 
@@ -465,6 +554,10 @@ class ReconService
                 'ProcedureName' => config('agora.schema').'.'.$definition['procedure'],
                 'ParamsJson' => json_encode($params),
                 'PreviewMs' => $elapsed,
+                // What the person called this run. Null where they did not
+                // name it — the run list describes an unnamed run by its
+                // period rather than showing a dash.
+                'Note' => $note,
                 'CreatedBy' => auth()->id(),
                 'CreatedAt' => now(),
                 ...$counts,

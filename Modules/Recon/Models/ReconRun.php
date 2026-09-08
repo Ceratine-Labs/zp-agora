@@ -106,4 +106,33 @@ class ReconRun extends BaseModel
     {
         return $this->Status === 'committed';
     }
+
+    /**
+     * Where this person left off — their newest run that is still open work.
+     *
+     * "Open" is `previewed`: a run that was recorded and never committed. It
+     * is the one thing a recon clerk asked for that the ledger could already
+     * answer and nothing read — CreatedBy has been stamped on every run since
+     * the module landed.
+     *
+     * A committed or reversed run is history and is not offered as somewhere
+     * to resume; it is still on the Runs tab, where history belongs.
+     *
+     * Null user, null run: an unauthenticated caller cannot have left off
+     * anywhere, and "everyone's newest open run" is not a useful answer to
+     * offer somebody as their own.
+     */
+    public static function openFor(?int $userId, ?string $area = null): ?self
+    {
+        if ($userId === null) {
+            return null;
+        }
+
+        return static::query()
+            ->where('CreatedBy', $userId)
+            ->where('Status', 'previewed')
+            ->when($area !== null, fn ($query) => $query->where('ReconArea', $area))
+            ->orderByDesc('CreatedAt')
+            ->first();
+    }
 }

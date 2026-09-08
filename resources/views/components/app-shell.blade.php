@@ -29,7 +29,8 @@
 <x-scope-bar
     :branches="$shellBranches"
     :branch-id="$shellBranchId"
-    :workspace="$shellWorkspace" />
+    :workspace="$shellWorkspace"
+    :granted="$shellBranchesGranted" />
 
 <main class="shell-main">
     <div class="shell-in">

@@ -38,8 +38,17 @@ class PermissionService
     /** @var array<int, array<int, string>> */
     private array $memo = [];
 
-    /** Every pattern this user holds, through every role granted to them. */
-    /** @return array<int, string> */
+    /**
+     * Every pattern this user holds — through their roles, and directly.
+     *
+     * The union is deliberate and the direct half is additive: agora.UserPermission
+     * carries the exceptions six roles cannot express without handing over a whole
+     * second role with them. There is no deny row, so this can be a UNION rather
+     * than a precedence rule, and "what may this person do" stays answerable by
+     * reading their roles plus a short list.
+     *
+     * @return array<int, string>
+     */
     public function patternsFor(User $user): array
     {
         $id = (int) $user->getKey();
@@ -48,42 +57,92 @@ class PermissionService
             return $this->memo[$id];
         }
 
-        $schema = config('agora.schema');
-
         /** @var array<int, string> $patterns */
         $patterns = Cache::rememberForever(
             self::CACHE_PREFIX.$id,
-            function () use ($id, $schema): array {
-                $rows = DB::connection(config('agora.connections.app'))->select("
-                    SELECT DISTINCT p.[Code]
-                    FROM [{$schema}].[UserRole] ur
-                    JOIN [{$schema}].[RolePermission] rp ON rp.[RoleId] = ur.[RoleId]
-                    JOIN [{$schema}].[Permission] p ON p.[Id] = rp.[PermissionId]
-                    WHERE ur.[UserId] = ?
-                ", [$id]);
-
-                return array_values(array_map(
-                    static fn (object $r): string => strtolower((string) $r->Code),
-                    $rows
-                ));
-            }
+            fn (): array => array_values(array_unique(array_merge(
+                $this->rolePatternsFor($user),
+                $this->directPatternsFor($user)
+            )))
         );
 
         return $this->memo[$id] = $patterns;
     }
 
-    /** Does this user hold the given permission? */
-    public function userHas(User $user, string $code): bool
+    /**
+     * The half that comes from the roles this person holds.
+     *
+     * Public and uncached because the user screen needs the two halves apart
+     * to answer "is this grant doing anything, or does a role already carry
+     * it" — a question `patternsFor()` deliberately cannot answer, having
+     * already merged them.
+     *
+     * @return array<int, string>
+     */
+    public function rolePatternsFor(User $user): array
+    {
+        $schema = config('agora.schema');
+
+        return $this->codes(DB::connection(config('agora.connections.app'))->select("
+            SELECT DISTINCT p.[Code]
+            FROM [{$schema}].[UserRole] ur
+            JOIN [{$schema}].[RolePermission] rp ON rp.[RoleId] = ur.[RoleId]
+            JOIN [{$schema}].[Permission] p ON p.[Id] = rp.[PermissionId]
+            WHERE ur.[UserId] = ?
+        ", [(int) $user->getKey()]));
+    }
+
+    /**
+     * The half granted to this person by name, in agora.UserPermission.
+     *
+     * @return array<int, string>
+     */
+    public function directPatternsFor(User $user): array
+    {
+        $schema = config('agora.schema');
+
+        return $this->codes(DB::connection(config('agora.connections.app'))->select("
+            SELECT DISTINCT p.[Code]
+            FROM [{$schema}].[UserPermission] up
+            JOIN [{$schema}].[Permission] p ON p.[Id] = up.[PermissionId]
+            WHERE up.[UserId] = ?
+        ", [(int) $user->getKey()]));
+    }
+
+    /**
+     * Does any pattern in the set cover this code?
+     *
+     * @param  array<int, string>  $patterns
+     */
+    public function anyMatches(array $patterns, string $code): bool
     {
         $code = strtolower(trim($code));
 
-        foreach ($this->patternsFor($user) as $pattern) {
+        foreach ($patterns as $pattern) {
             if ($this->matches($pattern, $code)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * @param  array<int, object>  $rows
+     * @return array<int, string>
+     */
+    private function codes(array $rows): array
+    {
+        return array_values(array_map(
+            static fn (object $r): string => strtolower((string) $r->Code),
+            $rows
+        ));
+    }
+
+    /** Does this user hold the given permission? */
+    public function userHas(User $user, string $code): bool
+    {
+        return $this->anyMatches($this->patternsFor($user), $code);
     }
 
     /** @param  array<int, string>  $codes */
@@ -147,7 +206,11 @@ class PermissionService
 
         $schema = config('agora.schema');
         $ids = DB::connection(config('agora.connections.app'))
-            ->select("SELECT DISTINCT [UserId] FROM [{$schema}].[UserRole]");
+            ->select("
+                SELECT [UserId] FROM [{$schema}].[UserRole]
+                UNION
+                SELECT [UserId] FROM [{$schema}].[UserPermission]
+            ");
 
         foreach ($ids as $row) {
             Cache::forget(self::CACHE_PREFIX.(int) $row->UserId);

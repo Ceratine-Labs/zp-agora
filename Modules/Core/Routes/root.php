@@ -24,6 +24,14 @@ Route::middleware('guest')->group(function () {
     Route::post('password/forgot', [PasswordResetController::class, 'email'])
         ->middleware('throttle:10,1')->name('password.email');
     Route::get('password/reset/{token}', [PasswordResetController::class, 'reset'])->name('password.reset');
+
+    // The code from the mail. Throttled on top of the model's five-attempt
+    // lock: the lock is the real defence, and this is what stops a script
+    // burning somebody's five attempts in a second and calling it a denial of
+    // service.
+    Route::post('password/verify', [PasswordResetController::class, 'verify'])
+        ->middleware('throttle:10,1')->name('password.verify');
+
     Route::post('password/reset', [PasswordResetController::class, 'update'])
         ->middleware('throttle:10,1')->name('password.update');
 });
