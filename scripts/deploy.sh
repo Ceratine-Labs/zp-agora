@@ -22,6 +22,16 @@
 #                       exactly how it gets rsynced onto a web server by
 #                       accident. It did, on the first deploy.
 #
+# And --no-owner --no-group, which is a third incident and was documented in
+# docs/deployment.md on 8 Sep 2026 without ever reaching this script — so the
+# next deploy through here would have reproduced it. `rsync -a` implies -o -g,
+# and run as root it applies the SOURCE's numeric owner: for the length of a
+# deploy every file it touched is owned by a uid that does not exist on the
+# box. A changed Blade cannot then be compiled — tempnam() fails, PHP falls
+# back to the system temp directory, and Laravel turns the warning into a
+# ViewException naming an innocent template. Three 500s across thirteen
+# seconds on 8 Sep 2026, and an hour chasing a template that was fine.
+#
 # Read docs/deployment.md before changing anything here.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -52,7 +62,7 @@ npm run build >/dev/null
 [ -f public/build/manifest.json ] || { echo "no build manifest — the build failed silently" >&2; exit 1; }
 
 echo "==> shipping to ${HOST}:${REMOTE}"
-rsync -az --delete $DRY \
+rsync -az --no-owner --no-group --delete $DRY \
     --exclude '.git' \
     --exclude 'node_modules' \
     --exclude 'vendor' \
