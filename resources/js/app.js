@@ -15,6 +15,7 @@ import reconGroup from './components/recon-group';
 import reconMatch from './components/recon-match';
 import modal from './components/modal';
 import tableTools from './components/table-tools';
+import linkedSelect from './components/linked-select';
 import * as format from './format';
 
 megaMenu();
@@ -36,6 +37,10 @@ modal();
 // Sorting, column filters and the sticky heads. Every table gets the head
 // offset; only <x-table tools> gets the controls.
 tableTools();
+// A select whose options belong to another select's choice — the counting
+// areas at a site. Does nothing on a page with none, which is every page but
+// the stock recon centre.
+linkedSelect();
 
 // Reachable from an inline handler in a blade view without importing anything
 // there. This is the only global the application defines.
