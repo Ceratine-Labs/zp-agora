@@ -133,7 +133,17 @@ function replace(row, html) {
 
     const fresh = table.querySelector('tr');
 
-    if (fresh) row.replaceWith(fresh);
+    if (!fresh) return;
+
+    const host = row.closest('table');
+
+    row.replaceWith(fresh);
+
+    // The row that carried the filters and the tick state is gone. Anything
+    // watching the table — the column filters, the select-all, the posting
+    // count — has to be told rather than left holding a detached node.
+    host?.dispatchEvent(new CustomEvent('table-tools:rescan', { bubbles: true }));
+    host?.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function mark(row, text) {

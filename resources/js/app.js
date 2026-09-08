@@ -14,6 +14,7 @@ import dataGrid from './components/data-grid';
 import reconGroup from './components/recon-group';
 import reconMatch from './components/recon-match';
 import modal from './components/modal';
+import tableTools from './components/table-tools';
 import * as format from './format';
 
 megaMenu();
@@ -32,6 +33,9 @@ runbar();
 reconGroup();
 reconMatch();
 modal();
+// Sorting, column filters and the sticky heads. Every table gets the head
+// offset; only <x-table tools> gets the controls.
+tableTools();
 
 // Reachable from an inline handler in a blade view without importing anything
 // there. This is the only global the application defines.

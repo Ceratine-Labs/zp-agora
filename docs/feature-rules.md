@@ -272,6 +272,26 @@ procedure answers — and client-side filtering is only ever an optimisation on 
 page already in hand. Worth agreeing explicitly, because it decides the shape of
 every grid procedure we write.
 
+**What "a page already in hand" turned out to be, 8 Sep 2026.** The optimisation
+that paragraph allows for now exists as `<x-table tools>` — click-to-sort and an
+Excel-style filter row applied in the browser, built by `table-tools.js`. It is
+opt-in, and the test for whether a table may opt in is a single question: **did
+the whole answer arrive in this response?** A recon run's proposals, a group's
+twenty-six sites and both sides of a manual match all did — they arrive complete
+because their tick boxes decide what a commit stamps, and they cannot be
+`<x-data-grid>` for the same reason. A paginated result set did not: the Reports
+table is page 1 of 9, and sorting or filtering it in the browser would answer a
+different question from the one the reader asked while looking exactly like the
+right answer. Those stay with the procedure, which is the rule above.
+
+One consequence is about money rather than about tables, and it is why this is
+written down here. On these screens a filter takes rows **out of the
+submission** — a hidden row's inputs are disabled — so a clerk cannot narrow to
+one site and then stamp four hundred rows they cannot see. `<x-action-bar>`
+recomputes its count from what is left and says how many rows a filter is
+holding back. Any future screen that filters in the browser over rows carrying
+a commit must do the same.
+
 ### C. Things a grid needs that are not on the list
 
 * **A loading state.** These procedures run over big tables; a grid that goes

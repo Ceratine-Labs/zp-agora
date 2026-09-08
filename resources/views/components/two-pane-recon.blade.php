@@ -54,7 +54,13 @@
                 {{ \App\Support\Format::r($summary->BankTotal ?? 0) }}</span>
         </div>
 
-        <x-table dense :count="$bank->count()"
+        {{-- Sorted and filtered in the browser, over the rows already here.
+             Both sides arrive complete from one procedure, so "show me only
+             the ones over R10 000" is a question about this page and should
+             not cost a round trip. A filtered row's tick box is disabled, so
+             the running totals above and the match itself only ever count
+             what is on screen. --}}
+        <x-table dense :count="$bank->count()" id="match-bank" tools
                  empty="Nothing on the statement is outstanding for this site and period.">
             <x-slot:head>
                 <tr>
@@ -101,7 +107,7 @@
                 {{ \App\Support\Format::r($summary->MopsTotal ?? 0) }}</span>
         </div>
 
-        <x-table dense :count="$mops->count()"
+        <x-table dense :count="$mops->count()" id="match-mops" tools
                  empty="Nothing on the deposit side is outstanding for this site and period.">
             <x-slot:head>
                 <tr>

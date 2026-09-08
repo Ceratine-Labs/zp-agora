@@ -275,7 +275,36 @@ div.emptystate { padding: 44px 20px; text-align: center; }
    page never scrolls sideways (feature-rules §3).
    --------------------------------------------------------------------------- */
 .table-block { display: block; }
-.table-scroll { overflow-x: auto; }
+/* THE STICKY HEAD, and why it needed a height.
+   `table.dt thead th` has declared `position: sticky; top: 0` since the table
+   was written, and it never once stuck. `overflow-x: auto` alone makes this a
+   scroll container on BOTH axes — the spec resolves the other axis from
+   `visible` to `auto` — so the header stops being sticky against the WINDOW
+   and becomes sticky against this box instead. A box whose height is its
+   content never scrolls, and a header pinned to the top of something that
+   never scrolls is a header that never moves.
+
+   Bounding it is what turns the declaration into the behaviour: the table
+   scrolls inside its own frame, the head stays on screen, and the page below
+   it — the action bar, the footer, the next card — stays where the reader put
+   it. `--table-max-h` is the escape hatch for a screen that wants a shorter
+   frame (two panes side by side, a drawer); the default leaves room for the
+   app bar, the scope bar and a card head above it.
+
+   No `overscroll-behavior: contain`. A reader who reaches the bottom of the
+   table expects the page to carry on moving under the same gesture, and
+   trapping the wheel inside a 600px box is the single most complained-about
+   behaviour a frozen header brings with it. */
+.table-scroll {
+  overflow: auto;
+  max-height: var(--table-max-h, calc(100vh - 230px));
+  max-height: var(--table-max-h, calc(100dvh - 230px));
+}
+
+/* A table short enough to have no scrollbar must not draw a frame that implies
+   one. Nothing to do — max-height only engages above it — but it is the reason
+   there is no min-height here. */
+
 
 table.dt {
   width: 100%; border-collapse: collapse; font-size: 13px;
@@ -286,8 +315,15 @@ table.dt {
   thead th {
     font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
     font-weight: 600; border-bottom: 1px solid var(--line); white-space: nowrap;
-    background: var(--surface-2); position: sticky; top: 0; z-index: 1;
+    background: var(--surface-2); position: sticky; top: 0; z-index: 2;
   }
+  /* A second head row — the grid's filter row, or the one table-tools.js
+     builds — sticks UNDER the first, not on top of it. The offset is the
+     first row's rendered height, which only the browser knows: the labels
+     wrap, the text size is the user's, and a hard-coded 28px is wrong on
+     every screen but the one it was measured on. `stickyHeads()` writes
+     `--head-row-h` and re-writes it whenever the row resizes. */
+  thead tr:nth-child(2) th { top: var(--head-row-h, 0px); z-index: 1; }
   tbody tr:hover { background: var(--surface-2); }
   /* Grouping uses an ordinary space so a figure copied out of the table
      pastes into a spreadsheet as a number; the cell holds the line instead. */
@@ -308,6 +344,189 @@ table.dt {
   font-size: 11px; color: var(--muted);
 }
 .table-proc { font-family: var(--font-mono); font-size: 11px; color: var(--brand-ink); }
+
+/* ---------------------------------------------------------------------------
+   The confirmation dialog's body.
+
+   The ONLY rule this class carries, and it exists for one reason: SweetAlert's
+   `text` option sets textContent, so a paragraph break written as \n\n
+   collapses to a single space and the sentence meant to stand out runs
+   straight into the standing explanation below it. That is exactly what
+   happened to the column-filter warning — it rendered as the first clause of
+   a wall of text instead of as its own line.
+
+   `pre-line` keeps the newlines and still collapses runs of spaces, so every
+   existing single-line confirm text renders exactly as it did.
+
+   NOTE for whoever comes next: `ag-dialog`, `ag-dialog-title` and `ag-toast`
+   are passed to SweetAlert by notify.js and have no styles at all, so the
+   dialogs render in the library's own light skin even on a dark page. That is
+   a real gap and it is not this rule's job to close.
+   --------------------------------------------------------------------------- */
+.ag-dialog-body { white-space: pre-line; }
+
+/* ---------------------------------------------------------------------------
+   Table tools — the sort control, the filter row and the value panel that
+   table-tools.js builds on an <x-table tools>.
+
+   It deliberately looks like the data grid's own filter row rather than like a
+   second idea about filtering: the two do the same job in different places
+   (one in the source, one in the page) and a reader should not have to learn
+   which screen they are on to know what a box under a heading does.
+   --------------------------------------------------------------------------- */
+
+.tt-sort {
+  background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+  font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit;
+  display: inline-flex; align-items: center; gap: 5px;
+  &:hover { color: var(--brand-ink); }
+  &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+}
+.tt-arrow { font-size: 9px; line-height: 1; }
+
+table.dt thead th[aria-sort] { color: var(--brand-ink); }
+
+/* A filtered column is marked on the HEADING as well as in the box. The box
+   scrolls out of view the moment somebody looks at a row; the question "why am
+   I only seeing four rows" is asked further down the page than the answer. */
+table.dt thead th.is-filtered { color: var(--brand-ink); }
+table.dt thead th.is-filtered::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: var(--brand);
+}
+
+.tt-filters {
+  th {
+    background: var(--surface-2); padding: 4px 8px 7px;
+    border-bottom: 1px solid var(--line);
+    &.is-filtered { box-shadow: inset 0 -2px 0 var(--brand); }
+  }
+}
+
+.tt-filter {
+  display: flex; gap: 3px; align-items: center;
+
+  input, select {
+    min-width: 0; flex: 1;
+    background: var(--surface); color: var(--ink); font: inherit; font-size: 12px;
+    border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px;
+    text-transform: none; letter-spacing: 0;
+    &:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+  }
+
+  .tt-op { flex: 0 0 44px; text-align: center; }
+
+  /* The tick list opener. Sized to the glyph so it never takes room from the
+     box beside it, which is the control most columns actually use. */
+  .tt-pick {
+    flex: 0 0 auto; cursor: pointer; font-size: 10px; line-height: 1;
+    background: var(--surface); color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: 4px; padding: 4px 5px;
+    &:hover { border-color: var(--brand); color: var(--brand-ink); }
+  }
+}
+
+/* IN THE BODY, not in the cell: .table-scroll is a scroll container on both
+   axes — that is what makes the head stick — so anything drawn inside it is
+   clipped by it. Positioned against the window from the button's rectangle. */
+.tt-panel {
+  position: fixed; z-index: 90;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--shadow-pop); padding: 9px;
+  font-size: 12.5px;
+}
+
+.tt-panel-search {
+  background: var(--surface-2); color: var(--ink); font: inherit; font-size: 12px;
+  border: 1px solid var(--line); border-radius: 4px; padding: 4px 7px;
+  &:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+}
+
+.tt-panel-all {
+  display: flex; align-items: center; gap: 7px; font-weight: 600;
+  padding-bottom: 7px; border-bottom: 1px solid var(--line-soft);
+}
+
+.tt-panel-list {
+  overflow: auto; min-height: 0; flex: 1;
+  display: flex; flex-direction: column; gap: 1px;
+
+  label {
+    display: flex; align-items: center; gap: 7px;
+    padding: 3px 3px; border-radius: 4px; cursor: pointer;
+    &:hover { background: var(--surface-2); }
+    &[hidden] { display: none; }
+    span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+}
+
+.tt-panel-foot {
+  display: flex; gap: 8px; align-items: center; justify-content: space-between;
+  padding-top: 8px; border-top: 1px solid var(--line-soft);
+  .btn-ghost, .btn { padding: 4px 10px; font-size: 12px; }
+}
+
+/* Hidden by a filter. A class rather than [hidden], because a <tr> carries
+   `display: table-row` from the stylesheet and would win. */
+tr.tt-out { display: none; }
+
+.table-empty [data-tt-empty], p[data-tt-empty] .btn-ghost { margin-left: 6px; }
+
+/* ---------------------------------------------------------------------------
+   The action bar: the press that commits, above the rows it commits.
+
+   Every reconcile screen had its primary action in a footer under the table,
+   which on a month of ABSA is four hundred rows below the first thing the
+   reader looks at. Sticky rather than merely moved: it reads as "at the top"
+   on first paint AND is still there at row 400, which is where somebody
+   actually decides they are finished.
+
+   `--sticky-top` is written by table-tools.js from the measured scope bar,
+   because the bar has to stop under the chrome and the scope bar is not on
+   every page and is not a fixed height.
+   --------------------------------------------------------------------------- */
+.action-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+
+  .action-bar-note { margin: 0; flex: 1 1 260px; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+  .action-bar-gap { margin-left: auto; }
+
+  /* A control that gates the press — the manual match's reason — sits beside
+     it rather than under the lists, because it appears at the moment the
+     press stops being allowed without it. */
+  .field { flex: 1 1 300px; min-width: 0; }
+  .field .field-help { font-size: 11px; }
+}
+
+.action-bar.is-sticky {
+  position: sticky; top: var(--sticky-top, var(--appbar-h)); z-index: 30;
+  /* The rows scroll under it, so it cannot be translucent. */
+  background: var(--surface-2);
+}
+
+/* NOT PINNED ON A PHONE. The note wraps under the button at 375px and the bar
+   becomes about 150px tall — a third of the screen, permanently, on the one
+   device that has none to spare. It stays above the table, which is what was
+   asked for; it stops following the reader down, which nobody asked for. */
+@media (max-width: 720px) {
+  .action-bar.is-sticky { position: static; }
+  .action-bar { padding: 9px 12px; }
+  .action-bar .action-bar-note { font-size: 11px; }
+}
+
+/* Marked while a filter is narrowing what the button will act on. The count
+   already says the number; this says WHY the number changed, which is the
+   thing somebody queries afterwards. */
+.action-bar-scope {
+  font-size: 11.5px; color: var(--warn-ink);
+  background: var(--warn-bg); border-radius: 100px; padding: 3px 10px;
+  &[hidden] { display: none; }
+}
 
 /* ---------------------------------------------------------------------------
    Form fields.

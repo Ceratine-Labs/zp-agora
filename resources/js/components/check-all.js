@@ -14,7 +14,11 @@ export default function checkAll() {
         const table = master.closest('table');
         if (!table) return;
 
-        const boxes = () => Array.from(table.querySelectorAll('[data-check]'));
+        // `:not(:disabled)` is what makes select-all honest on a filtered
+        // table. table-tools.js disables the boxes in rows a filter has hidden
+        // so they leave the submission; a master box that still counted them
+        // would tick four hundred invisible rows and report "all selected".
+        const boxes = () => Array.from(table.querySelectorAll('[data-check]:not(:disabled)'));
 
         const sync = () => {
             const all = boxes();
@@ -26,11 +30,25 @@ export default function checkAll() {
         master.addEventListener('click', (event) => event.stopPropagation());
         master.addEventListener('change', () => {
             boxes().forEach((b) => { b.checked = master.checked; });
+            table.dispatchEvent(new Event('change', { bubbles: true }));
         });
 
+        // A filter changing what is visible changes what "all" means.
+        table.addEventListener('table-tools:change', sync);
+
+        // Per box, because stopping the click has to happen BELOW the row —
+        // a row with data-row-detail expands on click and ticking a box is not
+        // asking for that, and a listener on the table is too late to prevent
+        // it.
         boxes().forEach((box) => {
             box.addEventListener('click', (event) => event.stopPropagation());
-            box.addEventListener('change', sync);
+        });
+
+        // Delegated, because a row can be replaced after load — the group
+        // runner swaps each site in as its preview answers — and a listener
+        // bound to the box that was there at load goes with it.
+        table.addEventListener('change', (event) => {
+            if (event.target.matches?.('[data-check]')) sync();
         });
 
         sync();

@@ -156,7 +156,10 @@ table.dg {
   tr.dg-total td {
     background: var(--surface-3); font-weight: 600;
     border-top: 1px solid var(--line); border-bottom: 0;
-    position: sticky; bottom: 0;
+    // Above the body it is pinned over. It has been sticky since it was
+    // written and only started having anything to be sticky INSIDE once
+    // .table-scroll got a height; with no z-index the rows scrolled over it.
+    position: sticky; bottom: 0; z-index: 1;
   }
 }
 

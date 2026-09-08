@@ -17,6 +17,14 @@
 
     `head` and the default slot are markup: the caller writes its own <th> and
     <tr>, because a column set is the screen's business.
+
+    `tools` is the one thing it has that the grid also has: click-to-sort and a
+    per-column filter row, done in the BROWSER over the rows already on the
+    page. That is the right shape here and the wrong shape in the grid — see
+    the head of `table-tools.js` for the whole argument — and it is opt-in
+    because it only makes sense on a table that arrived complete. A paginated
+    or truncated result set must not offer it: filtering page one of nine and
+    calling the answer a filter is a lie.
 --}}
 @props([
     'procedure' => null,
@@ -24,13 +32,15 @@
     'total' => null,
     'empty' => 'Nothing to show.',
     'dense' => false,
+    'tools' => false,
 ])
 
 {{-- Attributes land on the TABLE, not the wrapper: `data-row-detail` and the
      like describe the grid itself, and row-detail.js looks for them there. --}}
 <div class="table-block">
     <div class="table-scroll">
-        <table {{ $attributes->merge(['class' => 'dt '.($dense ? 'dense' : '')]) }}>
+        <table {{ $attributes->merge(['class' => 'dt '.($dense ? 'dense' : '')]) }}
+               @if ($tools) data-table-tools @endif>
             @isset($head)<thead>{{ $head }}</thead>@endisset
             <tbody>{{ $slot }}</tbody>
         </table>

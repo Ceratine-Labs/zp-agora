@@ -73,6 +73,9 @@
     @endif
 
     <form method="POST" action="{{ route('app.recon.execute', $run) }}" id="execute-{{ $run->Id }}"
+          {{-- Names the table so the confirmation can say out loud that a
+               column filter is holding rows back. Silent when none is. --}}
+          data-confirm-filtered="recon-lines-{{ $run->Id }}"
           data-confirm="{{ $stampMode === 'live' ? 'Reconcile the selected batches in PumpIT?' : 'Record the selected batches?' }}"
           data-confirm-text="{{ $stampMode === 'live'
               ? 'This stamps ReconState and ReconBatchNo on the bank lines and ReconBatchNoPumpIT on the deposits, in the customer\'s live database. Every row is re-checked first, and anything that has moved since the preview is skipped. It can be reversed from this page.'
@@ -128,8 +131,48 @@
         </div>
     @endisset
 
+    @if ($run->Status === 'previewed')
+        @php($ready = $run->lines->where('WouldReconcile', true)->where('CommitState', 'pending')->count())
+
+        {{-- The press, above the rows it acts on. It used to sit in the footer
+             under the table, which on a month of ABSA is four hundred rows
+             further down than the reader's eye ever goes. The count follows
+             the ticks and the column filters — see <x-action-bar>. --}}
+        <x-action-bar :for="'recon-lines-'.$run->Id">
+            <button type="submit" form="execute-{{ $run->Id }}" class="btn-primary"
+                    data-count-verb="{{ $stampMode === 'live' ? 'Reconcile' : 'Record' }}"
+                    data-count-noun="batch" data-count-plural="batches"
+                    @disabled($ready === 0)>
+                {{ $stampMode === 'live' ? 'Reconcile' : 'Record' }}
+                {{ $ready }} {{ Str::plural('batch', $ready) }}
+            </button>
+
+            <x-slot:note>
+                @if ($stampMode === 'live')
+                    Stamps <code>ReconState</code> and <code>ReconBatchNo</code> in PumpIT, and
+                    <code>ReconBatchNoPumpIT</code> on the deposits. It acts on the ticked rows and no
+                    others — not on a second walk of the data, which is what the executable does. Every
+                    row is re-checked first: anything reconciled by something else since the preview, or
+                    whose two sides no longer balance, is skipped and reported. Reversible from this page.
+                @else
+                    <strong>Journal mode.</strong> The decision is recorded here and nothing in PumpIT
+                    changes — the reviewed worklist offered to ZP on 18 August 2026.
+                @endif
+            </x-slot:note>
+        </x-action-bar>
+    @endif
+
+    {{-- `tools` gives the head a sort control and a filter row, applied in the
+         browser over the rows already here. This table cannot be an
+         <x-data-grid> — the tick boxes decide what a commit stamps and the
+         rows expand — but "show me only the bank-only ones" is a question
+         about rows on the page and should not cost a round trip. A filtered
+         row's tick box is disabled, so it leaves the submission and the count
+         above says so. --}}
     <x-table :count="$run->lines->count()"
              :procedure="$run->ProcedureName"
+             :id="'recon-lines-'.$run->Id"
+             tools
              data-row-detail
              empty="The procedure ran and found nothing in this period. That is an answer, not a failure.">
         <x-slot:head>
@@ -233,27 +276,13 @@
         ])
     @endisset
 
+    {{-- What is left down here is what is NOT a press on the rows above: a
+         reversal, which needs a typed reason and must not be one scroll away
+         from the button that made the run, and the two states that are prose
+         rather than a control. --}}
+    @unless ($run->Status === 'previewed')
     <footer class="run-actions">
-        @if ($run->Status === 'previewed')
-            @php($ready = $run->lines->where('WouldReconcile', true)->where('CommitState', 'pending')->count())
-            <button type="submit" form="execute-{{ $run->Id }}" class="btn-primary" @disabled($ready === 0)>
-                {{ $stampMode === 'live' ? 'Reconcile' : 'Record' }}
-                {{ $ready }} {{ Str::plural('batch', $ready) }}
-            </button>
-            <p class="field-help">
-                @if ($stampMode === 'live')
-                    Stamps <code>ReconState</code> and <code>ReconBatchNo</code> in PumpIT, and
-                    <code>ReconBatchNoPumpIT</code> on the deposits. It acts on the ticked rows and no
-                    others — not on a second walk of the data, which is what the executable does. Every
-                    row is re-checked first: anything reconciled by something else since the preview, or
-                    whose two sides no longer balance, is skipped and reported. Reversible from this page.
-                @else
-                    <strong>Journal mode.</strong> The decision is recorded here and nothing in PumpIT
-                    changes — the reviewed worklist offered to ZP on 18 August 2026.
-                @endif
-            </p>
-
-        @elseif ($run->Status === 'committed')
+        @if ($run->Status === 'committed')
             <form method="POST" action="{{ route('app.recon.reverse', $run) }}" class="reverse-form"
                   data-confirm="Reverse run #{{ $run->Id }}?"
                   data-confirm-text="Every bank line and deposit row this run stamped goes back to what it held before. The batch numbers are not reused."
@@ -278,4 +307,5 @@
             </p>
         @endif
     </footer>
+    @endunless
 </x-card>

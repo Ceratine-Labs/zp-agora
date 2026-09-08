@@ -81,6 +81,9 @@
             sub="Coloured where the same reference appears on both sides. Tick both sides, then match."
             flush>
         <form method="POST" action="{{ route('app.recon.match.save', $area['key']) }}" id="manual-match"
+              {{-- Both panes: a filter on either side takes rows out of the
+                   same submission, so the dialog counts them together. --}}
+              data-confirm-filtered="match-bank,match-mops"
               data-confirm="{{ $stampMode === 'live' ? 'Reconcile these rows in PumpIT?' : 'Record this match?' }}"
               data-confirm-text="{{ $stampMode === 'live'
                   ? 'This stamps ReconState and ReconBatchNo on the ticked bank lines and ReconBatchNoPumpIT on the ticked deposits, in the customer\'s live database. Every row is re-read and re-checked first, and exactly as many rows are claimed as you ticked. It can be reversed from the run page it takes you to.'
@@ -105,10 +108,18 @@
                  'note' => 'appear on both sides', 'tone' => ($summary->ColouredKeys ?? 0) > 0 ? 'good' : 'neutral'],
             ]" />
 
-            <x-two-pane-recon :bank="$bank" :mops="$mops" :summary="$summary"
-                              :key-label="$area['key_label']" />
+            {{-- The press, above the two lists it pairs. Both panes are as
+                 tall as the window now that their heads stick, so a button
+                 under them was a button nobody was going to scroll to. --}}
+            <x-action-bar>
+                <button type="submit" class="btn-primary" data-match-submit disabled>
+                    {{ $stampMode === 'live' ? 'Match' : 'Record match' }}
+                </button>
 
-            <footer class="run-actions">
+                {{-- Appears the moment the two sides stop agreeing, which is
+                     also the moment the procedure starts refusing without it.
+                     It belongs beside the button it gates, not under the
+                     lists. --}}
                 <div class="field" data-match-reason hidden>
                     <label for="match-reason">Why are these being matched despite the difference?</label>
                     <input type="text" id="match-reason" name="reason" maxlength="300"
@@ -118,10 +129,7 @@
                        shown afterwards.</p>
                 </div>
 
-                <button type="submit" class="btn-primary" data-match-submit disabled>
-                    {{ $stampMode === 'live' ? 'Match' : 'Record match' }}
-                </button>
-                <p class="field-help">
+                <x-slot:note>
                     @if ($stampMode === 'live')
                         Stamps both sides in PumpIT and allocates a batch number from the customer's own
                         counter. Every row is re-read first: anything reconciled by something else since
@@ -132,8 +140,11 @@
                         <strong>Journal mode.</strong> The match is recorded here and nothing in PumpIT
                         changes.
                     @endif
-                </p>
-            </footer>
+                </x-slot:note>
+            </x-action-bar>
+
+            <x-two-pane-recon :bank="$bank" :mops="$mops" :summary="$summary"
+                              :key-label="$area['key_label']" />
         </form>
     </x-card>
 @endif

@@ -49,6 +49,11 @@ export default async function selects(root = document) {
             // several are picked rather than closing after each one.
             closeAfterSelect: !multiple,
             hidePlaceholder: false,
+            // The grid's set filter lives inside `.table-scroll`, which is a
+            // scroll container on both axes and clips its own children — so a
+            // dropdown drawn in place was cut off at the table's edge. In the
+            // body it is clipped by nothing.
+            dropdownParent: 'body',
         });
     });
 }

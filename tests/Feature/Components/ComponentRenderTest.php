@@ -521,6 +521,53 @@ class ComponentRenderTest extends TestCase
         $this->assertStringContainsString('hidden', $html);
     }
 
+    // ------------------------------------------------- table tools + action bar
+
+    public function test_the_table_only_offers_the_tools_when_it_is_asked_to(): void
+    {
+        // Opt-in on purpose: filtering page one of nine in the browser answers
+        // a different question from the one the reader asked while looking
+        // exactly like the right answer. See feature-rules §B.
+        $plain = $this->render('<x-table :count="1"><tr><td>x</td></tr></x-table>');
+        $this->assertStringNotContainsString('data-table-tools', $plain);
+
+        $tooled = $this->render('<x-table tools :count="1"><tr><td>x</td></tr></x-table>');
+        $this->assertStringContainsString('data-table-tools', $tooled);
+    }
+
+    public function test_the_action_bar_points_at_the_table_it_commits(): void
+    {
+        $html = $this->render(<<<'BLADE'
+            <x-action-bar for="run-lines">
+                <button data-count-verb="Reconcile" data-count-noun="batch"
+                        data-count-plural="batches">Reconcile 3 batches</button>
+                <x-slot:note>What the press does.</x-slot:note>
+            </x-action-bar>
+        BLADE);
+
+        $this->assertStringContainsString('data-action-bar="run-lines"', $html);
+        $this->assertStringContainsString('is-sticky', $html);
+
+        // The count is correct with no JavaScript at all — the server renders
+        // it, and table-tools.js only keeps it correct afterwards.
+        $this->assertStringContainsString('Reconcile 3 batches', $html);
+        $this->assertStringContainsString('action-bar-note', $html);
+
+        // The place the "N rows are hidden by a filter" warning goes. It only
+        // exists on a bar that has a table to count, because it is the only
+        // bar that can know.
+        $this->assertStringContainsString('data-action-bar-scope', $html);
+    }
+
+    public function test_an_action_bar_with_no_table_counts_nothing_and_can_stay_in_the_flow(): void
+    {
+        $html = $this->render('<x-action-bar :sticky="false"><button>Match</button></x-action-bar>');
+
+        $this->assertStringNotContainsString('data-action-bar=', $html);
+        $this->assertStringNotContainsString('data-action-bar-scope', $html);
+        $this->assertStringNotContainsString('is-sticky', $html);
+    }
+
     // ------------------------------------------------------------- the rules
 
     public function test_no_component_declares_a_colour_of_its_own(): void

@@ -9,7 +9,7 @@
 --}}
 
 <x-card title="Runs" sub="Previews that proposed something carrying this value" collapsible flush>
-    <x-table :count="$sets['runs']->count()" empty="No run has ever proposed anything carrying this value.">
+    <x-table tools :count="$sets['runs']->count()" empty="No run has ever proposed anything carrying this value.">
         <x-slot:head>
             <tr><th>Run</th><th>Area</th><th>Site</th><th>Period</th><th>Status</th>
                 <th class="num">Proposals</th><th class="num">Stamped</th><th>Run by</th><th>When</th></tr>
@@ -36,7 +36,7 @@
 </x-card>
 
 <x-card title="Proposals" sub="The lines themselves, and what each was judged to be" collapsible flush>
-    <x-table :count="$sets['proposals']->count()" empty="No proposal carries this value.">
+    <x-table tools :count="$sets['proposals']->count()" empty="No proposal carries this value.">
         <x-slot:head>
             <tr><th>Run</th><th>Reference</th><th>Outcome</th><th class="num">Bank</th>
                 <th class="num">Deposit</th><th class="num">Difference</th><th>State</th><th>Rule</th></tr>
@@ -64,7 +64,7 @@
 </x-card>
 
 <x-card title="Batches" sub="Batch numbers Agora allocated, from the customer's own counter" collapsible flush>
-    <x-table :count="$sets['batches']->count()" empty="No batch was ever allocated for this value.">
+    <x-table tools :count="$sets['batches']->count()" empty="No batch was ever allocated for this value.">
         <x-slot:head>
             <tr><th>Batch</th><th>Run</th><th>Site</th><th>Reference</th>
                 <th class="num">Bank lines</th><th class="num">Bank</th>
@@ -90,7 +90,7 @@
 <x-card title="Rows touched"
         sub="One row per side, with what it held BEFORE Agora wrote to it — the record the executable never kept"
         collapsible flush>
-    <x-table :count="$sets['matches']->count()" empty="Agora has never written to a row carrying this value.">
+    <x-table tools :count="$sets['matches']->count()" empty="Agora has never written to a row carrying this value.">
         <x-slot:head>
             <tr><th>Batch</th><th>Side</th><th>Source</th><th>Key</th><th>Date</th>
                 <th class="num">Amount</th><th>Was</th></tr>
@@ -112,7 +112,7 @@
 </x-card>
 
 <x-card title="Stamps" sub="What Agora asked the customer's estate to become, and whether it was applied" collapsible flush>
-    <x-table :count="$sets['stamps']->count()" empty="Nothing was ever stamped for this value.">
+    <x-table tools :count="$sets['stamps']->count()" empty="Nothing was ever stamped for this value.">
         <x-slot:head>
             <tr><th>Batch</th><th>Target</th><th>Key</th><th>Columns</th><th>State</th>
                 <th class="num">Rows</th><th>When</th></tr>
@@ -135,7 +135,7 @@
 <x-card title="Bank statement"
         sub="The legacy rows as they stand right now — the check on everything above"
         collapsible flush>
-    <x-table :count="$sets['bank']->count()" empty="Nothing on the statement carries this value inside the window.">
+    <x-table tools :count="$sets['bank']->count()" empty="Nothing on the statement carries this value inside the window.">
         <x-slot:head>
             <tr><th>Line</th><th>Site</th><th>Date</th><th>Narrative</th>
                 <th class="num">Amount</th><th>Channel</th><th>Recon state</th></tr>
@@ -164,7 +164,7 @@
 </x-card>
 
 <x-card title="Deposits" sub="All five BRN_DailyBanking families, asked the same question" collapsible flush>
-    <x-table :count="$sets['deposits']->count()" empty="No deposit carries this value inside the window.">
+    <x-table tools :count="$sets['deposits']->count()" empty="No deposit carries this value inside the window.">
         <x-slot:head>
             <tr><th>Area</th><th>Site</th><th>Date</th><th>Reference</th>
                 <th>Second reference</th><th class="num">Amount</th><th>Reconciled in PumpIT</th></tr>

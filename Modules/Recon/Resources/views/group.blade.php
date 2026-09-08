@@ -83,6 +83,7 @@
         @endif
 
         <form method="POST" action="{{ route('app.recon.group.execute', $group->GroupRef) }}" id="group-post"
+              data-confirm-filtered="group-sites"
               data-confirm="{{ $stampMode === 'live' ? 'Reconcile the ticked sites in PumpIT?' : 'Record the ticked sites?' }}"
               data-confirm-text="{{ $stampMode === 'live'
                   ? 'Each ticked site is committed on its own, in its own transaction, through the same procedure a single run uses. Every row is re-checked first and anything that has moved since the preview is skipped. A site that refuses is reported and the others still go. Each one can be reversed from its own run page.'
@@ -91,7 +92,36 @@
               @if ($stampMode === 'live') data-confirm-danger @endif>
             @csrf
 
+            @php($postable = $runs->filter(fn ($r) => $r->Status === 'previewed' && $r->MatchedRows > 0))
+
+            {{-- The press, above the sites it posts, and pinned there. Twenty-six
+                 rows is not four hundred, but the button was still under the
+                 table and under a paragraph, and this is one decision for the
+                 whole application rather than a judgement per screen. --}}
+            <x-action-bar for="group-sites">
+                <button type="submit" form="group-post" class="btn-primary"
+                        data-count-verb="{{ $stampMode === 'live' ? 'Post' : 'Record' }}"
+                        data-count-noun="site" data-count-plural="sites"
+                        @disabled($postable->isEmpty())>
+                    {{ $stampMode === 'live' ? 'Post' : 'Record' }}
+                    {{ $postable->count() }} {{ Str::plural('site', $postable->count()) }}
+                </button>
+
+                <x-slot:note>
+                    It posts the sites you ticked and no others — there is no "post everything" here on
+                    purpose. Each site commits in its own transaction, so one refusal does not take the
+                    others with it, and each one is reversed from its own run page.
+                    @if ($group->FailedCount > 0)
+                        <br><strong>{{ $group->FailedCount }} {{ Str::plural('site', $group->FailedCount) }}
+                        could not run at all.</strong> That is a configuration answer, not an empty one —
+                        the site has no usable <code>BRN_AutoReconCriteria</code> row, and no amount of
+                        re-running will change it.
+                    @endif
+                </x-slot:note>
+            </x-action-bar>
+
             <x-table :count="$sites->count()" :procedure="'agora.'.$area['procedure']"
+                     id="group-sites" tools
                      empty="No trading site is in scope for you.">
                 <x-slot:head>
                     <tr>
@@ -115,24 +145,6 @@
                 @endforeach
             </x-table>
 
-            <footer class="run-actions">
-                @php($postable = $runs->filter(fn ($r) => $r->Status === 'previewed' && $r->MatchedRows > 0))
-                <button type="submit" form="group-post" class="btn-primary" @disabled($postable->isEmpty())>
-                    {{ $stampMode === 'live' ? 'Post' : 'Record' }}
-                    {{ $postable->count() }} {{ Str::plural('site', $postable->count()) }}
-                </button>
-                <p class="field-help">
-                    It posts the sites you ticked and no others — there is no "post everything" here on
-                    purpose. Each site commits in its own transaction, so one refusal does not take the
-                    others with it, and each one is reversed from its own run page.
-                    @if ($group->FailedCount > 0)
-                        <br><strong>{{ $group->FailedCount }} {{ Str::plural('site', $group->FailedCount) }}
-                        could not run at all.</strong> That is a configuration answer, not an empty one —
-                        the site has no usable <code>BRN_AutoReconCriteria</code> row, and no amount of
-                        re-running will change it.
-                    @endif
-                </p>
-            </footer>
         </form>
     </x-card>
 </x-app-shell>

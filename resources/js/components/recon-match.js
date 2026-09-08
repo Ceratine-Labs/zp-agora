@@ -43,7 +43,11 @@ export default function reconMatch() {
     pane.querySelectorAll('[data-pane-all]').forEach((box) => {
         box.addEventListener('change', () => {
             const side = box.dataset.paneAll;
-            pane.querySelectorAll(`[data-pane-pick="${side}"]`).forEach((pick) => {
+            // Only the rows a column filter has left on screen: their boxes
+            // are the ones still in the submission (table-tools.js disables
+            // the rest), so ticking a disabled one would promise a row the
+            // procedure is never sent.
+            pane.querySelectorAll(`[data-pane-pick="${side}"]:not(:disabled)`).forEach((pick) => {
                 pick.checked = box.checked;
             });
             recount();
@@ -62,7 +66,7 @@ export default function reconMatch() {
         event.preventDefault();
 
         pane.querySelectorAll(`[data-pair-key="${CSS.escape(key)}"]`).forEach((match) => {
-            const pick = match.querySelector('[data-pane-pick]');
+            const pick = match.querySelector('[data-pane-pick]:not(:disabled)');
             if (pick) pick.checked = true;
         });
 
@@ -70,6 +74,10 @@ export default function reconMatch() {
     });
 
     if (form) form.addEventListener('reset', () => window.setTimeout(recount, 0));
+
+    // A filter takes rows out of the submission, so the two totals and the
+    // difference are about different rows than they were a moment ago.
+    pane.addEventListener('table-tools:change', recount);
 
     recount();
 }
@@ -106,7 +114,7 @@ function report(pane, strip, reason, submit) {
 }
 
 function sum(pane, side) {
-    const picked = pane.querySelectorAll(`[data-pane-pick="${side}"]:checked`);
+    const picked = pane.querySelectorAll(`[data-pane-pick="${side}"]:checked:not(:disabled)`);
     let total = 0;
 
     picked.forEach((pick) => {

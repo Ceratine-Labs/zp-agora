@@ -308,8 +308,53 @@
                 </x-table>
             </div>
             <div class="gal-variant">
+                <p class="eyebrow">
+                    <code>tools</code> — click a heading to sort, and filter each column in the browser.
+                    The ▾ opens the value list; a filtered column is marked on the head, not only in the box
+                </p>
+                <x-table tools id="gal-table-tools"
+                         :procedure="'agora.usp_Cash_GridDailyBanking'" :count="3">
+                    <x-slot:head>
+                        <tr>
+                            <th class="pick"><input type="checkbox" data-check-all aria-label="Select every row"></th>
+                            <th>Site</th><th>Reference</th><th class="num">Declared</th><th class="num">Banked</th>
+                        </tr>
+                    </x-slot:head>
+                    @foreach ($fixtures['tableRows'] as $row)
+                        <tr>
+                            <td class="pick"><input type="checkbox" data-check value="{{ $row['ref'] }}"
+                                                    aria-label="Select {{ $row['ref'] }}" checked></td>
+                            <td>{{ $row['site'] }}</td>
+                            <td class="mono">{{ $row['ref'] }}</td>
+                            <td class="num">{{ \App\Support\Format::r($row['declared']) }}</td>
+                            <td class="num">{{ \App\Support\Format::r($row['banked']) }}</td>
+                        </tr>
+                    @endforeach
+                </x-table>
+            </div>
+            <div class="gal-variant">
                 <p class="eyebrow">Empty — a designed answer, not a gap</p>
                 <x-table :count="0" empty="The procedure ran and found nothing in this period. That is an answer, not a failure." />
+            </div>
+        </x-core::gallery-entry>
+
+        <x-core::gallery-entry name="x-action-bar">
+            <div class="gal-variant">
+                <p class="eyebrow">
+                    Pointed at the table above. Untick a row, or filter a column on it, and the count
+                    follows — it counts the boxes still in the submission, not the boxes on the page
+                </p>
+                <x-action-bar for="gal-table-tools" :sticky="false">
+                    <button type="button" class="btn-primary"
+                            data-count-verb="Reconcile" data-count-noun="batch" data-count-plural="batches">
+                        Reconcile 3 batches
+                    </button>
+                    <x-slot:note>
+                        The sentence that used to live under the table, beside the press it explains.
+                        <code>sticky</code> is false here only because a gallery entry that pinned itself
+                        to the window would follow you down the page past forty other components.
+                    </x-slot:note>
+                </x-action-bar>
             </div>
         </x-core::gallery-entry>
 
