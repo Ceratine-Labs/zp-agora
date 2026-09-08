@@ -115,4 +115,41 @@ trait AreaWorkbench
             ->orderBy('Name')
             ->get();
     }
+
+    /**
+     * Every site this user may see, trading or not.
+     *
+     * CONFIGURATION IS NOT RECONCILIATION. A run only makes sense for a
+     * trading site — an administrative entity keeps no day and has no bank
+     * statement — but an extraction RULE exists for whatever branch the
+     * customer configured one against, and five of them on the live estate are
+     * administrative: AJLG Properties, Zululand Petroleum itself, Arcum
+     * Venandi, Jakarie Vulstasie and Thokozile Trust. Their rules can never do
+     * anything, which is a finding worth showing rather than a reason to hide
+     * the rows.
+     *
+     * So the configuration screens read this and the reconciliation screens
+     * read branches() above. Using the trading list for both is what made a
+     * rule page say "Site 1" instead of "AJLG Properties".
+     *
+     * @return Collection<int, Branch>
+     */
+    protected function allBranches(): Collection
+    {
+        return Branch::query()
+            ->where('IsActive', true)
+            ->orderBy('Name')
+            ->get();
+    }
+
+    /**
+     * One site by its id, whether or not it trades.
+     *
+     * The caller has already established that this person may see it; this is
+     * only about putting a name to the number.
+     */
+    protected function branch(int $branchId): ?Branch
+    {
+        return Branch::query()->where('BranchId', $branchId)->first();
+    }
 }

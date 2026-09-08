@@ -235,6 +235,9 @@ class ReconController extends Controller
                 $request->user()?->Id,
             ),
             'checked' => ReconCriteriaGrid::wantsNarrativeCheck(),
+            // Overrides the frame's trading-only list: configuration exists
+            // for whatever branch the customer configured it against.
+            'branches' => $this->allBranches(),
         ]);
     }
 
@@ -250,18 +253,42 @@ class ReconController extends Controller
      * SSMS without telling us, and a form that showed only the effective value
      * would make the divergence invisible.
      */
-    public function configEdit(string $area, int $branch, int $order, BranchContext $context): View
+    public function configEdit(string $area, int $branch, int $order, Request $request, BranchContext $context): View
     {
         abort_unless($context->maySee($branch), 403, 'You may not look at that branch.');
 
-        return view('recon::partials.criteria-edit', [
+        $data = [
             'area' => $this->service->area($area),
             'branchId' => $branch,
-            'branch' => $this->branches()->firstWhere('BranchId', $branch),
+            // By id, not out of the trading list — five configured sites are
+            // administrative entities, and looking one up in a list that
+            // excludes them is why this page said "Site 1" instead of
+            // "AJLG Properties" when Ryan opened it on live.
+            'branch' => $this->branch($branch),
             'order' => $order,
-            'mayEdit' => (bool) request()->user()?->can('recon.criteria.edit'),
+            'mayEdit' => (bool) $request->user()?->can('recon.criteria.edit'),
             ...$this->criteria->rule($branch, $area, $order),
-        ]);
+        ];
+
+        /*
+         * ONE RULE, RENDERED TWO WAYS.
+         *
+         * The dialog fetches the bare fragment — modal.js sends
+         * X-Requested-With, which is what ajax() reads. Anything else is a
+         * person: they followed the site's own link off the grid, pasted the
+         * address, or have no JavaScript, and they get a page with the shell
+         * around it.
+         *
+         * It answered both with the fragment until 8 September 2026, so
+         * clicking a site name on the configuration tab landed on unstyled
+         * text with no navigation and no way back. Ryan found it on live. The
+         * grid's docblock claimed "the screen works with no JavaScript at all
+         * (the fragment renders on its own)" — true of the markup, false of
+         * the page, which is the most expensive kind of comment to be wrong.
+         */
+        return $request->ajax()
+            ? view('recon::partials.criteria-edit', $data)
+            : view('recon::criteria-rule', $data);
     }
 
     /**
@@ -312,6 +339,7 @@ class ReconController extends Controller
         $to = $request->integer('to_branch_id');
 
         abort_unless($context->maySee($from) && $context->maySee($to), 403, 'You may not touch that branch.');
+        abort_if($from === $to, 422, 'A site cannot be copied onto itself.');
 
         try {
             $result = $this->criteria->copy(

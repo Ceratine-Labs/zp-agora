@@ -155,9 +155,13 @@ class ReconCriteriaGrid extends GridDefinition
     /**
      * The row's action opens the editor in a dialog.
      *
-     * `rowUrl()` above still returns a real address, and the site name is still
-     * an anchor to it — so the rule is a place you can send someone and the
-     * screen works with no JavaScript at all (the fragment renders on its own).
+     * `rowUrl()` above returns a real address and the site name is an anchor to
+     * it, so a rule is a place you can send someone and the screen works with
+     * no JavaScript at all. That address renders a PAGE — the controller gives
+     * the bare fragment only to an XHR, which is what the dialog makes. Until
+     * 8 September 2026 it gave the fragment to everyone, so following the link
+     * landed on unstyled text with no way back.
+     *
      * The action is what makes it a dialog when scripting is there.
      *
      * @return array<int, array{label: string, url: string, primary?: bool, attributes?: array<string, string>}>

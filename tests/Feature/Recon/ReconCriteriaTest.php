@@ -5,6 +5,7 @@ namespace Tests\Feature\Recon;
 use App\Exceptions\AgoraProcException;
 use App\Support\ProcedureService;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Models\Branch;
 use Modules\Core\Models\User;
 use Modules\Recon\Models\ReconCriteria;
 use Tests\TestCase;
@@ -298,5 +299,72 @@ class ReconCriteriaTest extends TestCase
             'Reason' => self::REASON,
             'UserId' => 1,
         ], $values));
+    }
+
+    /**
+     * The rule address is a PAGE for a person and a FRAGMENT for the dialog.
+     *
+     * It answered both with the fragment until Ryan opened one on live and got
+     * unstyled text with no navigation. The grid links a site name straight at
+     * this address, so it has to stand on its own.
+     */
+    public function test_the_rule_address_is_a_page_for_a_person_and_a_fragment_for_the_dialog(): void
+    {
+        $legacy = collect($this->rowsOf('vw_LegacyReconCriteria'))->first();
+
+        if ($legacy === null) {
+            $this->markTestSkipped('The stub holds no criteria row.');
+        }
+
+        $url = "/app/recon/auto/{$legacy->BankReconArea}/config/{$legacy->BranchId}/{$legacy->ProcessOrder}";
+
+        $page = $this->actingAs($this->admin())->get($url)->assertOk();
+
+        // The shell, and a way back to the list it was reached from.
+        $page->assertSee('<html', false)
+            ->assertSee('class="appbar"', false)
+            ->assertSee(route('app.recon.config', $legacy->BankReconArea), false)
+            ->assertSee("The customer's row");
+
+        // The dialog asks the same address and must NOT get a whole document
+        // back — modal.js drops it straight into the dialog body.
+        $fragment = $this->actingAs($this->admin())
+            ->get($url, ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk();
+
+        $fragment->assertSee("The customer's row")
+            ->assertDontSee('<html', false)
+            ->assertDontSee('class="appbar"', false);
+    }
+
+    /**
+     * A configured site that does not trade still gets its name.
+     *
+     * Five branches on the live estate have extraction rules and keep no
+     * trading day — AJLG Properties, Zululand Petroleum itself, and three
+     * trusts and property companies. The rule page used to look them up in the
+     * trading-sites list, find nothing, and render "Site 1".
+     */
+    public function test_a_configured_site_that_does_not_trade_is_still_named(): void
+    {
+        $branch = Branch::query()->acrossBranches()
+            ->where('IsActive', true)->where('IsTrading', false)->first();
+
+        if ($branch === null) {
+            $this->markTestSkipped('This instance has no non-trading branch to check.');
+        }
+
+        $rule = collect($this->rowsOf('vw_LegacyReconCriteria'))
+            ->firstWhere('BranchId', $branch->BranchId);
+
+        if ($rule === null) {
+            $this->markTestSkipped('No non-trading branch here carries a criteria row.');
+        }
+
+        $this->actingAs($this->admin())
+            ->get("/app/recon/auto/{$rule->BankReconArea}/config/{$rule->BranchId}/{$rule->ProcessOrder}")
+            ->assertOk()
+            ->assertSee($branch->Name)
+            ->assertDontSee('Site '.$branch->BranchId);
     }
 }
