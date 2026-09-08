@@ -1,0 +1,11 @@
+{
+    "name": "StockRecon",
+    "alias": "stockrecon",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 14,
+    "requires": ["Core"],
+    "providers": [
+        "Modules\\StockRecon\\Providers\\StockReconServiceProvider"
+    ]
+}

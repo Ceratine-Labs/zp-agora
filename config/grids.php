@@ -8,6 +8,9 @@ use Modules\Recon\Grids\ReconCriteriaGrid;
 use Modules\Recon\Grids\ReconMopsSideGrid;
 use Modules\Recon\Grids\ReconRunGrid;
 use Modules\Recon\Grids\ReconRunLineGrid;
+use Modules\StockRecon\Grids\StockReconExceptionGrid;
+use Modules\StockRecon\Grids\StockReconRunGrid;
+use Modules\StockRecon\Grids\StockReconRunLineGrid;
 
 /*
 |--------------------------------------------------------------------------
@@ -97,6 +100,22 @@ return [
         // file's header describes.
         'app.recon.run:bank' => ReconBankSideGrid::class,
         'app.recon.run:mops' => ReconMopsSideGrid::class,
+
+        // The balancing runs made at a site — the centre's Runs tab and its
+        // hub. Scoped to the person who made them unless they ask for
+        // everyone's, and the counting area comes off the request.
+        'app.stockrecon.runs' => StockReconRunGrid::class,
+
+        // What balancing refused to hide. A real grid: thousands of rows,
+        // header filters, an export and a footer total somebody takes to a
+        // branch meeting.
+        'app.stockrecon.exceptions' => StockReconExceptionGrid::class,
+
+        // The run screen keeps its own table — tick boxes decide what a commit
+        // writes and a row expands into its chain — and registers here only so
+        // the standard extract endpoint serves it. In journal mode that
+        // extract IS the deliverable: the worklist an admin applies by hand.
+        'app.stockrecon.run' => StockReconRunLineGrid::class,
 
         'app.dev.grids:dayclose' => DayCloseGrid::class,
         'app.dev.grids:branches' => BranchGrid::class,
