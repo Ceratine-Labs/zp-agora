@@ -157,7 +157,15 @@ BEGIN
     DECLARE @Mops TABLE (
         RunLineId bigint, SourceRef nvarchar(50), SourceDate datetime,
         Amount money, Detail nvarchar(200),
-        SourceId bigint, SourceKey nvarchar(200)
+        SourceId bigint, SourceKey nvarchar(200),
+        /* Carried only so `INSERT INTO @DrillM EXEC` keeps lining up now that
+           usp_Recon_DrillMops returns it for the screen. The commit calls that
+           procedure with @IncludeReconciled = 0, so every row here is
+           outstanding by construction and this column is always 0. Nothing
+           below reads it, deliberately: the deposit side has no @MopsClaimed
+           counterpart to @BankClaimed yet, and giving it one is a change to
+           the writer, not a column rename. */
+        ReconBatchNoPumpIT int
     );
 
     DECLARE @Drill TABLE (
@@ -168,7 +176,8 @@ BEGIN
     );
     DECLARE @DrillM TABLE (
         SourceRef nvarchar(50), SourceDate datetime, Amount money, Detail nvarchar(200),
-        SourceId bigint, SourceKey nvarchar(200)
+        SourceId bigint, SourceKey nvarchar(200),
+        ReconBatchNoPumpIT int
     );
 
     DECLARE @Id bigint, @K nvarchar(50), @K2 nvarchar(50), @MK nvarchar(50), @BL bigint,
@@ -200,7 +209,13 @@ BEGIN
             @KeyRef = @K, @KeyRef2 = @K2, @BankLineId = @BL, @WindowFrom = @WF, @WindowTo = @WT,
             @RuleOrder = @RuleOrder, @BatchKey = @BatchKey, @MatchMode = @MatchMode,
             @MopsConvention = @MopsConvention, @BankStartOverride = @BankStart, @BankLenOverride = @BankLen,
-            @MopsKeyRef = @MK;
+            @MopsKeyRef = @MK,
+            /* Explicit, not defaulted. The deposit side stays NARROW here: a
+               claimed deposit must not reach the arithmetic or the stamp, and
+               unlike the bank side there is no @MopsClaimed to move it into.
+               The screen passes 1; the writer passes 0 and behaves exactly as
+               it did before the parameter existed. */
+            @IncludeReconciled = 0;
 
         INSERT INTO @Bank SELECT @Id, * FROM @Drill;
         INSERT INTO @Mops SELECT @Id, * FROM @DrillM;
