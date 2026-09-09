@@ -3,7 +3,7 @@
  *
  * Read by:  Stock recon centre -> a run -> click a row (the detail panel).
  * Reads:    agora.StockReconRunLine, agora.vw_StockMaster, agora.vw_StockArea,
- *           agora.StockReconAmendment
+ *           agora.StockReconAmendment, agora.vw_StockReconShiftEmployee
  *
  * WHO WAS ON THE SHIFT travels with each row. dbo.STK_StockReconEmployees is
  * keyed on the same grain a recon line is, so the panel can say who was signed
@@ -62,11 +62,20 @@ BEGIN
         /* How many DIFFERENT people appear anywhere on this chain. One is a
            chain a single person is answerable for; six is a chain where a
            persistent short is about the item or the process, not a person. */
-        (SELECT COUNT(DISTINCT x.EmployeeCodes)
+        /* Resolved the same way the rows below are, or a run made before
+           v1__14a reports "one person across the whole chain" for a chain
+           worked by six of them — a stronger claim than the blank it used to
+           show, and a wrong one. */
+        (SELECT COUNT(DISTINCT ISNULL(x.EmployeeCodes, xse.EmployeeCodes))
            FROM agora.StockReconRunLine x
+           LEFT JOIN agora.vw_StockReconShiftEmployee xse
+                  ON xse.BranchId        = x.BranchId
+                 AND xse.TransactionDate = x.TransactionDate
+                 AND xse.ShiftNo         = x.ShiftNo
+                 AND xse.AreaNo          = x.AreaNo
           WHERE x.BranchId = rl.BranchId AND x.RunId = rl.RunId
             AND x.AreaNo = rl.AreaNo AND x.StockItemNo = rl.StockItemNo
-            AND x.EmployeeCodes IS NOT NULL)                         AS DistinctEmployeeSets,
+            AND ISNULL(x.EmployeeCodes, xse.EmployeeCodes) IS NOT NULL) AS DistinctEmployeeSets,
         MAX(rl.ActiveLen)                                   AS ActiveShifts,
         COUNT(*)                                            AS ChainShifts,
         SUM(CONVERT(int, rl.IsDormant))                     AS DormantShifts,
@@ -108,9 +117,17 @@ BEGIN
         rl.QtyOpenNew, rl.QtyCloseNew, rl.AmendClose, rl.QtyVarNew,
         rl.ExceptionCode,
         rl.Outcome,
-        rl.EmployeeNames,
-        rl.EmployeeCodes,
-        rl.EmployeeCount,
+        /* THE BUG RYAN SAW, 9 September 2026: the header above resolves the
+           item by joining the master, and these rows resolved nothing — so a
+           run made before v1__14a named the product at the top and showed an
+           em dash for ON SHIFT on all fourteen shifts under it. Stored first,
+           the estate second, exactly as everywhere else. */
+        CASE WHEN rl.EmployeeCodes IS NOT NULL THEN rl.EmployeeNames
+             ELSE se.EmployeeNames END                                  AS EmployeeNames,
+        CASE WHEN rl.EmployeeCodes IS NOT NULL THEN rl.EmployeeCodes
+             ELSE se.EmployeeCodes END                                  AS EmployeeCodes,
+        CASE WHEN rl.EmployeeCodes IS NOT NULL THEN rl.EmployeeCount
+             ELSE ISNULL(se.EmployeeCount, 0) END                       AS EmployeeCount,
         rl.WouldAmend,
         rl.Selected,
         rl.CommitState,
@@ -122,6 +139,11 @@ BEGIN
     FROM agora.StockReconRunLine rl
     LEFT JOIN agora.StockReconAmendment am
            ON am.BranchId = rl.BranchId AND am.RunId = rl.RunId AND am.RunLineId = rl.Id
+    LEFT JOIN agora.vw_StockReconShiftEmployee se
+           ON se.BranchId        = rl.BranchId
+          AND se.TransactionDate = rl.TransactionDate
+          AND se.ShiftNo         = rl.ShiftNo
+          AND se.AreaNo          = rl.AreaNo
     WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
       AND rl.AreaNo = @AreaNo AND rl.StockItemNo = @StockItemNo
     ORDER BY rl.[LineNo];

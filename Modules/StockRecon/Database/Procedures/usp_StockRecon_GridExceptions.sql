@@ -2,7 +2,8 @@
  * agora.usp_StockRecon_GridExceptions — what balancing must refuse to hide.
  *
  * Read by:  Stock recon centre -> a run -> Exceptions.
- * Reads:    agora.StockReconRunLine, agora.vw_StockArea, agora.vw_StockMaster
+ * Reads:    agora.StockReconRunLine, agora.vw_StockArea, agora.vw_StockMaster,
+ *           agora.vw_StockReconShiftEmployee
  * Writes:   nothing.
  *
  * THIS IS THE HALF THAT IS WORTH MORE THAN THE BALANCING. Balancing well makes
@@ -105,9 +106,19 @@ BEGIN
             ISNULL(rl.StockLocation, m.StockLocation) AS StockLocation,
             /* Who was on. The point of it is D1 — a persistent short is the
                one class that can carry a charge, and until now it could only
-               name a shift number. */
-            rl.EmployeeNames,
-            rl.EmployeeCount,
+               name a shift number.
+
+               RESOLVED, not stored-only. This reader fell back to the join for
+               the item and the area and NOT for the employee, so the one column
+               the class exists for was the one column that stayed blank on a
+               run made before v1__14a. EmployeeCodes is the test, not
+               EmployeeCount: the count is NOT NULL DEFAULT 0 and so cannot tell
+               a run that recorded nothing from a shift nobody was signed on
+               to, which must stay 0. */
+            CASE WHEN rl.EmployeeCodes IS NOT NULL THEN rl.EmployeeNames
+                 ELSE se.EmployeeNames END                                AS EmployeeNames,
+            CASE WHEN rl.EmployeeCodes IS NOT NULL THEN rl.EmployeeCount
+                 ELSE ISNULL(se.EmployeeCount, 0) END                     AS EmployeeCount,
             rl.TransactionDate,
             rl.ShiftNo,
             rl.ExceptionCode,
@@ -132,6 +143,11 @@ BEGIN
         FROM agora.StockReconRunLine rl
         LEFT JOIN agora.vw_StockArea   a ON a.BranchId = rl.BranchId AND a.AreaNo = rl.AreaNo
         LEFT JOIN agora.vw_StockMaster m ON m.BranchId = rl.BranchId AND m.StockItemNo = rl.StockItemNo
+        LEFT JOIN agora.vw_StockReconShiftEmployee se
+               ON se.BranchId        = rl.BranchId
+              AND se.TransactionDate = rl.TransactionDate
+              AND se.ShiftNo         = rl.ShiftNo
+              AND se.AreaNo          = rl.AreaNo
         WHERE rl.ExceptionCode IS NOT NULL
           AND (@RunId IS NULL OR rl.RunId = @RunId)
           AND (@AllBranches = 1 OR rl.BranchId IN (SELECT BranchId FROM @Branch))

@@ -3,7 +3,8 @@
  *
  * Read by:  Stock recon centre -> Balance (the preview press), and nothing else.
  * Reads:    agora.vw_StockReconLine, agora.vw_StockArea, agora.vw_StockMaster,
- *           agora.vw_StockReconEmployee, agora.vw_Employee  (all over PumpIT, read-only)
+ *           agora.vw_StockReconShiftEmployee  (who was on the shift — the ONLY
+ *           definition of that in Agora; readers use it too, see v1__14b)
  * Writes:   agora.StockReconRunLine, agora.StockReconRun — Agora's own ledger.
  *           NOTHING in the customer's estate. The commit is a separate
  *           procedure and even that only writes to PumpIT in 'live' stamp mode.
@@ -383,47 +384,28 @@ BEGIN
     IF OBJECT_ID('tempdb..#emp') IS NOT NULL DROP TABLE #emp;
 
     /*
-     * The display name is computed in a derived table and only then
-     * aggregated, and that is a requirement rather than a style.
+     * ONE DEFINITION, read here and by every reader.
      *
-     * SQL Server refuses "multiple ordered aggregate functions in the same
-     * scope with mutually incompatible orderings" — and it counts two
-     * WITHIN GROUP clauses as incompatible even when the ORDER BY expressions
-     * are character-for-character identical, as long as they are expressions
-     * rather than columns. Resolving the name once below turns both orderings
-     * into the same plain column and the restriction goes away.
+     * The aggregate used to be written out inline here, and the readers were
+     * left to fall back on their own — which is exactly how the proposals
+     * screen came to show a shift with nobody on it while the exceptions grid
+     * showed a name. agora.vw_StockReconShiftEmployee is now the only place
+     * that says who was on a shift; see v1__14b for what it costs to have two.
      *
-     * Ordering both by the name is also what makes the pair readable: the nth
-     * code is the nth name, which is the only reason to carry both on a shift
-     * two people worked.
+     * The predicate is on the view's GROUPING columns, so it is pushed into
+     * the aggregate rather than applied after it.
      */
-    SELECT
-        d.TransactionDate,
-        d.ShiftNo,
-        d.AreaNo,
-        COUNT(*)                                                          AS EmployeeCount,
-        /* Capped at the columns. Three people never approach 400 characters,
-           and a data fault that put thirty on one shift must not fail the
-           whole preview. */
-        LEFT(STRING_AGG(CONVERT(nvarchar(max), d.EmployeeCode), ', ')
-             WITHIN GROUP (ORDER BY d.DisplayName), 200)                  AS EmployeeCodes,
-        LEFT(STRING_AGG(CONVERT(nvarchar(max), d.DisplayName), ', ')
-             WITHIN GROUP (ORDER BY d.DisplayName), 400)                  AS EmployeeNames
+    SELECT se.TransactionDate,
+           se.ShiftNo,
+           se.AreaNo,
+           se.EmployeeCount,
+           se.EmployeeCodes,
+           se.EmployeeNames
     INTO #emp
-    FROM (
-        SELECT se.TransactionDate, se.ShiftNo, se.AreaNo, se.EmployeeCode,
-               /* An unresolved code shows as the code. Every one of branch
-                  18's 45 resolved, but a code with no master row is a finding
-                  and must not read as a blank. */
-               ISNULL(NULLIF(LTRIM(RTRIM(e.EmployeeName)), ''), se.EmployeeCode) AS DisplayName
-        FROM agora.vw_StockReconEmployee se
-        LEFT JOIN agora.vw_Employee e
-               ON e.BranchId = se.BranchId AND e.EmployeeCode = se.EmployeeCode
-        WHERE se.BranchId = @BranchId
-          AND se.TransactionDate >= @FromDate
-          AND se.TransactionDate <  DATEADD(day, 1, @ToDate)
-    ) d
-    GROUP BY d.TransactionDate, d.ShiftNo, d.AreaNo;
+    FROM agora.vw_StockReconShiftEmployee se
+    WHERE se.BranchId = @BranchId
+      AND se.TransactionDate >= @FromDate
+      AND se.TransactionDate <  DATEADD(day, 1, @ToDate);
 
     /* ------------------------------------------------------------- stage 8
        Record it. One INSERT, ordered so the line numbers read as a chain.

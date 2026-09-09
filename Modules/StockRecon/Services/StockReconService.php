@@ -264,7 +264,23 @@ class StockReconService
      */
     public function select(StockReconRun $run, array $lineIds): int
     {
-        $lines = fn () => StockReconRunLine::query()
+        /*
+         * THE TABLE, NAMED, not the model.
+         *
+         * StockReconRunLine reads agora.vw_StockReconRunLine so that a run made
+         * before v1__14a still shows an item name and the shift's employee —
+         * see the note on that model. The view joins the stock master, the area
+         * master and the shift-employee aggregate, and SQL Server will not
+         * update through a joined view. This is the only Eloquent write to a
+         * run line in the module; everything else goes through a procedure.
+         *
+         * BranchId is passed explicitly, so nothing is lost by stepping outside
+         * BranchScope here — the scope would have applied the same predicate.
+         */
+        $table = config('agora.schema').'.StockReconRunLine';
+
+        $lines = fn () => DB::connection((new StockReconRunLine)->getConnectionName())
+            ->table($table)
             ->where('BranchId', $run->BranchId)
             ->where('RunId', $run->Id);
 

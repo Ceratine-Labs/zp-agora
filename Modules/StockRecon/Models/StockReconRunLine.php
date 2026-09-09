@@ -55,11 +55,31 @@ use Illuminate\Support\Carbon;
  * @property string|null $EmployeeCodes
  * @property string|null $EmployeeNames
  * @property int $EmployeeCount
+ * @property string|null $UOMCode
  * @property-read StockReconRun $run
  */
 class StockReconRunLine extends BaseModel
 {
-    protected $table = 'StockReconRunLine';
+    /**
+     * READS COME FROM THE VIEW, and that is the fix for what Ryan saw on
+     * 9 September 2026: a proposals row reading `10` over `area 1` while the
+     * exceptions grid, three clicks away, named the same product.
+     *
+     * v1__14a stores the labels on the line at preview time, which is right —
+     * a run is a record of what was true when it was made. What was wrong was
+     * leaving every reader to fall back on its own: the procedures did it and
+     * this model did not, so a run made before 14a had a label everywhere
+     * except here. agora.vw_StockReconRunLine (v1__14b) is the table with
+     * `ISNULL(stored, estate)` over the six label columns and nothing else —
+     * no filtering, no aggregation, same grain, same ids.
+     *
+     * WRITES STILL GO TO THE TABLE. The view joins, so SQL Server cannot
+     * update through it. There is exactly one Eloquent writer —
+     * StockReconService::select(), the operator's tick boxes — and it names
+     * agora.StockReconRunLine directly and says so. Everything else that
+     * writes a line is a procedure.
+     */
+    protected $table = 'vw_StockReconRunLine';
 
     /**
      * Integers come back from sqlsrv as strings; quantities deliberately do not.
@@ -158,16 +178,17 @@ class StockReconRunLine extends BaseModel
     /**
      * What to call this item on screen.
      *
-     * The label the RUN recorded, then the bare number. A run made before
-     * v1__14a stored none, and showing an empty cell on a screen that used to
-     * show something is worse than showing the id it always had.
+     * The view has already tried the stored label and then the stock master,
+     * so this is the last resort only: an item the master has no row for at
+     * all. Showing the number then is right — showing a blank cell would hide
+     * that the item is missing from the master, which is itself a finding.
      */
     public function itemLabel(): string
     {
         return $this->ItemDescription ?: $this->StockItemNo;
     }
 
-    /** The counting area, named where the run recorded one. */
+    /** The counting area — stored, then the area master, then the bare number. */
     public function areaLabel(): string
     {
         return $this->AreaDescription ?: 'area '.$this->AreaNo;

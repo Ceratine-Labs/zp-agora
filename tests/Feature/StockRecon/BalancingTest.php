@@ -501,6 +501,125 @@ class BalancingTest extends TestCase
             'Both aggregates order by the display name, so the pair lines up by index.');
     }
 
+    /**
+     * THE BUG RYAN SAW ON THE LIVE SCREEN, 9 September 2026.
+     *
+     * v1__14a stores the labels on the line at preview time, and every run
+     * made before it has NULL in all six columns. That was expected. What was
+     * not is that each reader was left to fall back on its own: the exceptions
+     * procedure wrote ISNULL(stored, join) and named the product, the chain
+     * header joined the master and named the product, and the proposals screen
+     * — Eloquent, no join — showed `10` over `area 1`. One row, three answers.
+     * His words: "why does it show 10 instead of the product? but
+     * exceptions.... shows the product?"
+     *
+     * So this nulls the stored labels exactly as an old run has them, and
+     * asserts the model still names everything. It reads through
+     * agora.vw_StockReconRunLine, which is the single place the fallback now
+     * lives.
+     */
+    public function test_a_run_that_stored_no_labels_still_names_the_item_and_the_shift(): void
+    {
+        $run = $this->preview();
+
+        // Exactly the shape of a run previewed before v1__14a: the amounts are
+        // recorded, none of the labels are.
+        DB::connection('agora')->table(config('agora.schema').'.StockReconRunLine')
+            ->where('BranchId', self::BRANCH)
+            ->where('RunId', $run->Id)
+            ->update([
+                'ItemDescription' => null, 'POSCode' => null, 'StockLocation' => null,
+                'AreaDescription' => null, 'EmployeeCodes' => null, 'EmployeeNames' => null,
+                'EmployeeCount' => 0,
+            ]);
+
+        $run->unsetRelation('lines');
+        $line = $run->lines->where('ShiftNo', 3)->where('StockItemNo', self::ITEM)->first();
+
+        $this->assertSame('TEST-Chicken quarter', $line->ItemDescription,
+            'With nothing stored, the item name comes from the stock master.');
+        $this->assertSame('TEST-Chicken quarter', $line->itemLabel(),
+            'And the screen shows the name, not the number Ryan was looking at.');
+        $this->assertSame('TEST-Hot Foods', $line->areaLabel(),
+            'The area is named too, rather than reading "area 1".');
+
+        // The half that was blank in EVERY reader, including the one that got
+        // the item right.
+        $this->assertSame(2, $line->EmployeeCount);
+        $this->assertTrue($line->sharedShift());
+        $this->assertStringContainsString('Khumalo Thandi', $line->EmployeeNames);
+        $this->assertStringContainsString('Ndlovu Sipho', $line->EmployeeNames);
+    }
+
+    /**
+     * A SHIFT NOBODY WAS SIGNED ON TO STAYS EMPTY.
+     *
+     * The resolution keys on EmployeeCodes rather than EmployeeCount, and this
+     * is why: the count is NOT NULL DEFAULT 0, so it cannot tell a run that
+     * recorded nothing from a shift that recorded nobody. Keying on the count
+     * would make every genuinely unmanned shift go back to the estate and
+     * invent an answer for it.
+     */
+    public function test_a_recorded_shift_with_nobody_on_it_is_not_back_filled(): void
+    {
+        $run = $this->preview();
+
+        DB::connection('agora')->table(config('agora.schema').'.StockReconRunLine')
+            ->where('BranchId', self::BRANCH)
+            ->where('RunId', $run->Id)
+            ->update(['EmployeeCodes' => '', 'EmployeeNames' => null, 'EmployeeCount' => 0]);
+
+        $run->unsetRelation('lines');
+        $line = $run->lines->where('ShiftNo', 3)->where('StockItemNo', self::ITEM)->first();
+
+        $this->assertSame(0, $line->EmployeeCount,
+            'A run that recorded an empty list keeps it — the estate is not consulted.');
+        $this->assertNull($line->EmployeeNames);
+        $this->assertFalse($line->sharedShift());
+    }
+
+    /**
+     * TICKING A PROPOSAL WRITES TO THE TABLE, THOUGH THE MODEL READS A VIEW.
+     *
+     * StockReconRunLine reads agora.vw_StockReconRunLine so an old run still
+     * names its item; the view joins three masters and SQL Server cannot update
+     * through it. StockReconService::select() therefore names the table. This
+     * is the assertion that keeps those two facts from drifting apart — without
+     * it, the tick boxes would fail only in front of an operator, on the one
+     * screen that decides what gets written to the customer's database.
+     */
+    public function test_ticking_a_proposal_persists_and_reads_back(): void
+    {
+        $run = $this->preview();
+
+        $amendable = $run->lines
+            ->where('WouldAmend', true)
+            ->where('ChainBlocked', false)
+            ->where('CommitState', 'pending');
+
+        $this->assertGreaterThan(1, $amendable->count(),
+            'The fixture must propose more than one amendment for this to mean anything.');
+
+        $keep = $amendable->first();
+
+        $this->assertSame(1, $this->service->select($run, [$keep->Id]),
+            'Exactly the one line asked for is ticked.');
+
+        $run->unsetRelation('lines');
+
+        $this->assertTrue((bool) $run->lines->firstWhere('Id', $keep->Id)->Selected);
+        $this->assertSame(1, $run->lines->where('Selected', true)->count(),
+            'And everything else was unticked in the same call.');
+
+        // A row the commit could not honour cannot be ticked, whatever is asked
+        // for — the tick is a promise the commit has to keep.
+        $blocked = $run->lines->firstWhere('ChainBlocked', true);
+
+        if ($blocked !== null) {
+            $this->assertSame(0, $this->service->select($run, [$blocked->Id]));
+        }
+    }
+
     /** An empty window is an answer, not a failure. */
     public function test_a_window_with_no_shifts_in_it_previews_cleanly(): void
     {
