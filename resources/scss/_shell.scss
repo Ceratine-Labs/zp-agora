@@ -50,6 +50,21 @@ nav.primary { display: flex; align-items: stretch; flex: 1; min-width: 0; overfl
   .signout { display: flex; margin: 0; }
 }
 
+/* The door to ZP-NQL. Uses the app's own sand accent so it sits inside
+   Agora's chrome rather than shouting, and the link glyph carries the
+   "leaves this app" meaning. */
+.peerlink {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  text-decoration: none; white-space: nowrap;
+  font-size: 11.5px; font-weight: 600;
+  color: var(--sand);
+  background: var(--chrome-2);
+  border: 1px solid var(--chrome-line);
+  &:hover { background: var(--chrome-3); }
+  svg { width: 13px; height: 13px; flex: none; }
+}
+
 .iconbtn {
   background: none; border: 0; color: var(--chrome-muted);
   width: 30px; height: 30px; border-radius: var(--r); cursor: pointer;
@@ -253,6 +268,10 @@ body.is-wide {
   }
 
   .navbtn { padding: 0 11px; font-size: 12.5px; }
+
+  // The peer link keeps its glyph and loses its word — the icon alone still
+  // reads as "leaves this app", and the bar is already two rows here.
+  .peerlink { padding: 4px 8px; span { display: none; } }
 
   // One column on a phone, and the panel deliberately stops short of the
   // bottom: at full height it covered the entire screen, leaving nowhere to

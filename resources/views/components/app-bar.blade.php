@@ -45,6 +45,26 @@
     </nav>
 
     <div class="tools">
+        {{-- The way across to ZP-NQL (Ryan, 2026-09-09). Its twin lives in
+             ZP's app bar; the two systems sit under one brand on one box and
+             increasingly the same people use both, so each carries a door to
+             the other.
+
+             Renders whether or not single sign-on is switched on — the URL is
+             config('sso.peer.url'), which has a real default, while sign-on
+             additionally needs a shared secret. With sign-on on you arrive
+             already authenticated; without it you arrive at ZP's login page,
+             which still beats typing the address.
+
+             New tab on purpose: the two are used side by side, and somebody
+             mid-way through a reconciliation does not want it replaced. --}}
+        @if($peerUrl = config('sso.peer.url'))
+        <a class="peerlink" href="{{ $peerUrl }}" target="_blank" rel="noopener"
+           title="Open {{ config('sso.peer.name', 'ZP-NQL') }} in a new tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m4.5-4.5l1.5-1.5a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656 0"/></svg>
+            <span>{{ config('sso.peer.name', 'ZP-NQL') }}</span>
+        </a>
+        @endif
         <button class="iconbtn" id="themebtn" aria-label="Switch light / dark" title="Switch light / dark">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.2 9.6A5.6 5.6 0 0 1 6.4 2.8a5.6 5.6 0 1 0 6.8 6.8Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
         </button>

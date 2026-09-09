@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\Auth\LoginController;
 use Modules\Core\Http\Controllers\Auth\PasswordResetController;
+use Modules\Core\Http\Controllers\Auth\SsoController;
 use Modules\Core\Http\Controllers\ChartGalleryController;
 use Modules\Core\Http\Controllers\StyleguideController;
 
@@ -37,6 +38,30 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::post('logout', [LoginController::class, 'destroy'])->middleware('auth')->name('logout');
+
+/*
+ | Cross-app single sign-on with ZP-NQL (config/sso.php).
+ |
+ | Outside /app and outside `guest` both: `emit` is ZP asking whether we have
+ | a session, which is a question worth answering either way, and `logout`
+ | must work for somebody who IS signed in. What authorises them is the HMAC
+ | on the query string, checked against the shared secret — there is no state
+ | here a caller without that secret can move.
+ |
+ | `directory` is read by `php artisan sso:link` on the ZP box. Same
+ | signature, no session, and it returns three fields per user and nothing
+ | else — see the controller.
+ |
+ | Throttled: these are the only unauthenticated endpoints doing
+ | cryptographic work, and a signature check is a cheap thing to ask for a
+ | million times.
+ */
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('sso/emit', [SsoController::class, 'emit'])->name('sso.emit');
+    Route::get('sso/accept', [SsoController::class, 'accept'])->name('sso.accept');
+    Route::get('sso/logout', [SsoController::class, 'logout'])->name('sso.logout');
+    Route::get('sso/directory', [SsoController::class, 'directory'])->name('sso.directory');
+});
 
 /*
  | The component gallery. Not registered outside local and testing: it is a
