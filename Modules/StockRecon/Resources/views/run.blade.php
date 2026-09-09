@@ -8,7 +8,10 @@
     The strip is built in the controller so it can drop a tab the person may not
     open, rather than offering a door that answers 403.
 --}}
-<x-app-shell :title="'Run #'.$run->Id" :wide="$tab === 'exceptions'">
+{{-- BOTH tabs are wide, not just exceptions. The proposals table carries
+     fifteen columns — one more than the exceptions grid — and was the one
+     left on the reading measure; see `table.dt.fit` for what that cost. --}}
+<x-app-shell :title="'Run #'.$run->Id" wide>
     <x-page-head
         eyebrow="Stock recon centre"
         :title="'Run #'.$run->Id.' — '.($branch?->Name ?? 'site '.$run->BranchId)"

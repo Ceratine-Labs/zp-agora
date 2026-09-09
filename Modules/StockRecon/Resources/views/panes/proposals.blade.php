@@ -113,7 +113,7 @@
         <x-table :count="$run->lines->count()"
                  :procedure="$run->ProcedureName"
                  :id="'stockrecon-lines-'.$run->Id"
-                 tools
+                 tools fit
                  data-row-detail
                  empty="The procedure ran and found no shifts in this period. That is an answer, not a failure.">
             <x-slot:head>
@@ -129,7 +129,11 @@
                     <th>Outcome</th>
                     <th>Item</th>
                     <th>On shift</th>
-                    <th>Date</th>
+                    {{-- `fit-min`: a date is short and must never wrap. Under
+                         `fit` the surplus goes to the word columns, and without
+                         this the browser squeezed "01 Sep" onto two lines and
+                         the date set the row height. --}}
+                    <th class="fit-min">Date</th>
                     <th class="num">Shift</th>
                     <th class="num">Open</th>
                     <th class="num">Issued</th>
@@ -189,14 +193,20 @@
                             @if ($line->sharedShift())
                                 {{-- Both names, and the fact that it was
                                      shared. A short on a shift two people
-                                     worked cannot be put on either of them. --}}
-                                <br><x-chip tone="warn" :dot="false">{{ $line->EmployeeCount }} on shift</x-chip>
+                                     worked cannot be put on either of them.
+
+                                     INLINE, not on its own line. It was written
+                                     as the exception; on the first real chain
+                                     Ryan opened, all fourteen shifts were
+                                     shared, so a block chip was a third line on
+                                     every row of the table. --}}
+                                <x-chip tone="warn" :dot="false" class="crew-count">{{ $line->EmployeeCount }} on shift</x-chip>
                             @endif
                         @else
                             <span class="muted">—</span>
                         @endif
                     </td>
-                    <td>{{ $line->TransactionDate->format('d M') }}</td>
+                    <td class="fit-min">{{ $line->TransactionDate->format('d M') }}</td>
                     <td class="num">{{ $line->ShiftNo }}</td>
                     <td class="num">{{ \App\Support\Format::n($line->QtyOpen, 3) }}</td>
                     <td class="num">{{ (float) $line->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($line->QtyIssued, 3) }}</td>

@@ -18,6 +18,13 @@
     `head` and the default slot are markup: the caller writes its own <th> and
     <tr>, because a column set is the screen's business.
 
+    `fit` is for a table with more columns than a window has room for. It lets
+    the numeric HEADINGS wrap and pins every numeric column to its content
+    width, so the surplus goes to the columns carrying words instead of to
+    eleven column headings — see the block above `table.dt.fit` for the
+    measurements that motivated it. Height in the head once, against width on
+    every row forever.
+
     `tools` is the one thing it has that the grid also has: click-to-sort and a
     per-column filter row, done in the BROWSER over the rows already on the
     page. That is the right shape here and the wrong shape in the grid — see
@@ -32,6 +39,7 @@
     'total' => null,
     'empty' => 'Nothing to show.',
     'dense' => false,
+    'fit' => false,
     'tools' => false,
 ])
 
@@ -39,7 +47,7 @@
      like describe the grid itself, and row-detail.js looks for them there. --}}
 <div class="table-block">
     <div class="table-scroll">
-        <table {{ $attributes->merge(['class' => 'dt '.($dense ? 'dense' : '')]) }}
+        <table {{ $attributes->merge(['class' => 'dt '.($dense ? 'dense ' : '').($fit ? 'fit' : '')]) }}
                @if ($tools) data-table-tools @endif>
             @isset($head)<thead>{{ $head }}</thead>@endisset
             <tbody>{{ $slot }}</tbody>

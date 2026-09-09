@@ -819,6 +819,76 @@ tr.is-expandable > td.pick { position: relative; }
 td.cell-name { min-width: 190px; }
 
 /* ---------------------------------------------------------------------------
+   `fit` — a table whose width goes to the words, not to the column headings
+
+   WHAT WAS ACTUALLY EATING THE SPACE, measured on the stock recon proposals
+   table at 1546px before changing anything:
+
+     pick 34 · Outcome 139 · Item 217 · On shift 295 · Date 56 · Shift 57 ·
+     Open 66 · Issued 66 · Close 66 · POS 57 · Variance 84 · New open 88 ·
+     New close 94 · Amend 66 · New variance 117            = 1502 of 1502
+
+   Every one of those numeric columns holds a figure about 60px wide. They are
+   wider than that because `thead th` is `white-space: nowrap` and the LABEL is
+   the widest thing in the column — "New variance" is 117px of 10px uppercase
+   with .09em of letter-spacing, sitting over "37.000". So 817px of the table
+   was spent on eleven column headings, while the item name wrapped to two
+   lines and a four-person crew wrapped to three, on every row, forever.
+
+   The trade this variant makes: a numeric heading may wrap to two lines, which
+   costs height ONCE, in the head. A nowrap heading costs width on every row for
+   as long as the table exists.
+
+   `width: 1%` is the standard way to say "take your content and no more" in an
+   auto-layout table: the browser satisfies the minimum content width and hands
+   the surplus to the columns that did not ask, which here are exactly the two
+   that carry words. Nothing is truncated and nothing is forced to nowrap — a
+   name too long for any width still wraps, it just does it far less often.
+
+   Ryan asked for this on the live screen (9 Sep 2026): "make the text a bit
+   smaller, full width content and try to claim a bit of width where you can".
+   The shell's `wide` mode was the obvious answer and is the wrong one — at
+   1546px `min(2200px, 100vw - 96px)` is 1450px, NARROWER than the 1546px the
+   ordinary shell already gives. The width was never the constraint. */
+table.dt.fit {
+  font-size: 12px;
+
+  th, td { padding: 4px 7px; }
+  td.mono { font-size: 11px; }
+
+  /* The heading may take two lines. The figures underneath never wrap — that
+     is `td.num` in the base and is untouched. */
+  thead th.num { white-space: normal; }
+
+  /* Take your content and no more. The surplus goes to the word columns.
+
+     `fit-min` is for a SHORT non-numeric column — a date, a code. Without it
+     the browser is free to squeeze such a column below its max-content and
+     wrap it: giving eleven numeric columns their content width left "01 Sep"
+     rendering as "01 / Sep" and made the date, of all things, the thing
+     setting the row height. Caught in a render; the column-width numbers alone
+     did not show it. */
+  th.num, td.num, th.pick, td.pick, th.fit-min, td.fit-min { width: 1%; }
+  th.fit-min, td.fit-min { white-space: nowrap; }
+
+  /* A right-aligned figure needs less gutter than a sentence does: it is read
+     against the column above it, not against its neighbours. Two pixels a side
+     across eleven numeric columns is 44px, which is the difference between a
+     four-name crew fitting on one line and not. */
+  th.num, td.num { padding-left: 5px; padding-right: 5px; }
+
+  /* The floor stays a floor. Without it a table of short names would give the
+     name column nothing, which is the opposite failure. */
+  td.cell-name { min-width: 190px; }
+}
+
+/* A count that belongs to the names beside it — "3 on shift" after a crew.
+   Inline rather than on a line of its own: on the chain Ryan opened, all
+   fourteen shifts were shared, so a block chip was a third line on every row
+   of the table rather than the exception it was written for. */
+.chip.crew-count { margin-left: 6px; vertical-align: baseline; }
+
+/* ---------------------------------------------------------------------------
    Users and access (T028)
    --------------------------------------------------------------------------- */
 

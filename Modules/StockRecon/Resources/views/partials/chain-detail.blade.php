@@ -61,11 +61,14 @@
         </x-notice>
     @endif
 
-    <x-table :count="$shifts->count()" dense
+    {{-- `fit` for the same reason the proposals table has it: fourteen columns,
+         eleven of them a figure under a heading twice its width, and one column
+         carrying up to four names. --}}
+    <x-table :count="$shifts->count()" dense fit
              empty="This item has no other shift in the window.">
         <x-slot:head>
             <tr>
-                <th class="l">Date</th><th class="num">Shift</th><th class="l">On shift</th>
+                <th class="l fit-min">Date</th><th class="num">Shift</th><th class="l">On shift</th>
                 <th class="num">Open</th><th class="num">Issued</th><th class="num">Close</th>
                 <th class="num">POS</th><th class="num">Variance</th><th class="num">Cumulative</th>
                 <th class="num grp">New open</th><th class="num">New close</th><th class="num">Amend</th>
@@ -75,17 +78,17 @@
 
         @foreach ($shifts as $shift)
             <tr @class(['is-matched' => (bool) $shift->IsClicked])>
-                <td class="l">{{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }}</td>
+                <td class="l fit-min">{{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }}</td>
                 <td class="num">{{ $shift->ShiftNo }}</td>
                 {{-- Who was signed on to this counting area for this shift.
                      The method note listed this as the second thing the
                      algorithm could not see; the estate records it after all,
                      at exactly this grain. --}}
-                <td class="l">
+                <td class="l cell-name">
                     @if ($shift->EmployeeNames)
                         {{ $shift->EmployeeNames }}
                         @if ((int) $shift->EmployeeCount > 1)
-                            <x-chip tone="warn" :dot="false">{{ $shift->EmployeeCount }} on shift</x-chip>
+                            <x-chip tone="warn" :dot="false" class="crew-count">{{ $shift->EmployeeCount }} on shift</x-chip>
                         @endif
                     @else
                         <span class="muted">—</span>

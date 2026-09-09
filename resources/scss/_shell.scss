@@ -176,8 +176,18 @@ nav.primary { display: flex; align-items: stretch; flex: 1; min-width: 0; overfl
    The 96px is a real gutter, not a hairline: with .shell-in's own 22px that
    puts content 70px from the window edge, so a wide table still sits ON the
    page rather than against it. The cap keeps it from stretching to absurdity
-   on an ultrawide. */
-body.is-wide .shell-in { max-width: min(2200px, calc(100vw - 96px)); }
+   on an ultrawide.
+
+   THE `max(1560px, ...)` IS NOT DECORATION. Written as
+   `min(2200px, calc(100vw - 96px))` alone, this made a page NARROWER than not
+   asking for it at all on any window under 1656px: at 1546px it resolved to
+   1450px against the ordinary measure's 1546px, because below the cap the
+   96px gutter is subtracted from a viewport that was never reaching 1560
+   anyway. So `wide` quietly cost 96px on exactly the laptop widths where a
+   fifteen-column table needs it most. Floored at the ordinary measure, `wide`
+   can now only ever add width, which is the only thing a caller ever means by
+   it. Measured 9 Sep 2026 on the stock recon proposals table. */
+body.is-wide .shell-in { max-width: min(2200px, max(1560px, calc(100vw - 96px))); }
 
 /* Widening the page must not widen the PROSE. A paragraph is read, and a line
    of it running 1800px is harder to follow than the same line at 1560 — the
