@@ -878,8 +878,15 @@ table.dt.fit {
   th.num, td.num { padding-left: 5px; padding-right: 5px; }
 
   /* The floor stays a floor. Without it a table of short names would give the
-     name column nothing, which is the opposite failure. */
-  td.cell-name { min-width: 190px; }
+     name column nothing, which is the opposite failure. Higher here than the
+     base 190px: on a `fit` table the name column is the one the width is being
+     claimed FOR, and 190 left it pinned at its minimum while a neighbour took
+     327px. Ryan, 9 Sep 2026: "make the item column a bit wider".
+
+     The neighbour was the Outcome column, and the real fix for THAT was not a
+     wider table — it was to stop putting a 67-character sentence inside a
+     status pill. See StockReconRunLine::outcomeLabel(); a chip stays nowrap. */
+  td.cell-name { min-width: 240px; }
 }
 
 /* A count that belongs to the names beside it — "3 on shift" after a crew.

@@ -128,7 +128,6 @@
                     @endif
                     <th>Outcome</th>
                     <th>Item</th>
-                    <th>On shift</th>
                     {{-- `fit-min`: a date is short and must never wrap. Under
                          `fit` the surplus goes to the word columns, and without
                          this the browser squeezed "01 Sep" onto two lines and
@@ -167,8 +166,13 @@
                             @endif
                         </td>
                     @endif
+                    {{-- The LABEL in the pill, the whole sentence on hover.
+                         The procedure writes "Label: explanation" so the
+                         customer can read the column in SSMS; a pill cannot
+                         wrap without ceasing to look like one, and the longest
+                         outcome is 67 characters. --}}
                     <td>
-                        <x-chip :tone="$line->tone()">{{ $line->Outcome }}</x-chip>
+                        <x-chip :tone="$line->tone()" :title="$line->Outcome">{{ $line->outcomeLabel() }}</x-chip>
                         @if ($line->ExceptionCode)
                             <br><span class="drill-line-id">{{ $line->ExceptionCode }}</span>
                         @endif
@@ -182,29 +186,20 @@
                          number over "area 1", which is two ids and no answer —
                          Ryan on the live screen, 9 Sep 2026. A run made before
                          v1__14a has no stored label and falls back to the id it
-                         always had. --}}
+                         always had.
+
+                         WHO WAS ON THE SHIFT IS NOT ON THIS TABLE, deliberately
+                         (Ryan, same afternoon). It cost 469px — a third of the
+                         table — to carry a crew list down a screen somebody
+                         scrolls hundreds of rows of, on a table whose question
+                         is "what will the commit write". It is on the CHAIN
+                         panel behind the row, which is where a variance is
+                         actually judged and where the count of distinct crews
+                         already lives, and it stays in the extract, which is
+                         the worklist an admin works line by line. --}}
                     <td class="cell-name">
                         {{ $line->itemLabel() }}
                         <br><span class="muted mono" style="font-size:11px">{{ $line->StockItemNo }} · {{ $line->areaLabel() }}</span>
-                    </td>
-                    <td class="cell-name">
-                        @if ($line->EmployeeNames)
-                            {{ $line->EmployeeNames }}
-                            @if ($line->sharedShift())
-                                {{-- Both names, and the fact that it was
-                                     shared. A short on a shift two people
-                                     worked cannot be put on either of them.
-
-                                     INLINE, not on its own line. It was written
-                                     as the exception; on the first real chain
-                                     Ryan opened, all fourteen shifts were
-                                     shared, so a block chip was a third line on
-                                     every row of the table. --}}
-                                <x-chip tone="warn" :dot="false" class="crew-count">{{ $line->EmployeeCount }} on shift</x-chip>
-                            @endif
-                        @else
-                            <span class="muted">—</span>
-                        @endif
                     </td>
                     <td class="fit-min">{{ $line->TransactionDate->format('d M') }}</td>
                     <td class="num">{{ $line->ShiftNo }}</td>

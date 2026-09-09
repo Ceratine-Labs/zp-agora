@@ -139,6 +139,35 @@ class StockReconRunLine extends BaseModel
         };
     }
 
+    /**
+     * The outcome as a LABEL, with the explanation left for the hover.
+     *
+     * The procedure writes an outcome as "Label: explanation", because the
+     * customer reads that column in SSMS and a bare label there would make them
+     * go and read the procedure to find out what it meant. On screen the same
+     * sentence is a status pill, and the longest of the fifteen is 67
+     * characters — "Implausible amendment: the correction is too large to be a
+     * miscount". A pill cannot wrap without ceasing to look like a pill, so
+     * that one column was claiming 327px of a 1546px table and pinning the item
+     * name at its floor.
+     *
+     * So the pill carries the label and `title` carries the whole sentence.
+     * Ryan asked for exactly this on the live screen, 9 Sep 2026: "maybe
+     * shorten the description of the outcome, on hover show the full value".
+     *
+     * SPLIT ON THE COLON RATHER THAN TRUNCATED. An ellipsis at 22 characters
+     * gives "Opening follows the am…", which is worse than the number it
+     * replaced; the procedure has already written a good short form and it is
+     * the part before the colon. An outcome with no colon is already short —
+     * "Balanced to zero", "No change needed" — and is returned whole.
+     */
+    public function outcomeLabel(): string
+    {
+        $at = strpos($this->Outcome, ':');
+
+        return $at === false ? $this->Outcome : rtrim(substr($this->Outcome, 0, $at));
+    }
+
     /** The chip tone for that outcome. */
     public function tone(): string
     {

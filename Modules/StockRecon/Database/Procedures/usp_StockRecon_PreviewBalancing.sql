@@ -483,7 +483,13 @@ BEGIN
                                               THEN 'Balanced, short remains: accountable'
             WHEN a.EffVarNew < -@eps          THEN 'Short: accountable, no amendment available'
             WHEN ABS(a.EffAmend) > @eps       THEN 'Balanced to zero'
-            WHEN a.RowMoves = 1               THEN 'Opening follows the amended closing before it'
+            /* EVERY outcome is "Label: explanation", and this was the one
+               that was not. The screen shows the label and hovers the rest
+               — see StockReconRunLine::outcomeLabel() — so an outcome with
+               no colon has to render its whole sentence in a pill, which is
+               how a 45-character string came to be the widest thing in the
+               proposals table. The wording is otherwise unchanged. */
+            WHEN a.RowMoves = 1               THEN 'Opening only: follows the amended closing before it'
             ELSE 'No change needed'
         END,
 
