@@ -51,8 +51,18 @@ class StockReconRunLineGrid extends GridDefinition
             new GridColumn(key: 'Outcome', label: 'Outcome', sort: 'Outcome', wide: true),
             new GridColumn(key: 'ExceptionCode', label: 'Class', sort: 'ExceptionCode'),
             new GridColumn(key: 'CommitState', label: 'State', sort: 'CommitState'),
-            new GridColumn(key: 'AreaNo', label: 'Area', format: 'number', sort: 'AreaNo'),
+            new GridColumn(key: 'AreaDescription', label: 'Area', sort: 'AreaDescription'),
+            new GridColumn(key: 'AreaNo', label: 'Area no', format: 'number', sort: 'AreaNo', visible: false),
+            /*
+             * The description leads and the number follows, hidden. In journal
+             * mode this extract IS the worklist an admin applies by hand, and
+             * a worklist of item numbers is not one.
+             */
+            new GridColumn(key: 'ItemDescription', label: 'Item', sort: 'ItemDescription', wide: true),
             new GridColumn(key: 'StockItemNo', label: 'Item no', sort: 'StockItemNo', mono: true),
+            new GridColumn(key: 'POSCode', label: 'POS code', sort: 'POSCode', mono: true, visible: false),
+            new GridColumn(key: 'EmployeeNames', label: 'On shift', sort: 'EmployeeNames', wide: true),
+            new GridColumn(key: 'EmployeeCount', label: 'People on shift', format: 'number', visible: false),
             new GridColumn(key: 'TransactionDate', label: 'Date', format: 'date', sort: 'TransactionDate'),
             new GridColumn(key: 'ShiftNo', label: 'Shift', format: 'number', sort: 'ShiftNo'),
             new GridColumn(key: 'QtyOpen', label: 'Open', format: 'number', sort: 'QtyOpen'),
@@ -84,12 +94,16 @@ class StockReconRunLineGrid extends GridDefinition
                 // 0 matches nothing. An extract asked for without a run must
                 // come back empty, never as every proposal in the estate.
                 ->where('RunId', $runId ?? 0),
-            searchable: ['StockItemNo', 'Outcome', 'BlockReason'],
+            searchable: ['StockItemNo', 'ItemDescription', 'EmployeeNames', 'Outcome', 'BlockReason'],
             sortable: [
                 'Outcome' => 'Outcome',
                 'ExceptionCode' => 'ExceptionCode',
                 'CommitState' => 'CommitState',
                 'AreaNo' => 'AreaNo',
+                'AreaDescription' => 'AreaDescription',
+                'ItemDescription' => 'ItemDescription',
+                'POSCode' => 'POSCode',
+                'EmployeeNames' => 'EmployeeNames',
                 'StockItemNo' => 'StockItemNo',
                 'TransactionDate' => 'TransactionDate',
                 'ShiftNo' => 'ShiftNo',

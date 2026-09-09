@@ -2,7 +2,8 @@
  * agora.usp_StockRecon_PreviewBalancing — shift variance balancing, computed.
  *
  * Read by:  Stock recon centre -> Balance (the preview press), and nothing else.
- * Reads:    agora.vw_StockReconLine, agora.vw_StockArea  (both over PumpIT, read-only)
+ * Reads:    agora.vw_StockReconLine, agora.vw_StockArea, agora.vw_StockMaster,
+ *           agora.vw_StockReconEmployee, agora.vw_Employee  (all over PumpIT, read-only)
  * Writes:   agora.StockReconRunLine, agora.StockReconRun — Agora's own ledger.
  *           NOTHING in the customer's estate. The commit is a separate
  *           procedure and even that only writes to PumpIT in 'live' stamp mode.
@@ -364,6 +365,66 @@ BEGIN
     )
     SELECT * INTO #apply FROM ranked;
 
+    /* ------------------------------------------------------------- stage 7c
+       The labels, resolved ONCE.
+
+       Stored on the line rather than joined at read time for the same reason
+       SellPrice already is: a run is a record of what was true when it was
+       made, and an item gets renamed. It is also what lets the proposals table
+       — the one screen here that is not powered by a procedure, because its
+       tick boxes decide what a commit writes — show an item name at all.
+
+       THE EMPLOYEE IS A LIST. dbo.STK_StockReconEmployees is keyed on exactly
+       the grain a recon line is, and 90 of branch 18's 1,138 shifts have more
+       than one person signed on to the area. A short on a shift two people
+       worked cannot be attributed to either, so the count travels with the
+       names and the screen says so. STRING_AGG orders by name so the same two
+       people always read the same way round. */
+    IF OBJECT_ID('tempdb..#emp') IS NOT NULL DROP TABLE #emp;
+
+    /*
+     * The display name is computed in a derived table and only then
+     * aggregated, and that is a requirement rather than a style.
+     *
+     * SQL Server refuses "multiple ordered aggregate functions in the same
+     * scope with mutually incompatible orderings" — and it counts two
+     * WITHIN GROUP clauses as incompatible even when the ORDER BY expressions
+     * are character-for-character identical, as long as they are expressions
+     * rather than columns. Resolving the name once below turns both orderings
+     * into the same plain column and the restriction goes away.
+     *
+     * Ordering both by the name is also what makes the pair readable: the nth
+     * code is the nth name, which is the only reason to carry both on a shift
+     * two people worked.
+     */
+    SELECT
+        d.TransactionDate,
+        d.ShiftNo,
+        d.AreaNo,
+        COUNT(*)                                                          AS EmployeeCount,
+        /* Capped at the columns. Three people never approach 400 characters,
+           and a data fault that put thirty on one shift must not fail the
+           whole preview. */
+        LEFT(STRING_AGG(CONVERT(nvarchar(max), d.EmployeeCode), ', ')
+             WITHIN GROUP (ORDER BY d.DisplayName), 200)                  AS EmployeeCodes,
+        LEFT(STRING_AGG(CONVERT(nvarchar(max), d.DisplayName), ', ')
+             WITHIN GROUP (ORDER BY d.DisplayName), 400)                  AS EmployeeNames
+    INTO #emp
+    FROM (
+        SELECT se.TransactionDate, se.ShiftNo, se.AreaNo, se.EmployeeCode,
+               /* An unresolved code shows as the code. Every one of branch
+                  18's 45 resolved, but a code with no master row is a finding
+                  and must not read as a blank. */
+               ISNULL(NULLIF(LTRIM(RTRIM(e.EmployeeName)), ''), se.EmployeeCode) AS DisplayName
+        FROM agora.vw_StockReconEmployee se
+        LEFT JOIN agora.vw_Employee e
+               ON e.BranchId = se.BranchId AND e.EmployeeCode = se.EmployeeCode
+        WHERE se.BranchId = @BranchId
+          AND se.TransactionDate >= @FromDate
+          AND se.TransactionDate <  DATEADD(day, 1, @ToDate)
+    ) d
+    GROUP BY d.TransactionDate, d.ShiftNo, d.AreaNo;
+
     /* ------------------------------------------------------------- stage 8
        Record it. One INSERT, ordered so the line numbers read as a chain.
 
@@ -381,6 +442,8 @@ BEGIN
         FlagBigAmendment, FlagPctAmendment, FlagNegativeClose, FlagShortChain,
         FlagDormantMoved, FlagChainBroken, ChainBlocked,
         ExceptionCode, Outcome, WouldAmend, Selected, CommitState,
+        ItemDescription, POSCode, StockLocation, AreaDescription,
+        EmployeeCodes, EmployeeNames, EmployeeCount,
         CreatedAt, CreatedBy)
     SELECT
         @BranchId,
@@ -445,8 +508,28 @@ BEGIN
         a.RowMoves,
         a.RowMoves,
         'pending',
+
+        /* The labels. A missing master row leaves the description NULL and
+           every reader falls back to the item number — inventing a name for an
+           item the master does not have would be worse than showing its id. */
+        m.StockItemDescription,
+        m.POSCode,
+        m.StockLocation,
+        ar.AreaDescription,
+        emp.EmployeeCodes,
+        emp.EmployeeNames,
+        ISNULL(emp.EmployeeCount, 0),
+
         SYSDATETIME(), @UserId
-    FROM #apply a;
+    FROM #apply a
+    LEFT JOIN agora.vw_StockMaster m
+           ON m.BranchId = @BranchId AND m.StockItemNo = a.StockItemNo
+    LEFT JOIN agora.vw_StockArea ar
+           ON ar.BranchId = @BranchId AND ar.AreaNo = a.AreaNo
+    LEFT JOIN #emp emp
+           ON emp.TransactionDate = a.TransactionDate
+          AND emp.ShiftNo = a.ShiftNo
+          AND emp.AreaNo  = a.AreaNo;
 
     /* ------------------------------------------------------------- stage 9
        The header, from the same pass. Nothing here is recomputed in PHP.
@@ -521,6 +604,7 @@ BEGIN
     ) c
     WHERE r.BranchId = @BranchId AND r.Id = @RunId;
 
+    DROP TABLE #emp;
     DROP TABLE #apply;
     DROP TABLE #gate;
     DROP TABLE #chain;

@@ -128,6 +128,7 @@
                     @endif
                     <th>Outcome</th>
                     <th>Item</th>
+                    <th>On shift</th>
                     <th>Date</th>
                     <th class="num">Shift</th>
                     <th class="num">Open</th>
@@ -173,9 +174,27 @@
                             <br><span class="drill-line-id">amended</span>
                         @endif
                     </td>
-                    <td class="mono">
-                        {{ $line->StockItemNo }}
-                        <br><span class="muted" style="font-size:11px">area {{ $line->AreaNo }}</span>
+                    {{-- The name leads and the number follows. It showed the
+                         number over "area 1", which is two ids and no answer —
+                         Ryan on the live screen, 9 Sep 2026. A run made before
+                         v1__14a has no stored label and falls back to the id it
+                         always had. --}}
+                    <td class="cell-name">
+                        {{ $line->itemLabel() }}
+                        <br><span class="muted mono" style="font-size:11px">{{ $line->StockItemNo }} · {{ $line->areaLabel() }}</span>
+                    </td>
+                    <td class="cell-name">
+                        @if ($line->EmployeeNames)
+                            {{ $line->EmployeeNames }}
+                            @if ($line->sharedShift())
+                                {{-- Both names, and the fact that it was
+                                     shared. A short on a shift two people
+                                     worked cannot be put on either of them. --}}
+                                <br><x-chip tone="warn" :dot="false">{{ $line->EmployeeCount }} on shift</x-chip>
+                            @endif
+                        @else
+                            <span class="muted">—</span>
+                        @endif
                     </td>
                     <td>{{ $line->TransactionDate->format('d M') }}</td>
                     <td class="num">{{ $line->ShiftNo }}</td>

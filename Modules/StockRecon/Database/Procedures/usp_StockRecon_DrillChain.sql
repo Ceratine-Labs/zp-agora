@@ -4,6 +4,14 @@
  * Read by:  Stock recon centre -> a run -> click a row (the detail panel).
  * Reads:    agora.StockReconRunLine, agora.vw_StockMaster, agora.vw_StockArea,
  *           agora.StockReconAmendment
+ *
+ * WHO WAS ON THE SHIFT travels with each row. dbo.STK_StockReconEmployees is
+ * keyed on the same grain a recon line is, so the panel can say who was signed
+ * on to the area rather than only which shift number it was — which is the
+ * difference between an item-level observation and something that can support
+ * a conversation with a person. Where two people were on, both are named and
+ * the count says so: a short on a shift two people worked cannot be attributed
+ * to either of them, and the panel must not imply that it can.
  * Writes:   nothing.
  *
  * A shift row on its own cannot be judged. Its variance was produced by the
@@ -40,14 +48,25 @@ BEGIN
     /* The header. The chain totals come off the lines rather than from the run,
        because the run is about every item and this panel is about one. */
     SELECT
-        m.StockItemDescription,
-        m.POSCode,
-        m.StockLocation,
-        m.UOMCode,
-        a.AreaDescription,
-        a.AreaGroup,
+        /* The stored label first, the master second. A run made before
+           v1__14a has none, and its panel should still be able to name the
+           item rather than going blank on a screen that used to work. */
+        ISNULL(MAX(rl.ItemDescription), MAX(m.StockItemDescription)) AS StockItemDescription,
+        ISNULL(MAX(rl.POSCode),         MAX(m.POSCode))              AS POSCode,
+        ISNULL(MAX(rl.StockLocation),   MAX(m.StockLocation))        AS StockLocation,
+        MAX(m.UOMCode)                                               AS UOMCode,
+        ISNULL(MAX(rl.AreaDescription), MAX(a.AreaDescription))      AS AreaDescription,
+        MAX(a.AreaGroup)                                             AS AreaGroup,
         rl.AreaNo,
         rl.StockItemNo,
+        /* How many DIFFERENT people appear anywhere on this chain. One is a
+           chain a single person is answerable for; six is a chain where a
+           persistent short is about the item or the process, not a person. */
+        (SELECT COUNT(DISTINCT x.EmployeeCodes)
+           FROM agora.StockReconRunLine x
+          WHERE x.BranchId = rl.BranchId AND x.RunId = rl.RunId
+            AND x.AreaNo = rl.AreaNo AND x.StockItemNo = rl.StockItemNo
+            AND x.EmployeeCodes IS NOT NULL)                         AS DistinctEmployeeSets,
         MAX(rl.ActiveLen)                                   AS ActiveShifts,
         COUNT(*)                                            AS ChainShifts,
         SUM(CONVERT(int, rl.IsDormant))                     AS DormantShifts,
@@ -72,8 +91,7 @@ BEGIN
     LEFT JOIN agora.vw_StockArea   a ON a.BranchId = rl.BranchId AND a.AreaNo      = rl.AreaNo
     WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
       AND rl.AreaNo = @AreaNo AND rl.StockItemNo = @StockItemNo
-    GROUP BY m.StockItemDescription, m.POSCode, m.StockLocation, m.UOMCode,
-             a.AreaDescription, a.AreaGroup, rl.AreaNo, rl.StockItemNo;
+    GROUP BY rl.BranchId, rl.RunId, rl.AreaNo, rl.StockItemNo;
 
     /* The chain. `IsClicked` marks the row the reader came from, so a panel
        over twelve shifts does not make them find it again. `CumulativeVar` is
@@ -90,6 +108,9 @@ BEGIN
         rl.QtyOpenNew, rl.QtyCloseNew, rl.AmendClose, rl.QtyVarNew,
         rl.ExceptionCode,
         rl.Outcome,
+        rl.EmployeeNames,
+        rl.EmployeeCodes,
+        rl.EmployeeCount,
         rl.WouldAmend,
         rl.Selected,
         rl.CommitState,

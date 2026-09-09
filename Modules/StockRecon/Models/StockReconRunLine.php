@@ -48,6 +48,13 @@ use Illuminate\Support\Carbon;
  * @property bool $Selected
  * @property string $CommitState
  * @property string|null $BlockReason
+ * @property string|null $ItemDescription
+ * @property string|null $POSCode
+ * @property string|null $StockLocation
+ * @property string|null $AreaDescription
+ * @property string|null $EmployeeCodes
+ * @property string|null $EmployeeNames
+ * @property int $EmployeeCount
  * @property-read StockReconRun $run
  */
 class StockReconRunLine extends BaseModel
@@ -68,6 +75,7 @@ class StockReconRunLine extends BaseModel
         'ShiftNo' => 'integer',
         'ActiveSeq' => 'integer',
         'ActiveLen' => 'integer',
+        'EmployeeCount' => 'integer',
         'TransactionDate' => 'date',
         'IsDormant' => 'boolean',
         'FlagNetOver' => 'boolean',
@@ -145,6 +153,37 @@ class StockReconRunLine extends BaseModel
     public function amendment(): float
     {
         return (float) $this->AmendClose;
+    }
+
+    /**
+     * What to call this item on screen.
+     *
+     * The label the RUN recorded, then the bare number. A run made before
+     * v1__14a stored none, and showing an empty cell on a screen that used to
+     * show something is worse than showing the id it always had.
+     */
+    public function itemLabel(): string
+    {
+        return $this->ItemDescription ?: $this->StockItemNo;
+    }
+
+    /** The counting area, named where the run recorded one. */
+    public function areaLabel(): string
+    {
+        return $this->AreaDescription ?: 'area '.$this->AreaNo;
+    }
+
+    /**
+     * More than one person was signed on to this area for this shift.
+     *
+     * 90 of branch 18's 1,138 shifts, up to three people. It matters because a
+     * short on a shared shift cannot be attributed to either of them, and a
+     * screen that shows two names without saying they SHARED it invites
+     * exactly that attribution.
+     */
+    public function sharedShift(): bool
+    {
+        return $this->EmployeeCount > 1;
     }
 
     /**

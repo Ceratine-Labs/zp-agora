@@ -169,6 +169,18 @@ CREATE TABLE dbo.BRN_Employee (
     PostNo                           SMALLINT         NOT NULL
 );
 
+-- Who was signed on to a counting area for a shift. Same grain as
+-- STK_StockReconLine, and the join that lets a stock short name a person
+-- rather than a shift number.
+IF OBJECT_ID('dbo.STK_StockReconEmployees') IS NULL
+CREATE TABLE dbo.STK_StockReconEmployees (
+    SSBranchId                       INT              NOT NULL,
+    TransactionDate                  DATETIME         NULL,
+    ShiftNo                          INT              NULL,
+    AreaNo                           INT              NULL,
+    EmployeeCode                     NVARCHAR(22)     NOT NULL
+);
+
 IF OBJECT_ID('dbo.BRN_DailyBanking') IS NULL
 CREATE TABLE dbo.BRN_DailyBanking (
     SSBranchId                       INT              NOT NULL,

@@ -808,6 +808,16 @@ tr.is-expandable > td.pick { position: relative; }
   > .field-help { margin: 8px 0 0; }
 }
 
+/* A cell whose value is a NAME rather than a figure.
+
+   Stock recon's proposals table carries fifteen columns and one of them is
+   "BENSON & HEDGES CIGARETTES SPE 20`S". Left to the browser it wrapped to
+   four lines and made every row four rows tall, on a table somebody scrolls
+   several hundred rows of. A floor on the width buys it back to two without
+   taking space the numeric columns need — they are `white-space: nowrap` and
+   sized by their content. */
+td.cell-name { min-width: 190px; }
+
 /* ---------------------------------------------------------------------------
    Users and access (T028)
    --------------------------------------------------------------------------- */

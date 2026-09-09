@@ -88,8 +88,20 @@ class SyncLocalReportsCommand extends Command
         'BRN_UtilityTransaction' => 'TransactionDate',
     ];
 
-    /** Line grain, and enormous. Its own, much shorter window. */
-    private const LINE_GRAIN = ['STK_StockReconLine' => 'TransactionDate'];
+    /**
+     * Line grain, and enormous. Their own, much shorter window.
+     *
+     * STK_StockReconEmployees is here rather than in DATED because it is the
+     * same grain as the recon line and roughly as big — 441k rows live — and
+     * because the two are only useful together: a slice of lines with no
+     * employees behind them makes the stock recon drill look as though the
+     * estate does not record who was on shift, which is exactly the wrong
+     * conclusion.
+     */
+    private const LINE_GRAIN = [
+        'STK_StockReconLine' => 'TransactionDate',
+        'STK_StockReconEmployees' => 'TransactionDate',
+    ];
 
     /** Its own window, for the reason in the DATED docblock. */
     private const WIDE = ['BRN_FuelPrice' => 'Date'];

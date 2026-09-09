@@ -44,7 +44,9 @@ class StockReconExceptionGrid extends GridDefinition
         return 'Every line the balancing reported instead of amending. A-class rows are stock that '
             .'entered the store without an issue being captured and no amendment can remove them; '
             .'B is a data fault; C is a count that was never taken; D is the residual short that '
-            .'survives balancing and is the only class that can carry a charge.';
+            .'survives balancing and is the only class that can carry a charge — and "On shift" is '
+            .'who was signed on to the area, so a D1 can name a person rather than a shift number. '
+            .'Where two people were on, both are named and neither can be held to it alone.';
     }
 
     public function columns(): array
@@ -55,6 +57,18 @@ class StockReconExceptionGrid extends GridDefinition
             new GridColumn(key: 'AreaName', label: 'Area', sort: 'AreaName'),
             new GridColumn(key: 'ItemDescription', label: 'Item', sort: 'ItemDescription', wide: true, link: true),
             new GridColumn(key: 'POSCode', label: 'POS code', sort: 'POSCode', mono: true),
+            /*
+             * Who was on the shift. The reason it is here rather than only in
+             * the drill is D1 — a persistent short is the one class that can
+             * carry a charge, and a charge against "shift 1" is not a charge
+             * against anybody. `EmployeeCount` rides alongside, hidden, so a
+             * shared shift is filterable: two people on a shift means the
+             * short cannot be attributed to either.
+             */
+            new GridColumn(key: 'EmployeeNames', label: 'On shift', sort: 'EmployeeNames', wide: true,
+                title: 'Signed on to this counting area for this shift, from dbo.STK_StockReconEmployees'),
+            new GridColumn(key: 'EmployeeCount', label: 'People on shift', format: 'number', visible: false,
+                title: 'More than one means the short cannot be attributed to any single person'),
             new GridColumn(key: 'StockLocation', label: 'Location', visible: false),
             new GridColumn(key: 'TransactionDate', label: 'Date', format: 'date', sort: 'TransactionDate'),
             new GridColumn(key: 'ShiftNo', label: 'Shift', format: 'number'),
@@ -91,6 +105,7 @@ class StockReconExceptionGrid extends GridDefinition
             'AreaName' => new GridFilter(column: 'AreaName', type: 'text'),
             'ItemDescription' => new GridFilter(column: 'ItemDescription', type: 'text'),
             'POSCode' => new GridFilter(column: 'POSCode', type: 'text'),
+            'EmployeeNames' => new GridFilter(column: 'EmployeeNames', type: 'text'),
             'TransactionDate' => new GridFilter(column: 'TransactionDate', type: 'date'),
             'ExceptionValue' => new GridFilter(column: 'ExceptionValue', type: 'number'),
         ];

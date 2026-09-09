@@ -277,8 +277,21 @@ reconciled as stock, on the same reasoning that keeps fuel out of the pack.
   means that if the total is R500, somebody carries R500. Before a balanced
   figure is used to charge anybody, the C1 list should be clear for that item: a
   shift that never counted cannot support a charge on the shift next to it.
-* **The cashier is not in the recon line.** Shift number is a poor proxy for a
-  person. Joining the cashier on duty to each shift is what would turn D1 from
-  an item-level observation into an accountability record — and it would settle
-  the dormant test properly, as a fact rather than an inference from three
-  quantities all being equal.
+* ~~**The cashier is not in the recon line.**~~ **It is** — corrected
+  9 September 2026. `dbo.STK_StockReconEmployees` is keyed on
+  (branch, date, shift, area), which is exactly the grain of a recon line, and
+  on branch 18 across August and early September it covers **all 1,138 shifts**
+  with every one of its 45 distinct codes resolving against `BRN_Employee`. The
+  preview resolves it once and stores it on the line, so the proposals table,
+  the chain drill, the exception report and the extract all name the person.
+
+  **D1 can now name somebody, and that raises the bar rather than lowering it.**
+  90 of those 1,138 shifts had more than one person signed on, up to three. A
+  short on a shared shift cannot be attributed to either of them, so the count
+  travels beside the names and every screen says so. Collapsing the list to one
+  name would manufacture an accountability the counts do not support.
+
+  What it does NOT settle is the dormant test: a shift with nobody signed on
+  would be dormant as a fact rather than as an inference from three quantities
+  being equal, but on this data there is no such shift — coverage is total —
+  so there is nothing to test the idea against yet.

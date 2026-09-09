@@ -183,23 +183,38 @@ class StockReconController extends Controller
     }
 
     /**
-     * The chain behind one shift, as the fragment the row expands into.
+     * The chain behind one shift — a fragment for the row, a page for a person.
      *
      * HTML rather than JSON, on purpose. The formatting rules — a missing
      * figure is an em dash, never 0.000; the grouping character is an ordinary
      * space so a copied number pastes into a spreadsheet — live in
      * App\Support\Format, and rebuilding them in JavaScript is how the two
      * drift apart. The browser gets markup and inserts it.
+     *
+     * TWO WAYS IN, ONE COPY OF THE MARKUP. row-detail.js sends
+     * X-Requested-With, which is what ajax() reads; anything else is a person
+     * who followed the exception grid's own link, pasted the address, or
+     * opened it in a new tab, and they get the shell around it.
+     *
+     * It answered both with the fragment until 9 September 2026, so opening a
+     * chain from the exceptions grid landed on unstyled text with no
+     * navigation and no way back. ReconController::configEdit carries a
+     * paragraph about exactly this bug, written the day before, and I
+     * reproduced it here — which is why the note is now in both places.
      */
-    public function line(StockReconRun $run, StockReconRunLine $line): View
+    public function line(StockReconRun $run, StockReconRunLine $line, Request $request): View
     {
         abort_unless($line->RunId === $run->Id, 404);
 
-        return view('stockrecon::partials.chain-detail', [
+        $data = [
             'run' => $run,
             'line' => $line,
             ...$this->service->chain($run, $line),
-        ]);
+        ];
+
+        return $request->ajax()
+            ? view('stockrecon::partials.chain-detail', $data)
+            : view('stockrecon::chain', $data);
     }
 
     /**

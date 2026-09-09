@@ -82,7 +82,9 @@ BEGIN
             @fArea    NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'AreaName'),
             @fAreaOp  NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'AreaName'),
             @fPos     NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'POSCode'),
-            @fPosOp   NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'POSCode');
+            @fPosOp   NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'POSCode'),
+            @fEmp     NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'EmployeeNames'),
+            @fEmpOp   NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'EmployeeNames');
 
     DECLARE @fCodeAny bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'ExceptionCode') THEN 1 ELSE 0 END;
 
@@ -92,11 +94,20 @@ BEGIN
             rl.BranchId,
             rl.RunId,
             rl.AreaNo,
-            ISNULL(a.AreaDescription, 'Area ' + CONVERT(nvarchar(10), rl.AreaNo)) AS AreaName,
+            ISNULL(rl.AreaDescription,
+                   ISNULL(a.AreaDescription, 'Area ' + CONVERT(nvarchar(10), rl.AreaNo))) AS AreaName,
             rl.StockItemNo,
-            ISNULL(m.StockItemDescription, rl.StockItemNo) AS ItemDescription,
-            m.POSCode,
-            m.StockLocation,
+            /* The label the RUN recorded, then the master, then the bare
+               number. A run made before v1__14a stored none, so the join
+               stays as the fallback rather than being replaced by it. */
+            ISNULL(rl.ItemDescription, ISNULL(m.StockItemDescription, rl.StockItemNo)) AS ItemDescription,
+            ISNULL(rl.POSCode, m.POSCode)             AS POSCode,
+            ISNULL(rl.StockLocation, m.StockLocation) AS StockLocation,
+            /* Who was on. The point of it is D1 — a persistent short is the
+               one class that can carry a charge, and until now it could only
+               name a shift number. */
+            rl.EmployeeNames,
+            rl.EmployeeCount,
             rl.TransactionDate,
             rl.ShiftNo,
             rl.ExceptionCode,
@@ -133,6 +144,7 @@ BEGIN
            OR base.AreaName        LIKE '%' + @Search + '%'
            OR base.POSCode         LIKE '%' + @Search + '%'
            OR base.StockItemNo     LIKE '%' + @Search + '%'
+           OR base.EmployeeNames   LIKE '%' + @Search + '%'
            OR base.Outcome         LIKE '%' + @Search + '%')
       AND (@fItem IS NULL OR (CASE WHEN @fItemOp = 'eq' THEN CASE WHEN base.ItemDescription =        @fItem      THEN 1 ELSE 0 END
                                    ELSE                      CASE WHEN base.ItemDescription LIKE '%'+@fItem+'%' THEN 1 ELSE 0 END END) = 1)
@@ -140,10 +152,13 @@ BEGIN
                                    ELSE                      CASE WHEN base.AreaName        LIKE '%'+@fArea+'%' THEN 1 ELSE 0 END END) = 1)
       AND (@fPos  IS NULL OR (CASE WHEN @fPosOp  = 'eq' THEN CASE WHEN base.POSCode         =        @fPos       THEN 1 ELSE 0 END
                                    ELSE                      CASE WHEN base.POSCode         LIKE '%'+@fPos +'%' THEN 1 ELSE 0 END END) = 1)
+      AND (@fEmp  IS NULL OR (CASE WHEN @fEmpOp  = 'eq' THEN CASE WHEN base.EmployeeNames   =        @fEmp       THEN 1 ELSE 0 END
+                                   ELSE                      CASE WHEN base.EmployeeNames   LIKE '%'+@fEmp +'%' THEN 1 ELSE 0 END END) = 1)
       AND (@fCodeAny = 0 OR base.ExceptionCode IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'ExceptionCode'));
 
     SELECT
         Id, RunId, BranchId, AreaNo, AreaName, StockItemNo, ItemDescription, POSCode, StockLocation,
+        EmployeeNames, EmployeeCount,
         TransactionDate, ShiftNo, ExceptionCode, Outcome, IsDormant, ActiveLen,
         QtyOpen, QtyIssued, QtyClose, QtyPOS, QtyVar, ChainNetVar, SellPrice, ExceptionValue
     FROM #Rows
@@ -154,6 +169,7 @@ BEGIN
                 WHEN 'AreaName'        THEN AreaName
                 WHEN 'ItemDescription' THEN ItemDescription
                 WHEN 'POSCode'         THEN POSCode
+                WHEN 'EmployeeNames'   THEN EmployeeNames
                 WHEN 'Outcome'         THEN Outcome
             END
         END ASC,
@@ -163,6 +179,7 @@ BEGIN
                 WHEN 'AreaName'        THEN AreaName
                 WHEN 'ItemDescription' THEN ItemDescription
                 WHEN 'POSCode'         THEN POSCode
+                WHEN 'EmployeeNames'   THEN EmployeeNames
                 WHEN 'Outcome'         THEN Outcome
             END
         END DESC,

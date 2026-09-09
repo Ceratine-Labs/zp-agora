@@ -421,6 +421,86 @@ class BalancingTest extends TestCase
             'Reading the _Original columns is what makes this true; writing them would break it.');
     }
 
+    /**
+     * The run records what the item is CALLED, not only its number.
+     *
+     * The proposals table is the one screen here not powered by a procedure —
+     * its tick boxes decide what a commit writes — so it has no join to hang a
+     * name on, and it showed "10" over "area 1" until Ryan said so on the live
+     * screen. The label is resolved once at preview time and stored, for the
+     * same reason SellPrice already is: a run is a record of what was true
+     * when it was made, and an item gets renamed.
+     */
+    public function test_the_run_records_what_the_item_is_called(): void
+    {
+        $run = $this->preview();
+
+        foreach ($run->lines as $line) {
+            $this->assertNotNull($line->ItemDescription, 'Every line should carry the item name.');
+            $this->assertSame('TEST-Hot Foods', $line->AreaDescription);
+        }
+
+        $this->assertSame('TEST-Chicken quarter',
+            $run->lines->firstWhere('StockItemNo', self::ITEM)->ItemDescription);
+
+        // And the fallback, for a run made before the label existed.
+        $line = $run->lines->first();
+        $line->ItemDescription = null;
+        $this->assertSame($line->StockItemNo, $line->itemLabel(),
+            'A line with no stored label falls back to the number it always had.');
+    }
+
+    /**
+     * WHO WAS ON THE SHIFT — the thing docs/stock-recon.md said the algorithm
+     * could not see.
+     *
+     * dbo.STK_StockReconEmployees is keyed on exactly the grain a recon line
+     * is, and on branch 18 it covers every shift. That turns D1 — persistent
+     * short, the one class that can carry a charge — from an item-level
+     * observation into something that can name a person.
+     */
+    public function test_the_shift_carries_who_was_on_it(): void
+    {
+        $run = $this->preview();
+
+        $shiftOne = $run->lines->where('ShiftNo', 1)->where('StockItemNo', self::ITEM);
+
+        $this->assertGreaterThan(0, $shiftOne->count());
+
+        foreach ($shiftOne as $line) {
+            $this->assertSame(1, $line->EmployeeCount);
+            $this->assertSame('Ndlovu Sipho', $line->EmployeeNames);
+            $this->assertSame('TE01', $line->EmployeeCodes);
+            $this->assertFalse($line->sharedShift());
+        }
+    }
+
+    /**
+     * A SHARED SHIFT NAMES BOTH PEOPLE AND SAYS IT IS SHARED.
+     *
+     * 90 of branch 18's 1,138 shifts have more than one person signed on, up
+     * to three. A short on a shift two people worked cannot be attributed to
+     * either of them, so collapsing the list to one name would manufacture an
+     * accountability the data does not support — which is the whole reason
+     * the count is stored beside the names rather than inferred from them.
+     */
+    public function test_a_shared_shift_names_everybody_on_it(): void
+    {
+        $run = $this->preview();
+
+        $shiftThree = $run->lines->where('ShiftNo', 3)->where('StockItemNo', self::ITEM)->first();
+
+        $this->assertSame(2, $shiftThree->EmployeeCount);
+        $this->assertTrue($shiftThree->sharedShift());
+        $this->assertStringContainsString('Khumalo Thandi', $shiftThree->EmployeeNames);
+        $this->assertStringContainsString('Ndlovu Sipho', $shiftThree->EmployeeNames);
+
+        // The codes and the names are ordered the same way, so the nth code is
+        // the nth name — the only thing that makes carrying both readable.
+        $this->assertSame('TE02, TE01', $shiftThree->EmployeeCodes,
+            'Both aggregates order by the display name, so the pair lines up by index.');
+    }
+
     /** An empty window is an answer, not a failure. */
     public function test_a_window_with_no_shifts_in_it_previews_cleanly(): void
     {
@@ -517,6 +597,15 @@ class BalancingTest extends TestCase
             '2026-07-21' => [1 => [10, 50, 50, 5],  3 => [50, 0, 50, 6]],
         ];
 
+        // Two people, so the shared-shift case is covered rather than assumed.
+        foreach ([['TE01', 'Ndlovu', 'Sipho'], ['TE02', 'Khumalo', 'Thandi']] as [$code, $surname, $first]) {
+            $db->table('PumpIT.dbo.BRN_Employee')->insert([
+                'SSBranchId' => self::BRANCH, 'EmployeeCode' => $code,
+                'FirstName' => $first, 'Surname' => $surname, 'NickName' => $first,
+                'IsActive' => 1, 'IsPumpAttendant' => 0, 'PostNo' => 0,
+            ]);
+        }
+
         foreach ($chain as $date => $shifts) {
             foreach ($shifts as $shift => [$open, $issued, $close, $pos]) {
                 $db->table('PumpIT.dbo.STK_StockReconLine')->insert(
@@ -539,6 +628,17 @@ class BalancingTest extends TestCase
             $db->table('PumpIT.dbo.STK_StockReconLine')->insert(
                 $this->line(self::ITEM, $date, 2, $shifts[1][2], 0, $shifts[1][2], 0)
             );
+
+            // Who was on. Shift 1 is one person; shift 3 is TWO, which is the
+            // case that must never collapse to a single name.
+            foreach ([[1, ['TE01']], [3, ['TE01', 'TE02']]] as [$shift, $codes]) {
+                foreach ($codes as $code) {
+                    $db->table('PumpIT.dbo.STK_StockReconEmployees')->insert([
+                        'SSBranchId' => self::BRANCH, 'TransactionDate' => $date,
+                        'ShiftNo' => $shift, 'AreaNo' => self::AREA, 'EmployeeCode' => $code,
+                    ]);
+                }
+            }
         }
     }
 
@@ -562,7 +662,8 @@ class BalancingTest extends TestCase
     {
         $db = $this->db();
 
-        foreach (['STK_StockReconLine', 'STK_StockMaster', 'STK_Area'] as $table) {
+        foreach (['STK_StockReconLine', 'STK_StockReconEmployees', 'STK_StockMaster',
+            'STK_Area', 'BRN_Employee'] as $table) {
             $db->table("PumpIT.dbo.{$table}")->where('SSBranchId', self::BRANCH)->delete();
         }
 

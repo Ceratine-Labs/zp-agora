@@ -22,6 +22,7 @@
         <h4>{{ $item->StockItemDescription ?? $line->StockItemNo }}</h4>
         <p class="muted">
             {{ $item->AreaDescription ?? 'area '.$line->AreaNo }}
+            · item <code>{{ $line->StockItemNo }}</code>
             @if ($item?->POSCode) · POS <code>{{ $item->POSCode }}</code> @endif
             @if ($item?->StockLocation) · {{ $item->StockLocation }} @endif
             @if ($item?->UOMCode) · {{ $item->UOMCode }} @endif
@@ -37,6 +38,13 @@
         ['label' => 'Chain', 'value' => ($item?->ChainBlocked ? 'Reported' : 'Balanceable'),
          'note' => $item?->ChainBlocked ? 'blocked whole' : 'every over goes to zero',
          'tone' => $item?->ChainBlocked ? 'serious' : 'good'],
+        /* How many different people appear anywhere on this chain. One is a
+           chain a single person is answerable for; six is a chain where a
+           persistent short is about the item or the process, not a person. */
+        ['label' => 'People on it', 'value' => \App\Support\Format::n($item?->DistinctEmployeeSets),
+         'note' => (int) ($item?->DistinctEmployeeSets ?? 0) > 1
+             ? 'a short spread across several is about the item, not a person'
+             : 'one person across the whole chain'],
     ]" />
 
     @if ($blocks->isNotEmpty())
@@ -57,7 +65,7 @@
              empty="This item has no other shift in the window.">
         <x-slot:head>
             <tr>
-                <th class="l">Date</th><th class="num">Shift</th>
+                <th class="l">Date</th><th class="num">Shift</th><th class="l">On shift</th>
                 <th class="num">Open</th><th class="num">Issued</th><th class="num">Close</th>
                 <th class="num">POS</th><th class="num">Variance</th><th class="num">Cumulative</th>
                 <th class="num grp">New open</th><th class="num">New close</th><th class="num">Amend</th>
@@ -69,6 +77,20 @@
             <tr @class(['is-matched' => (bool) $shift->IsClicked])>
                 <td class="l">{{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }}</td>
                 <td class="num">{{ $shift->ShiftNo }}</td>
+                {{-- Who was signed on to this counting area for this shift.
+                     The method note listed this as the second thing the
+                     algorithm could not see; the estate records it after all,
+                     at exactly this grain. --}}
+                <td class="l">
+                    @if ($shift->EmployeeNames)
+                        {{ $shift->EmployeeNames }}
+                        @if ((int) $shift->EmployeeCount > 1)
+                            <x-chip tone="warn" :dot="false">{{ $shift->EmployeeCount }} on shift</x-chip>
+                        @endif
+                    @else
+                        <span class="muted">—</span>
+                    @endif
+                </td>
                 <td class="num">{{ \App\Support\Format::n($shift->QtyOpen, 3) }}</td>
                 <td class="num">{{ (float) $shift->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($shift->QtyIssued, 3) }}</td>
                 <td class="num">{{ \App\Support\Format::n($shift->QtyClose, 3) }}</td>
@@ -91,6 +113,11 @@
         @endforeach
     </x-table>
 
+    <p class="field-help">
+        <strong>Two people on a shift is not two people to charge.</strong> Where a shift is shared the
+        panel names both and says so: the counts cannot tell you which of them the variance belongs to,
+        and a screen that showed one name would be deciding that on your behalf.
+    </p>
     <p class="field-help">
         Only the closing count is amended. The opening follows automatically, because it <em>is</em> the
         previous closing — which is why a shift whose closing is pinned can still have its opening moved,
