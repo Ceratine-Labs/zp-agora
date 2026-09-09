@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\User;
 use Modules\Core\Services\ActivityLogger;
+use Modules\Core\Support\Sso;
 
 /**
  * Sign in and out.
@@ -131,6 +132,18 @@ class LoginController extends Controller
         return redirect()->intended(route($user->landingRoute()));
     }
 
+    /**
+     * Sign out — of this app, and of ZP-NQL with it.
+     *
+     * The hand-off is not a nicety. With cross-app sign-in on, a session left
+     * standing at ZP is one the very next page load here would pull back
+     * through the handshake, so a sign-out that only cleared this side would
+     * read as a button that does nothing.
+     *
+     * The guard cookie goes out too, and covers the window between this
+     * response and ZP's: without it the redirect to the login page is itself
+     * a page load that would trigger a fresh handshake.
+     */
     public function destroy(Request $request): RedirectResponse
     {
         $user = $request->user();
@@ -142,6 +155,12 @@ class LoginController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        if (Sso::enabled()) {
+            return redirect()
+                ->away(Sso::peerLogoutUrl(route('login')))
+                ->withCookie(Sso::guardCookie());
+        }
 
         return redirect()->route('login');
     }
