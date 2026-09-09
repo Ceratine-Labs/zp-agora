@@ -210,6 +210,76 @@ class AutoReconPreviewTest extends TestCase
         $this->assertEqualsWithDelta(750.00, (float) $detail['mops']->sum('Amount'), 0.001);
     }
 
+    /**
+     * Run #260's bug, reproduced on the stub.
+     *
+     * Ryan expanded a Matched proposal on branch 13 and the panel said "Bank
+     * lines 0 · R0.00" and "Nothing was declared against this reference" — of
+     * a batch whose 17 deposits and 4 bank lines had every one been stamped
+     * since the preview, as batches 125384 and 125385. Both drills filtered to
+     * what was still outstanding, so a fully settled batch and a batch that
+     * never existed rendered identically.
+     *
+     * The bank side has had @IncludeReconciled since usp_Recon_Commit needed
+     * it; the deposit side had no such parameter at all until 9 Sep 2026.
+     */
+    public function test_a_proposal_reconciled_by_something_else_still_shows_what_it_matched(): void
+    {
+        $run = $this->preview();
+        $line = $run->lines->firstWhere('KeyRef', '125');
+        $this->assertNotNull($line);
+
+        // Something else gets there first — the customer's own executable, or
+        // another clerk — after the preview was taken.
+        $pumpit = $this->db();
+        $pumpit->statement('UPDATE PumpIT.dbo.BRN_DailyBankingABSA SET ReconBatchNoPumpIT = 125384
+                            WHERE SSBranchId = ? AND BatchNumber = 125', [self::BRANCH]);
+        $pumpit->statement("UPDATE PumpIT.dbo.RCN_BankStatementLinesPumpIT SET ReconState = 2, ReconBatchNo = 125384
+                            WHERE SSBranchId = ? AND SUBSTRING(Description, 58, 3) = '125'", [self::BRANCH]);
+
+        $sides = $this->service->drill($run, $line);
+
+        $this->assertCount(2, $sides['bank'], 'The two bank lines must still be visible, not hidden by the stamp.');
+        $this->assertCount(1, $sides['mops'], 'The deposit must still be visible — this is the half that had no parameter.');
+
+        $this->assertSame(
+            [2, 2],
+            $sides['bank']->pluck('ReconState')->map(fn ($v) => (int) $v)->all(),
+            'A claimed bank line must come back LABELLED so the panel can say what happened to it.'
+        );
+        $this->assertSame(
+            125384,
+            (int) $sides['mops']->first()->ReconBatchNoPumpIT,
+            'The deposit must carry the batch that claimed it — "reconciled" with no number is not an answer.'
+        );
+    }
+
+    /**
+     * And the writer is unmoved by any of it.
+     *
+     * usp_Recon_Commit calls the same procedure with @IncludeReconciled = 0.
+     * A claimed deposit must not reach the arithmetic or the stamp — unlike
+     * the bank side there is no @MopsClaimed to move it into — so the narrow
+     * call must still return nothing.
+     */
+    public function test_the_narrow_drill_still_hides_a_claimed_deposit(): void
+    {
+        $run = $this->preview();
+        $line = $run->lines->firstWhere('KeyRef', '125');
+
+        $this->db()->statement('UPDATE PumpIT.dbo.BRN_DailyBankingABSA SET ReconBatchNoPumpIT = 125384
+                                WHERE SSBranchId = ? AND BatchNumber = 125', [self::BRANCH]);
+
+        $narrow = DB::connection(config('agora.connections.app'))->select(
+            'EXEC agora.usp_Recon_DrillMops @ReconArea = ?, @BranchId = ?, @FromDate = ?, @ToDate = ?,
+                 @KeyRef = ?, @IncludeReconciled = 0',
+            ['ABSA', self::BRANCH, $run->FromDate->toDateString(),
+                $run->ToDate->endOfDay()->toDateTimeString(), $line->KeyRef]
+        );
+
+        $this->assertSame([], $narrow, 'The commit must not see a deposit something else has claimed.');
+    }
+
     /** A preview is a record of a read, so it can simply go. */
     public function test_a_preview_can_be_discarded_with_its_lines(): void
     {
@@ -246,6 +316,46 @@ class AutoReconPreviewTest extends TestCase
         }
 
         $this->assertNotNull(ReconRun::query()->acrossBranches()->find($run->Id));
+    }
+
+    /**
+     * The hole the committed-only guard left.
+     *
+     * A reversed run stamped rows and then unstamped them, so something was
+     * unarguably processed against it — and it is the only record that both
+     * halves happened. The old guard named 'committed' alone and let it
+     * through, and because the procedure deletes ReconRun and ReconRunLine and
+     * nothing else, sweeping one orphaned its ReconBatch, ReconMatch and
+     * ReconStamp rows against a RunId that no longer existed.
+     *
+     * Ryan, 9 Sep 2026: "if anything is processed against a run we can't close
+     * it, else the ladies can remove it, but if anything processed then no."
+     */
+    public function test_a_reversed_run_is_refused(): void
+    {
+        $run = $this->preview();
+        $run->forceFill(['Status' => 'reversed'])->save();
+
+        try {
+            $this->service->discard(self::BRANCH, null, $run->Id);
+            $this->fail('Discarding a reversed run must be refused — it stamped rows and then unstamped them.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('RUN_COMMITTED', $e->code());
+        }
+
+        $this->assertNotNull(ReconRun::query()->acrossBranches()->find($run->Id));
+    }
+
+    /** And a sweep must skip it too, not merely refuse it when named. */
+    public function test_a_sweep_keeps_reversed_runs(): void
+    {
+        $keep = $this->preview();
+        $keep->forceFill(['Status' => 'reversed'])->save();
+        $this->preview();
+
+        $this->assertSame(1, $this->service->discard(self::BRANCH, 'ABSA'));
+
+        $this->assertNotNull(ReconRun::query()->acrossBranches()->find($keep->Id));
     }
 
     /**

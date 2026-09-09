@@ -346,10 +346,25 @@ table.dt {
   /* Kept a step below the default, which moved down with it. A dense table
      that was looser than a normal one would be a ladder with a rung missing. */
   &.dense { th, td { padding: 2px 8px; } }
+  /* The outcome rail, and the tint behind it.
+     The rail alone was three pixels at the far left of a fifteen-column table
+     — by the time the eye reached the Rule column there was nothing left
+     saying which kind of row it was on. Ryan, 9 Sep 2026: "can highlight
+     matched rows that are shown in green to differentiate". So the whole row
+     carries a wash of its own tone, kept very light because a full-strength
+     --good behind a table of figures is unreadable (the same reason the token
+     file already separates --good from --good-fill). Hover still wins, so the
+     row under the cursor is unambiguous. */
   tr.is-matched td:first-child { box-shadow: inset 3px 0 0 var(--good); }
   tr.is-warn    td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
   tr.is-serious td:first-child { box-shadow: inset 3px 0 0 var(--serious); }
   tr.is-crit    td:first-child { box-shadow: inset 3px 0 0 var(--crit); }
+  tbody tr.is-matched { background: var(--good-bg); }
+  tbody tr.is-warn    { background: var(--warn-bg); }
+  tbody tr.is-serious { background: var(--serious-bg); }
+  tbody tr.is-crit    { background: var(--crit-bg); }
+  tbody tr.is-matched:hover, tbody tr.is-warn:hover,
+  tbody tr.is-serious:hover, tbody tr.is-crit:hover { background: var(--surface-2); }
 }
 
 .table-empty { padding: 18px 14px; }
@@ -749,6 +764,28 @@ tr.row-detail > td {
   font-size: 11px; color: var(--muted);
 }
 .drill-warn { color: var(--warn-ink); }
+
+/* Rows something else reconciled since the preview was taken.
+   Listed rather than hidden — hidden, they were indistinguishable from rows
+   that never existed, and the panel then claimed nothing had been declared
+   about a batch that was fully settled. Struck through and dimmed, because
+   they are context for the reader and NOT what Execute will act on. */
+.drill-claimed-note {
+  grid-column: 1 / -1;
+  margin: 0; padding: 10px 14px;
+  font-size: 12.5px; line-height: 1.55;
+  color: var(--warn-ink); background: var(--warn-bg);
+  border-bottom: 1px solid var(--line-soft);
+  strong { font-weight: 600; }
+}
+table.dt.drill-gone {
+  margin-top: 8px; opacity: .75;
+  thead th { font-style: italic; }
+  tbody td { text-decoration: line-through; text-decoration-color: var(--muted); }
+  /* The batch that claimed it is the one thing here that is not struck out —
+     it is the answer to "what happened to this", not part of the loss. */
+  tbody td:nth-last-child(2) { text-decoration: none; color: var(--warn-ink); }
+}
 
 /* An action rendered as a form — a POST or DELETE that must not be a link.
    Keeps it on the baseline of whatever it sits beside. */

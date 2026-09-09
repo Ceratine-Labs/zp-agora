@@ -306,6 +306,25 @@ class ReconService
             // Only CashBags fills this, and only on a proposal that IS one
             // deposit. It is what lets an orphan be drilled at all.
             'MopsSourceId' => $line->MopsSourceId,
+            /*
+             * The screen sees rows something else has reconciled since the
+             * preview; the commit does not.
+             *
+             * Narrow, a claimed row is indistinguishable from a row that never
+             * existed, and the panel says "Nothing on the statement carries
+             * this reference" about a batch that has just been settled by the
+             * customer's own executable. Run #260 (branch 13, ABSA, batch 904)
+             * was exactly that: 17 deposits and 4 bank lines, every one of
+             * them stamped since, and both columns empty. What the screen owes
+             * the reader there is "these were claimed by batch 125384", not
+             * silence.
+             *
+             * The rows come back LABELLED, not merged — see the run-38 note in
+             * usp_Recon_Commit. A widened drill also returns other rows sharing
+             * the key and window that were never part of this proposal, so the
+             * panel separates the two rather than presenting them as one list.
+             */
+            'IncludeReconciled' => 1,
         ];
 
         foreach (array_intersect_key($run->params(), array_flip($replayed)) as $name => $value) {

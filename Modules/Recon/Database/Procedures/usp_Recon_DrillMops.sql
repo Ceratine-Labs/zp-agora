@@ -57,7 +57,22 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_DrillMops]
        everywhere else, and null on a run previewed before agora.ReconRunLine
        carried the column — in which case the reference paths below behave
        exactly as they always have. */
-    @MopsSourceId      bigint        = NULL
+    @MopsSourceId      bigint        = NULL,
+    /*
+     * Off by default, so agora.usp_Recon_Commit sees exactly what it has
+     * always seen. ON for the SCREEN, which has to be able to show a deposit
+     * something else has reconciled since the preview was taken.
+     *
+     * Filtered out, such a row looks like a row that never existed — and the
+     * panel then says "Nothing was declared against this reference" about a
+     * batch whose every deposit was in fact declared and has since been
+     * settled. Ryan hit exactly that on run #260 (branch 13, ABSA, batch 904):
+     * 17 deposits worth R2,241.20, all of them carrying a non-zero
+     * ReconBatchNoPumpIT, and the drill showing nothing at all. The bank side
+     * has had @IncludeReconciled since the commit needed it; this is the
+     * deposit side catching up.
+     */
+    @IncludeReconciled bit           = 0
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -132,10 +147,11 @@ BEGIN
                'Merchant '+ LTRIM(RTRIM(a.MerchantNumber))        AS Detail,
                CONVERT(bigint, NULL)                              AS SourceId,
                LTRIM(RTRIM(CONVERT(nvarchar(50), a.BatchNumber)))
-                 + '|' + LTRIM(RTRIM(a.MerchantNumber))           AS SourceKey
+                 + '|' + LTRIM(RTRIM(a.MerchantNumber))           AS SourceKey,
+               a.ReconBatchNoPumpIT                               AS ReconBatchNoPumpIT
         FROM agora.vw_DailyBankingABSA a
         WHERE a.BranchId = @BranchId
-          AND a.ReconBatchNoPumpIT = 0
+          AND (@IncludeReconciled = 1 OR a.ReconBatchNoPumpIT = 0)
           AND a.TransactionDate >= @FromDate AND a.TransactionDate <= @ToDate
           AND TRY_CONVERT(bigint, LTRIM(RTRIM(CONVERT(nvarchar(50), a.BatchNumber)))) = TRY_CONVERT(bigint, @Ref)
           AND (@KeyRef2 IS NULL OR TRY_CONVERT(int, a.MerchantNumber) = TRY_CONVERT(int, @KeyRef2))
@@ -147,10 +163,11 @@ BEGIN
                f.Amount                                 AS Amount,
                'Merchant '+ LTRIM(RTRIM(f.MerchantNo))  AS Detail,
                CONVERT(bigint, NULL)                    AS SourceId,
-               LTRIM(RTRIM(f.BatchNo)) + '|' + LTRIM(RTRIM(f.MerchantNo)) AS SourceKey
+               LTRIM(RTRIM(f.BatchNo)) + '|' + LTRIM(RTRIM(f.MerchantNo)) AS SourceKey,
+               f.ReconBatchNoPumpIT                     AS ReconBatchNoPumpIT
         FROM agora.vw_DailyBankingFNB f
         WHERE f.BranchId = @BranchId
-          AND f.ReconBatchNoPumpIT = 0
+          AND (@IncludeReconciled = 1 OR f.ReconBatchNoPumpIT = 0)
           AND f.TransactionDate >= @FromDate AND f.TransactionDate <= @ToDate
           AND (
                 /* The standalone population has no batch reference; it is
@@ -176,10 +193,11 @@ BEGIN
                /* The whole slip number, not the configured slice — the slice
                   is what the two sides are MATCHED on, the slip is what the
                   row IS. Stamping must address the row. */
-               LTRIM(RTRIM(d.SlipNo))                                  AS SourceKey
+               LTRIM(RTRIM(d.SlipNo))                                  AS SourceKey,
+               d.ReconBatchNoPumpIT                                     AS ReconBatchNoPumpIT
         FROM agora.vw_DailyBankingDeposita d
         WHERE d.BranchId = @BranchId
-          AND d.ReconBatchNoPumpIT = 0
+          AND (@IncludeReconciled = 1 OR d.ReconBatchNoPumpIT = 0)
           AND d.TransactionDate >= @FromDate AND d.TransactionDate <= @ToDate
           AND LTRIM(RTRIM(SUBSTRING(d.SlipNo, @MopsStart, @MopsLen))) = @Ref
         ORDER BY d.TransactionDate;
@@ -198,9 +216,11 @@ BEGIN
                             ELSE '' END    AS Detail,
                /* The one area whose deposit table has a key of its own. */
                g.DailyBankingCashBagID     AS SourceId,
-               CONVERT(nvarchar(50), g.DailyBankingCashBagID) AS SourceKey
+               CONVERT(nvarchar(50), g.DailyBankingCashBagID) AS SourceKey,
+               g.ReconBatchNoPumpIT        AS ReconBatchNoPumpIT
         FROM (
             SELECT a.DailyBankingCashBagID, a.TransactionDate, a.CashBagNo, a.CashBagAmount,
+                   a.ReconBatchNoPumpIT,
                    MAX(d.DBagNo) AS DBagNo, COUNT(d.DBagNo) AS CollectionRows
             FROM agora.vw_DailyBankingCashBags a
             LEFT JOIN agora.vw_DropSafe c
@@ -208,9 +228,10 @@ BEGIN
             LEFT JOIN agora.vw_DropSafeCollection d
                    ON d.BranchId = c.BranchId AND d.CollectionId = c.CollectionId
             WHERE a.BranchId = @BranchId
-              AND a.ReconBatchNoPumpIT = 0
+              AND (@IncludeReconciled = 1 OR a.ReconBatchNoPumpIT = 0)
               AND a.TransactionDate >= @FromDate AND a.TransactionDate <= @ToDate
-            GROUP BY a.DailyBankingCashBagID, a.TransactionDate, a.CashBagNo, a.CashBagAmount
+            GROUP BY a.DailyBankingCashBagID, a.TransactionDate, a.CashBagNo, a.CashBagAmount,
+                     a.ReconBatchNoPumpIT
         ) g
         CROSS APPLY (SELECT ISNULL(g.DBagNo, g.CashBagNo) AS Ref) r
         WHERE
@@ -250,13 +271,14 @@ BEGIN
                /* This table has a key of its own; use it rather than a string
                   built out of a float. */
                a.DailyBankingSmartATMID                                    AS SourceId,
-               CONVERT(nvarchar(50), a.DailyBankingSmartATMID)             AS SourceKey
+               CONVERT(nvarchar(50), a.DailyBankingSmartATMID)             AS SourceKey,
+               a.ReconBatchNoPumpIT                                        AS ReconBatchNoPumpIT
         FROM agora.vw_DailyBankingSmartATM a
         LEFT JOIN agora.vw_SmartATM b
                ON a.BranchId = b.BranchId AND a.TerminalId = b.TerminalId
               AND a.TraceNo = b.TraceNo AND a.UniqueNo = b.UniqueNo
         WHERE a.BranchId = @BranchId
-          AND a.ReconBatchNoPumpIT = 0
+          AND (@IncludeReconciled = 1 OR a.ReconBatchNoPumpIT = 0)
           AND ISNULL(b.DepositDateTime, a.DepositDateTime) >= @FromDate
           AND ISNULL(b.DepositDateTime, a.DepositDateTime) <= @ToDate
           AND LTRIM(RTRIM(SUBSTRING(a.TerminalId, @MopsStart, @MopsLen))) = @Ref
@@ -273,6 +295,7 @@ BEGIN
                CONVERT(money, NULL)         AS Amount,
                CONVERT(nvarchar(200), NULL) AS Detail,
                CONVERT(bigint, NULL)        AS SourceId,
-               CONVERT(nvarchar(200), NULL) AS SourceKey
+               CONVERT(nvarchar(200), NULL) AS SourceKey,
+               CONVERT(int, NULL)           AS ReconBatchNoPumpIT
         WHERE 1 = 0;
 END
