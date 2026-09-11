@@ -301,6 +301,33 @@ class StockReconService
     }
 
     /**
+     * Tick everything the commit could still honour.
+     *
+     * The default state of the screen: the preview sets Selected = WouldAmend
+     * "because the ask is the least interaction". After a SINGLE-row amend the
+     * selection has been narrowed to that one row, and leaving it there would
+     * hand the operator a screen where nothing is ticked and no explanation of
+     * why — so the default is put back, minus whatever just committed.
+     *
+     * Same predicate as select(), deliberately: two definitions of "a row the
+     * commit could honour" is how one of them ends up offering a tick the
+     * commit has to break.
+     */
+    public function selectAllAmendable(StockReconRun $run): int
+    {
+        $table = config('agora.schema').'.StockReconRunLine';
+
+        return DB::connection((new StockReconRunLine)->getConnectionName())
+            ->table($table)
+            ->where('BranchId', $run->BranchId)
+            ->where('RunId', $run->Id)
+            ->where('WouldAmend', true)
+            ->where('ChainBlocked', false)
+            ->where('CommitState', 'pending')
+            ->update(['Selected' => true]);
+    }
+
+    /**
      * The chain behind one shift — the row detail panel.
      *
      * A shift on its own cannot be judged: its variance came from the counts on

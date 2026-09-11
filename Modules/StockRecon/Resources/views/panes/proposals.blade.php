@@ -172,16 +172,30 @@
                     <th class="num">Close</th>
                     <th class="num">POS</th>
                     <th class="num">Variance</th>
-                    {{-- The balanced half. Named rather than grouped under a
-                         spanning row: `tools` builds its sort control and its
-                         filter row from the header cells, and a second header
-                         row would give it two of everything. Two columns
-                         called "Open" a few pixels apart is worse than a
-                         longer word. --}}
+                    {{-- The balanced half, named rather than grouped.
+
+                         NOT because `tools` forbids it — an earlier note here
+                         said a second header row would give it two of
+                         everything, and that is wrong: TableTools reads
+                         `head.rows[LAST]` for its columns and only the sticky
+                         height reads row 0, so a spanning row is available
+                         here exactly as it is on the chain panel. The reason
+                         is narrower: this table is sorted and filtered per
+                         column, and two sortable columns both labelled "Open"
+                         a few pixels apart is worse than one longer word. --}}
                     <th class="num grp">New open</th>
                     <th class="num">New close</th>
                     <th class="num">Amend</th>
                     <th class="num">New variance</th>
+                    {{-- The per-row press. `data-no-tools` keeps the cell in
+                         the filter row so the columns still line up, without
+                         offering to sort or filter a column of buttons.
+                         Deliberately unlabelled: the numeric "Amend" column is
+                         three cells to the left and two headings reading
+                         "Amend" would be worse than none. --}}
+                    @if ($run->isOpen())
+                        <th class="fit-min" data-no-tools></th>
+                    @endif
                 </tr>
             </x-slot:head>
 
@@ -245,6 +259,35 @@
                     <td class="num">{{ \App\Support\Format::n($line->QtyCloseNew, 3) }}</td>
                     <td class="num">{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::n($line->AmendClose, 3) }}</td>
                     <td class="num">{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($line->QtyVarNew, 3) }}</td>
+                    @if ($run->isOpen())
+                        {{-- AMEND THIS ONE SHIFT, without touching the ticks.
+
+                             Every amendable row arrives ticked, so writing a
+                             single shift used to mean unticking everything
+                             else first. The button posts `only` with this
+                             row's id and the commit narrows to it.
+
+                             Same predicate as the tick box beside it and as
+                             StockReconService::select(): a press the commit
+                             would have to refuse is not offered. And it
+                             carries its OWN confirmation, because "amend 24
+                             shifts" is the wrong sentence to read immediately
+                             before writing one. --}}
+                        <td class="fit-min">
+                            @if ($line->WouldAmend && ! $line->ChainBlocked && $line->CommitState === 'pending')
+                                <button type="submit" name="only" value="{{ $line->Id }}"
+                                        class="btn-ghost btn-row"
+                                        data-confirm-single
+                                        data-confirm="{{ $stampMode === 'live' ? 'Amend this one shift in PumpIT?' : 'Record this one amendment?' }}"
+                                        data-confirm-text="{{ $line->StockItemDescription ?? $line->StockItemNo }} · {{ $line->TransactionDate->format('d M Y') }} shift {{ $line->ShiftNo }} · closing {{ \App\Support\Format::n($line->QtyClose, 3) }} becomes {{ \App\Support\Format::n($line->QtyCloseNew, 3) }}.{{ $stampMode === 'live' ? ' Nothing else on this run is written, and it is reversible from this page.' : ' Journal mode: nothing in PumpIT changes.' }}"
+                                        data-confirm-action="{{ $stampMode === 'live' ? 'Amend' : 'Record' }}"
+                                        @if ($stampMode === 'live') data-confirm-danger @endif
+                                        aria-label="Amend {{ $line->StockItemNo }} on {{ $line->TransactionDate->toDateString() }} shift {{ $line->ShiftNo }}, this shift only">
+                                    {{ $stampMode === 'live' ? 'Amend' : 'Record' }}
+                                </button>
+                            @endif
+                        </td>
+                    @endif
                 </tr>
             @endforeach
         </x-table>

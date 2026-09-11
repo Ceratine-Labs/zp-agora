@@ -374,6 +374,13 @@ table.dt {
     padding-bottom: 2px; border-bottom: 0; white-space: nowrap;
   }
   td.money { font-variant-numeric: tabular-nums; }
+  /* A press inside a dense row. Compact enough not to set the row height —
+     the row is 2px of padding and this must live inside that, or every row on
+     the table grows to fit a button most of them do not have. */
+  .btn-row {
+    padding: 1px 9px; font-size: 11px; line-height: 1.5;
+    white-space: nowrap; border-radius: var(--r);
+  }
   tbody tr.is-matched { background: var(--good-bg); }
   tbody tr.is-warn    { background: var(--warn-bg); }
   tbody tr.is-serious { background: var(--serious-bg); }

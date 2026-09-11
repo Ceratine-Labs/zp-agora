@@ -7,6 +7,7 @@ use App\Support\ProcedureService;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Models\User;
 use Modules\StockRecon\Models\StockReconAmendment;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
@@ -336,6 +337,60 @@ class BalancingTest extends TestCase
 
         $line->ChainNetVar = 0.0;
         $this->assertTrue($line->isEmptyChain());
+    }
+
+    /**
+     * One shift, from its own row, without touching the ticks.
+     *
+     * Ryan, 11 Sep 2026: "the user cant select 1 row at a time, we need to be
+     * able to amend per row." Every amendable row arrives ticked, so writing a
+     * single shift meant unticking every other row first.
+     *
+     * The two things worth asserting are that exactly one row is written, and
+     * that the screen is handed back in a usable state rather than with the
+     * narrowing left behind it.
+     */
+    public function test_a_single_row_amend_writes_that_shift_and_no_other(): void
+    {
+        $user = User::query()->acrossBranches()->where('EmailAddress', 'ryan@revvtech.co.za')->first();
+
+        if (! $user) {
+            $this->markTestSkipped('No seeded administrator — run db:seed first.');
+        }
+
+        $run = $this->preview();
+
+        $amendable = $run->lines
+            ->where('WouldAmend', true)
+            ->where('ChainBlocked', false)
+            ->where('CommitState', 'pending');
+
+        $this->assertGreaterThan(1, $amendable->count(),
+            'This proves nothing unless there is more than one row it could have written.');
+
+        $target = $amendable->first();
+
+        $this->actingAs($user)
+            ->post(route('app.stockrecon.commit', $run), ['only' => (string) $target->Id])
+            ->assertRedirect(route('app.stockrecon.run', $run));
+
+        $after = StockReconRunLine::query()->acrossBranches()->where('RunId', $run->Id)->get();
+
+        $this->assertSame('committed', $after->firstWhere('Id', $target->Id)->CommitState,
+            'The row whose button was pressed must be written.');
+
+        $others = $after->where('Id', '!=', $target->Id)->where('CommitState', 'committed');
+        $this->assertCount(0, $others,
+            'A single-row amend that wrote anything else is the failure this exists to prevent.');
+
+        /* And the screen comes back usable: the narrowing was a means, not an
+           instruction, so what is still amendable is ticked again. */
+        $stillOpen = $after->where('WouldAmend', true)->where('CommitState', 'pending');
+
+        foreach ($stillOpen as $line) {
+            $this->assertTrue((bool) $line->Selected,
+                'After a single-row amend the remaining rows must not be left unticked.');
+        }
     }
 
     public function test_the_preview_is_idempotent(): void

@@ -253,12 +253,52 @@ class StockReconController extends Controller
             $submitted,
         )));
 
+        /*
+         * ONE SHIFT, FROM ITS OWN ROW.
+         *
+         * Every amendable row arrives ticked — the preview sets Selected =
+         * WouldAmend, "because the ask is the least interaction" — which is
+         * right for the common case and leaves the uncommon one very
+         * expensive: to write a single shift the operator had to untick every
+         * other row on the screen first. Ryan, 11 Sep 2026: "the user cant
+         * select 1 row at a time".
+         *
+         * So a per-row button posts `only` with that row's id, and it REPLACES
+         * the ticks rather than adding to them. It is still the same commit,
+         * through the same procedure, with the same re-check and the same
+         * reversal — the selection is the only thing that differs, which is
+         * what keeps this from being a second way to write.
+         */
+        $only = $request->input('only');
+        $single = is_scalar($only) && (int) $only > 0;
+
+        if ($single) {
+            $lineIds = [(int) $only];
+        }
+
         $this->service->select($run, $lineIds);
 
         try {
             $result = $this->service->commit($run->fresh());
         } catch (AgoraProcException $e) {
+            // The narrowing was a means, not an instruction: a refusal must not
+            // leave the operator with a screen ticked differently from the one
+            // they pressed on.
+            if ($single) {
+                $this->service->selectAllAmendable($run);
+            }
+
             return back()->with('refusal', $e->getMessage());
+        }
+
+        /*
+         * Put the default back. A single-row amend narrowed the selection to
+         * one row; leaving it there hands back a screen with nothing ticked
+         * and no reason given. Everything the commit could still honour is
+         * re-ticked — which is the state the preview itself produces.
+         */
+        if ($single) {
+            $this->service->selectAllAmendable($run->fresh());
         }
 
         return redirect()

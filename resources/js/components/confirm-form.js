@@ -42,22 +42,70 @@ export default function confirmForm() {
 
             event.preventDefault();
 
+            /*
+             * THE BUTTON THAT WAS PRESSED, not just the form.
+             *
+             * A submit button carrying its own `data-confirm` speaks for
+             * itself — a per-row action in a table of many is not the same
+             * press as the form's main button and must not borrow its wording.
+             * Falls back to the form, so every existing form is unchanged.
+             *
+             * `event.submitter` is null when the form is submitted by Enter or
+             * by script, which is exactly when the form's own wording is right.
+             */
+            const by = event.submitter;
+            const src = by && by.dataset.confirm ? by.dataset : form.dataset;
+
+            /*
+             * A single-row action is not narrowed by a column filter — it names
+             * one row by id — so the filter warning would be a lie about it.
+             */
+            const single = Boolean(by && by.hasAttribute('data-confirm-single'));
+
             // The filter line LEADS. It is the part that can surprise; the
             // standing explanation below it is the same every time and is
             // already familiar to anybody pressing this button.
-            const text = [filtered(form), form.dataset.confirmText || '']
+            const text = [single ? '' : filtered(form), src.confirmText || '']
                 .filter(Boolean)
                 .join('\n\n');
 
-            const ok = await window.Agora.notify.confirm(form.dataset.confirm, {
+            const ok = await window.Agora.notify.confirm(src.confirm, {
                 text,
-                action: form.dataset.confirmAction || 'Continue',
-                danger: form.hasAttribute('data-confirm-danger'),
+                action: src.confirmAction || 'Continue',
+                danger: by && by.dataset.confirm
+                    ? by.hasAttribute('data-confirm-danger')
+                    : form.hasAttribute('data-confirm-danger'),
             });
 
             if (!ok) return;
 
             form.dataset.confirmed = 'yes';
+
+            /*
+             * ⚠ `form.submit()` DOES NOT SEND THE SUBMITTER.
+             *
+             * A real press posts the pressed button's name and value; calling
+             * submit() from script posts neither. So a named button behind a
+             * confirmation silently loses what it was naming — and for a
+             * per-row amend that means the row id vanishes and the commit
+             * falls back to "everything ticked", which is the whole table.
+             * Confirming a one-row action and writing forty is precisely the
+             * failure the confirmation exists to prevent.
+             *
+             * Carrying it by hand is the fix. requestSubmit(by) would also do
+             * it, but it re-enters this handler and the `confirmed` latch is
+             * what stops that being an infinite loop — this way the flow stays
+             * one-directional and obvious.
+             */
+            if (by && by.name) {
+                const carry = document.createElement('input');
+
+                carry.type = 'hidden';
+                carry.name = by.name;
+                carry.value = by.value;
+                form.appendChild(carry);
+            }
+
             form.submit();
         });
     });
