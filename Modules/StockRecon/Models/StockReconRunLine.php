@@ -247,4 +247,29 @@ class StockReconRunLine extends BaseModel
     {
         return $this->WouldAmend && abs($this->amendment()) <= 0.005;
     }
+
+    /**
+     * A chain that carries nothing at all.
+     *
+     * "Too few active shifts to balance" catches two different things, and
+     * only one of them is noise. A chain with ONE active shift and a real
+     * variance is flagged short because there is nowhere to move the variance
+     * TO — and that is precisely the accountable case, the short nobody can
+     * balance away. A chain with NO active shift and no net variance is the
+     * other thing: fourteen identical rows, opening equal to closing
+     * throughout, a total of 0.000 and R0.00. Nothing moved, nothing is owed,
+     * and there is nothing for a person to decide.
+     *
+     * So the test is the SUBSTANCE, not the flag. Hiding on FlagShortChain
+     * alone would take the accountable case with it, which is the one row on
+     * the screen that must never disappear.
+     *
+     * Ryan, 11 Sep 2026: "shall we omit chains too short?" — yes, but only
+     * these.
+     */
+    public function isEmptyChain(): bool
+    {
+        return (bool) $this->FlagShortChain
+            && abs((float) $this->ChainNetVar) < 0.0005;
+    }
 }

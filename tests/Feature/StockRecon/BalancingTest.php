@@ -245,6 +245,99 @@ class BalancingTest extends TestCase
     }
 
     /** The counts are read from the _Original columns, so a re-run never compounds. */
+    /**
+     * The rand beside the quantity, on both sides of the chain.
+     *
+     * Ryan, 11 Sep 2026, reading run 7 next to the legacy Stock Recon
+     * Balancing window: "any chance in the detail we can show the original
+     * value and the amended value?" That screen carries Qty Var and Value Var
+     * under each of its two blocks, because a variance is read as a pair —
+     * 0.1 kg of a R240 cheese and 0.1 kg of sauce are the same number and not
+     * the same finding.
+     *
+     * Derived from the SellPrice STORED on the run line, not joined to the
+     * master, so a price change afterwards cannot rewrite what a run said.
+     */
+    public function test_the_chain_carries_the_value_beside_the_quantity_on_both_sides(): void
+    {
+        $run = $this->preview();
+        $line = $run->lines->firstWhere('StockItemNo', self::ITEM);
+        $this->assertNotNull($line);
+
+        $shifts = $this->service->chain($run, $line)['shifts'];
+        $this->assertNotEmpty($shifts);
+
+        foreach ($shifts as $shift) {
+            $this->assertEqualsWithDelta(
+                round((float) $shift->QtyVar * 21.80, 2),
+                (float) $shift->VarValue,
+                0.005,
+                'The counted variance value must be the counted quantity at the stored price.'
+            );
+            $this->assertEqualsWithDelta(
+                round((float) $shift->QtyVarNew * 21.80, 2),
+                (float) $shift->VarValueNew,
+                0.005,
+                'The amended variance value must follow the amended quantity, not the counted one.'
+            );
+        }
+
+        $this->assertTrue(
+            $shifts->contains(fn ($s) => abs((float) $s->VarValue) > 0.005),
+            'A fixture built around a real variance must show a non-zero value somewhere, '
+            .'or this test would pass just as well against a column of zeroes.'
+        );
+    }
+
+    /**
+     * The chains worth hiding, and the one that must never be hidden with them.
+     *
+     * Ryan, 11 Sep 2026: "shall we omit chains too short?" Only half of them.
+     * "Too few active shifts to balance" covers a chain that never traded —
+     * opening equal to closing throughout, a nil total, nothing for anybody to
+     * decide — and it also covers a chain with ONE active shift carrying a
+     * real short, which is flagged only because there is nowhere to move the
+     * short TO. The second is the accountable case. Hiding on the flag would
+     * take it with the noise, so the test is the substance.
+     */
+    public function test_only_a_chain_that_carries_nothing_counts_as_empty(): void
+    {
+        $run = $this->preview();
+
+        $dormant = $run->lines->where('StockItemNo', self::DORMANT_ITEM);
+        $this->assertGreaterThan(0, $dormant->count(), 'The fixture must hold a never-trading chain.');
+
+        foreach ($dormant as $line) {
+            $this->assertTrue($line->isEmptyChain(),
+                'A chain that never moved and nets to nothing carries no finding and is hidden.');
+        }
+
+        $traded = $run->lines->where('StockItemNo', self::ITEM);
+        foreach ($traded as $line) {
+            $this->assertFalse($line->isEmptyChain(),
+                'A chain with a real total must stay on the list whatever its length.');
+        }
+    }
+
+    /**
+     * The guard the whole distinction rests on: short AND carrying something
+     * is never hidden. Asserted against the predicate directly, because the
+     * fixture has no one-active-shift chain and inventing one would be testing
+     * the fixture rather than the rule.
+     */
+    public function test_a_short_chain_that_carries_a_variance_is_never_hidden(): void
+    {
+        $line = new StockReconRunLine;
+        $line->FlagShortChain = true;
+        $line->ChainNetVar = -5.0;
+
+        $this->assertFalse($line->isEmptyChain(),
+            'One active shift with a short nobody can balance is the accountable case, not noise.');
+
+        $line->ChainNetVar = 0.0;
+        $this->assertTrue($line->isEmptyChain());
+    }
+
     public function test_the_preview_is_idempotent(): void
     {
         $first = $this->preview();

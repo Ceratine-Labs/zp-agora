@@ -359,6 +359,21 @@ table.dt {
   tr.is-warn    td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
   tr.is-serious td:first-child { box-shadow: inset 3px 0 0 var(--serious); }
   tr.is-crit    td:first-child { box-shadow: inset 3px 0 0 var(--crit); }
+  /* THE GROUP BOUNDARY. `grp` has been on the first amended column since the
+     module shipped and there has never been a rule behind it — so a table
+     showing a counted figure and an amended one put them side by side with
+     nothing between. A rule, not a fill: the divider has to survive the row
+     tints below it. */
+  th.grp, td.grp { border-left: 2px solid var(--line); }
+  /* The spanning row that names the two blocks, after the legacy screen's
+     Original Values / Amended Values. Quieter than the real headings — it
+     labels them, it is not one of them. */
+  thead tr.grp-head th {
+    font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; text-align: left;
+    padding-bottom: 2px; border-bottom: 0; white-space: nowrap;
+  }
+  td.money { font-variant-numeric: tabular-nums; }
   tbody tr.is-matched { background: var(--good-bg); }
   tbody tr.is-warn    { background: var(--warn-bg); }
   tbody tr.is-serious { background: var(--serious-bg); }

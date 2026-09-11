@@ -151,6 +151,18 @@ class StockReconController extends Controller
              * the hub says so beside the area picker.
              */
             'run' => $run->load('lines'),
+            /*
+             * Chains that carry nothing are hidden by DEFAULT, and counted out
+             * loud rather than dropped.
+             *
+             * A fully dormant chain with a nil total is fourteen identical
+             * rows saying an item did not move — true, and not a finding. On a
+             * branch-month there are enough of them to bury the chains that
+             * are. `?empty=show` puts them back, and the count is always on
+             * screen, because a screen that silently decides what you are not
+             * allowed to see is worse than a long one.
+             */
+            'hideEmpty' => $request->query('empty') !== 'show',
             'extract' => $this->grids->build(
                 $this->registry->findOrFail('app.stockrecon.run'),
                 $request,

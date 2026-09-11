@@ -115,6 +115,17 @@ BEGIN
         rl.ActiveSeq,
         rl.QtyOpen, rl.QtyIssued, rl.QtyClose, rl.QtyPOS, rl.QtyVar,
         rl.QtyOpenNew, rl.QtyCloseNew, rl.AmendClose, rl.QtyVarNew,
+        /* The rand beside the quantity, on BOTH sides.
+           The legacy Stock Recon Balancing screen puts Qty Var and Value Var
+           under each of its two blocks, Original and Amended, and that is the
+           pair the people who work this screen read together — a 0.1 kg
+           variance on a R240 cheese is not the same finding as 0.1 kg of
+           sauce. SellPrice is stored on the run line rather than joined, for
+           the reason the whole module stores its labels: a run is a record of
+           what was true when it was made, and a price changes. */
+        CONVERT(decimal(18,2), rl.QtyVar    * ISNULL(rl.SellPrice, 0)) AS VarValue,
+        CONVERT(decimal(18,2), rl.QtyVarNew * ISNULL(rl.SellPrice, 0)) AS VarValueNew,
+        rl.SellPrice,
         rl.ExceptionCode,
         rl.Outcome,
         /* THE BUG RYAN SAW, 9 September 2026: the header above resolves the

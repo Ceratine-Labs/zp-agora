@@ -14,6 +14,18 @@
         'unrecorded' => 'is-crit', 'dormant' => '', 'clean' => '',
     ];
     $ready = $run->lines->where('WouldAmend', true)->where('CommitState', 'pending')->count();
+
+    /*
+     * Chains that carry nothing: flagged too short to balance AND with a nil
+     * total. Not the same as "too short" on its own — a chain with one active
+     * shift and a real variance is also flagged short, and that one is the
+     * accountable case, the short nobody can balance away. Hiding on the flag
+     * would take it with them. See StockReconRunLine::isEmptyChain().
+     */
+    $hideEmpty = $hideEmpty ?? true;
+    $emptyLines = $run->lines->filter(fn ($l) => $l->isEmptyChain());
+    $emptyChains = $emptyLines->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->count();
+    $rows = $hideEmpty ? $run->lines->reject(fn ($l) => $l->isEmptyChain()) : $run->lines;
 @endphp
 
 <x-card :title="'Proposals'"
@@ -73,8 +85,8 @@
                  not depend on that — and in journal mode the extract IS the
                  deliverable. --}}
             <div class="dg-bar" style="margin:12px 14px 0">
-                <span class="dg-shown">{{ \App\Support\Format::n($run->lines->count()) }}
-                    {{ Str::plural('shift', $run->lines->count()) }}</span>
+                <span class="dg-shown">{{ \App\Support\Format::n($rows->count()) }}
+                    {{ Str::plural('shift', $rows->count()) }}</span>
                 <span class="dg-bar-gap"></span>
                 <button type="button" class="btn-ghost" data-drawer-open="dg-stockrecon-{{ $run->Id }}-extract">Extract</button>
             </div>
@@ -110,7 +122,28 @@
             </x-action-bar>
         @endif
 
-        <x-table :count="$run->lines->count()"
+        @if ($emptyChains > 0)
+            {{-- Counted out loud, with the way back. A screen that silently
+                 decides what you are not allowed to see is worse than a long
+                 one — and on a branch-month these are most of the length. --}}
+            <p class="field-help" style="margin:10px 14px 0">
+                {{ \App\Support\Format::n($emptyChains) }}
+                {{ Str::plural('chain', $emptyChains) }}
+                ({{ \App\Support\Format::n($emptyLines->count()) }}
+                {{ Str::plural('shift', $emptyLines->count()) }})
+                @if ($hideEmpty)
+                    carried no movement and no variance and {{ $emptyChains === 1 ? 'is' : 'are' }} hidden —
+                    <a href="{{ route('app.stockrecon.run', [$run, 'empty' => 'show']) }}">show them</a>.
+                @else
+                    carried no movement and no variance —
+                    <a href="{{ route('app.stockrecon.run', $run) }}">hide them</a>.
+                @endif
+                A chain with one active shift and a real short stays on the list either way: that is
+                the case nobody can balance, not an empty one.
+            </p>
+        @endif
+
+        <x-table :count="$rows->count()"
                  :procedure="$run->ProcedureName"
                  :id="'stockrecon-lines-'.$run->Id"
                  tools fit
@@ -152,7 +185,7 @@
                 </tr>
             </x-slot:head>
 
-            @foreach ($run->lines as $line)
+            @foreach ($rows as $line)
                 {{-- Click, or Enter, opens the whole chain behind the row.
                      Fetched on demand: a branch-month is thousands of shifts. --}}
                 <tr class="{{ $tones[$line->outcomeKey()] ?? '' }}"

@@ -64,15 +64,35 @@
     {{-- `fit` for the same reason the proposals table has it: fourteen columns,
          eleven of them a figure under a heading twice its width, and one column
          carrying up to four names. --}}
+    {{-- TWO HEADER ROWS, because the screen this replaces has two blocks.
+         The legacy Stock Recon Balancing window sets Original Values beside
+         Amended Values over the same column names, and the people who work
+         this screen read it that way. Before this the two halves were told
+         apart only by the word "New" on three of the headings and a `grp`
+         class that had no stylesheet rule behind it at all — so the panel
+         showed both answers and never said which was which.
+
+         Safe here and NOT in the proposals table: table-tools.js reads
+         `head.rows[0]` for its sort and filter row, so a spanning row above
+         the real headings would break a table that opts into `tools`. This one
+         does not. --}}
     <x-table :count="$shifts->count()" dense fit
              empty="This item has no other shift in the window.">
         <x-slot:head>
+            <tr class="grp-head">
+                <th class="l fit-min" colspan="3"></th>
+                <th class="num grp" colspan="7">Original — as counted</th>
+                <th class="num grp" colspan="5">Amended — as this run proposes</th>
+                <th class="l"></th>
+            </tr>
             <tr>
                 <th class="l fit-min">Date</th><th class="num">Shift</th><th class="l">On shift</th>
-                <th class="num">Open</th><th class="num">Issued</th><th class="num">Close</th>
-                <th class="num">POS</th><th class="num">Variance</th><th class="num">Cumulative</th>
-                <th class="num grp">New open</th><th class="num">New close</th><th class="num">Amend</th>
-                <th class="num">New variance</th><th class="l">Outcome</th>
+                <th class="num grp">Open</th><th class="num">Issued</th><th class="num">Close</th>
+                <th class="num">POS</th><th class="num">Variance</th><th class="num">Value</th>
+                <th class="num">Cumulative</th>
+                <th class="num grp">Open</th><th class="num">Close</th><th class="num">Amend</th>
+                <th class="num">Variance</th><th class="num">Value</th>
+                <th class="l">Outcome</th>
             </tr>
         </x-slot:head>
 
@@ -94,11 +114,16 @@
                         <span class="muted">—</span>
                     @endif
                 </td>
-                <td class="num">{{ \App\Support\Format::n($shift->QtyOpen, 3) }}</td>
+                <td class="num grp">{{ \App\Support\Format::n($shift->QtyOpen, 3) }}</td>
                 <td class="num">{{ (float) $shift->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($shift->QtyIssued, 3) }}</td>
                 <td class="num">{{ \App\Support\Format::n($shift->QtyClose, 3) }}</td>
                 <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($shift->QtyPOS, 3) }}</td>
                 <td class="num">{{ (float) $shift->QtyVar === 0.0 ? '—' : \App\Support\Format::n($shift->QtyVar, 3) }}</td>
+                {{-- The rand behind the quantity. A variance is read as a pair
+                     on the legacy screen and it should be read as a pair here:
+                     0.1 kg of R240 cheese and 0.1 kg of sauce are the same
+                     number and not the same finding. --}}
+                <td class="num money">{{ (float) $shift->QtyVar === 0.0 ? '—' : \App\Support\Format::r($shift->VarValue) }}</td>
                 {{-- The curve the method is drawn on. The balanced answer is
                      its non-rising envelope, and seeing the running total is
                      what makes that legible without a chart. --}}
@@ -107,6 +132,7 @@
                 <td class="num">{{ \App\Support\Format::n($shift->QtyCloseNew, 3) }}</td>
                 <td class="num">{{ abs((float) $shift->AmendClose) < 0.0005 ? '—' : \App\Support\Format::n($shift->AmendClose, 3) }}</td>
                 <td class="num">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($shift->QtyVarNew, 3) }}</td>
+                <td class="num money">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::r($shift->VarValueNew) }}</td>
                 <td class="l muted" style="font-size:12px">
                     {{ $shift->Outcome }}
                     @if ($shift->IsDormant)<x-chip tone="neutral" :dot="false">dormant</x-chip>@endif
