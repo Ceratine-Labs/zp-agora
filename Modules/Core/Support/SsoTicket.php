@@ -94,7 +94,7 @@ final class SsoTicket
      * this app actually asked for.
      *
      * @param  array<string, scalar>  $params
-     * @return array<string, scalar>  the same params plus `ts` and `sig`
+     * @return array<string, scalar> the same params plus `ts` and `sig`
      */
     public static function signParams(array $params): array
     {

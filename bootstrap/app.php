@@ -1,9 +1,11 @@
 <?php
 
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Middleware\AttemptCrossAppSignIn;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -55,12 +57,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // that is what the framework's own list holds; anchoring on the
         // concrete class would silently no-op.
         $middleware->web(append: [
-            \Modules\Core\Http\Middleware\AttemptCrossAppSignIn::class,
+            AttemptCrossAppSignIn::class,
         ]);
 
         $middleware->prependToPriorityList(
-            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
-            prepend: \Modules\Core\Http\Middleware\AttemptCrossAppSignIn::class,
+            before: AuthenticatesRequests::class,
+            prepend: AttemptCrossAppSignIn::class,
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
