@@ -128,10 +128,10 @@ return [
             'label' => 'Smart ATM',
             'procedure' => 'usp_Recon_PreviewSmartATM',
             'legacy' => 'sp_AUTOReconcile_SmartATM_BankRecon',
-            'blurb' => 'Terminal deposits against the bank, paired inside a trading-day window. '
-                .'The live procedure builds that window by string arithmetic that fails on the first of a '
-                .'month; this one uses date arithmetic. Which date is the trading day is question 3.6, '
-                .'still open with ZP.',
+            'blurb' => 'Terminal deposits against the bank, paired inside a trading-day window that runs '
+                .'midnight to midnight on the date in the bank narrative — settled with ZP on 16 September '
+                .'2026, closing question 3.6. The live procedure builds that window by string arithmetic '
+                .'that fails on the first of a month; this one uses date arithmetic.',
             'key_label' => 'Terminal',
             'key2_label' => null,
             'options' => ['RuleOrder', 'MopsConvention'],

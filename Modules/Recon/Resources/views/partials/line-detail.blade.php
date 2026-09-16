@@ -27,7 +27,38 @@
     $bankGone = $bank->reject(fn ($r) => ! isset($r->ReconState) || (int) $r->ReconState === 1);
     $mopsOpen = $mops->filter(fn ($r) => ! isset($r->ReconBatchNoPumpIT) || (int) $r->ReconBatchNoPumpIT === 0);
     $mopsGone = $mops->reject(fn ($r) => ! isset($r->ReconBatchNoPumpIT) || (int) $r->ReconBatchNoPumpIT === 0);
+
+    /*
+     * A SMART ATM RUN PREVIEWED BEFORE 16 SEP 2026 CANNOT BE DRILLED EITHER.
+     *
+     * Its bank group is (terminal, the MM/DD in the narrative), and the run
+     * lines from before that date carry only the terminal — KeyRef2 was mapped
+     * from MerchantRef alone, so the narrative date was thrown away. The drill
+     * now needs both and correctly returns nothing.
+     *
+     * Correctly, but NOT harmlessly: without this flag the panel below falls
+     * to "Nothing on the statement carries this reference in the period", which
+     * is a statement about the customer's estate and is false — the line is
+     * sitting on the statement exactly where the preview found it. Saying
+     * nothing would repeat, on the day it was fixed, the precise fault this
+     * whole change set exists to remove.
+     */
+    $staleSmartAtm = $line->ReconArea === 'SmartATM'
+        && ! $line->isCommitted()
+        && ($line->KeyRef2 === null || $line->KeyRef2 === '');
 @endphp
+
+@if ($staleSmartAtm)
+    <p class="drill-claimed-note">
+        <strong>This proposal is from a run previewed before the Smart ATM matching fix, so the two
+        panels below cannot be filled in.</strong>
+        The run recorded the terminal but not the trading date in the bank narrative, and it takes both
+        to find the statement lines again. The figures on the row above are what the preview found and
+        they still stand — what is missing is the ability to re-read them now.
+        <strong>Preview this site again</strong> and the proposal comes back drillable and
+        committable; executing this one is refused rather than allowed to stamp nothing.
+    </p>
+@endif
 
 @if ($bankGone->isNotEmpty() || $mopsGone->isNotEmpty())
     <p class="drill-claimed-note">
@@ -74,6 +105,9 @@
             <p class="drill-none">This batch was stamped, but no bank lines were recorded against it
                in <code>agora.ReconMatch</code>. That should not happen — the commit writes both
                sides together — so it is worth reporting rather than reading as "nothing settled".</p>
+        @elseif ($bank->isEmpty() && $staleSmartAtm)
+            <p class="drill-none">Not re-read, because this run predates the matching fix — see above.
+               This is not a statement about the bank.</p>
         @elseif ($bank->isEmpty())
             <p class="drill-none">Nothing on the statement carries this reference in the period —
                the deposit was captured but the bank has not settled it, or it settled under a
@@ -178,7 +212,14 @@
                 <tbody>
                     @foreach ($mopsOpen as $row)
                         <tr>
-                            <td class="mono">{{ $row->SourceDate ? \Illuminate\Support\Carbon::parse($row->SourceDate)->format('d M Y') : '—' }}</td>
+                            {{-- Date AND TIME where the source carries one. A Smart ATM deposit has a
+                                 real device timestamp and the customer reconciles by it (ZP, 16 Sep 2026); the
+                                 other four areas file by date and sit at midnight, so the test is on the value
+                                 rather than on the area. --}}
+                            <td class="mono">{{ $row->SourceDate
+                                ? \Illuminate\Support\Carbon::parse($row->SourceDate)->format(
+                                    \Illuminate\Support\Carbon::parse($row->SourceDate)->format('H:i') === '00:00' ? 'd M Y' : 'd M Y H:i')
+                                : '—' }}</td>
                             <td class="mono">{{ $row->SourceRef ?: '—' }}
                                 @if ($row->Detail)<br><span class="drill-line-id">{{ $row->Detail }}</span>@endif
                             </td>
@@ -197,7 +238,14 @@
                 <tbody>
                     @foreach ($mopsGone as $row)
                         <tr>
-                            <td class="mono">{{ $row->SourceDate ? \Illuminate\Support\Carbon::parse($row->SourceDate)->format('d M Y') : '—' }}</td>
+                            {{-- Date AND TIME where the source carries one. A Smart ATM deposit has a
+                                 real device timestamp and the customer reconciles by it (ZP, 16 Sep 2026); the
+                                 other four areas file by date and sit at midnight, so the test is on the value
+                                 rather than on the area. --}}
+                            <td class="mono">{{ $row->SourceDate
+                                ? \Illuminate\Support\Carbon::parse($row->SourceDate)->format(
+                                    \Illuminate\Support\Carbon::parse($row->SourceDate)->format('H:i') === '00:00' ? 'd M Y' : 'd M Y H:i')
+                                : '—' }}</td>
                             <td class="mono">{{ $row->SourceRef ?: '—' }}
                                 @if ($row->Detail)<br><span class="drill-line-id">{{ $row->Detail }}</span>@endif
                             </td>
@@ -227,6 +275,11 @@
              agora.ReconMatch — what the commit RECORDED it touched — because
              the drill only ever returns what is still outstanding, and
              committing is precisely what makes it not. --}}
-        <span class="table-proc">{{ $line->isCommitted() ? 'agora.ReconMatch' : 'agora.usp_Recon_DrillProposal' }}</span>
+        {{-- usp_Recon_DrillProposal was DROPPED by v1__13a and split into the two
+             below; naming it here sent anyone who looked to a procedure that no
+             longer exists, which is worse than naming none. --}}
+        <span class="table-proc">{{ $line->isCommitted()
+            ? 'agora.ReconMatch'
+            : 'agora.usp_Recon_DrillBank + usp_Recon_DrillMops' }}</span>
     </footer>
 </div>

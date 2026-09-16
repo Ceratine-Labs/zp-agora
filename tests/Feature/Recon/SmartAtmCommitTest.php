@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Recon;
 
+use App\Exceptions\AgoraProcException;
 use App\Support\ProcedureService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -123,6 +124,71 @@ class SmartAtmCommitTest extends TestCase
             'All three deposits fall on 30 August and all three belong to it.');
         $this->assertEqualsWithDelta(1400.00, (float) $line->MopsTotal, 0.001);
         $this->assertEqualsWithDelta(1400.00, (float) $line->BankTotal, 0.001);
+    }
+
+    /**
+     * A run previewed before the fix is refused by name, and SAYS SO on screen.
+     *
+     * Those runs carry no KeyRef2, so the drill correctly finds no bank lines.
+     * Correctly is not the same as harmlessly: left alone the panel fell back to
+     * "Nothing on the statement carries this reference in the period", which is
+     * a claim about the customer's estate and is false — the line is on the
+     * statement exactly where the preview found it. That is the same species of
+     * untrue message this whole change set exists to remove, so it would have
+     * been an unusually poor thing to reintroduce on the day. Caught on live,
+     * run 1016, within the hour.
+     */
+    public function test_a_run_from_before_the_fix_says_so_instead_of_blaming_the_bank(): void
+    {
+        $run = $this->preview();
+        $line = $run->lines->firstWhere('WouldReconcile', true);
+
+        // Exactly what a pre-fix run looks like: everything else intact, the
+        // narrative date absent.
+        DB::connection(config('agora.connections.app'))->table('agora.ReconRunLine')
+            ->where('Id', $line->Id)->update(['KeyRef2' => null]);
+
+        $this->get(route('app.recon.line', [$run, $line]))
+            ->assertOk()
+            ->assertSee('previewed before the Smart ATM matching fix', false)
+            ->assertSee('Preview this site again', false)
+            ->assertDontSee('Nothing on the statement carries this reference', false);
+
+        $this->service->select($run->fresh(), [$line->Id]);
+
+        try {
+            $this->service->commit($run->fresh());
+            $this->fail('A run previewed before the fix must be refused, not allowed to stamp nothing.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('RUN_PREDATES_KEYREF2', $e->code());
+        }
+    }
+
+    /**
+     * The deposit column shows the DEPOSIT's time, never the bank line's.
+     *
+     * Ryan, 16 Sep 2026: "are you showing line date and time or the deposit
+     * date and times? it must be deposit." The fixture makes the two
+     * impossible to confuse — the bank line is posted on 31 August and the
+     * three deposits went in on 30 August at 09:15, 17:02 and 21:40.
+     */
+    public function test_the_panel_shows_the_deposit_time_not_the_bank_line_date(): void
+    {
+        $run = $this->preview();
+        $line = $run->lines->firstWhere('WouldReconcile', true);
+
+        $panel = $this->get(route('app.recon.line', [$run, $line]))->assertOk();
+
+        foreach (['30 Aug 2026 09:15', '30 Aug 2026 17:02', '30 Aug 2026 21:40'] as $stamp) {
+            $panel->assertSee($stamp, false);
+        }
+
+        // The bank line's own date is 31 August. It must not appear as a
+        // deposit date, and the deposit times must not be flattened to it.
+        $panel->assertDontSee('31 Aug 2026 09:15', false);
+
+        // And the timestamp is not printed twice on the same row.
+        $panel->assertDontSee('trace TR900010 · 2026-08-30 09:15', false);
     }
 
     private function preview(): ReconRun

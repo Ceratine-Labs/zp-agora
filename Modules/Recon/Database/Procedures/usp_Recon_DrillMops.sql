@@ -264,10 +264,16 @@ BEGIN
         SELECT LTRIM(RTRIM(SUBSTRING(a.TerminalId, @MopsStart, @MopsLen))) AS SourceRef,
                ISNULL(b.DepositDateTime, a.DepositDateTime)                AS SourceDate,
                a.Deposited                                                 AS Amount,
+               /* The timestamp is NOT repeated here. It is what SourceDate now
+                  carries and what the panel's Date column shows since 16 Sep
+                  2026, and printing it twice on one row is noise. What stays is
+                  the thing the column cannot say: that a deposit has no device
+                  row behind it, so its date is the filing date and not a real
+                  deposit time. */
                'Terminal '+ LTRIM(RTRIM(a.TerminalId))
                      +' · trace '+ LTRIM(RTRIM(a.TraceNo))
-                     + CASE WHEN b.DepositDateTime IS NULL THEN ' · no device row'
-                            ELSE ' · ' + CONVERT(nvarchar(16), b.DepositDateTime, 120) END AS Detail,
+                     + CASE WHEN b.DepositDateTime IS NULL
+                            THEN ' · no device row — filing date' ELSE '' END AS Detail,
                /* This table has a key of its own; use it rather than a string
                   built out of a float. */
                a.DailyBankingSmartATMID                                    AS SourceId,
