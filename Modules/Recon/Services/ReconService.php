@@ -528,7 +528,18 @@ class ReconService
             // The reference the two sides were joined on, whatever it is
             // called in this area.
             'KeyRef' => $this->text($get('BatchRef', 'SlipRef', 'BagRef', 'TerminalRef')),
-            'KeyRef2' => $this->text($get('MerchantRef')),
+
+            // The SECOND half of the key, and for SmartATM it is load-bearing
+            // rather than descriptive. SmartATM groups on (terminal, the MM/DD
+            // read out of the bank narrative), and until 16 Sep 2026 only the
+            // terminal was persisted — so the commit had no way to find the
+            // bank lines the preview had grouped and re-found them by LineDate
+            // inside a window that describes the DEPOSIT side. It never once
+            // matched. See the note in usp_Recon_DrillBank.
+            //
+            // BankMMDD is what usp_Recon_PreviewSmartATM has always returned;
+            // nothing was reading it.
+            'KeyRef2' => $this->text($get('MerchantRef', 'BankMMDD')),
 
             'BankDate' => $get('BankDate'),
             'WindowFrom' => $get('WindowFrom'),

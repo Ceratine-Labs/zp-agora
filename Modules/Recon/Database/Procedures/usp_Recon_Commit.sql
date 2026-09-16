@@ -67,7 +67,7 @@
    standard of proof. It is re-checked here exactly like everything else.
 
    Refusals: RUN_NOT_FOUND · RUN_NOT_PREVIEWED · RUN_ALREADY_COMMITTED ·
-             NOTHING_SELECTED · NO_COUNTER
+             NOTHING_SELECTED · NO_COUNTER · RUN_PREDATES_KEYREF2
    ============================================================================ */
 
 CREATE OR ALTER PROCEDURE [agora].[usp_Recon_Commit]
@@ -130,6 +130,25 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM @Rows)
         THROW 51000, 'AGORA:NOTHING_SELECTED:Nothing on this run is both selected and reconcilable.', 1;
+
+    /*
+     * A SMARTATM RUN PREVIEWED BEFORE 16 SEP 2026 CANNOT BE COMMITTED.
+     *
+     * Its bank group is (terminal, the MM/DD in the narrative), and until that
+     * date only the terminal was persisted — usp_Recon_PreviewSmartATM returned
+     * BankMMDD and ReconService mapped KeyRef2 from MerchantRef alone. Without
+     * the MM/DD there is nothing to re-find the bank lines by, and the old code
+     * fell back to the window, which describes the deposit side and excludes
+     * the bank line by construction.
+     *
+     * Refusing by name matters more than it looks. The old path did not fail —
+     * it reported every row as 'reconciled by something else' or 'no longer
+     * balances', which are statements about the customer's data and were false.
+     * An operator who reads that goes looking at the estate. Better to say the
+     * run is stale and ask for a fresh preview, which costs seconds.
+     */
+    IF @Area = 'SmartATM' AND EXISTS (SELECT 1 FROM @Rows WHERE KeyRef2 IS NULL)
+        THROW 51000, 'AGORA:RUN_PREDATES_KEYREF2:This Smart ATM run was previewed before the matching fix and cannot be committed — the bank narrative date it grouped on was not recorded. Preview it again and the same proposals will come back ready to post.', 1;
 
     /* ---- 2. Resolve both sides through the drill --------------------------- */
 

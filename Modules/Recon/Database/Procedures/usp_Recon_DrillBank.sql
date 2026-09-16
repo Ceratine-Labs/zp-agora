@@ -179,9 +179,39 @@ BEGIN
     WHERE
         /* One exact line — CashBags in 'contains' mode. */
         (@BankLineId IS NOT NULL)
-        /* A trading-day window — SmartATM, and FNB's standalone population,
-           which carries no batch reference at all (58% of FNB lines). */
-        OR (@BankLineId IS NULL AND @WindowFrom IS NOT NULL
+        /* SMARTATM IS FOUND BY ITS NARRATIVE DATE, NEVER BY LineDate.
+           
+           The window on a SmartATM row describes the DEPOSIT side — it is
+           derived FROM the MM/DD in the bank narrative and is what
+           usp_Recon_DrillMops scopes the device timestamps by. The bank line
+           that carries that narrative is posted by the bank on the FOLLOWING
+           calendar day, so it lies outside its own window by construction.
+
+           Matching it here on b.LineDate therefore never returned the line the
+           preview grouped: it returned the PREVIOUS day's line, or nothing.
+           Every Smart ATM commit consequently stamped zero and reported it as
+           'reconciled by something else' or 'no longer balances' — all of them
+           untrue. Found 16 Sep 2026 on run 999 branch 9: the preview's line
+           ATMH0130|0828, 26,800.00, LineDate 2026-08-29, ReconState 1, was
+           still outstanding while the drill returned ATMH0130|0827 from
+           2026-08-28, already reconciled.
+
+           So it is matched the way the preview grouped it — terminal plus the
+           MM/DD read out of the narrative, which is exactly ExtractedRef and
+           ExtractedRef2. @Bank is already scoped to the run's date range, so
+           this cannot reach outside the period.
+
+           KeyRef2 is REQUIRED. A SmartATM run line previewed before the fix
+           that persisted it has none, and matching on the terminal alone would
+           return every line for that ATM in the period — a far worse answer
+           than nothing. usp_Recon_Commit refuses such a run by name instead. */
+        OR (@BankLineId IS NULL AND @ReconArea = 'SmartATM'
+            AND @KeyRef IS NOT NULL AND @KeyRef2 IS NOT NULL
+            AND b.ExtractedRef = @KeyRef AND b.ExtractedRef2 = @KeyRef2)
+        /* A trading-day window — FNB's standalone population, which carries no
+           batch reference at all (58% of FNB lines). SmartATM is excluded
+           above: its window is a deposit window, not a statement window. */
+        OR (@BankLineId IS NULL AND @ReconArea <> 'SmartATM' AND @WindowFrom IS NOT NULL
             AND b.LineDate >= @WindowFrom AND b.LineDate <= @WindowTo
             AND (@KeyRef IS NULL OR b.ExtractedRef = @KeyRef))
         /* By reference, narrowed by merchant where the area has one. ABSA and

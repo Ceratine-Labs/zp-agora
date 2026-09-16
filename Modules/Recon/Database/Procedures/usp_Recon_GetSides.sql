@@ -221,20 +221,47 @@ BEGIN
         ORDER BY d.TransactionDate, d.CashBagNo;
 
     ELSE IF @ReconArea = 'SmartATM'
+        /*
+         * THE DEVICE TIMESTAMP, not the cashup's — the same expression the
+         * preview and both drills use, so this screen and the matcher describe
+         * the same deposit.
+         *
+         * BRN_DailyBankingSmartATM.DepositDateTime is a DATE wearing a
+         * datetime's clothes: all 286 of branch 9's rows for Aug-Sep 2026 sit
+         * at exactly 00:00:00. The time the customer asked to see exists only
+         * on the device row, and that is also the value auto-reconciliation
+         * pairs on, so showing the cashup column here would print 00:00 beside
+         * every deposit AND disagree with the matcher on the 14 rows of 286
+         * where the two fall on different days.
+         *
+         * The join is the established one (branch, terminal, trace, unique) and
+         * was checked for fan-out before being used here: 286 rows and
+         * 1,455,650.00 with it and without it, and no row lacking a device
+         * match. ISNULL keeps a future row with no device row visible rather
+         * than dropping it silently.
+         *
+         * Manual matching is unaffected: SmartATM carries
+         * DailyBankingSmartATMID and usp_Recon_ManualMatch pairs on that id,
+         * never on the date carried in the tick box.
+         */
         INSERT INTO @Mops (SourceId, SourceKey, SourceRef, SourceRef2, SourceDate, Amount, PairKey, ReconBatchNoPumpIT)
         SELECT TOP (@MaxRows) d.DailyBankingSmartATMID,
                LTRIM(RTRIM(CONVERT(nvarchar(50), d.TerminalId))),
                LTRIM(RTRIM(CONVERT(nvarchar(50), d.TerminalId))),
                LTRIM(RTRIM(CONVERT(nvarchar(50), d.TraceNo))),
-               d.DepositDateTime, d.Deposited,
+               ISNULL(s.DepositDateTime, d.DepositDateTime), d.Deposited,
                LTRIM(RTRIM(CONVERT(nvarchar(50), d.TerminalId))),
                d.ReconBatchNoPumpIT
         FROM agora.vw_DailyBankingSmartATM d
+        LEFT JOIN agora.vw_SmartATM s
+               ON s.BranchId = d.BranchId AND s.TerminalId = d.TerminalId
+              AND s.TraceNo  = d.TraceNo  AND s.UniqueNo   = d.UniqueNo
         WHERE d.BranchId = @BranchId
-          AND d.DepositDateTime >= @FromDate AND d.DepositDateTime <= @ToDate
+          AND ISNULL(s.DepositDateTime, d.DepositDateTime) >= @FromDate
+          AND ISNULL(s.DepositDateTime, d.DepositDateTime) <= @ToDate
           AND ((@WantOutstanding = 1 AND d.ReconBatchNoPumpIT = 0)
             OR (@WantReconciled  = 1 AND d.ReconBatchNoPumpIT <> 0))
-        ORDER BY d.DepositDateTime, d.TerminalId;
+        ORDER BY ISNULL(s.DepositDateTime, d.DepositDateTime), d.TerminalId;
 
     ELSE
         THROW 51000, 'AGORA:UNKNOWN_AREA:That is not a reconciliation area.', 1;

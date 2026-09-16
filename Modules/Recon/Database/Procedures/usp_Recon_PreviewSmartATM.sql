@@ -90,8 +90,9 @@
    Matching rule, from the live proc:
      terminal   SUBSTRING(Description, BANK_StartPosition,  BANK_EndPosition)
      MMDD       SUBSTRING(Description, BANK_StartPosition2, BANK_EndPosition2)
-     window     previous day 19:00:00  ->  MM/DD 18:59:00, year taken from the
-                bank line's LineDate
+     window     MM/DD 00:00:00 -> MM/DD 23:59:59, year taken from the bank
+                line's LineDate. The live proc uses previous-day 19:00 ->
+                18:59; ZP settled on midnight to midnight, 16 Sep 2026.
      MOPS       SUBSTRING(TerminalId, MOPS_StartPosition, MOPS_EndPosition)
                 matching the terminal, with SmartATM_DateTime inside the window
 
@@ -112,42 +113,50 @@
    so it is a known-hit bug rather than a theoretical one. Both boundaries are
    built here with DATEADD off the parsed date instead, which is rollover-safe:
 
-       WindowFrom = DATEADD(hour,   -5, midnight of MM/DD)   -- prev day 19:00
-       WindowTo   = DATEADD(minute, 1139, midnight of MM/DD) -- same day 18:59
+       WindowFrom = midnight of MM/DD                        -- 00:00:00
+       WindowTo   = DATEADD(second, 86399, midnight of MM/DD) -- 23:59:59
 
    A description whose MM/DD does not parse yields a NULL window, and its rows
    are reported as 'Bank line - unparseable date in narrative' rather than being
    silently compared against nothing.
 
    ------------------------------------------------------------------------
-   OPEN — the trading-day boundary is NOT settled (ZP, 14 Aug 2026)
+   SETTLED — the trading day is midnight to midnight (ZP, 16 Sep 2026)
    ------------------------------------------------------------------------
-   The 19:00 -> 18:59 window above is what the live proc does, reproduced
-   faithfully. It is not confirmed to be what the business means by a trading
-   day. Asked which date is the trading day, ZP answered: "we are going to
+   Asked on 14 Aug which date is the trading day, ZP answered "we are going to
    have to consider before and after midnight, we will come around to this
-   one."
+   one", and the window stayed a mirror of the live procedure's 19:00 -> 18:59
+   while that was outstanding. On 16 Sep they came around to it: the match runs
+   MIDNIGHT TO MIDNIGHT on the narrative date. The window below is now that,
+   and it is a decision rather than a reproduction.
 
-   So the window here is a mirror of current behaviour, not a decision. A
-   deposit taken at, say, 23:40 lands in the NEXT calendar day's MM/DD in the
-   bank narrative while belonging to the previous day's takings, and the two
-   sources (BRN_DailyBankingSmartATM's own date vs BRN_SmartATM's
-   DepositDateTime) do not agree on which side of midnight it falls. Until ZP
-   fixes the definition, treat any SmartATM near-midnight mismatch reported
-   by this preview as unexplained rather than as a defect to chase.
+   WHAT IT MOVES. A deposit taken between 19:00 and midnight used to be counted
+   against the FOLLOWING narrative date and is now counted against its own; one
+   taken between midnight and 19:00 is unaffected. Measured on branch 9 for
+   16 Aug - 16 Sep 2026 before shipping it — see the note on the migration.
 
-   Rework the window together with the same boundary in
-   sp_AUTOReconcile_SmartATM_BankRecon — changing one without the other makes
-   preview and Execute disagree.
+   THE LEGACY PROCEDURE STILL SAYS 19:00. sp_AUTOReconcile_SmartATM_BankRecon
+   in PumpIT is the customer's own and is not ours to edit; Agora no longer
+   runs it. That is fine while Agora is the only thing reconciling Smart ATM,
+   and it is a divergence to be aware of if anyone runs the legacy Execute in
+   parallel — the two will disagree about which day a late-evening deposit
+   belongs to.
 
 
    ---------------------------------------------------------------------------
    2026-08-27 — criteria iteration and position convention
    ---------------------------------------------------------------------------
    Re-run the validated case first: branch 18, Jan-Jul 2026, 9 terminal/window
-   groups all resolving with deposits on both sides — e.g. ATMH0133 MMDD 0730
-   -> window 2026-07-29 19:00 to 2026-07-30 18:59, bank 68,250.00 against 18
-   deposits totalling 56,850.00. Neither change below should move it.
+   groups all resolving with deposits on both sides — e.g. ATMH0133 MMDD 0730,
+   bank 68,250.00 against 18 deposits totalling 56,850.00. Neither change below
+   should move it.
+
+   ⚠ THE WINDOW IN THAT CASE HAS SINCE MOVED. It read 2026-07-29 19:00 to
+   2026-07-30 18:59 when this note was written; since 16 Sep 2026 it is
+   2026-07-30 00:00 to 23:59:59. The bank side is unaffected — it is grouped on
+   the narrative MM/DD, not on the window — so the 68,250.00 still stands. The
+   deposit total may not, and that is the boundary change doing its job rather
+   than a regression. Measure, do not assume.
 
    1. The criteria lookup iterates instead of reading TOP 1 (section 6.3),
       resolving one row per bank line by FILTER_Value with the most specific
@@ -263,16 +272,25 @@ BEGIN
         Amount           money
     );
 
-    /* The -5h / +1139min window mirrors the live proc's 19:00 -> 18:59 trading
-       day. ZP has NOT confirmed that boundary — see "OPEN — the trading-day
-       boundary is NOT settled" in the header before changing either number. */
+    /* MIDNIGHT TO MIDNIGHT — the trading day, settled at last.
+
+       ZP, 16 Sep 2026, through Ryan: "i noticed that its doing the match based
+       on 19:00 - 19:00. This was supposed to be changed to be from midnight to
+       midnight." That closes the question the header has carried as OPEN since
+       14 Aug, when the answer was "we will come around to this one".
+
+       What it replaces is DATEADD(hour, -5) / DATEADD(minute, 1139) — the
+       previous day 19:00 to 18:59 on the narrative date, which was the live
+       procedure's boundary reproduced faithfully rather than a decision. The
+       window is still built with DATEADD off the parsed date, so the rollover
+       bug in the legacy string arithmetic ('2023/06/00 19:00') stays fixed. */
     INSERT INTO @Bank (TerminalRef, MMDD, WindowFrom, WindowTo, Amount,
                        ProcessOrder, UsedStart, UsedLen)
     SELECT TerminalRef, MMDD,
            CASE WHEN BaseDate IS NULL THEN NULL
-                ELSE DATEADD(hour,   -5,   CONVERT(datetime, BaseDate)) END,
+                ELSE CONVERT(datetime, BaseDate) END,
            CASE WHEN BaseDate IS NULL THEN NULL
-                ELSE DATEADD(minute, 1139, CONVERT(datetime, BaseDate)) END,
+                ELSE DATEADD(second, 86399, CONVERT(datetime, BaseDate)) END,
            Amount, ProcessOrder, UsedStart, UsedLen
     FROM (
         SELECT LTRIM(RTRIM(SUBSTRING(l.Description, x.BankStart,  x.BankLen)))  AS TerminalRef,

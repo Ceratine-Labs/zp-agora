@@ -112,7 +112,7 @@
             <x-slot:head>
                 <tr>
                     <th class="pick"><input type="checkbox" data-pane-all="mops" aria-label="Select every deposit"></th>
-                    <th>Date</th>
+                    <th>Date &amp; time</th>
                     <th>{{ $keyLabel }}</th>
                     <th>Second</th>
                     <th class="num">Amount</th>
@@ -137,7 +137,20 @@
                                ]) }}"
                                aria-label="Deposit {{ $row->SourceKey }}">
                     </td>
-                    <td class="mono">{{ substr((string) $row->SourceDate, 0, 10) }}</td>
+                    {{-- Date, and the TIME beside it where the source has one.
+                         Smart ATM deposits carry a real device timestamp and
+                         the customer reconciles by it — "please can you add the
+                         deposit date & time" (ZP, 16 Sep 2026). The other areas
+                         file by date alone and sit at midnight, so the test is
+                         on the value rather than on the area: no area needs a
+                         branch here, and one that gains a time later shows it
+                         without this file changing. --}}
+                    <td class="mono">
+                        {{ substr((string) $row->SourceDate, 0, 10) }}
+                        @if (substr((string) $row->SourceDate, 11, 5) !== '' && substr((string) $row->SourceDate, 11, 5) !== '00:00')
+                            <span class="muted" style="font-size:11px">{{ substr((string) $row->SourceDate, 11, 5) }}</span>
+                        @endif
+                    </td>
                     <td>
                         <x-chip :tone="$row->ColourIndex > 0 ? 'good' : 'neutral'">{{ $row->SourceKey }}</x-chip>
                     </td>
