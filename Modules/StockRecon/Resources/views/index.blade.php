@@ -117,7 +117,16 @@
                             ->concat($areas->map(fn ($a) => [
                                 'value' => $a->AreaNo,
                                 'when' => $a->BranchId,
-                                'label' => $a->AreaDescription.($a->AreaGroup ? ' — '.$a->AreaGroup : ''),
+                                /* The description alone. The AreaGroup used to
+                                   be appended — "Bakery OK — Food Items" — and
+                                   it earned nothing: every counted area's
+                                   description is already unique within its
+                                   site (checked across all 25), so the suffix
+                                   disambiguated nothing and the widest entry
+                                   in the list was a word nobody was choosing
+                                   by. Ryan, 17 Sep 2026. The group is still
+                                   read above, to drop the excluded ones. */
+                                'label' => $a->AreaDescription,
                             ]))->all()"
                          help="One area at a time is the working habit: the proposals table is deliberately not paged, because a paged commit form is a form that writes rows nobody looked at." />
 

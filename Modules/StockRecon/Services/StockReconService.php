@@ -89,6 +89,25 @@ class StockReconService
             return collect();
         }
 
+        /*
+         * ONLY THE AREAS THE SITE ACTUALLY COUNTS.
+         *
+         * STK_Area holds every area a site has ever had, and the three shift
+         * bits are what say whether it is still counted — the same columns the
+         * legacy 'missing count' report uses to decide what SHOULD have been
+         * counted. An area with none of them ticked is history: it has no
+         * shifts, so a preview scoped to it can only come back empty.
+         *
+         * It is most of the list. Esikhawini Convenience carries 18 areas and
+         * counts 9 of them; estate-wide it is 198 of 250. Ryan, 17 Sep 2026:
+         * "Please limit this list based on the site selected."
+         *
+         * FILTER ON THE FLAGS, NEVER ON THE GROUP NAME. 'NOT USED' is an
+         * AreaGroup the customer types, and it does not mean what it says —
+         * 27 of its 31 areas estate-wide are actively counted, including
+         * Esikhawini's own High Shrinkage Items OK on days and nights. Rejecting
+         * by that name would hide areas people are counting today.
+         */
         // Interpolated because they are ints this method cast itself, and a
         // bound IN list would need a placeholder per site — 25 of them, and a
         // different statement every time the grant changes.
@@ -96,6 +115,7 @@ class StockReconService
             SELECT BranchId, AreaNo, AreaDescription, AreaGroup
             FROM ['.config('agora.schema').'].[vw_StockArea]
             WHERE BranchId IN ('.implode(',', $ids).')
+              AND (DayShift = 1 OR AfternoonShift = 1 OR NightShift = 1)
             ORDER BY AreaDescription
         '))
             ->reject(fn (object $area) => in_array((string) $area->AreaGroup, $excluded, true))
