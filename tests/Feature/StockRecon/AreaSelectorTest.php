@@ -5,6 +5,7 @@ namespace Tests\Feature\StockRecon;
 use App\Support\ProcedureService;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Models\User;
 use Modules\StockRecon\Services\StockReconService;
 use Tests\TestCase;
 
@@ -93,6 +94,49 @@ class AreaSelectorTest extends TestCase
         foreach ($this->service->areas([self::BRANCH]) as $area) {
             $this->assertSame(self::BRANCH, (int) $area->BranchId);
         }
+    }
+
+    /**
+     * THE SCREEN ACTUALLY RENDERS, and the Counting area field is on it.
+     *
+     * On 17 September 2026 it did not. The explanatory comment added beside
+     * the label carried a pair of double quotes, and it sat INSIDE
+     * :choices="…" — an HTML attribute delimited by double quotes. The first
+     * quote in the prose ended the attribute and the rest of the expression
+     * rendered as text on the page, taking the whole field with it.
+     *
+     * Every gate passed: pint, phpstan, check-blades, check-components and four
+     * unit tests on areas() itself, because none of them renders the view. It
+     * shipped to live and Ryan found it. This is the assertion that was
+     * missing — not "is the data right" but "does the form come back".
+     */
+    public function test_the_form_renders_with_a_counting_area_field(): void
+    {
+        $this->actingAs($this->admin());
+
+        $page = $this->get(route('app.stockrecon.index'))->assertOk();
+
+        $page->assertSee('Counting area', false);
+        $page->assertSee('name="area_no"', false);
+        $page->assertSee('Every area at this site', false);
+
+        // The tells of an attribute that ended early. Any of these on the page
+        // means the expression leaked instead of being evaluated.
+        foreach (['->all()"', '$a->AreaDescription', '->concat($areas', 'collect(['] as $leak) {
+            $page->assertDontSee($leak, false);
+        }
+    }
+
+    private function admin(): User
+    {
+        $user = User::query()->acrossBranches()
+            ->where('EmailAddress', config('agora.e2e.email'))->first();
+
+        if (! $user) {
+            $this->markTestSkipped('No E2E fixture user — run the E2eFixtureSeeder.');
+        }
+
+        return $user;
     }
 
     private function seedFixture(): void
