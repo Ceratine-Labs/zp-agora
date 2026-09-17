@@ -103,8 +103,12 @@ BEGIN
        the counting area the waste happened IN, not the item's home area, so it
        is deliberately not part of this join. Joining it too is what makes an
        item captured outside its home area silently disappear from the report. */
-    LEFT JOIN agora.vw_StockMaster m
-           ON m.BranchId = w.BranchId AND m.StockItemNo = w.StockItemNo
+    /* OUTER APPLY, not a join: the master is keyed by branch AND Location,
+       and a duplicate here would double the waste VALUE as well as the rows. */
+    OUTER APPLY (SELECT TOP 1 m.StockItemDescription, m.UOMCode, m.SellingPrice
+                   FROM agora.vw_StockMaster m
+                  WHERE m.BranchId = w.BranchId AND m.StockItemNo = w.StockItemNo
+                  ORDER BY CASE WHEN m.AreaNo = w.AreaNo THEN 0 ELSE 1 END, m.StockLocation) m
     WHERE w.TransactionDate >= @DateFrom AND w.TransactionDate < DATEADD(day, 1, @DateTo)
       AND (@AllBranches = 1 OR w.BranchId IN (SELECT BranchId FROM @Branch))
       AND (@Search IS NULL

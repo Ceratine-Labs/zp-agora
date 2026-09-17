@@ -142,7 +142,13 @@ BEGIN
                 ELSE 0 END)                                                   AS ExceptionValue
         FROM agora.StockReconRunLine rl
         LEFT JOIN agora.vw_StockArea   a ON a.BranchId = rl.BranchId AND a.AreaNo = rl.AreaNo
-        LEFT JOIN agora.vw_StockMaster m ON m.BranchId = rl.BranchId AND m.StockItemNo = rl.StockItemNo
+        /* OUTER APPLY, not a join: the master is keyed by branch AND
+           Location, and a join on the item alone duplicates every exception
+           row for an item counted under two POS families. */
+        OUTER APPLY (SELECT TOP 1 m.StockItemDescription, m.POSCode, m.StockLocation
+                       FROM agora.vw_StockMaster m
+                      WHERE m.BranchId = rl.BranchId AND m.StockItemNo = rl.StockItemNo
+                      ORDER BY CASE WHEN m.AreaNo = rl.AreaNo THEN 0 ELSE 1 END, m.StockLocation) m
         LEFT JOIN agora.vw_StockReconShiftEmployee se
                ON se.BranchId        = rl.BranchId
               AND se.TransactionDate = rl.TransactionDate

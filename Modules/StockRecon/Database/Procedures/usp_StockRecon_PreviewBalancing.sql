@@ -510,8 +510,25 @@ BEGIN
 
         SYSDATETIME(), @UserId
     FROM #apply a
-    LEFT JOIN agora.vw_StockMaster m
-           ON m.BranchId = @BranchId AND m.StockItemNo = a.StockItemNo
+    /* OUTER APPLY, NOT A JOIN, AND THAT IS THE WHOLE POINT.
+
+       STK_StockMaster is keyed by branch AND Location — the same StockItemNo
+       exists once under WINBRANCH and once under AURA at a site running both
+       POS families. Joined on (BranchId, StockItemNo) this label lookup
+       MULTIPLIES the shift, and it does so on an INSERT: the duplicate is
+       written to agora.StockReconRunLine with its own LineNo, its own tick box
+       and its own place in the commit. The unique key (BranchId, RunId,
+       LineNo) does not catch it, because LineNo is a ROW_NUMBER over the
+       already-fanned set.
+
+       It is the same item either way (Ryan, 11 Sep 2026 — "same product, two
+       POS families"), so the labels are interchangeable and TOP 1 is safe. The
+       ORDER BY still prefers the master row for THIS counting area, so the
+       description shown is the one belonging to where the count was taken. */
+    OUTER APPLY (SELECT TOP 1 m.StockItemDescription, m.POSCode, m.StockLocation
+                   FROM agora.vw_StockMaster m
+                  WHERE m.BranchId = @BranchId AND m.StockItemNo = a.StockItemNo
+                  ORDER BY CASE WHEN m.AreaNo = a.AreaNo THEN 0 ELSE 1 END, m.StockLocation) m
     LEFT JOIN agora.vw_StockArea ar
            ON ar.BranchId = @BranchId AND ar.AreaNo = a.AreaNo
     LEFT JOIN #emp emp

@@ -796,6 +796,60 @@ class BalancingTest extends TestCase
         );
     }
 
+    /**
+     * ONE SHIFT IS ONE ROW, however many master rows the item has.
+     *
+     * STK_StockMaster is keyed by branch AND Location — the same StockItemNo
+     * exists once under WINBRANCH and once under AURA on a site that runs both
+     * POS families. Every reader in this module joins the master on
+     * (BranchId, StockItemNo) alone, so a second master row multiplies the
+     * shift rather than naming it, and stage 8 of PreviewBalancing does it on
+     * an INSERT: the duplicate is WRITTEN to agora.StockReconRunLine, gets its
+     * own LineNo, its own tick box, and its own place in the commit.
+     *
+     * The unique key (BranchId, RunId, LineNo) does not catch it, because
+     * LineNo is a ROW_NUMBER over the already-fanned set.
+     */
+    public function test_a_second_master_row_does_not_duplicate_the_shift(): void
+    {
+        $shifts = $this->preview()->lines->where('StockItemNo', self::ITEM)->count();
+
+        // The same item, counted at a second location. Nothing else changes.
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->insert([
+            'SSBranchId' => self::BRANCH, 'StockItemNo' => self::ITEM,
+            'StockItemDescription' => 'TEST-Chicken quarter (AURA)', 'AreaNo' => self::AREA,
+            'Location' => 'TEST2', 'UOMCode' => 'EA',
+            'SellingPrice' => 21.80, 'POSCode' => 'TESTAURA',
+            'QtyVarAllowance' => 0, 'isMonitoredItem' => 0,
+        ]);
+
+        $run = $this->preview();
+        $lines = $run->lines->where('StockItemNo', self::ITEM);
+
+        // The grid, which reads agora.vw_StockReconRunLine.
+        $this->assertSame($shifts, $lines->count(),
+            'A second master row for the same item multiplied the shifts: the run line is the shift, not the master row.');
+
+        // The LEDGER underneath it. The view could be made honest while the
+        // INSERT still wrote two rows per shift, and that is the half of this
+        // the commit would act on — so it is asserted separately, on the table
+        // and not through the view that reads it.
+        $stored = $this->db()->table('agora.StockReconRunLine')
+            ->where('RunId', $run->Id)->where('StockItemNo', self::ITEM)->count();
+
+        $this->assertSame($shifts, $stored,
+            'The preview WROTE a duplicate run line per master row. Each carries its own LineNo, tick box and commit path.');
+
+        // And the chain panel's own count, which is a COUNT(*) in the header
+        // block of usp_StockRecon_DrillChain — a third, independent join.
+        $chain = $this->service->chain($run, $lines->first());
+
+        $this->assertSame($shifts, (int) $chain['item']->ChainShifts,
+            'The chain panel counted the master rows rather than the shifts.');
+        $this->assertSame($shifts, $chain['shifts']->count(),
+            'The chain panel listed a shift more than once.');
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private function preview(): StockReconRun

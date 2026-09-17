@@ -96,7 +96,14 @@ BEGIN
         MAX(CASE WHEN rl.FlagShortChain         = 1 THEN 'Too few active shifts to balance'             END) AS BlockShortChain,
         MAX(CASE WHEN rl.FlagDormantMoved       = 1 THEN 'A dormant shift would have been moved'        END) AS BlockDormantMoved
     FROM agora.StockReconRunLine rl
-    LEFT JOIN agora.vw_StockMaster m ON m.BranchId = rl.BranchId AND m.StockItemNo = rl.StockItemNo
+    /* OUTER APPLY: the master is keyed by branch AND Location, so a join on
+       (BranchId, StockItemNo) alone multiplies every row of the chain — and
+       here that inflates COUNT(*) AS ChainShifts, which is the panel's own
+       "Shifts" figure. One row per item, preferring this counting area. */
+    OUTER APPLY (SELECT TOP 1 m.StockItemDescription, m.POSCode, m.StockLocation, m.UOMCode
+                   FROM agora.vw_StockMaster m
+                  WHERE m.BranchId = rl.BranchId AND m.StockItemNo = rl.StockItemNo
+                  ORDER BY CASE WHEN m.AreaNo = rl.AreaNo THEN 0 ELSE 1 END, m.StockLocation) m
     LEFT JOIN agora.vw_StockArea   a ON a.BranchId = rl.BranchId AND a.AreaNo      = rl.AreaNo
     WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
       AND rl.AreaNo = @AreaNo AND rl.StockItemNo = @StockItemNo

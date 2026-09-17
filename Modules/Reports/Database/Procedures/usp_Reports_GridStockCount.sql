@@ -138,8 +138,14 @@ BEGIN
        on it as well drops every line counted outside the item's home area —
        the customer's own procedure has that join commented out for exactly this
        reason and the comment has survived since 2024. */
-    LEFT JOIN agora.vw_StockMaster m
-           ON m.BranchId = l.BranchId AND m.StockItemNo = l.StockItemNo
+    /* OUTER APPLY, not a join: the master is keyed by branch AND Location,
+       so joining on the item alone reports every counted line twice for an
+       item that exists under both WINBRANCH and AURA. */
+    OUTER APPLY (SELECT TOP 1 m.StockItemDescription, m.UOMCode, m.StockLocation,
+                              m.QtyVarAllowance, m.IsMonitoredItem
+                   FROM agora.vw_StockMaster m
+                  WHERE m.BranchId = l.BranchId AND m.StockItemNo = l.StockItemNo
+                  ORDER BY CASE WHEN m.AreaNo = l.AreaNo THEN 0 ELSE 1 END, m.StockLocation) m
     WHERE l.TransactionDate >= @DateFrom AND l.TransactionDate < DATEADD(day, 1, @DateTo)
       AND (@AllBranches = 1 OR l.BranchId IN (SELECT BranchId FROM @Branch))
       AND (@Search IS NULL
