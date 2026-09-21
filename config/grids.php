@@ -3,6 +3,8 @@
 use App\Grid\Definitions\BranchGrid;
 use App\Grid\Definitions\DayCloseGrid;
 use Modules\Core\Grids\UserGrid;
+use Modules\Product\Grids\CriticalLineGrid;
+use Modules\Product\Grids\StockItemGrid;
 use Modules\Recon\Grids\ReconBankSideGrid;
 use Modules\Recon\Grids\ReconCriteriaGrid;
 use Modules\Recon\Grids\ReconMopsSideGrid;
@@ -76,6 +78,16 @@ return [
     */
     'grids' => [
         'app.setup.users' => UserGrid::class,
+
+        // The per-branch stock master: the customer's row unless Agora holds
+        // a live override for it, with cost, GP, stock on hand and last
+        // counted joined on from places the master itself does not carry.
+        'app.master.stock' => StockItemGrid::class,
+
+        // The lines that must never be out of stock, and whether they are.
+        // Keyed to the POS file rather than the stock master — a third of the
+        // list is not counted at all.
+        'app.master.critical' => CriticalLineGrid::class,
 
         // The extraction configuration, ours beside the customer's. A row
         // opens a modal edit form rather than editing in place — the grid

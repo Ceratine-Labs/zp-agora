@@ -96,12 +96,14 @@ up)
     #
     # Order matters: pumpit-reports.sql widens SS_Branch and the two drop-safe
     # tables rather than redefining them, so both of the files above it must
-    # have run first.
+    # have run first, and pumpit-product.sql widens STK_StockMaster from the
+    # ten columns pumpit-recon.sql gives it to all twenty-four.
     # A missing file is skipped rather than failing the whole `up`, because
     # these arrive one module at a time.
     for stub in database/stubs/pumpit-recon.sql \
                 database/stubs/pumpit-reports.sql \
-                database/stubs/pumpit-users.sql; do
+                database/stubs/pumpit-users.sql \
+                database/stubs/pumpit-product.sql; do
         [ -f "$stub" ] || continue
         docker exec -i "$NAME" /opt/mssql-tools18/bin/sqlcmd \
             -S localhost -U sa -P "$(sa_password)" -C -b -d PumpIT \

@@ -1,5 +1,4 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
-// Registered under /api with the api middleware stack.
+// Registered under /api with the api middleware stack. Import
+// Illuminate\Support\Facades\Route when this file gains its first route.
