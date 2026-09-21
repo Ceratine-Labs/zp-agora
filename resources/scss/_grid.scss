@@ -10,6 +10,15 @@
 // every component and the only way a screen renders correctly in both themes
 // without being checked in both by hand.
 
+/* A page head immediately followed by a grid must not pay for the gap twice.
+   The head carries 18px of its own and .dg-scope below adds 24px on top, and
+   on a screen whose whole content is a title and a grid — the stock master
+   since the preamble came off — that stacked to roughly 54px of nothing
+   between the two. The 24px belongs to the form, because on the screens that
+   DO put a notice above it that padding is the only separation there is; so
+   it is the head's margin that goes, and only in this one arrangement. */
+.page-head:has(+ .data-grid) { margin-bottom: 0; }
+
 .data-grid {
   margin-bottom: 18px;
 
