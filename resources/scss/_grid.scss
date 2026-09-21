@@ -20,8 +20,14 @@
     /* The 12px matches .dg-bar and the table's own cell padding, so the filter
        form, the "Showing N of N" bar and the first column all begin on one
        line. It had no left padding at all, which only showed once a page was
-       wide enough for the eye to travel down the edge. */
-    padding: 0 12px 14px;
+       wide enough for the eye to travel down the edge.
+
+       The 24px on TOP is the second half of the same complaint, 21 September:
+       the form began at its first label, so the SEARCH caption sat hard
+       against whatever the screen put above it — on the stock master, the
+       "Where each column comes from" callout. A caption touching the block
+       above it reads as belonging to that block. */
+    padding: 24px 12px 14px;
     /* A FILTER BAR IS NOT A TABLE. .field-row lays fields out as
        repeat(auto-fit, minmax(190px, 1fr)), so on a wide page the search box
        collapsed to a 190px sliver with its help text wrapping to three lines
