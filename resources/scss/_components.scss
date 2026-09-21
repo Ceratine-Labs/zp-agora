@@ -659,11 +659,19 @@ tr.tt-out { display: none; }
   display: flex; flex-direction: column; gap: 4px;
   /* The caption sits ABOVE its control, so the 4px that separates the control
      from its help line below is not enough above it: at 10.5px uppercase the
-     label read as if it were stuck to the box. `:not(.field-check)` because a
-     bool field's second <label> is the checkbox row, not a caption. */
+     label read as if it were stuck to the box.
+
+     10px, not the 4px this was first fixed with — that took the gap from 4 to
+     8 and Ryan could not see the difference on the live screen, which is the
+     same as not having fixed it. The caption now clears its control by 14px,
+     three times the 4px that sits under it, so the label reads as belonging
+     to the field below rather than to the border it was touching.
+
+     `:not(.field-check)` because a bool field's second <label> is the
+     checkbox row, not a caption. */
   > label:not(.field-check) {
     font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
-    margin-bottom: 4px;
+    margin-bottom: 10px;
   }
   input[type="text"], input[type="date"], input[type="number"], select {
     background: var(--surface); color: var(--ink);
