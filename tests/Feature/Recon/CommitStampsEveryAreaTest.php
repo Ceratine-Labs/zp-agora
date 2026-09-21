@@ -201,16 +201,6 @@ class CommitStampsEveryAreaTest extends TestCase
         return $user;
     }
 
-    private function skipUnlessLocalStub(): void
-    {
-        $connection = config('agora.connections.app');
-        $host = config("database.connections.{$connection}.host");
-
-        if (! in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
-            $this->markTestSkipped("This test writes to the estate and [{$connection}] points at [{$host}].");
-        }
-    }
-
     private function cleanUp(): void
     {
         $db = $this->db();

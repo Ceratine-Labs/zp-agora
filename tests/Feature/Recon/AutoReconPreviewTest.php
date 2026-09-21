@@ -546,26 +546,6 @@ class AutoReconPreviewTest extends TestCase
         return DB::connection(config('agora.connections.app'));
     }
 
-    /**
-     * Writing bank lines and deposits is only safe against the local stub.
-     *
-     * The app connection is the one this test writes through, so it is the one
-     * that has to be local. Belt and braces on the rule that matters most in
-     * this repository: nothing in the customer's databases is ever written.
-     */
-    private function skipUnlessLocalStub(): void
-    {
-        $connection = config('agora.connections.app');
-        $host = config("database.connections.{$connection}.host");
-
-        if (! in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
-            $this->markTestSkipped(
-                "The recon fixture writes bank lines and deposits, and [{$connection}] points at [{$host}]. "
-                .'It runs against the local container only.'
-            );
-        }
-    }
-
     private function seedFixture(): void
     {
         $pumpit = $this->db();

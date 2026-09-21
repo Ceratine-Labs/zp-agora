@@ -166,16 +166,6 @@ class AreaSelectorTest extends TestCase
         return DB::connection(config('agora.connections.app'));
     }
 
-    private function skipUnlessLocalStub(): void
-    {
-        $connection = config('agora.connections.app');
-        $host = config("database.connections.{$connection}.host");
-
-        if (! in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
-            $this->markTestSkipped("This test writes areas and [{$connection}] points at [{$host}].");
-        }
-    }
-
     private function cleanUp(): void
     {
         $this->db()->table('PumpIT.dbo.STK_Area')->where('SSBranchId', self::BRANCH)->delete();

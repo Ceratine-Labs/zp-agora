@@ -578,18 +578,6 @@ class ExecuteReconciliationTest extends TestCase
         return $user;
     }
 
-    private function skipUnlessLocalStub(): void
-    {
-        $connection = config('agora.connections.app');
-        $host = config("database.connections.{$connection}.host");
-
-        if (! in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
-            $this->markTestSkipped(
-                "This test STAMPS RECONCILIATIONS and [{$connection}] points at [{$host}]. Local container only."
-            );
-        }
-    }
-
     private function seedFixture(): void
     {
         $db = $this->db();

@@ -144,16 +144,6 @@ class SmartAtmDepositDateTest extends TestCase
         return $user;
     }
 
-    private function skipUnlessLocalStub(): void
-    {
-        $connection = config('agora.connections.app');
-        $host = config("database.connections.{$connection}.host");
-
-        if (! in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
-            $this->markTestSkipped("This test writes deposits and [{$connection}] points at [{$host}].");
-        }
-    }
-
     private function cleanUp(): void
     {
         $db = DB::connection(config('agora.connections.app'));
