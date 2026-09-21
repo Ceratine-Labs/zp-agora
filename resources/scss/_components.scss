@@ -109,6 +109,51 @@
 }
 a.kpi:hover { border-color: var(--brand); }
 
+/* FACTS ---------------------------------------------------------------------
+   The body of a detail screen: labelled properties of one record, each with
+   an optional line saying what it MEANS.
+
+   Deliberately quieter than a KPI tile. A detail page carries six to a dozen
+   of these and rendering them at KPI weight makes the page read as a
+   dashboard, pushing the thing the reader came for below the fold. Same
+   bordered-grid family as the KPI strip, one type step down, and the
+   explanation line is the part that earns its space.                        */
+
+.facts {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  grid-template-columns: repeat(var(--facts-columns, auto-fit), minmax(220px, 1fr));
+}
+.fact {
+  background: var(--surface);
+  padding: 12px 14px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+
+  .fact-label {
+    font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  .fact-value {
+    font-weight: 600; font-size: 15px; line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+  }
+  /* The line that makes this worth more than a table row. Muted, because it
+     is context rather than the answer — but present, because without it a
+     reader has to already know what they are looking at. */
+  .fact-why { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+
+  &.tone-good .fact-value    { color: var(--good-ink); }
+  &.tone-warn .fact-value    { color: var(--warn-ink); }
+  &.tone-serious .fact-value { color: var(--serious-ink); }
+  &.tone-crit .fact-value    { color: var(--crit-ink); }
+}
+
 /* ============================================================ small parts */
 
 .chip {

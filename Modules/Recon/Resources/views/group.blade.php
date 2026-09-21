@@ -57,7 +57,7 @@
                  fills in as it goes and a refusal is a row rather than a dead
                  page. A reload picks up wherever it stopped, because the
                  outstanding list is recomputed from the runs on the server. --}}
-            <div class="group-progress" data-recon-group
+            <div data-recon-group
                  data-group-total="{{ $group->BranchCount }}"
                  data-group-done="{{ $group->CompletedCount + $group->FailedCount }}"
                  data-group-branches="{{ implode(',', $outstanding) }}"

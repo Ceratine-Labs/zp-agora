@@ -118,6 +118,74 @@ for module in Modules/*/; do
     fi
 done
 
+# A class a view writes that NOTHING defines is markup that does nothing.
+#
+# The blocklist above catches a screen REUSING a component's class name. It
+# cannot catch the opposite mistake, which is what actually happened on
+# 20 September 2026: the stock master detail screen was written with
+# `.grid-cards` and `.gc` — classes the report-writing template defines and
+# Agora never has — and it rendered as a wall of unstyled text. Every gate
+# passed, phpstan passed, and the only thing that caught it was looking at a
+# screenshot.
+#
+# So: every class in a static class="..." in a non-component view must appear
+# somewhere in the compiled CSS, the JavaScript, or a component's own markup.
+# Dynamic class expressions are skipped — a class built at render time cannot
+# be checked here and pretending otherwise would make the check lie.
+#
+# Run `npm run build` first if you have changed a stylesheet; this reads the
+# BUILT css, deliberately, because that is what the browser gets.
+if ls public/build/assets/*.css >/dev/null 2>&1; then
+    defined=$(mktemp)
+
+    # From the stylesheet: selectors only. CSS carries no prose, so a leading
+    # dot is unambiguous there.
+    cat public/build/assets/*.css 2>/dev/null \
+        | grep -oE '\.[a-zA-Z][A-Za-z0-9_-]*' | cut -c2- > "$defined"
+
+    # From the JavaScript: quoted strings, which is how classList and
+    # querySelector name a class.
+    find resources/js -name '*.js' -exec cat {} + 2>/dev/null \
+        | grep -oE "['\"\`][a-zA-Z][A-Za-z0-9_-]*" | cut -c2- >> "$defined"
+
+    # From the components: the class ATTRIBUTES they write, and nothing else.
+    # NOT their prose — a docblock explaining why `.grid-cards` is wrong would
+    # otherwise define `.grid-cards`, which is exactly how the first cut of
+    # this check passed a deliberately broken view.
+    find resources/views Modules -path '*/views/components/*' -name '*.blade.php' -exec cat {} + 2>/dev/null \
+        | grep -oE "class=[\"'][^\"']*[\"']" | tr " \"'" '\\n\\n\\n' | grep -vE '^(class=|)$' >> "$defined"
+
+    # And the class names a component composes into a string.
+    find resources/views Modules -path '*/views/components/*' -name '*.blade.php' -exec cat {} + 2>/dev/null \
+        | grep -oE "'[a-zA-Z][A-Za-z0-9_-]*'" | tr -d "'" >> "$defined"
+
+    # And the selectors in a component's own inline <style> — signin-layout
+    # carries the whole sign-in stylesheet that way, so `.signin-links` is
+    # defined there and nowhere else. A selector is a dot-name followed by
+    # `{`, `,` or another selector; prose naming `.a-class` in a sentence is
+    # followed by a backtick or a space and a word, so it does not match.
+    find resources/views Modules -path '*/views/components/*' -name '*.blade.php' -exec cat {} + 2>/dev/null \
+        | grep -oP '\.[a-zA-Z][A-Za-z0-9_-]*(?=[[:space:]]*[{,.:])' | cut -c2- >> "$defined"
+
+    sort -u -o "$defined" "$defined"
+
+    for view in $views; do
+        # Static class attributes only: no {{ }}, no @if, no blade at all.
+        used=$(grep -oE 'class="[^"{}@]+"' "$view" 2>/dev/null \
+               | sed -E 's/^class="//; s/"$//' | tr ' ' '\n' | grep -v '^$' | sort -u)
+
+        for class in $used; do
+            if ! grep -qxF "$class" "$defined"; then
+                say "${view}: class=\"${class}\" is defined in no stylesheet, script or component. Dead markup, or a class copied in from somewhere that is not this application."
+            fi
+        done
+    done
+
+    rm -f "$defined"
+else
+    echo "  (skipping the class audit — no built CSS. Run: npm run build)"
+fi
+
 # docs/components.md carries a generated block. A component added without its
 # row is a component the next session will build a second version of.
 if ! php artisan agora:components-doc --check >/dev/null 2>&1; then

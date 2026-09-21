@@ -40,6 +40,16 @@ build if the file is stale, if a view hand-writes component markup such as
 `class="kpi"`, if a blade hand-writes a menu link, or if a module with routes
 has no `MenuSeeder`.
 
+It also fails on **a class no stylesheet, script or component defines**. The
+blocklist above catches a screen reusing a component's class name; this catches
+the opposite mistake, which is the one that actually happened — the stock master
+detail screen was written with `grid-cards` and `gc`, which the report-writing
+template defines and Agora never has, and it rendered as a wall of unstyled
+text with every gate green. The check reads the BUILT css, so run `npm run
+build` after changing a stylesheet; dynamic class expressions are skipped,
+because a class composed at render time cannot be checked here and pretending
+otherwise would make the check lie.
+
 ## Shipped
 
 <!-- components:shipped -->
@@ -71,6 +81,8 @@ How a screen is divided: panels, figures, tabs.
 | `<x-tabs>` | `items` `active` `persist` `label` | A strip of tabs, in link mode or panel mode. | Give the items an `href` and it renders anchors and uses no JavaScript at all — the right mode whenever the panes are separate result sets, because a link carries its scope. Leave `href` out, put `<x-tab-panel>` children in the slot, and `tabs.js` adds the two things the platform does not give: memory of the last choice (`persist`) and arrow-key movement across the strip. Behaviour: `tabs.js`. |
 | `<x-tab-panel>` | `key` | One pane behind a tab. | Takes `active` off the parent `<x-tabs>` with `@aware`, so a page lists its panes without repeating the selection. The inactive ones carry `hidden` from the server — that is what makes the first paint correct with no JavaScript. |
 | `<x-modal>` | `id` `title` `wide` | A dialog: a form or a confirmation that needs the page kept behind it. | Native `<dialog>`, so the browser owns the top layer, the backdrop, the focus trap, Escape and returning focus. `modal.js` adds only what it does not: opening from a `data-modal-open` control anywhere on the page, and fetching the body from `data-modal-url` when the content depends on which row was clicked. **Fetched EVERY open**, unlike `row-detail.js`'s fetch-once — the reason to open an edit form is that what you saw last time may no longer be there. **When not to use it:** a modal interrupts. A row that merely wants to show more of itself belongs in `data-row-detail`, which expands in place and keeps the list visible. Behaviour: `modal.js`. |
+| `<x-facts>` | `columns` `slot` | A block of labelled facts about one record — the body of a detail screen. | Not `<x-kpi-strip>`: a KPI is a headline about the business, a fact is a property of the record already open, and a detail page carries six to a dozen of them. Rendering facts at KPI weight makes the page read as a dashboard and pushes what the reader came for below the fold. Not `<x-table>` either — a two-column table of label and value cannot carry the third thing that makes a detail screen worth reading, the line saying what the value MEANS. `columns` fixes the count; left alone it fits as many as the width allows and collapses to one on a phone. Built after the stock master detail screen was first written with the report template's `.grid-cards`, which no Agora stylesheet has ever defined, and rendered as a wall of unstyled text. |
+| `<x-fact>` | `label` `value` `tone` `slot` | One labelled fact, with what it means underneath. | **The slot is the point.** A label and a value is a table row; the third line is what turns a detail screen into something a person learns from — where the number came from, what it is scoped by, what its absence means. `value` has already been through `App\Support\Format`, because only the caller knows whether the figure is money, litres or a count; null renders the house em dash rather than an empty space that reads as a bug. `tone` is checked against the same five names as every other component, so an unknown value is dropped rather than interpolated into a class. |
 
 ### Data
 

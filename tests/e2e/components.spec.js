@@ -286,3 +286,65 @@ test.describe('the gallery on a phone', () => {
         await expect(page.locator('#tip')).toBeHidden();
     });
 });
+
+/**
+ * <x-modal> actually opens and can actually be seen.
+ *
+ * WHY THIS EXISTS. On 21 September 2026 Ryan reported that the stock master's
+ * Edit button "does nothing", and that afterwards Back to the list could not
+ * be clicked either. Both halves were one bug: Bootstrap ships its own
+ * `.modal { display: none; position: fixed; width: 100%; height: 100% }` and
+ * Agora's own `.modal` rule — same specificity, later in the sheet — set
+ * width and background but never `display`. So showModal() put the dialog in
+ * the top layer INVISIBLE, which makes the whole page inert while showing
+ * nothing. Every <x-modal> in the application was affected, including the
+ * recon Copy-configuration one, which had been opening invisibly since it
+ * shipped.
+ *
+ * Nothing caught it. The markup was correct, so every server-side assertion
+ * passed; the CSS was wrong, and only a browser can see that. Hence a browser
+ * test, on the gallery, where the component lives.
+ */
+test.describe('x-modal opens visibly', () => {
+    test('the dialog is visible after the trigger is clicked, not merely present', async ({ page }) => {
+        const response = await page.goto('/dev/components');
+        test.skip(response !== null && response.status() === 404, '/dev/components is not registered here.');
+
+        const dialog = page.locator('dialog#gallery-modal');
+        await expect(dialog).toBeHidden();
+
+        await page.getByRole('button', { name: 'Open the dialog' }).click();
+
+        // toBeVisible is the assertion the bug would have failed: the element
+        // was in the DOM and [open] the whole time, and display:none made it
+        // invisible.
+        await expect(dialog).toBeVisible();
+        await expect(dialog).toHaveAttribute('open', '');
+
+        // And it has real size. A dialog collapsed to nothing is as much use
+        // as one that is display:none.
+        const box = await dialog.boundingBox();
+        expect(box.width).toBeGreaterThan(200);
+        expect(box.height).toBeGreaterThan(80);
+    });
+
+    test('the page behind it is usable again once it closes', async ({ page }) => {
+        const response = await page.goto('/dev/components');
+        test.skip(response !== null && response.status() === 404, '/dev/components is not registered here.');
+
+        await page.getByRole('button', { name: 'Open the dialog' }).click();
+        await expect(page.locator('dialog#gallery-modal')).toBeVisible();
+
+        // Escape is the browser's, not ours — but if the dialog is invisible
+        // a person never learns that, which is how "I cannot click anything"
+        // happens.
+        await page.keyboard.press('Escape');
+        await expect(page.locator('dialog#gallery-modal')).toBeHidden();
+
+        // The trigger is clickable again, which it is not while a modal
+        // dialog holds the top layer.
+        await expect(page.getByRole('button', { name: 'Open the dialog' })).toBeEnabled();
+        await page.getByRole('button', { name: 'Open the dialog' }).click();
+        await expect(page.locator('dialog#gallery-modal')).toBeVisible();
+    });
+});

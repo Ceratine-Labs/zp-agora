@@ -375,6 +375,28 @@ class ComponentCatalogue
                 ],
             ],
             [
+                'name' => 'x-facts',
+                'group' => 'Structure',
+                'summary' => 'A block of labelled facts about one record — the body of a detail screen.',
+                'notes' => 'Not `<x-kpi-strip>`: a KPI is a headline about the business, a fact is a property of the record already open, and a detail page carries six to a dozen of them. Rendering facts at KPI weight makes the page read as a dashboard and pushes what the reader came for below the fold. Not `<x-table>` either — a two-column table of label and value cannot carry the third thing that makes a detail screen worth reading, the line saying what the value MEANS. `columns` fixes the count; left alone it fits as many as the width allows and collapses to one on a phone. Built after the stock master detail screen was first written with the report template\'s `.grid-cards`, which no Agora stylesheet has ever defined, and rendered as a wall of unstyled text.',
+                'props' => [
+                    ['columns', '?int', 'null', 'Fix the column count; omit to fit'],
+                    ['slot', 'slot', '—', 'The `<x-fact>` children'],
+                ],
+            ],
+            [
+                'name' => 'x-fact',
+                'group' => 'Structure',
+                'summary' => 'One labelled fact, with what it means underneath.',
+                'notes' => '**The slot is the point.** A label and a value is a table row; the third line is what turns a detail screen into something a person learns from — where the number came from, what it is scoped by, what its absence means. `value` has already been through `App\\Support\\Format`, because only the caller knows whether the figure is money, litres or a count; null renders the house em dash rather than an empty space that reads as a bug. `tone` is checked against the same five names as every other component, so an unknown value is dropped rather than interpolated into a class.',
+                'props' => [
+                    ['label', 'string', '—', 'The property being named'],
+                    ['value', '?string', 'null', 'Already formatted; null is an em dash'],
+                    ['tone', '?string', 'null', 'good warn serious crit neutral'],
+                    ['slot', 'slot', '—', 'What the value means, in one line'],
+                ],
+            ],
+            [
                 'name' => 'x-sqlbox',
                 'group' => 'Data',
                 'summary' => 'The procedure behind a screen, shown.',
