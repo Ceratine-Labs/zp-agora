@@ -657,8 +657,13 @@ tr.tt-out { display: none; }
    --------------------------------------------------------------------------- */
 .field {
   display: flex; flex-direction: column; gap: 4px;
-  > label {
+  /* The caption sits ABOVE its control, so the 4px that separates the control
+     from its help line below is not enough above it: at 10.5px uppercase the
+     label read as if it were stuck to the box. `:not(.field-check)` because a
+     bool field's second <label> is the checkbox row, not a caption. */
+  > label:not(.field-check) {
     font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+    margin-bottom: 4px;
   }
   input[type="text"], input[type="date"], input[type="number"], select {
     background: var(--surface); color: var(--ink);
