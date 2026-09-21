@@ -1154,8 +1154,38 @@ table.dt.fit {
 | both grounds and is the one place in the sheet where a token would buy
 | nothing.
 */
-.modal {
+/*
+   `dialog.modal`, NOT `.modal` — and this is the whole bug, not a tidy-up.
+
+   Bootstrap ships its own `.modal`, and the bridge pulls it in:
+
+     .modal { display:none; position:fixed; top:0; left:0;
+              width:100%; height:100%; z-index:1055; overflow:hidden auto }
+
+   The rule below used to be a bare `.modal` at the same specificity, later in
+   the sheet, and it set width, background and border — but never `display`.
+   So Bootstrap's `display:none` survived, and a native <dialog> opened with
+   showModal() went into the top layer INVISIBLE. The page then behaves
+   exactly as Ryan reported on 21 September: the Edit button "does nothing",
+   and afterwards nothing else on the page can be clicked — because a modal
+   dialog makes the rest of the document inert whether you can see it or not.
+
+   Every <x-modal> in the application was affected, not just the stock master:
+   the recon Copy-configuration modal has been opening invisibly since it
+   shipped.
+
+   `dialog.modal` is 0,1,1 against Bootstrap's 0,1,0, so it wins regardless of
+   order, and every property Bootstrap sets that would fight the native
+   dialog — display, position, the full-viewport box — is answered here
+   rather than left to the cascade.
+*/
+dialog.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    margin: auto;
     width: min(560px, calc(100vw - 32px));
+    height: auto;
     max-height: min(80vh, 760px);
     padding: 0;
     border: 1px solid var(--line);
@@ -1163,6 +1193,11 @@ table.dt.fit {
     background: var(--surface);
     color: var(--ink);
     overflow: auto;
+
+    // The one line Bootstrap was eating. A dialog is display:none until the
+    // browser adds [open], and the UA sheet that would do this for us is
+    // outranked by any author rule naming .modal.
+    &[open] { display: block; }
 
     &.modal-wide { width: min(880px, calc(100vw - 32px)); }
 
