@@ -37,7 +37,6 @@ class StockMasterController extends Controller
                 $request,
                 $request->user()?->Id,
             ),
-            'refreshedAt' => $this->service->countStatsRefreshedAt(),
         ]);
     }
 

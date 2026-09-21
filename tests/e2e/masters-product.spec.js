@@ -25,10 +25,12 @@ test.describe('Stock master', () => {
         // this, so they can open it themselves.
         await expect(page.getByText('usp_Product_GridStockItems')).toBeVisible();
 
-        // The provenance notice, which is the one thing this page adds over a
-        // bare grid: cost and GP are NOT on the stock master.
-        const notice = page.getByText('Where each column comes from');
-        await expect(notice).toBeVisible();
+        // And nothing above the grid but the title. The eyebrow, the blurb and
+        // the collapsible provenance panel were removed on 21 September —
+        // they took half the screen before the first row, and the provenance
+        // they explained is on the columns themselves.
+        await expect(page.getByText('Where each column comes from')).toHaveCount(0);
+        await expect(page.getByText('Every stock line a site carries')).toHaveCount(0);
     });
 
     test('the columns that carry the answer are the ones that start visible', async ({ page, isMobile }) => {
