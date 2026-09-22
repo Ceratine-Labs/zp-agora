@@ -71,6 +71,35 @@ class StockMasterService
     }
 
     /**
+     * Switch ONE flag on MANY lines.
+     *
+     * The batch half of the screen (Ryan, 22 September 2026). It is a separate
+     * procedure rather than a loop over `save()`, and the reason is on
+     * `usp_Product_SetStockItemFlag`'s header: a save replaces the override
+     * whole and would need all twenty-two columns round-tripped through the
+     * browser to change one bit.
+     *
+     * The selection goes over as JSON because it is a list of pairs and a
+     * procedure parameter is a scalar. `usp_Product_GridStockItems` already
+     * takes its filters the same way.
+     *
+     * The refusal is not caught here, exactly as it is not in `save()`: the
+     * controller puts it in front of the person who pressed the button.
+     *
+     * @param  array<int, array{BranchId: int, StockItemNo: string}>  $items
+     */
+    public function setFlag(array $items, string $flag, bool $value, ?string $reason, ?int $userId): object
+    {
+        return $this->procedures->write('agora.usp_Product_SetStockItemFlag', [
+            'ItemsJson' => json_encode(array_values($items)),
+            'Flag' => $flag,
+            'Value' => (int) $value,
+            'Reason' => $reason,
+            'UserId' => $userId,
+        ]);
+    }
+
+    /**
      * The counting areas at one site, for the editor's area picker.
      *
      * @return array<int, object>

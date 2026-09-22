@@ -16,6 +16,7 @@ import reconMatch from './components/recon-match';
 import modal from './components/modal';
 import tableTools from './components/table-tools';
 import linkedSelect from './components/linked-select';
+import bulkSelection from './components/bulk-selection';
 import * as format from './format';
 
 megaMenu();
@@ -41,6 +42,10 @@ tableTools();
 // areas at a site. Does nothing on a page with none, which is every page but
 // the stock recon centre.
 linkedSelect();
+// Copies a grid's ticked rows into the batch form that acts on them. Does
+// nothing on a page with no `data-bulk-form`, which is every page but the
+// stock recon master.
+bulkSelection();
 
 // Reachable from an inline handler in a blade view without importing anything
 // there. This is the only global the application defines.

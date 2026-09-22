@@ -10,11 +10,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Modules\Product\Http\Requests\SaveStockItemRequest;
+use Modules\Product\Http\Requests\SetStockItemFlagsRequest;
 use Modules\Product\Services\StockMasterService;
+use Modules\Product\Support\StockItemFlags;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * Setup → Masters → Stock master (T025).
+ * Setup → Trading rules → Stock recon master (T025).
  *
  * Thin, like every controller here: the listing is a GridDefinition the grid
  * service builds, and the detail panel is one call to the service. Nothing in
@@ -37,6 +39,9 @@ class StockMasterController extends Controller
                 $request,
                 $request->user()?->Id,
             ),
+            // The batch action's picker. From the one list the FormRequest and
+            // the test read too — see StockItemFlags.
+            'flags' => StockItemFlags::choices(),
         ]);
     }
 
@@ -61,6 +66,35 @@ class StockMasterController extends Controller
             'area' => $this->service->area($branch, (int) $stockItem->AreaNo),
             'areas' => $this->service->areas($branch),
         ]);
+    }
+
+    /**
+     * One flag, on every ticked line.
+     *
+     * Back to the LISTING, not to a detail page: the person is standing in
+     * front of a grid with forty rows ticked and the thing they want to see
+     * next is the same grid with the flag changed. `back()` keeps the page,
+     * the sort, the filters and the branch selection they were looking at,
+     * which a redirect to the bare index would throw away.
+     *
+     * A refusal lands the same way a single save's does — on the screen that
+     * asked for it, as a message rather than a 500. See `update()`.
+     */
+    public function flags(SetStockItemFlagsRequest $request): RedirectResponse
+    {
+        try {
+            $result = $this->service->setFlag(
+                $request->pairs(),
+                (string) $request->validated('flag'),
+                (bool) $request->validated('value'),
+                (string) $request->validated('reason'),
+                $request->user()?->Id,
+            );
+        } catch (AgoraProcException $e) {
+            return back()->withInput()->withErrors(['refusal' => $e->getMessage()]);
+        }
+
+        return back()->with('status', $result->Message ?? 'Done.');
     }
 
     /**

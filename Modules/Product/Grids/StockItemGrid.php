@@ -9,7 +9,7 @@ use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
 
 /**
- * Setup → Masters → Stock master (T025).
+ * Setup → Trading rules → Stock recon master (T025).
  *
  * The per-branch product listing: 7,447 lines across 22 sites, each one the
  * customer's row from `PumpIT.dbo.STK_StockMaster` unless Agora holds a live
@@ -39,7 +39,7 @@ class StockItemGrid extends GridDefinition
 
     public function title(): string
     {
-        return 'Stock master';
+        return 'Stock recon master';
     }
 
     public function blurb(): ?string
@@ -87,7 +87,32 @@ class StockItemGrid extends GridDefinition
             ),
             new GridColumn(key: 'PosSellPrice', label: 'POS sell (excl)', format: 'money', visible: false),
             new GridColumn(key: 'IsCritical', label: 'Critical line', format: 'bool', visible: false),
+
+            /*
+             * THE SEVEN BEHAVIOUR FLAGS, which are what the batch action sets.
+             *
+             * They start hidden because they are rarely the question — but
+             * every one of them is now settable across a ticked selection, and
+             * a flag you can change in bulk and cannot see afterwards is a
+             * change nobody can check. Tick a column on in the chooser and the
+             * result of the last batch is on screen.
+             *
+             * IsActive is not here: it is what the Status column already says
+             * as the word `Retired`, and two renderings of one bit invite the
+             * reader to look for a difference between them.
+             */
             new GridColumn(key: 'IsMonitoredItem', label: 'Monitored', format: 'bool', visible: false),
+            new GridColumn(
+                key: 'IsDoCloseQtyCalc',
+                label: 'Close-qty calc',
+                format: 'bool',
+                visible: false,
+                title: 'Whether the close quantity is calculated for this line. No server-side rule enforces it — see the save procedure.',
+            ),
+            new GridColumn(key: 'IsAllowNegativeQtyIssued', label: 'Neg. issue', format: 'bool', visible: false),
+            new GridColumn(key: 'IsAllowNegativeQtyClose', label: 'Neg. close', format: 'bool', visible: false),
+            new GridColumn(key: 'IsStockItemPreProduction', label: 'Pre-production input', format: 'bool', visible: false),
+            new GridColumn(key: 'IsPreProductionItem', label: 'Pre-production item', format: 'bool', visible: false),
             new GridColumn(key: 'Factor', label: 'Factor', format: 'number', visible: false),
             new GridColumn(key: 'AreaGroup', label: 'Area group', visible: false),
             new GridColumn(key: 'AreaNo', label: 'Area no', format: 'number', visible: false),
@@ -158,6 +183,33 @@ class StockItemGrid extends GridDefinition
     public function branchSelector(): bool
     {
         return true;
+    }
+
+    /**
+     * Ticking rows is what makes the batch flag action possible (Ryan,
+     * 22 September 2026): "batch actions to toggle the booleans on them, set
+     * them as active or inactive for each boolean type".
+     */
+    public function selectable(): bool
+    {
+        return true;
+    }
+
+    /**
+     * BRANCH AND ITEM, because an item number alone is not a row.
+     *
+     * 653 numbers are reused across 22 sites, so with head office looking at
+     * the whole estate a key of '10' names twenty-two unrelated products. The
+     * batch endpoint splits this back into the pair and the procedure is keyed
+     * on both.
+     */
+    public function rowKey(object $row): string|int|null
+    {
+        if (! isset($row->BranchId, $row->StockItemNo)) {
+            return null;
+        }
+
+        return ((int) $row->BranchId).':'.$row->StockItemNo;
     }
 
     public function rowUrl(object $row): ?string

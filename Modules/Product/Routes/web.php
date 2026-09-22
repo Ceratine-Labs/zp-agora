@@ -11,7 +11,7 @@ Route::middleware('auth')->group(function () {
     /*
      | ---- T025: product masters -------------------------------------------
      |
-     | Setup -> Masters -> Stock master. `view` reads the listing and one
+     | Setup -> Trading rules -> Stock recon master. `view` reads the listing and one
      | line; `edit` writes an override. The two are separate because reading
      | the master is what a count, a GP query and a price review all start
      | with, while changing it alters what a count is VALUED at, at one site,
@@ -32,6 +32,19 @@ Route::middleware('auth')->group(function () {
             ->middleware('can:master.stock.view')->name('stock.index');
         Route::get('stock/{branch}/{item}', [StockMasterController::class, 'show'])
             ->middleware('can:master.stock.view')->whereNumber('branch')->name('stock.show');
+
+        /*
+         | The batch flag action. A POST body rather than a path: the
+         | selection is a list of (branch, item) pairs and a URL is the wrong
+         | place for forty of them.
+         |
+         | DECLARED BEFORE `stock/{branch}/{item}` for readability rather than
+         | out of necessity — {branch} is whereNumber, so `stock/flags` could
+         | not match it either way, and leaving that to be noticed is how the
+         | next path that is not a number gets swallowed.
+         */
+        Route::put('stock/flags', [StockMasterController::class, 'flags'])
+            ->middleware('can:master.stock.edit')->name('stock.flags');
 
         // No separate edit route. The editor is a modal on the detail page,
         // and that page load is the fresh read — modal.js's fetch-per-open

@@ -24,7 +24,7 @@
 
 <x-app-shell :title="$item->StockItemDescription ?? $item->StockItemNo">
     <x-page-head
-        eyebrow="Setup · Masters · Stock master"
+        eyebrow="Setup · Trading rules · Stock recon master"
         :title="$item->StockItemDescription ?? 'Item '.$item->StockItemNo"
         :blurb="$item->BranchName.' · item '.$item->StockItemNo.' · '.$item->PosSystem.' '.$item->POSCode">
         <x-slot:actions>

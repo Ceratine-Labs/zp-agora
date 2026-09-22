@@ -8,11 +8,12 @@ use Illuminate\Support\Str;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserBranch;
 use Modules\Core\Models\UserPermission;
+use Modules\Product\Support\StockItemFlags;
 use Tests\Fixtures\GrantsAccess;
 use Tests\TestCase;
 
 /**
- * The stock master screens and the boundary around them (T025).
+ * The stock recon master screens and the boundary around them (T025).
  *
  * SaveStockItemTest covers what the procedure refuses. This covers the layer
  * above it: who may open the screens, who may write, and whether a refusal
@@ -70,7 +71,7 @@ class StockMasterScreenTest extends TestCase
             $this->actingAs($this->person($role))
                 ->get(route('app.master.stock.index'))
                 ->assertOk()
-                ->assertSee('Stock master');
+                ->assertSee('Stock recon master');
         }
     }
 
@@ -191,6 +192,102 @@ class StockMasterScreenTest extends TestCase
 
         $this->assertSame('agora', trim($row->Source));
         $this->assertSame('TEST-SAVED FROM THE FORM', trim((string) $row->StockItemDescription));
+    }
+
+    public function test_the_listing_offers_the_batch_flag_action_to_someone_who_may_write(): void
+    {
+        $page = $this->actingAs($this->person('operations'))
+            ->get(route('app.master.stock.index'))
+            ->assertOk();
+
+        // The control in the selection bar, the form it opens, and the handle
+        // bulk-selection.js uses to find the ticked rows.
+        $page->assertSee('data-modal-open="stock-flags"', false)
+            ->assertSee('data-bulk-form="app.master.stock"', false)
+            ->assertSee('Set a flag on the selected lines');
+
+        // And every flag the screen claims to offer is in the picker.
+        foreach (StockItemFlags::choices() as $column => $label) {
+            $page->assertSee('value="'.$column.'"', false);
+            $page->assertSee($label);
+        }
+    }
+
+    public function test_a_reader_who_cannot_write_is_not_offered_the_batch_action(): void
+    {
+        // feature-rules §4 again: a control the user cannot use is not drawn.
+        $this->actingAs($this->person('auditor'))
+            ->get(route('app.master.stock.index'))
+            ->assertOk()
+            ->assertDontSee('data-modal-open="stock-flags"', false)
+            ->assertDontSee('Set a flag on the selected lines');
+    }
+
+    public function test_a_batch_flag_lands_and_comes_back_to_the_listing(): void
+    {
+        $this->actingAs($this->person('operations'))
+            ->from(route('app.master.stock.index'))
+            ->put(route('app.master.stock.flags'), [
+                'flag' => 'IsMonitoredItem',
+                'value' => '1',
+                'reason' => 'TEST-batch from the screen',
+                'items' => [self::BRANCH.':10'],
+            ])
+            ->assertRedirect(route('app.master.stock.index'))
+            ->assertSessionHas('status');
+
+        $row = $this->db()->selectOne(
+            'SELECT * FROM [agora].[vw_StockItem] WHERE BranchId = ? AND StockItemNo = ?',
+            [self::BRANCH, '10']
+        );
+
+        $this->assertSame('agora', trim($row->Source));
+        $this->assertSame(1, (int) $row->IsMonitoredItem);
+    }
+
+    public function test_the_batch_action_is_behind_the_same_permission_as_a_single_edit(): void
+    {
+        $this->actingAs($this->person('auditor'))
+            ->put(route('app.master.stock.flags'), [
+                'flag' => 'IsActive',
+                'value' => '0',
+                'reason' => 'TEST-should be forbidden',
+                'items' => [self::BRANCH.':10'],
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(0, $this->db()->table('agora.StockItem')
+            ->where('BranchId', self::BRANCH)->count());
+    }
+
+    public function test_a_batch_with_nothing_ticked_is_caught_by_the_form(): void
+    {
+        $this->actingAs($this->person('admin'))
+            ->put(route('app.master.stock.flags'), [
+                'flag' => 'IsActive',
+                'value' => '0',
+                'reason' => 'TEST-nothing ticked',
+            ])
+            ->assertSessionHasErrors('items');
+    }
+
+    public function test_a_batch_refusal_comes_back_to_the_listing_rather_than_as_an_error_page(): void
+    {
+        $response = $this->actingAs($this->person('admin'))
+            ->from(route('app.master.stock.index'))
+            ->put(route('app.master.stock.flags'), [
+                'flag' => 'IsActive',
+                'value' => '0',
+                'reason' => 'TEST-stale selection',
+                'items' => [self::BRANCH.':10', self::BRANCH.':ZZZZZ'],
+            ]);
+
+        $response->assertRedirect(route('app.master.stock.index'));
+        $response->assertSessionHasErrors('refusal');
+
+        // Refused as a whole: the line that WAS real is untouched.
+        $this->assertSame(0, $this->db()->table('agora.StockItem')
+            ->where('BranchId', self::BRANCH)->count());
     }
 
     private function updateUrl(): string

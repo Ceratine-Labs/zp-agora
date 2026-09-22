@@ -1,7 +1,7 @@
 /* ============================================================================
- * agora.usp_Product_GridStockItems — the stock master listing.
+ * agora.usp_Product_GridStockItems — the stock recon master listing.
  *
- * Read by:  Setup -> Masters -> Stock master  (T025)
+ * Read by:  Setup -> Trading rules -> Stock recon master  (T025)
  * Reads:    agora.vw_StockItem (the override-or-legacy resolution),
  *           agora.vw_StockArea, agora.vw_StockItemPos, agora.vw_StockItemCritical,
  *           agora.StockItemCountStat, agora.Branch
@@ -139,6 +139,11 @@ BEGIN
             i.SellingPrice,
             i.Factor,
             i.IsMonitoredItem,
+            i.IsDoCloseQtyCalc,
+            i.IsAllowNegativeQtyIssued,
+            i.IsAllowNegativeQtyClose,
+            i.IsStockItemPreProduction,
+            i.IsPreProductionItem,
             i.IsActive,
             i.[Source],
 
@@ -263,6 +268,11 @@ BEGIN
         f.CountLines90,
         f.Factor,
         f.IsMonitoredItem,
+        f.IsDoCloseQtyCalc,
+        f.IsAllowNegativeQtyIssued,
+        f.IsAllowNegativeQtyClose,
+        f.IsStockItemPreProduction,
+        f.IsPreProductionItem,
         f.IsActive,
         f.[Source],
         f.[Status]

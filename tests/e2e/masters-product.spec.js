@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * Setup → Trading rules → Stock master (T025).
+ * Setup → Trading rules → Stock recon master (T025).
  *
  * The listing and one line's detail, driven in a real browser. What is worth
  * asserting here rather than in phpunit is the things only a render shows:
@@ -10,11 +10,11 @@ import { expect, test } from '@playwright/test';
  * that the provenance notice actually explains where the columns come from,
  * and that clicking an item opens it.
  */
-test.describe('Stock master', () => {
+test.describe('Stock recon master', () => {
     test('the listing renders with its scope, its provenance and its procedure named', async ({ page }) => {
         await page.goto('/app/master/stock');
 
-        await expect(page.getByRole('heading', { name: 'Stock master', level: 1 })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Stock recon master', level: 1 })).toBeVisible();
 
         // The branch selector. An item number is per site — "item 10" is
         // twenty-two different products across the estate — so a listing
@@ -78,6 +78,23 @@ test.describe('Stock master', () => {
         // Provenance, not decoration: the detail page has to say whether the
         // row it is showing is the customer's or an Agora override.
         await expect(page.getByText('Held by')).toBeVisible();
+    });
+
+    test('a reader who cannot write is not offered the batch flag action', async ({ page }) => {
+        // The fixture user is an Auditor — master.stock.view, not
+        // master.stock.edit. feature-rules §4: the control is not drawn at
+        // all, rather than drawn and then refused. Asserted on the LISTING
+        // because that is where the batch action lives, beside the editor
+        // assertion below which covers the detail page.
+        await page.goto('/app/master/stock');
+
+        await expect(page.getByRole('button', { name: 'Set a flag…' })).toHaveCount(0);
+        await expect(page.locator('dialog#stock-flags')).toHaveCount(0);
+
+        // The tick boxes themselves stay: selecting rows is not writing, and
+        // a reader who cannot act on a selection still has one from the
+        // grid's own bar.
+        await expect(page.locator('[data-check-all]')).toBeVisible();
     });
 
     test('a reader who cannot write is not offered the editor', async ({ page, isMobile }) => {
