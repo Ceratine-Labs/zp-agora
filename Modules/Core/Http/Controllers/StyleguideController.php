@@ -91,6 +91,25 @@ class StyleguideController extends Controller
                 ['site' => 'Total Mkuze', 'ref' => 'CCB69812', 'declared' => 7415.00, 'banked' => 0.00],
             ],
 
+            /*
+             * Enough rows to page, and a state column with a real spread, for
+             * the `data-tt-page` + `data-tt-pills` entry. Generated rather than
+             * typed: the point of that entry is what 64 rows look like split
+             * into pages, and 64 hand-written fixtures would be 64 lines of
+             * noise nobody would ever read.
+             */
+            'pagedRows' => collect(range(1, 64))->map(fn (int $n) => [
+                'site' => ['Elephant Coast', 'Nyala One Stop', 'Total Mkuze', 'Hluhluwe Filling'][$n % 4],
+                'ref' => 'CCB'.(69800 + $n),
+                'state' => match (true) {
+                    $n % 9 === 0 => 'Blocked',
+                    $n % 5 === 0 => 'Short',
+                    $n % 7 === 0 => 'Unrecorded issue',
+                    default => 'Balanced',
+                },
+                'amount' => 1000.00 + ($n * 137.25),
+            ])->all(),
+
             'recon' => [
                 'bank' => collect([
                     (object) ['BankStatementLineID' => 4101, 'LineDate' => '2026-08-08', 'Description' => 'CF NPF CREDIT ABSA BANK CCB125', 'Amount' => 14937.40, 'PairKey' => '125', 'ColourIndex' => 1],

@@ -29,9 +29,25 @@
     per-column filter row, done in the BROWSER over the rows already on the
     page. That is the right shape here and the wrong shape in the grid — see
     the head of `table-tools.js` for the whole argument — and it is opt-in
-    because it only makes sense on a table that arrived complete. A paginated
-    or truncated result set must not offer it: filtering page one of nine and
-    calling the answer a filter is a lie.
+    because it only makes sense on a table that arrived complete. A table whose
+    rows were paged or truncated BY THE SERVER must not offer it: filtering page
+    one of nine and calling the answer a filter is a lie.
+
+    Three attributes ride through to the table for `tools` to read. They are
+    attributes rather than props because they describe the rows, which are the
+    caller's markup, not this component's:
+
+      data-tt-page="50"      cut the rows into pages of fifty, in the browser,
+                             over the set that already arrived. Every row stays
+                             in the document and in any form around it — a page
+                             is a way of looking, not a scope — so this is safe
+                             on a table whose tick boxes decide what a commit
+                             writes, which server paging would not be.
+      data-tt-pills="Value"  on a <th>: show that column as a strip of pills
+                             above the table instead of as a tick list in the
+                             filter row, opening scoped to that value.
+                             `data-tt-pill-order="A|B|C"` fixes their order.
+      data-tone="good"       on a <td>: the chip tone that column's pill takes.
 --}}
 @props([
     'procedure' => null,

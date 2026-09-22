@@ -31,9 +31,23 @@
  * The markup contract:
  *
  *   <table class="dt" data-table-tools>          — the whole thing
+ *   <table data-tt-page="50">                     — cut the rows into pages
  *   <th data-no-tools>                            — no sort, no filter
+ *   <th data-tt-pills="Balanced"                  — this column as a pill strip
+ *       data-tt-pill-order="A|B|C">                 above the table, opening on
+ *                                                   that value
  *   <td data-sort="2026-09-08">8 Sep</td>         — sort and filter on this
  *                                                   instead of the rendered text
+ *   <td data-sort="Balanced" data-tone="good">    — and the chip tone its pill
+ *                                                   takes
+ *
+ * PAGING IS A WAY OF LOOKING, NOT A SCOPE, and that is the whole reason it is
+ * allowed on a screen that stamps from tick boxes. Every row is in the
+ * document and every ticked row is in the submission, whichever page it is
+ * sitting on; the button's count is of the whole filtered set, not of the page.
+ * A FILTER is the other thing — it takes rows out of the submission, as above.
+ * Confusing the two is how a clerk would come to stamp four hundred rows they
+ * never saw, or to miss three hundred they meant to.
  */
 
 const NOTHING = '—';
@@ -46,6 +60,18 @@ export default function tableTools() {
     // is a second head row too, and it has been sliding under the first since
     // the day the scroll container got a height.
     document.querySelectorAll('table.dt').forEach(stickyHead);
+
+    /*
+     * BEFORE the tables mount, not after.
+     *
+     * A pill strip can arrive with a default scope on, so the first `apply()`
+     * is already hiding rows — and it dispatches the only `table-tools:change`
+     * that will be sent until somebody touches a control. An action bar wired
+     * up afterwards missed it, and sat there saying nothing while a scope held
+     * 68 of 144 shifts out of the press. Wiring it first costs one recount
+     * against an unfiltered table and then it hears the real one.
+     */
+    document.querySelectorAll('[data-action-bar]').forEach(actionBar);
 
     document.querySelectorAll('table[data-table-tools]').forEach((table) => {
         const tools = new TableTools(table);
@@ -60,8 +86,6 @@ export default function tableTools() {
         // holding references to rows the DOM has thrown away.
         table.addEventListener('table-tools:rescan', () => tools.refresh());
     });
-
-    document.querySelectorAll('[data-action-bar]').forEach(actionBar);
 }
 
 /* ------------------------------------------------------------------ sticky */
@@ -121,7 +145,14 @@ class TableTools {
         this.headRow = this.head.rows[this.head.rows.length - 1];
         this.rows = Array.from(this.body.rows).filter((row) => isDataRow(row));
         this.order = this.rows.slice();
+        // The order the rows are in ON SCREEN. `order` is the order the server
+        // sent and stops being the reader's order the moment a column is
+        // sorted — and paging has to cut the reader's order, or page two of a
+        // freshly sorted table is the second fifty of the previous one.
+        this.view = this.rows.slice();
         this.sort = null;
+        this.pageSize = readPageSize(this.table);
+        this.page = 1;
         this.columns = this.readColumns();
         this.usable = this.columns.length > 0 && this.rows.length > 0;
     }
@@ -148,6 +179,13 @@ class TableTools {
                 query: '',
                 op: 'eq',
                 chosen: null,
+                // A pilled column is filtered ABOVE the table rather than in
+                // the filter row — same filter, different control.
+                pills: th.dataset.ttPills !== undefined,
+                pillDefault: (th.dataset.ttPills || '').trim(),
+                pillOrder: (th.dataset.ttPillOrder || '').split('|')
+                    .map((value) => value.trim()).filter(Boolean),
+                pillButtons: [],
             };
 
             if (!skip) column.type = this.inferType(column);
@@ -184,15 +222,22 @@ class TableTools {
     refresh() {
         this.rows = Array.from(this.body.rows).filter((row) => isDataRow(row));
         this.order = this.rows.slice();
+        this.view = this.rows.slice();
         this.sort = null;
+        this.page = 1;
         this.apply();
     }
 
     mount() {
         this.buildSort();
         this.buildFilters();
+        this.buildPills();
+        this.buildPager();
         stickyHead(this.table);
-        this.report(this.rows.length);
+        // Not `report(total)`: a pill strip can arrive with a default scope on,
+        // so the first paint has to be a real pass over the rows rather than an
+        // assertion that nothing is hidden yet.
+        this.apply();
     }
 
     /* ------------------------------------------------------------- sorting */
@@ -248,6 +293,13 @@ class TableTools {
         const fragment = document.createDocumentFragment();
         ordered.forEach((row) => block(row).forEach((node) => fragment.append(node)));
         this.body.append(fragment);
+
+        // Re-sorting is re-paging: the pages are cuts of the order on screen,
+        // and that order has just changed. Back to page one, because page four
+        // of a new sort is somewhere nobody asked to be.
+        this.view = ordered.slice();
+        this.page = 1;
+        this.apply();
     }
 
     compare(a, b, column) {
@@ -298,12 +350,31 @@ class TableTools {
             column.chosen = null;
             if (column.input) column.input.value = '';
             this.markColumn(column);
+            this.markPills(column);
         });
 
+        this.refilter();
+    }
+
+    /**
+     * A filter changed. Paging starts again from the first page — staying on
+     * page seven of a set that is now two pages long shows an empty table and
+     * reads as a broken screen.
+     */
+    refilter() {
+        this.page = 1;
         this.apply();
     }
 
     buildFilterCell(cell, column) {
+        // A pilled column is already filtered, above the table. A second
+        // control for the same column here would be a second answer to one
+        // question; the cell stays so the columns still line up.
+        if (column.pills) {
+            cell.classList.add('tt-pilled');
+            return;
+        }
+
         const wrap = document.createElement('div');
         wrap.className = 'tt-filter';
 
@@ -319,7 +390,7 @@ class TableTools {
 
             operator.addEventListener('change', () => {
                 column.op = operator.value;
-                if (column.query !== '') this.apply();
+                if (column.query !== '') this.refilter();
             });
 
             wrap.append(operator);
@@ -346,7 +417,7 @@ class TableTools {
             // A search box that re-hides two hundred rows on every keystroke
             // reads as a stutter; a hundred and twenty milliseconds reads as
             // instant and only runs once for a typed word.
-            timer = window.setTimeout(() => { this.markColumn(column); this.apply(); }, 120);
+            timer = window.setTimeout(() => { this.markColumn(column); this.refilter(); }, 120);
         });
 
         column.input = input;
@@ -445,7 +516,8 @@ class TableTools {
             allBox.indeterminate = ticked.length > 0 && ticked.length < boxes.length;
 
             this.markColumn(column);
-            this.apply();
+            this.markPills(column);
+            this.refilter();
         };
 
         allBox.addEventListener('change', () => {
@@ -474,7 +546,8 @@ class TableTools {
             column.query = '';
             if (column.input) column.input.value = '';
             this.markColumn(column);
-            this.apply();
+            this.markPills(column);
+            this.refilter();
             closePanel();
         });
 
@@ -539,19 +612,305 @@ class TableTools {
         });
     }
 
-    apply() {
-        let visible = 0;
+    /* --------------------------------------------------------------- pills */
+
+    /**
+     * A column shown as a row of pills above the table instead of as a tick
+     * list buried in the filter row.
+     *
+     * Asked for on the stock recon proposals, 22 Sep 2026: the outcome column's
+     * Excel list answered the question but hid it behind a press, and the
+     * handful of states it holds are the first cut anybody makes on a run. As
+     * pills they are visible, counted, and one click each.
+     *
+     * It is the SAME filter — `column.chosen`, the thing the tick list sets —
+     * so everything that follows from a filter still follows: the heading is
+     * marked, the hidden rows leave the submission, and the action bar says so.
+     * A pill that merely hid rows while leaving them in the commit would be the
+     * dangerous half of a filter with none of the honest half.
+     */
+    buildPills() {
+        this.columns.filter((column) => column.pills).forEach((column) => this.buildPillStrip(column));
+    }
+
+    buildPillStrip(column) {
+        const counts = new Map();
+        const tones = new Map();
 
         this.rows.forEach((row) => {
+            const value = this.text(row, column.index) || NOTHING;
+
+            counts.set(value, (counts.get(value) || 0) + 1);
+
+            if (!tones.has(value)) tones.set(value, row.cells[column.index]?.dataset.tone || 'neutral');
+        });
+
+        /*
+         * The declared order first, so a run that happens not to contain a
+         * state does not reshuffle a strip somebody has learned the shape of —
+         * a zero is rendered, dimmed, rather than left out. Then anything the
+         * data holds that the caller did not name.
+         */
+        const named = column.pillOrder.filter((value, i, all) => all.indexOf(value) === i);
+        const rest = Array.from(counts.keys())
+            .filter((value) => !named.includes(value))
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+        const strip = document.createElement('div');
+        strip.className = 'tt-pills';
+        strip.setAttribute('role', 'group');
+        strip.setAttribute('aria-label', `Filter by ${column.label}`);
+
+        const caption = document.createElement('span');
+        caption.className = 'tt-pills-label';
+        caption.textContent = column.label;
+        strip.append(caption);
+
+        column.pillButtons = [];
+
+        const add = (value, label, tone, count) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `tt-pill chip ${tone} tone-${tone}`;
+            button.disabled = count === 0;
+
+            const dot = document.createElement('span');
+            dot.className = 'dot';
+            dot.setAttribute('aria-hidden', 'true');
+
+            const text = document.createElement('span');
+            text.className = 'tt-pill-t';
+            text.textContent = label;
+
+            const n = document.createElement('span');
+            n.className = 'tt-pill-n';
+            n.textContent = String(count);
+
+            button.append(dot, text, n);
+            button.title = count === 1 ? `1 shift · ${label}` : `${count} shifts · ${label}`;
+            button.addEventListener('click', () => this.choosePill(column, value));
+
+            strip.append(button);
+            column.pillButtons.push({ button, value });
+        };
+
+        add(null, 'All', 'neutral', this.rows.length);
+        named.concat(rest).forEach((value) => add(value, value, tones.get(value) || 'neutral', counts.get(value) || 0));
+
+        (this.table.closest('.table-block') || this.table.parentElement).prepend(strip);
+
+        /*
+         * The pill the screen opens on. A default this particular run has no
+         * rows for would open the table empty, which reads as a broken screen
+         * rather than as a scope — so it quietly falls back to All.
+         */
+        if (column.pillDefault && (counts.get(column.pillDefault) || 0) > 0) {
+            column.chosen = new Set([column.pillDefault]);
+        }
+
+        this.markColumn(column);
+        this.markPills(column);
+    }
+
+    choosePill(column, value) {
+        // One pill at a time. The tick list is still the way to say "these
+        // three"; a pill strip is the way to say "that one", which is the
+        // question it was asked for.
+        column.chosen = value === null ? null : new Set([value]);
+
+        this.markColumn(column);
+        this.markPills(column);
+        this.refilter();
+    }
+
+    markPills(column) {
+        column.pillButtons.forEach(({ button, value }) => {
+            const on = value === null
+                ? column.chosen === null
+                : column.chosen !== null && column.chosen.size === 1 && column.chosen.has(value);
+
+            button.classList.toggle('is-on', on);
+            button.setAttribute('aria-pressed', String(on));
+        });
+    }
+
+    /* --------------------------------------------------------------- paging */
+
+    /**
+     * The pager, under the rows. Built once; its numbers are redrawn on every
+     * pass, because how many pages there are is a function of what the filters
+     * left behind.
+     */
+    buildPager() {
+        if (!this.pageSize) return;
+
+        const nav = document.createElement('nav');
+        nav.className = 'tt-pager';
+        nav.setAttribute('aria-label', `Pages of ${this.table.id || 'this table'}`);
+
+        this.pagerPrev = pagerButton('‹ Prev', () => this.goTo(this.page - 1));
+        this.pagerNext = pagerButton('Next ›', () => this.goTo(this.page + 1));
+
+        this.pagerPages = document.createElement('div');
+        this.pagerPages.className = 'tt-pager-pages';
+
+        const size = document.createElement('label');
+        size.className = 'tt-pager-size';
+
+        const select = document.createElement('select');
+        const options = PAGE_SIZES.includes(this.pageSize) ? PAGE_SIZES : [this.pageSize, ...PAGE_SIZES].sort((a, b) => a - b);
+        options.forEach((n) => select.append(new Option(String(n), String(n))));
+        // "All" is not a dare — it is the way back to the screen this table was
+        // before it was paged, which somebody printing or scanning wants.
+        select.append(new Option('All', '0'));
+        select.value = String(this.pageSize);
+        select.setAttribute('aria-label', 'Rows per page');
+        select.addEventListener('change', () => {
+            this.pageSize = Number(select.value) || 0;
+            this.page = 1;
+            this.apply();
+        });
+
+        size.append(document.createTextNode('Rows '), select);
+        nav.append(this.pagerPrev, this.pagerPages, this.pagerNext, size);
+
+        this.pager = nav;
+        this.table.closest('.table-scroll')?.after(nav);
+    }
+
+    goTo(page) {
+        this.page = page;
+        this.apply();
+        this.scrollToTop();
+    }
+
+    /**
+     * Page two starts at the top of page two, not eighty rows into it — and
+     * not underneath the furniture either.
+     *
+     * The pager is under the last row, so pressing Next leaves the reader at
+     * the bottom of the table with a new page of rows above them. Scrolling
+     * back is right; scrolling the block to y = 0 is not, because the app bar,
+     * the scope bar and the commit bar are all pinned over that space and the
+     * table's own sticky head lands behind them. A page of rows with no column
+     * headings on it is what that looks like, and it looks like a bug.
+     */
+    scrollToTop() {
+        const block = this.table.closest('.table-block');
+
+        if (!block) return;
+
+        this.table.closest('.table-scroll')?.scrollTo({ top: 0 });
+
+        // Measured, and only the bars that are actually pinned right now: the
+        // action bar is static on a phone, and counting it there would leave a
+        // gap where the rows should be.
+        const chrome = Array.from(document.querySelectorAll('.appbar, .scopebar, .action-bar'))
+            .filter((el) => ['fixed', 'sticky'].includes(getComputedStyle(el).position))
+            .reduce((total, el) => total + el.getBoundingClientRect().height, 0);
+
+        const top = block.getBoundingClientRect().top + window.scrollY - chrome - 8;
+
+        window.scrollTo({ top: Math.max(0, top) });
+    }
+
+    /**
+     * Hide everything outside the current page — WITHOUT disabling it. This is
+     * the line between paging and filtering, and it is the reason a paged
+     * commit form is not a form that stamps rows nobody looked at: a tick on
+     * page three is still ticked, still counted on the button, and still in the
+     * POST. See the head of this file.
+     */
+    paginate(rows) {
+        if (!this.pageSize) {
+            rows.forEach((row) => block(row).forEach((node) => node.classList.remove('tt-page-out')));
+            this.drawPager(1, rows.length, 0, rows.length);
+
+            return;
+        }
+
+        const pages = Math.max(1, Math.ceil(rows.length / this.pageSize));
+
+        this.page = Math.min(Math.max(1, this.page), pages);
+
+        const first = (this.page - 1) * this.pageSize;
+        const last = Math.min(first + this.pageSize, rows.length);
+
+        rows.forEach((row, index) => {
+            const on = index >= first && index < last;
+
+            block(row).forEach((node) => node.classList.toggle('tt-page-out', !on));
+        });
+
+        this.drawPager(pages, rows.length, first, last);
+    }
+
+    drawPager(pages, total, first, last) {
+        if (!this.pager) return;
+
+        // Nothing worth a control: a table shorter than the smallest page size
+        // cannot be paged into anything, and a pager on it is furniture.
+        this.pager.hidden = total <= PAGE_SIZES[0];
+
+        this.pagerPrev.disabled = this.page <= 1;
+        this.pagerNext.disabled = this.page >= pages;
+
+        this.pagerPages.textContent = '';
+
+        pageNumbers(this.page, pages).forEach((n) => {
+            if (n === null) {
+                const gap = document.createElement('span');
+                gap.className = 'tt-pager-gap';
+                gap.textContent = '…';
+                this.pagerPages.append(gap);
+
+                return;
+            }
+
+            const button = pagerButton(String(n), () => this.goTo(n));
+            button.classList.toggle('is-on', n === this.page);
+            button.setAttribute('aria-current', n === this.page ? 'page' : 'false');
+            this.pagerPages.append(button);
+        });
+
+        this.pager.dataset.range = total === 0 ? '0' : `${first + 1}–${last} of ${total}`;
+    }
+
+    apply() {
+        const passing = [];
+
+        this.view.forEach((row) => {
             const show = this.matches(row);
 
             block(row).forEach((node) => node.classList.toggle('tt-out', !show));
             enable(row, show);
 
-            if (show) visible += 1;
+            if (show) passing.push(row);
+            // A row the filter took out is not on any page, so it must not
+            // carry a page class into the next pass and back out of one.
+            else block(row).forEach((node) => node.classList.remove('tt-page-out'));
         });
 
-        this.report(visible);
+        this.paginate(passing);
+        this.report(passing.length);
+    }
+
+    /**
+     * The footer line. Three things can be true at once — rows hidden by a
+     * filter, rows on another page, and the count the server printed — and the
+     * sentence has to say which is which. "Showing 1–50 of 312 — filtered from
+     * 940" is the whole state in one line.
+     */
+    countText(visible, total, filtered) {
+        if (!this.pageSize || visible <= this.pageSize) {
+            return filtered ? `Showing ${visible} of ${total} — filtered` : this.originalCount;
+        }
+
+        const first = (this.page - 1) * this.pageSize;
+        const last = Math.min(first + this.pageSize, visible);
+        const shown = `Showing ${first + 1}–${last} of ${visible}`;
+
+        return filtered ? `${shown} — filtered from ${total}` : shown;
     }
 
     /**
@@ -577,9 +936,7 @@ class TableTools {
 
             if (count) {
                 if (this.originalCount === undefined) this.originalCount = count.textContent;
-                count.textContent = filtered
-                    ? `Showing ${visible} of ${total} — filtered`
-                    : this.originalCount;
+                count.textContent = this.countText(visible, total, filtered);
             }
 
             let empty = block_.querySelector('[data-tt-empty]');
@@ -691,6 +1048,53 @@ document.addEventListener('keydown', (event) => {
 // event on an element does not bubble.
 document.addEventListener('scroll', () => { if (openPanelState) openPanelState.place(); }, true);
 window.addEventListener('resize', () => { if (openPanelState) openPanelState.place(); });
+
+const PAGE_SIZES = [25, 50, 100, 250];
+
+/** `data-tt-page="50"`. Absent, zero or nonsense means no paging at all. */
+function readPageSize(table) {
+    const raw = Number(table.dataset.ttPage);
+
+    return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0;
+}
+
+function pagerButton(label, onClick) {
+    const button = document.createElement('button');
+
+    button.type = 'button';
+    button.className = 'tt-pager-btn';
+    button.textContent = label;
+    button.addEventListener('click', onClick);
+
+    return button;
+}
+
+/**
+ * First, last, and the three around the current one — `null` where a run of
+ * pages was left out. Nine hundred rows is eighteen pages and eighteen buttons
+ * is a second navigation bar nobody reads.
+ */
+function pageNumbers(page, pages) {
+    const wanted = [];
+    const push = (n) => { if (n >= 1 && n <= pages && !wanted.includes(n)) wanted.push(n); };
+
+    push(1);
+    push(2);
+    for (let n = page - 1; n <= page + 1; n += 1) push(n);
+    push(pages - 1);
+    push(pages);
+
+    wanted.sort((a, b) => a - b);
+
+    const out = [];
+
+    wanted.forEach((n, i) => {
+        if (i > 0 && n - wanted[i - 1] > 1) out.push(null);
+        out.push(n);
+    });
+
+    return out;
+}
 
 /** A data row, not a drilled panel and not the grid's totals line. */
 function isDataRow(row) {

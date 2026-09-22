@@ -2,17 +2,55 @@
     Tab one: what the balancing proposes, and the press that writes it.
 
     The tick boxes decide what a commit writes, so this cannot be an
-    <x-data-grid> — and it is deliberately not paged either: a paged commit form
-    is a form that writes rows nobody looked at. `tools` gives the head a sort
-    control and an Excel-style filter row applied IN THE BROWSER over the rows
-    already here, and a filtered row's tick box is disabled, so it leaves the
-    submission and the count on the button says so.
+    <x-data-grid>. `tools` gives the head a sort control and an Excel-style
+    filter row applied IN THE BROWSER over the rows already here, and a filtered
+    row's tick box is disabled, so it leaves the submission and the count on the
+    button says so.
+
+    IT IS NOW PAGED, and the note that stood here said it must never be: "a
+    paged commit form is a form that writes rows nobody looked at". That is true
+    of SERVER paging, where page two is a second request and the rows on it are
+    not in the document at all. This is browser paging over the set that already
+    arrived complete: every row is in the form, a tick on page seven is still
+    ticked, still counted on the button and still in the POST, and the only
+    thing a page does is decide what is on screen. The customer asked for it
+    (22 Sep 2026) because a branch-month is thousands of shifts and the browser
+    was laying out every one of them.
+
+    The outcome column is a PILL STRIP rather than a tick list, opening scoped
+    to Balanced — same customer, same day. The pills set the same
+    `column.chosen` the tick list set, so scoping to a state disables the rows
+    outside it exactly as any other filter does, and the Amend button's count
+    follows. That is deliberate: opening on Balanced means the press arrives
+    scoped to the shifts that balance clean, and the amber note in the action
+    bar says how many rows the scope is holding back.
 --}}
 @php
     $tones = [
         'balanced' => 'is-matched', 'short' => 'is-warn', 'blocked' => 'is-serious',
         'unrecorded' => 'is-crit', 'dormant' => '', 'clean' => '',
     ];
+
+    /*
+     * The STATE a row is in, which is not the same as its outcome sentence.
+     * The procedure writes fifteen sentences; they collapse onto the six states
+     * StockReconRunLine::outcomeKey() already names and tone() already colours,
+     * and six is a strip of pills somebody reads at a glance where fifteen is
+     * another list. The label is what the pill says, what the column sorts on
+     * and what the filter matches — all three, because `data-sort` is the one
+     * value table-tools reads for a cell.
+     */
+    $states = [
+        'balanced' => 'Balanced',
+        'short' => 'Short',
+        'blocked' => 'Blocked',
+        'unrecorded' => 'Unrecorded issue',
+        'dormant' => 'Dormant',
+        'clean' => 'No change',
+    ];
+    // Worst-last, with the default first: the strip opens on the pill it is
+    // scoped to, and the states it is hiding read left to right after it.
+    $stateOrder = implode('|', $states);
     $ready = $run->lines->where('WouldAmend', true)->where('CommitState', 'pending')->count();
 
     /*
@@ -108,6 +146,9 @@
                 </button>
 
                 <x-slot:note>
+                    <strong>A page is not a scope.</strong> A ticked shift on any page is in this
+                    press and in the count above; only the outcome pills and the column filters
+                    take rows out of it, and the amber note beside the button says when they are.
                     @if ($stampMode === 'live')
                         Writes <code>QtyOpen</code> and <code>QtyClose</code> on the recon line in PumpIT.
                         It acts on the ticked rows and no others. Every one is re-checked first: a shift
@@ -143,10 +184,17 @@
             </p>
         @endif
 
+        {{-- `data-tt-page`: browser paging over rows that are all already here.
+             See the head of this file for why that is allowed on a form that
+             stamps, and the head of table-tools.js for the line between a page
+             and a filter. A Blade comment cannot go INSIDE a component tag —
+             the tag compiler reads the attribute list with a regex — which is
+             why this one is out here. --}}
         <x-table :count="$rows->count()"
                  :procedure="$run->ProcedureName"
                  :id="'stockrecon-lines-'.$run->Id"
                  tools fit
+                 data-tt-page="50"
                  data-row-detail
                  empty="The procedure ran and found no shifts in this period. That is an answer, not a failure.">
             <x-slot:head>
@@ -159,7 +207,13 @@
                              "everything". --}}
                         <th class="pick"><input type="checkbox" data-check-all aria-label="Select every amendable shift"></th>
                     @endif
-                    <th>Outcome</th>
+                    {{-- Filtered by the pill strip above the table, not by a
+                         tick list in the filter row. `data-tt-pills` is the
+                         pill it opens scoped to; the order is declared so a run
+                         with no blocked chains still shows "Blocked 0" in the
+                         same place rather than reshuffling the strip. --}}
+                    <th data-tt-pills="{{ $states['balanced'] }}"
+                        data-tt-pill-order="{{ $stateOrder }}">Outcome</th>
                     <th>Item</th>
                     {{-- `fit-min`: a date is short and must never wrap. Under
                          `fit` the surplus goes to the word columns, and without
@@ -218,7 +272,13 @@
                          customer can read the column in SSMS; a pill cannot
                          wrap without ceasing to look like one, and the longest
                          outcome is 67 characters. --}}
-                    <td>
+                    {{-- `data-sort` is the STATE, not the rendered text: the
+                         cell also carries the exception code and the commit
+                         result, and a filter that matched "Balanced A3 amended"
+                         would match nothing anybody would type. `data-tone`
+                         hands the pill the same colour the chip has. --}}
+                    <td data-sort="{{ $states[$line->outcomeKey()] ?? $line->outcomeKey() }}"
+                        data-tone="{{ $line->tone() }}">
                         <x-chip :tone="$line->tone()" :title="$line->Outcome">{{ $line->outcomeLabel() }}</x-chip>
                         @if ($line->ExceptionCode)
                             <br><span class="drill-line-id">{{ $line->ExceptionCode }}</span>

@@ -134,6 +134,110 @@ test.describe('table tools', () => {
 });
 
 /**
+ * Paging, and a column shown as pills.
+ *
+ * The gallery entry is `#gal-table-paged`: 64 rows, `data-tt-page="25"`, and a
+ * State column declared `data-tt-pills="Balanced"`. Both are browser behaviour
+ * and neither is reachable from phpunit.
+ *
+ * The test that matters here is the last one. Paging and filtering look alike
+ * on screen and are opposites underneath: a filter takes rows OUT of the
+ * submission, a page does not. Get that backwards in either direction and a
+ * commit form either stamps rows nobody could see or silently drops rows
+ * somebody ticked.
+ */
+test.describe('pills and paging', () => {
+    test.use(anonymous);
+
+    const PAGED = '#gal-table-paged';
+    const shown = (page) => page.locator(`${PAGED} tbody tr:not(.tt-out):not(.tt-page-out)`);
+    const strip = (page) => page.locator(PAGED)
+        .locator('xpath=ancestor::div[contains(@class,"table-block")]');
+
+    test('the strip opens on the pill it names, counted, in the declared order', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        // "All" leads, then the order the heading declared — not alphabetical,
+        // and not the order the rows happen to arrive in.
+        await expect(strip(page).locator('.tt-pill')).toHaveText([
+            'All64', 'Balanced39', 'Short11', 'Blocked7', 'Unrecorded issue7',
+        ]);
+
+        await expect(strip(page).locator('.tt-pill.is-on')).toHaveText('Balanced39');
+
+        // Scoped on arrival: 39 balanced rows, cut to a page of 25.
+        await expect(shown(page)).toHaveCount(25);
+        await expect(strip(page).locator('.table-count'))
+            .toHaveText('Showing 1–25 of 39 — filtered from 64');
+    });
+
+    test('a pill is a filter: one click rescopes, and the heading says so', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        await strip(page).locator('.tt-pill', { hasText: 'Blocked' }).click();
+
+        await expect(shown(page)).toHaveCount(7);
+        await expect(strip(page).locator('.table-count')).toHaveText('Showing 7 of 64 — filtered');
+
+        // Marked on the head, exactly as the tick list marks it — the strip is
+        // the control, not a second mechanism.
+        await expect(page.locator(`${PAGED} thead th`).first()).toHaveClass(/is-filtered/);
+
+        // Seven rows cannot be paged into anything, so the pager takes itself
+        // off rather than sitting there saying "1".
+        await expect(strip(page).locator('.tt-pager')).toBeHidden();
+
+        await strip(page).locator('.tt-pill', { hasText: 'All' }).click();
+        await expect(shown(page)).toHaveCount(25);
+        await expect(page.locator(`${PAGED} thead th`).first()).not.toHaveClass(/is-filtered/);
+    });
+
+    test('the pages cut the rows the reader is looking at, and say which', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        await strip(page).locator('.tt-pill', { hasText: 'All' }).click();
+        await expect(strip(page).locator('.tt-pager')).toHaveAttribute('data-range', '1–25 of 64');
+
+        const first = await shown(page).first().locator('td').nth(2).textContent();
+
+        await strip(page).locator('.tt-pager-btn', { hasText: 'Next' }).click();
+        await expect(strip(page).locator('.tt-pager')).toHaveAttribute('data-range', '26–50 of 64');
+        await expect(shown(page)).toHaveCount(25);
+        expect(await shown(page).first().locator('td').nth(2).textContent()).not.toBe(first);
+
+        // The last page is the remainder, and Next stops being offered.
+        await strip(page).locator('.tt-pager-btn', { hasText: '3' }).click();
+        await expect(strip(page).locator('.tt-pager')).toHaveAttribute('data-range', '51–64 of 64');
+        await expect(shown(page)).toHaveCount(14);
+        await expect(strip(page).locator('.tt-pager-btn', { hasText: 'Next' })).toBeDisabled();
+
+        // All in one page: every row comes back and the range says the whole set.
+        await strip(page).locator('.tt-pager-size select').selectOption('0');
+        await expect(shown(page)).toHaveCount(64);
+        await expect(strip(page).locator('.tt-pager')).toHaveAttribute('data-range', '1–64 of 64');
+    });
+
+    test('a paged-away row is still in the submission; a filtered one is not', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        await strip(page).locator('.tt-pill', { hasText: 'All' }).click();
+
+        // THE WHOLE POINT. A row on page three is hidden and enabled; a row a
+        // filter removed is hidden and disabled. Same invisibility, opposite
+        // consequence for a commit.
+        const offPage = page.locator(`${PAGED} tbody tr.tt-page-out`).first();
+        await expect(offPage).toHaveClass(/tt-page-out/);
+        await expect(offPage).not.toHaveClass(/tt-out/);
+
+        await strip(page).locator('.tt-pill', { hasText: 'Blocked' }).click();
+
+        const filtered = page.locator(`${PAGED} tbody tr.tt-out`).first();
+        await expect(filtered).toHaveClass(/tt-out/);
+        await expect(filtered).not.toHaveClass(/tt-page-out/);
+    });
+});
+
+/**
  * The other half of the money rule, and the one Ryan asked for after reading
  * the first: a filter narrowing a commit has to be SAID, not merely counted.
  *

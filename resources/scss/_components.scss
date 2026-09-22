@@ -596,6 +596,123 @@ table.dt thead th.is-filtered::after {
    `display: table-row` from the stylesheet and would win. */
 tr.tt-out { display: none; }
 
+/* Hidden because it is on another PAGE — which is not the same thing at all.
+   A filtered row is out of the submission; a paged-away row is ticked, counted
+   and still in the POST. Two classes so the difference is visible in the DOM
+   inspector as well as in the code. */
+tr.tt-page-out { display: none; }
+
+/* ---------------------------------------------------------------------------
+   A column as a strip of pills, above the table rather than inside the filter
+   row. The customer's ask on the stock recon proposals: the states are the
+   first cut anybody makes, and hiding them behind a ▾ made them look optional.
+
+   They reuse `.chip`, so a pill takes exactly the tone its cell's chip takes
+   and nothing here restates the palette — which also means the tone background
+   is ALWAYS on: `.chip.warn` outranks a bare `.tt-pill`, and a first attempt to
+   flatten the unselected ones read correctly in dark and backwards in light,
+   where the chosen pill came out paler than the six it had narrowed away from.
+   So selection is carried by weight, a ring in the pill's own colour, and the
+   unselected ones stepping back — all three legible in either theme and none of
+   them a hue.
+   --------------------------------------------------------------------------- */
+.tt-pills {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.tt-pills-label {
+  font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+  margin-right: 2px;
+}
+
+.tt-pill {
+  cursor: pointer; font-family: inherit; padding: 4px 10px; font-size: 11px;
+  border: 1px solid transparent;
+  opacity: .7;
+
+  &:hover:not(:disabled) { opacity: 1; border-color: currentColor; }
+  &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+  /* Zero of that state on this run. Left on the strip rather than dropped, so
+     the shape of the strip is the same on every run and "none blocked" is
+     readable as an answer instead of as an absence. */
+  &:disabled { opacity: .35; cursor: default; }
+
+  /* Chosen. Three signals, none of them colour: it is the only one at full
+     strength, it is bold, and it carries a ring in its own ink. */
+  &.is-on {
+    opacity: 1; font-weight: 700;
+    border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor;
+  }
+}
+
+/* The count rides inside the pill. It is the reason the strip beats the tick
+   list: "Blocked 41" is the finding, and the tick list never said it. */
+.tt-pill-n {
+  font-variant-numeric: tabular-nums; font-weight: 700;
+  padding-left: 6px; margin-left: 2px; border-left: 1px solid currentColor;
+  opacity: .75;
+}
+
+/* The pilled column keeps its cell in the filter row so the columns still line
+   up, and puts no control in it. */
+.tt-filters th.tt-pilled { padding: 3px 7px; }
+
+/* ---------------------------------------------------------------------------
+   The pager, under the rows.
+
+   `data-range` rather than a child element: the range is also printed in the
+   table footer by countText(), and this is the copy that sits where the thumb
+   is. Hidden on a phone, where the footer line is right there anyway.
+   --------------------------------------------------------------------------- */
+.tt-pager {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 9px 14px; border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--ink-2);
+
+  &[hidden] { display: none; }
+
+  &::before {
+    content: attr(data-range); color: var(--muted); margin-right: auto;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tt-pager-pages { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.tt-pager-gap { color: var(--muted); padding: 0 2px; }
+
+.tt-pager-btn {
+  font: inherit; font-size: 12px; cursor: pointer;
+  min-width: 30px; padding: 4px 9px;
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--line); border-radius: var(--r);
+  font-variant-numeric: tabular-nums;
+
+  &:hover:not(:disabled) { border-color: var(--brand); color: var(--brand-ink); }
+  &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  &:disabled { opacity: .4; cursor: not-allowed; }
+  &.is-on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
+}
+
+.tt-pager-size {
+  display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11.5px;
+
+  select {
+    font: inherit; font-size: 12px;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px;
+    &:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+  }
+}
+
+@media (max-width: 720px) {
+  .tt-pager::before { content: none; }
+  .tt-pager { justify-content: center; }
+  .tt-pills { padding: 9px 12px; }
+}
+
 .table-empty [data-tt-empty], p[data-tt-empty] .btn-ghost { margin-left: 6px; }
 
 /* ---------------------------------------------------------------------------

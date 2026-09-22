@@ -333,6 +333,36 @@
                 </x-table>
             </div>
             <div class="gal-variant">
+                <p class="eyebrow">
+                    <code>data-tt-page</code> — the rows are cut into pages IN THE BROWSER, over a set that
+                    arrived whole. Every row stays in the document and every tick stays in the submission,
+                    so the count on a press follows the filter and not the page. <code>data-tt-pills</code>
+                    on a heading moves that column's value list out to a strip above the table, opening
+                    scoped to the value it names
+                </p>
+                <x-table tools id="gal-table-paged" data-tt-page="25"
+                         :procedure="'agora.usp_Cash_GridDailyBanking'" :count="count($fixtures['pagedRows'])">
+                    <x-slot:head>
+                        <tr>
+                            <th data-tt-pills="Balanced"
+                                data-tt-pill-order="Balanced|Short|Blocked|Unrecorded issue">State</th>
+                            <th>Site</th><th>Reference</th><th class="num">Declared</th>
+                        </tr>
+                    </x-slot:head>
+                    @foreach ($fixtures['pagedRows'] as $row)
+                        @php($tone = ['Balanced' => 'good', 'Short' => 'warn', 'Blocked' => 'serious', 'Unrecorded issue' => 'crit'][$row['state']])
+                        <tr>
+                            <td data-sort="{{ $row['state'] }}" data-tone="{{ $tone }}">
+                                <x-chip :tone="$tone">{{ $row['state'] }}</x-chip>
+                            </td>
+                            <td>{{ $row['site'] }}</td>
+                            <td class="mono">{{ $row['ref'] }}</td>
+                            <td class="num">{{ \App\Support\Format::r($row['amount']) }}</td>
+                        </tr>
+                    @endforeach
+                </x-table>
+            </div>
+            <div class="gal-variant">
                 <p class="eyebrow">Empty — a designed answer, not a gap</p>
                 <x-table :count="0" empty="The procedure ran and found nothing in this period. That is an answer, not a failure." />
             </div>
