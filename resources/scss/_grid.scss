@@ -53,6 +53,62 @@
   .dg-scope .form-actions { margin-top: 12px; }
 }
 
+/* --------------------------------------------------------------- the panel
+
+   `surface` on <x-data-grid>. The toolbar below has carried
+   `border: 1px solid var(--line)` and a top-rounded radius since T014, and
+   .dg-cards has carried a matching border for the phone rendering for just as
+   long — the desktop table between them never had one. So a grid on a plain
+   page drew a box that started and was never closed, which is what Ryan was
+   looking at on the live stock recon master on 22 September 2026: "it looks a
+   bit bare". This closes it; it does not introduce a second style.
+
+   NO SHADOW, unlike .card. A card is an object on a page and its shadow says
+   so; a grid is the width of the window, and a drop shadow under something
+   that reaches both edges reads as a seam rather than a lift.
+
+   The frame goes on .table-block rather than on .data-grid itself for two
+   reasons. The scope form above it is the QUESTION and belongs outside the
+   panel holding the answer — that is the same argument .dg-scope's own comment
+   makes for having no card of its own. And a border on .data-grid would put
+   one around .dg-extract and the pager too.
+
+   It is opt-in: a grid inside a tab panel, a card, or the recon two-pane is
+   already on a surface, and this would be a border inside a border. */
+.data-grid.dg-surface {
+  @media (min-width: 721px) {
+    .table-block {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      /* The toolbar already drew this edge. Two borders meeting is a 2px
+         line, which on a table of 1px rules is the heaviest thing on the
+         screen. */
+      border-top: 0;
+      border-radius: 0 0 var(--r) var(--r);
+      /* The table's own corners are square; this is what rounds them. Safe
+         here and not on .data-grid: the column chooser's panel is absolutely
+         positioned inside .dg-bar, so nothing that has to escape a box lives
+         in this one. */
+      overflow: hidden;
+    }
+  }
+
+  /* The phone rendering already has the border — it only needs the same
+     bottom corners, and the footer above it is .table-block's. */
+  @media (max-width: 720px) {
+    .table-block { border: 0; }
+    .dg-cards { border-radius: 0 0 var(--r) var(--r); overflow: hidden; }
+  }
+}
+
+/* A title immediately above a PANEL needs back the gap that
+   `.page-head:has(+ .data-grid)` takes away. That rule is right for a BARE
+   grid, where the scope form's own 24px of top padding is the separation and
+   the head's margin on top of it stacked to about 54px of nothing. A panel has
+   an edge, and an edge hard against the title reads as the title belonging to
+   the panel. */
+.page-head:has(+ .data-grid.dg-surface) { margin-bottom: 14px; }
+
 /* ------------------------------------------------------------------ toolbar */
 
 .dg-bar {

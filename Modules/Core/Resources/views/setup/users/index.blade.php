@@ -16,5 +16,5 @@
         <x-notice tone="info" title="Saved">{{ session('status') }}</x-notice>
     @endif
 
-    <x-data-grid :grid="$grid" />
+    <x-data-grid :grid="$grid" surface />
 </x-app-shell>

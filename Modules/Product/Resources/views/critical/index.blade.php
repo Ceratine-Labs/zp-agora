@@ -51,5 +51,5 @@
         </p>
     </x-notice>
 
-    <x-data-grid :grid="$grid" />
+    <x-data-grid :grid="$grid" surface />
 </x-app-shell>

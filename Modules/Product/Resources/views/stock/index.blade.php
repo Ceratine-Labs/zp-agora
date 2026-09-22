@@ -42,7 +42,7 @@
         </x-notice>
     @endif
 
-    <x-data-grid :grid="$grid">
+    <x-data-grid :grid="$grid" surface>
         @can('master.stock.edit')
             <x-slot:bulk>
                 <button type="button" class="btn-ghost" data-modal-open="stock-flags">Set a flag…</button>

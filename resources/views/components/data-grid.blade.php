@@ -51,10 +51,25 @@
       actions   slot: buttons for the toolbar, right of the extract.
       bulk      slot: what to offer when rows are ticked. Rendered inside the
                 selection bar, which is hidden until something is ticked.
+      surface   draw the grid as a panel rather than bare on the page.
+
+    ABOUT `surface`. The toolbar has declared `border: 1px solid var(--line)`
+    and a top-rounded radius since T014, and the mobile card list below it has
+    carried a matching border for just as long — but the desktop table between
+    them never had one, so a grid on a plain page rendered as a box that starts
+    and is never closed. Ryan saw it on the live stock recon master on
+    22 September 2026: "it looks a bit bare". This finishes the frame rather
+    than inventing a second style for it.
+
+    It is opt-in because a grid inside something that is already a surface — a
+    tab panel, a card, the recon workbench's two-pane — would then be a border
+    inside a border. The test is what is BEHIND the grid: page background, pass
+    `surface`; anything else, leave it.
 --}}
 @props([
     'grid',
     'branches' => null,
+    'surface' => false,
 ])
 
 @php
@@ -78,7 +93,7 @@
     $fixed = collect($columns)->contains(fn ($v) => $v->width !== null);
 @endphp
 
-<div {{ $attributes->merge(['class' => 'data-grid dg-text-'.$grid->textSize]) }}
+<div {{ $attributes->merge(['class' => 'data-grid'.($surface ? ' dg-surface' : '').' dg-text-'.$grid->textSize]) }}
      data-grid
      data-grid-key="{{ $grid->key() }}"
      data-grid-slug="{{ $slug }}"
