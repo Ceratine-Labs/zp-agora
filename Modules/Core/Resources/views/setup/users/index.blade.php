@@ -10,11 +10,6 @@
         eyebrow="Setup · People and assets"
         title="Users and access"
         blurb="Everyone who can sign in. Head office or branch is derived from how many branches a person is granted — exactly one is a site, more than one is head office.">
-        <x-slot:actions>
-            @can('setup.roles.view')
-                <a class="btn" href="{{ route('app.setup.roles.index') }}">Roles and permissions</a>
-            @endcan
-        </x-slot:actions>
     </x-page-head>
 
     @if (session('status'))

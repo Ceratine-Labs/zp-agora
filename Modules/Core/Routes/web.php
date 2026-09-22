@@ -31,10 +31,14 @@ Route::middleware('auth')->group(function () {
      | ---- T028: users and access ------------------------------------------
      |
      | Setup -> People and assets -> Users and access. Each route carries its
-     | own permission: `view` reads the list and one person's roles, `edit`
-     | changes them. The roles matrix is a separate resource because seeing
-     | what a role may do and being able to change who holds it are different
-     | questions with different answers.
+     | own permission: `view` reads the list and one person's access, `edit`
+     | changes it.
+     |
+     | The roles matrix that used to live at setup/roles is GONE — roles were
+     | retired on 22 Sep 2026 and everything they carried was copied onto the
+     | people who held them. `setup.roles.view` and `setup.roles.edit` stay in
+     | the permission catalogue rather than being deleted under grants that
+     | reference them; nothing routes to them.
      */
     Route::prefix('setup')->name('setup.')->group(function () {
         Route::get('users', [UserAdminController::class, 'index'])
@@ -43,15 +47,13 @@ Route::middleware('auth')->group(function () {
             ->middleware('can:setup.users.view')->whereNumber('user')->name('users.show');
 
         /*
-         | The edit screen and its four saves. One route per card, because each
-         | card REPLACES the whole set it owns and a single endpoint would have
-         | no way to tell "the sites card was not on this form" from "grant no
+         | The edit screen and its saves. One route per card, because each card
+         | REPLACES the whole set it owns and a single endpoint would have no
+         | way to tell "the sites card was not on this form" from "grant no
          | sites" — and granting no sites means granting every site.
          */
         Route::get('users/{user}/edit', [UserAdminController::class, 'edit'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.edit');
-        Route::put('users/{user}', [UserAdminController::class, 'update'])
-            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.update');
         Route::put('users/{user}/details', [UserAdminController::class, 'updateDetails'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.details.update');
         Route::put('users/{user}/branches', [UserAdminController::class, 'updateBranches'])
@@ -69,20 +71,6 @@ Route::middleware('auth')->group(function () {
         // safe to repeat by refreshing.
         Route::post('users/{user}/password', [UserAdminController::class, 'updatePassword'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.password.update');
-
-        Route::get('roles', [UserAdminController::class, 'roles'])
-            ->middleware('can:setup.roles.view')->name('roles.index');
-
-        /*
-         | The menu half of the roles screen, and the FIRST thing on it that
-         | can be edited. The permission matrix beside it stays read-only —
-         | those grants are the system's own definition of the six roles and
-         | change in a seeder. The menu is the customer's own structure, so
-         | who sees which entry is theirs to set, and `setup.roles.edit` is
-         | the permission that already existed for exactly this.
-         */
-        Route::put('roles/menu', [UserAdminController::class, 'updateRoleMenu'])
-            ->middleware('can:setup.roles.edit')->name('roles.menu.update');
     });
 
     Route::get('console', [LandingStubController::class, 'console'])->name('console');

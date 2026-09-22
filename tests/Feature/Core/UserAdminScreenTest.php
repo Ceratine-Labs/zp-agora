@@ -10,13 +10,12 @@ use Modules\Core\Mail\PasswordResetMail;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\PasswordReset;
 use Modules\Core\Models\Permission;
-use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserBranch;
 use Modules\Core\Models\UserPermission;
-use Modules\Core\Models\UserRole;
 use Modules\Core\Services\PermissionService;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Fixtures\GrantsAccess;
 use Tests\TestCase;
 
 /**
@@ -28,6 +27,8 @@ use Tests\TestCase;
  */
 class UserAdminScreenTest extends TestCase
 {
+    use GrantsAccess;
+
     private int $branchId;
 
     /** @var array<int, User> */
@@ -42,7 +43,6 @@ class UserAdminScreenTest extends TestCase
     protected function tearDown(): void
     {
         foreach ($this->made as $user) {
-            UserRole::query()->acrossBranches()->where('UserId', $user->Id)->delete();
             UserBranch::query()->acrossBranches()->where('UserId', $user->Id)->delete();
             UserPermission::query()->acrossBranches()->where('UserId', $user->Id)->delete();
             PasswordReset::query()->acrossBranches()
@@ -53,10 +53,8 @@ class UserAdminScreenTest extends TestCase
         parent::tearDown();
     }
 
-    private function person(string $roleCode): User
+    private function person(string $profile): User
     {
-        $role = Role::query()->acrossBranches()->where('Code', $roleCode)->firstOrFail();
-
         /*
          * An ORDINARY signed-in person: a real password and no forced change.
          *
@@ -72,21 +70,14 @@ class UserAdminScreenTest extends TestCase
         $user = User::query()->acrossBranches()->create([
             'BranchId' => $this->branchId,
             'EmailAddress' => 'TEST-t028-'.uniqid().'@agora.invalid',
-            'UserName' => 'TEST-'.$roleCode,
-            'RoleId' => $role->Id,
+            'UserName' => 'TEST-'.$profile,
             'IsActive' => true,
             'IsLocked' => false,
+            'Workspace' => $this->profileWorkspace($profile),
             'PasswordHash' => 'TEST-only-'.Str::random(24),
         ]);
 
-        UserRole::query()->acrossBranches()->create([
-            'BranchId' => $this->branchId,
-            'UserId' => $user->Id,
-            'RoleId' => $role->Id,
-            'IsPrimary' => true,
-        ]);
-
-        app(PermissionService::class)->forget($user);
+        $this->grantProfile($user, $profile);
         $this->made[] = $user;
 
         return $user;
@@ -118,36 +109,8 @@ class UserAdminScreenTest extends TestCase
 
         // *.*.view covers setup.users.view but never setup.users.edit.
         $this->actingAs($auditor)
-            ->put(route('app.setup.users.update', ['user' => $subject->Id]), ['roles' => []])
+            ->put(route('app.setup.users.permissions.update', ['user' => $subject->Id]), ['permissions' => []])
             ->assertForbidden();
-    }
-
-    public function test_saving_roles_replaces_the_set_rather_than_adding_to_it(): void
-    {
-        $admin = $this->person('admin');
-        $subject = $this->person('operations');
-
-        $finance = Role::query()->acrossBranches()->where('Code', 'finance')->firstOrFail();
-
-        $this->actingAs($admin)
-            ->put(route('app.setup.users.update', ['user' => $subject->Id]), [
-                'roles' => [$finance->Id],
-                'primary' => $finance->Id,
-            ])
-            ->assertRedirect(route('app.setup.users.edit', ['user' => $subject->Id]).'#roles');
-
-        $held = UserRole::query()->acrossBranches()->where('UserId', $subject->Id)->get();
-
-        $this->assertCount(1, $held, 'The old Operations grant must be gone, not kept alongside.');
-        $this->assertSame($finance->Id, (int) $held->first()->RoleId);
-        $this->assertTrue((bool) $held->first()->IsPrimary);
-
-        // RoleId is the denormalised pointer the landing route reads; it must
-        // follow the primary grant or the two disagree silently.
-        $this->assertSame($finance->Id, (int) $subject->fresh()->RoleId);
-
-        // And the change must be visible immediately, not after a cache TTL.
-        $this->assertTrue(app(PermissionService::class)->userHas($subject->fresh(), 'recon.runs.execute'));
     }
 
     public function test_the_edit_screen_is_behind_the_edit_permission(): void
@@ -157,11 +120,11 @@ class UserAdminScreenTest extends TestCase
         $this->actingAs($this->person('admin'))
             ->get(route('app.setup.users.edit', ['user' => $subject->Id]))
             ->assertOk()
-            ->assertSee('Save roles')
+            ->assertSee('Save permissions')
             ->assertSee('Save sites');
 
-        // The Auditor holds *.*.view, which reaches the VIEW screen and stops
-        // there. A read-only role must not reach a page made of Save buttons.
+        // *.*.view reaches the VIEW screen and stops there. A read-only person
+        // must not reach a page made of Save buttons.
         $this->actingAs($this->person('auditor'))
             ->get(route('app.setup.users.edit', ['user' => $subject->Id]))
             ->assertForbidden();
@@ -298,18 +261,20 @@ class UserAdminScreenTest extends TestCase
         $admin = $this->person('admin');
 
         $this->actingAs($admin)
-            ->put(route('app.setup.users.update', ['user' => $admin->Id]), ['roles' => []])
-            ->assertSessionHasErrors('roles');
+            ->put(route('app.setup.users.permissions.update', ['user' => $admin->Id]), ['permissions' => []])
+            ->assertSessionHasErrors('permissions');
 
         // Refused INSIDE the transaction, so the grant is still there rather
-        // than half-removed with an apology on the screen.
+        // than half-removed with an apology on the screen. This matters more
+        // since roles were retired: there is no role underneath still carrying
+        // setup.users.edit, so a half-applied save is a locked-out estate.
         $this->assertTrue(
             app(PermissionService::class)->userHas($admin->fresh(), 'setup.users.edit'),
             'The refusal has to roll the write back, not merely report it.'
         );
-        $this->assertSame(
-            1,
-            UserRole::query()->acrossBranches()->where('UserId', $admin->Id)->count()
+        $this->assertGreaterThan(
+            0,
+            UserPermission::query()->acrossBranches()->where('UserId', $admin->Id)->count()
         );
     }
 
@@ -514,14 +479,6 @@ class UserAdminScreenTest extends TestCase
             ->assertSee($subject->fresh()->LastSignInAt->format('Y-m-d H:i'));
     }
 
-    public function test_the_role_matrix_renders_for_someone_who_may_see_it(): void
-    {
-        $this->actingAs($this->person('admin'))
-            ->get(route('app.setup.roles.index'))
-            ->assertOk()
-            ->assertSee('recon.runs.execute');
-    }
-
     /**
      * A header filter that matches NOTHING must return nothing.
      *
@@ -541,7 +498,6 @@ class UserAdminScreenTest extends TestCase
             'name that exists' => [['column' => 'UserName', 'type' => 'text', 'op' => 'contains', 'value' => 'Ryan'], true],
             'name that does not' => [['column' => 'UserName', 'type' => 'text', 'op' => 'contains', 'value' => 'ZZZZNOSUCHNAME'], false],
             'email that does not' => [['column' => 'EmailAddress', 'type' => 'text', 'op' => 'contains', 'value' => 'ZZZZ@nowhere'], false],
-            'role that does not' => [['column' => 'RoleNames', 'type' => 'text', 'op' => 'contains', 'value' => 'ZZZZNOSUCHROLE'], false],
             'status that does not' => [['column' => 'Status', 'type' => 'text', 'op' => 'contains', 'value' => 'ZZZZNOSUCHSTATE'], false],
             // A set filter has no $.value at all, so it was broken twice over.
             'type that does not' => [['column' => 'UserType', 'type' => 'set', 'in' => ['ZZZZ']], false],

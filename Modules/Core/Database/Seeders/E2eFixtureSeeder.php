@@ -4,9 +4,9 @@ namespace Modules\Core\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Modules\Core\Models\Branch;
-use Modules\Core\Models\Role;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
-use Modules\Core\Models\UserRole;
+use Modules\Core\Models\UserPermission;
 use Modules\Core\Services\PermissionService;
 use RuntimeException;
 
@@ -17,7 +17,7 @@ use RuntimeException;
  * cannot be allowed to create whatever it likes. It gets exactly two fixtures,
  * both deliberately inert:
  *
- *  - **A user**, `TEST-` prefixed, on the read-only auditor role. No suite ever
+ *  - **A user**, `TEST-` prefixed, granted read-only access. No suite ever
  *    signs in as a real person, and the account it does use cannot approve,
  *    capture or post anything.
  *  - **A branch**, id 999, marked `IsTrading = false` AND `IsActive = false`.
@@ -114,8 +114,6 @@ class E2eFixtureSeeder extends Seeder
 
     private function user(string $email, string $password): void
     {
-        $role = Role::query()->acrossBranches()->where('Code', 'auditor')->firstOrFail();
-
         $user = User::query()->acrossBranches()->firstOrNew([
             'BranchId' => (int) config('agora.group_branch_id'),
             'EmailAddress' => $email,
@@ -123,9 +121,9 @@ class E2eFixtureSeeder extends Seeder
 
         $user->fill([
             'UserName' => 'TEST Playwright',
-            'RoleId' => $role->Id,
             'IsActive' => true,
             'IsLocked' => false,
+            'Workspace' => 'ho',
         ]);
         $user->BranchId = (int) config('agora.group_branch_id');
 
@@ -135,29 +133,50 @@ class E2eFixtureSeeder extends Seeder
         $user->save();
 
         /*
-         * THE ROLE HAS TO BE IN agora.UserRole, not only in User.RoleId.
+         * THE GRANTS HAVE TO BE WRITTEN HERE, and this is the second time that
+         * sentence has been true for a different reason.
          *
-         * `RoleId` is the legacy single-role column carried over from PumpIT.
-         * PermissionService reads the PIVOT — `UserRole` joined to
-         * `RolePermission` — and nothing else, so a fixture with `RoleId` set
-         * and no pivot row is a user who can sign in and then do nothing at
-         * all: every `can:` middleware answers 403.
+         * It used to say: the role has to be in agora.UserRole, not only in
+         * User.RoleId — because PermissionService read the pivot and nothing
+         * else, so a fixture with RoleId set and no pivot row was a user who
+         * could sign in and then do nothing, every `can:` answering 403. It
+         * only showed up when E2eFixtureGuardTest force-deleted this user and
+         * re-seeded it, which is what that test exists to do; before that the
+         * pivot row happened to survive from however the account was first
+         * made, and the browser suite passed on a row this seeder had never
+         * written.
          *
-         * It only showed up when E2eFixtureGuardTest force-deleted this user
-         * and re-seeded it, which is what that test exists to do. Before that
-         * the pivot row happened to survive from however the account was first
-         * made, so the browser suite and four ExecuteReconciliationTest cases
-         * passed on a row this seeder had never written. They failed the moment
-         * the account was genuinely rebuilt from this code.
+         * Roles were retired on 22 September 2026, so the pivot is no longer
+         * read either and the same failure was one deploy away again. The
+         * grants are now written to agora.UserPermission directly, which is
+         * the only thing anything reads. What they ADD UP TO is unchanged:
+         * `*.*.view` plus `audit.*.*` — read everything, write nothing — which
+         * is what a browser suite pointed at the customer's production
+         * database should hold and no more.
          */
-        UserRole::query()->acrossBranches()->updateOrCreate(
-            ['BranchId' => $user->BranchId, 'UserId' => $user->Id, 'RoleId' => $role->Id],
-            ['IsPrimary' => true, 'UpdatedAt' => now()]
-        );
+        $patterns = ['*.*.view', 'audit.*.*'];
+        $permissions = app(PermissionService::class);
+        $granted = 0;
+
+        UserPermission::query()->acrossBranches()->where('UserId', $user->Id)->delete();
+
+        foreach (Permission::query()->acrossBranches()->get() as $permission) {
+            if (! $permissions->anyMatches($patterns, $permission->Code)) {
+                continue;
+            }
+
+            UserPermission::query()->acrossBranches()->create([
+                'BranchId' => (int) $user->BranchId,
+                'UserId' => (int) $user->Id,
+                'PermissionId' => (int) $permission->Id,
+                'CreatedAt' => now(),
+            ]);
+            $granted++;
+        }
 
         // Whatever this process had cached about that user is now wrong.
         app(PermissionService::class)->forget($user);
 
-        $this->command?->info("  E2E fixtures: user {$email} on the read-only auditor role.");
+        $this->command?->info("  E2E fixtures: user {$email} granted {$granted} read-only permission(s).");
     }
 }

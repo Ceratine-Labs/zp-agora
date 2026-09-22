@@ -19,7 +19,9 @@ use Illuminate\Support\Facades\Route;
  * @property string $UserName
  * @property string $EmailAddress
  * @property string $PasswordHash
- * @property int|null $RoleId
+ * @property int|null $RoleId the role they used to hold; unread since 22 Sep 2026
+ * @property string|null $LandingRoute where they go after signing in (was on the role)
+ * @property string|null $Workspace 'ho' or 'branch' (was on the role)
  * @property int|null $HomeBranchId
  * @property bool $IsActive
  * @property bool $IsLocked
@@ -76,7 +78,17 @@ class User extends BaseModel implements AuthenticatableContract
         'PasswordHash' => 'hashed',
     ];
 
-    /** @return BelongsTo<Role, $this> */
+    /**
+     * The role this person used to hold.
+     *
+     * @deprecated 22 Sep 2026 — roles are retired and nothing in the
+     * application reads this. agora.User.RoleId and agora.Role still exist so
+     * the flatten stays checkable against its source (v1__01g); the relation
+     * is kept for that inspection alone and must not come back into a screen
+     * or a permission check.
+     *
+     * @return BelongsTo<Role, $this>
+     */
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'RoleId', 'Id');
@@ -146,14 +158,19 @@ class User extends BaseModel implements AuthenticatableContract
     /**
      * Where this person lands after signing in.
      *
-     * The route is on the ROLE row, so "where does Finance land" is data the
-     * business changes without a deploy. A route that does not exist yet — and
-     * most of them do not, since the epics behind them are unbuilt — falls back
-     * to the dashboard rather than 500ing on the one page everybody uses.
+     * On the PERSON since roles were retired (22 Sep 2026) — it used to be on
+     * agora.Role, and RetireRolesSeeder copied each person's primary role's
+     * value onto them. It is still data rather than a match statement in a
+     * controller, so "where does this person land" changes without a deploy;
+     * it is now one row at a time rather than one row for a group.
+     *
+     * A route that does not exist yet — and most of them do not, since the
+     * epics behind them are unbuilt — falls back to the dashboard rather than
+     * 500ing on the one page everybody uses.
      */
     public function landingRoute(): string
     {
-        $route = $this->role?->LandingRoute;
+        $route = $this->LandingRoute;
 
         return $route && Route::has($route) ? $route : 'app.dashboard';
     }

@@ -3,20 +3,27 @@
 namespace Tests\Feature\Core;
 
 use Modules\Core\Models\Permission;
-use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
-use Modules\Core\Models\UserRole;
+use Modules\Core\Models\UserPermission;
 use Modules\Core\Services\PermissionService;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * RBAC (T008).
+ * RBAC (T008), after roles were retired on 22 September 2026.
  *
- * The acceptance is about the SPLIT: a route that commits must refuse the
- * person who may only look. The plan writes it as cash.allocate_zread, which
- * belongs to a module that does not exist yet; recon.runs.execute is the same
- * shape against the one module that already writes to the customer's estate.
+ * The acceptance is unchanged and it was never really about roles: a route
+ * that COMMITS must refuse the person who may only look. The plan writes it as
+ * cash.allocate_zread, which belongs to a module that does not exist yet;
+ * recon.runs.execute is the same shape against the one module that already
+ * writes to the customer's estate.
+ *
+ * What changed is where a person's grants come from. There is one source now —
+ * agora.UserPermission — so each fixture below states the grants it is about
+ * IN THE TEST, instead of naming a role and depending on what a seeder
+ * happened to put in it. That is a better test than the one it replaces: the
+ * old version of "Operations may preview but not commit" would have kept
+ * passing if somebody had quietly widened the Operations role.
  */
 class PermissionServiceTest extends TestCase
 {
@@ -37,33 +44,46 @@ class PermissionServiceTest extends TestCase
     protected function tearDown(): void
     {
         foreach ($this->made as $user) {
-            UserRole::query()->withoutGlobalScopes()->where('UserId', $user->Id)->delete();
+            UserPermission::query()->withoutGlobalScopes()->where('UserId', $user->Id)->delete();
             User::query()->withoutGlobalScopes()->where('Id', $user->Id)->delete();
         }
 
         parent::tearDown();
     }
 
-    private function userWithRole(string $roleCode): User
+    /**
+     * A person holding exactly the permissions these patterns match.
+     *
+     * The patterns are expanded against agora.Permission here, the same way
+     * RolePermissionSeeder expanded a role's — a grant is always a concrete
+     * permission id, and the wildcard is a convenience for writing the test.
+     *
+     * @param  array<int, string>  $patterns
+     */
+    private function userWith(array $patterns): User
     {
-        $role = Role::query()->withoutGlobalScopes()->where('Code', $roleCode)->firstOrFail();
+        $branchId = $this->branchId;
 
         $user = User::query()->withoutGlobalScopes()->create([
-            'BranchId' => $this->branchId,
-            'EmailAddress' => 'TEST-'.$roleCode.'-'.uniqid().'@agora.invalid',
-            'UserName' => 'TEST-'.$roleCode,
-            'RoleId' => $role->Id,
+            'BranchId' => $branchId,
+            'EmailAddress' => 'TEST-perm-'.uniqid().'@agora.invalid',
+            'UserName' => 'TEST-perm',
             'IsActive' => true,
             'IsLocked' => false,
             'PasswordHash' => User::UNUSABLE_PASSWORD,
         ]);
 
-        UserRole::query()->withoutGlobalScopes()->create([
-            'BranchId' => $this->branchId,
-            'UserId' => $user->Id,
-            'RoleId' => $role->Id,
-            'IsPrimary' => true,
-        ]);
+        foreach (Permission::query()->withoutGlobalScopes()->get() as $permission) {
+            if (! $this->service->anyMatches($patterns, $permission->Code)) {
+                continue;
+            }
+
+            UserPermission::query()->withoutGlobalScopes()->create([
+                'BranchId' => $branchId,
+                'UserId' => $user->Id,
+                'PermissionId' => $permission->Id,
+            ]);
+        }
 
         $this->service->forget($user);
         $this->made[] = $user;
@@ -71,10 +91,12 @@ class PermissionServiceTest extends TestCase
         return $user;
     }
 
-    public function test_finance_may_commit_a_reconciliation_and_the_auditor_may_not(): void
+    public function test_the_person_who_commits_is_not_the_person_who_only_reads(): void
     {
-        $finance = $this->userWithRole('finance');
-        $auditor = $this->userWithRole('auditor');
+        // The whole acceptance of T008 in two fixtures: everything in recon
+        // against read-only across the system.
+        $finance = $this->userWith(['recon.*.*']);
+        $auditor = $this->userWith(['*.*.view']);
 
         $this->assertTrue($this->service->userHas($finance, 'recon.runs.execute'), 'Finance must be able to commit.');
         $this->assertFalse($this->service->userHas($auditor, 'recon.runs.execute'), 'The Auditor must never commit.');
@@ -84,49 +106,51 @@ class PermissionServiceTest extends TestCase
         $this->assertTrue($this->service->userHas($auditor, 'recon.runs.view'));
     }
 
-    public function test_operations_may_preview_but_not_execute_or_reverse(): void
+    public function test_previewing_can_be_granted_without_committing(): void
     {
-        $ops = $this->userWithRole('operations');
+        // Granted per action, which is the point of the three-segment slug:
+        // previewing reads, committing stamps rows in the customer's estate.
+        $ops = $this->userWith(['recon.runs.view', 'recon.runs.create', 'recon.runs.delete']);
 
-        $this->assertTrue($this->service->userHas($ops, 'recon.runs.create'), 'Operations previews.');
-        $this->assertTrue($this->service->userHas($ops, 'recon.runs.delete'), 'Operations clears a preview.');
-        $this->assertFalse($this->service->userHas($ops, 'recon.runs.execute'), 'Operations must not commit.');
-        $this->assertFalse($this->service->userHas($ops, 'recon.runs.reverse'), 'Operations must not reverse.');
+        $this->assertTrue($this->service->userHas($ops, 'recon.runs.create'), 'This person previews.');
+        $this->assertTrue($this->service->userHas($ops, 'recon.runs.delete'), 'And clears a preview.');
+        $this->assertFalse($this->service->userHas($ops, 'recon.runs.execute'), 'But must not commit.');
+        $this->assertFalse($this->service->userHas($ops, 'recon.runs.reverse'), 'And must not reverse.');
     }
 
-    public function test_the_auditor_reads_everything_and_writes_nothing(): void
+    public function test_a_read_everything_grant_writes_nothing(): void
     {
-        $auditor = $this->userWithRole('auditor');
+        $auditor = $this->userWith(['*.*.view', 'audit.*.*']);
 
         foreach (Permission::query()->withoutGlobalScopes()->get() as $permission) {
             $held = $this->service->userHas($auditor, $permission->Code);
 
             if ($permission->Action === 'view' || $permission->Module === 'audit') {
-                $this->assertTrue($held, "Auditor should hold {$permission->Code}.");
+                $this->assertTrue($held, "Should hold {$permission->Code}.");
 
                 continue;
             }
 
-            $this->assertFalse($held, "Auditor must NOT hold {$permission->Code}.");
+            $this->assertFalse($held, "Must NOT hold {$permission->Code}.");
         }
     }
 
-    public function test_admin_holds_everything(): void
+    public function test_a_star_grant_holds_everything(): void
     {
-        $admin = $this->userWithRole('admin');
+        $admin = $this->userWith(['*.*.*']);
 
         foreach (Permission::query()->withoutGlobalScopes()->get() as $permission) {
-            $this->assertTrue($this->service->userHas($admin, $permission->Code), "Admin should hold {$permission->Code}.");
+            $this->assertTrue($this->service->userHas($admin, $permission->Code), "Should hold {$permission->Code}.");
         }
     }
 
-    public function test_a_branch_manager_cannot_reach_reconciliation_at_all(): void
+    public function test_a_grant_that_names_no_recon_slug_reaches_none_of_it(): void
     {
-        $manager = $this->userWithRole('branch-manager');
+        $manager = $this->userWith(['core.*.*', 'reports.catalogue.view', 'reports.report.view']);
 
         $this->assertFalse($this->service->userHas($manager, 'recon.runs.view'));
         $this->assertFalse($this->service->userHas($manager, 'recon.runs.execute'));
-        $this->assertTrue($this->service->userHas($manager, 'reports.report.view'), 'A site still reads its own numbers.');
+        $this->assertTrue($this->service->userHas($manager, 'reports.report.view'), 'They still read their own numbers.');
     }
 
     /** @return array<string, array{0: string, 1: string, 2: bool}> */

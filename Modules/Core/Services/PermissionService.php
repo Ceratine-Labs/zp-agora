@@ -9,9 +9,17 @@ use Modules\Core\Models\User;
 /**
  * What a person may do.
  *
- * THE WILDCARD IS EXPANDED AT THE GRANT, NOT AT THE CHECK. A role is granted
- * `cash.*.view` once; the service turns a person's grants into a set of
- * patterns and matches the asked-for code against them. The alternative —
+ * ROLES WERE RETIRED ON 22 SEPTEMBER 2026 (Ryan). Everything a role carried
+ * was copied onto the people who held it by RetireRolesSeeder, and from that
+ * release this reads agora.UserPermission and nothing else. agora.Role,
+ * UserRole and RolePermission still exist in the database, unread — v1__01g
+ * says why they were not dropped. The consequence to know about: there is no
+ * longer a way to say "everybody who does X may now do Y". A new permission
+ * is ticked per person.
+ *
+ * THE WILDCARD IS EXPANDED AT THE GRANT, NOT AT THE CHECK. A person is granted
+ * `cash.*.view` once; the service turns their grants into a set of patterns
+ * and matches the asked-for code against them. The alternative —
  * storing every concrete permission a wildcard implies — has to be re-run every
  * time a module adds a screen, and silently under-grants until somebody
  * remembers. Matching at the check costs a few string comparisons on a set that
@@ -19,10 +27,10 @@ use Modules\Core\Models\User;
  *
  * A pattern is three dot-separated segments and `*` matches one whole segment:
  *
- *   *.*.*            everything (Admin)
+ *   *.*.*            everything (an administrator)
  *   cash.*.*         everything in the cash module
- *   *.*.view         read anything (the Auditor's first half)
- *   audit.*.*        anything in audit (the Auditor's second half)
+ *   *.*.view         read anything
+ *   audit.*.*        anything in audit
  *   cash.dropsafe.*  every action on one resource
  *
  * `*` alone is accepted as shorthand for `*.*.*` because it is what people type.
@@ -39,13 +47,12 @@ class PermissionService
     private array $memo = [];
 
     /**
-     * Every pattern this user holds — through their roles, and directly.
+     * Every pattern this user holds.
      *
-     * The union is deliberate and the direct half is additive: agora.UserPermission
-     * carries the exceptions six roles cannot express without handing over a whole
-     * second role with them. There is no deny row, so this can be a UNION rather
-     * than a precedence rule, and "what may this person do" stays answerable by
-     * reading their roles plus a short list.
+     * One source now — agora.UserPermission — so "what may this person do" is
+     * answered by reading one list against their name, which is the whole
+     * point of retiring roles. Still cached forever and cleared on a grant
+     * change rather than on a TTL.
      *
      * @return array<int, string>
      */
@@ -60,40 +67,14 @@ class PermissionService
         /** @var array<int, string> $patterns */
         $patterns = Cache::rememberForever(
             self::CACHE_PREFIX.$id,
-            fn (): array => array_values(array_unique(array_merge(
-                $this->rolePatternsFor($user),
-                $this->directPatternsFor($user)
-            )))
+            fn (): array => array_values(array_unique($this->directPatternsFor($user)))
         );
 
         return $this->memo[$id] = $patterns;
     }
 
     /**
-     * The half that comes from the roles this person holds.
-     *
-     * Public and uncached because the user screen needs the two halves apart
-     * to answer "is this grant doing anything, or does a role already carry
-     * it" — a question `patternsFor()` deliberately cannot answer, having
-     * already merged them.
-     *
-     * @return array<int, string>
-     */
-    public function rolePatternsFor(User $user): array
-    {
-        $schema = config('agora.schema');
-
-        return $this->codes(DB::connection(config('agora.connections.app'))->select("
-            SELECT DISTINCT p.[Code]
-            FROM [{$schema}].[UserRole] ur
-            JOIN [{$schema}].[RolePermission] rp ON rp.[RoleId] = ur.[RoleId]
-            JOIN [{$schema}].[Permission] p ON p.[Id] = rp.[PermissionId]
-            WHERE ur.[UserId] = ?
-        ", [(int) $user->getKey()]));
-    }
-
-    /**
-     * The half granted to this person by name, in agora.UserPermission.
+     * The patterns granted to this person by name.
      *
      * @return array<int, string>
      */
@@ -199,18 +180,14 @@ class PermissionService
         Cache::forget(self::CACHE_PREFIX.$id);
     }
 
-    /** Drop every cached set. For a role's permissions changing under people. */
+    /** Drop every cached set. For a change that reaches more than one person. */
     public function forgetAll(): void
     {
         $this->memo = [];
 
         $schema = config('agora.schema');
         $ids = DB::connection(config('agora.connections.app'))
-            ->select("
-                SELECT [UserId] FROM [{$schema}].[UserRole]
-                UNION
-                SELECT [UserId] FROM [{$schema}].[UserPermission]
-            ");
+            ->select("SELECT DISTINCT [UserId] FROM [{$schema}].[UserPermission]");
 
         foreach ($ids as $row) {
             Cache::forget(self::CACHE_PREFIX.(int) $row->UserId);

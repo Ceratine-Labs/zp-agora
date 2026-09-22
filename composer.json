@@ -80,6 +80,7 @@
             "scripts/check-components.sh",
             "scripts/check-blades.sh",
             "scripts/check-recon-types.sh",
+            "scripts/check-roles.sh",
             "@php artisan test"
         ],
         "check-fast": [
@@ -88,7 +89,8 @@
             "scripts/check-procs.sh",
             "scripts/check-components.sh",
             "scripts/check-blades.sh",
-            "scripts/check-recon-types.sh"
+            "scripts/check-recon-types.sh",
+            "scripts/check-roles.sh"
         ]
     },
     "extra": {

@@ -6,10 +6,11 @@
     and must be able to read this page without any control on it being one
     misclick from a grant.
 
-    Four questions, in the order somebody actually asks them: who are they,
-    what are they, which sites can they see, and what does all that let them
-    do. The last card is the one that matters — a role list does not answer
-    "why can this person open the recon screen", and that is the question.
+    Three questions, in the order somebody actually asks them: who are they,
+    which sites can they see, and what may they do. Roles were retired on
+    22 September 2026, so "what may this person do" now has exactly one answer
+    and one place it comes from — which is the thing a role list never managed
+    to say plainly.
 --}}
 <x-app-shell :title="$person->UserName">
     <x-page-head
@@ -51,7 +52,7 @@
         ['label' => 'Code', 'value' => $person->UserCode ?? \App\Support\Format::NOTHING],
         ['label' => 'Type', 'value' => $person->UserType === 'branch' ? 'Branch' : ($person->UserType === 'ho' ? 'Head office' : \App\Support\Format::NOTHING), 'note' => $person->UserType === null ? 'No branch grants — sees every site' : null],
         ['label' => 'Sites granted', 'value' => $branchCount === 0 ? 'Every site' : \App\Support\Format::n($branchCount, 0)],
-        ['label' => 'Extra permissions', 'value' => \App\Support\Format::n($directCount, 0), 'note' => 'Beside their roles'],
+        ['label' => 'Permissions', 'value' => \App\Support\Format::n($directCount, 0), 'note' => 'Granted by name'],
         {{-- Carbon, not Format: App\Support\Format is money, volumes and
              percentages and has never had a date method. The written form is
              the grid's own (grid/_cell.blade.php), so the list and this screen
@@ -60,26 +61,7 @@
         ['label' => 'Legacy type', 'value' => $person->LegacyUserType ?? \App\Support\Format::NOTHING, 'note' => 'From PumpIT'],
     ]" />
 
-    <div class="two-col">
-        <x-card title="Roles" sub="What this person is. The primary role decides where they land after signing in.">
-            @php($heldRoles = $roles->filter(fn ($role) => $held->has($role->Id)))
-
-            @if ($heldRoles->isEmpty())
-                <x-empty-state text="No roles. This person can sign in and see nothing." />
-            @else
-                <ul class="perm-list">
-                    @foreach ($heldRoles as $role)
-                        <li>
-                            {{ $role->Name }}
-                            @if ($held->get($role->Id)?->IsPrimary)<x-chip tone="good">primary</x-chip>@endif
-                            @if ($role->IsReadOnly)<x-chip tone="neutral">read only</x-chip>@endif
-                        </li>
-                    @endforeach
-                </ul>
-            @endif
-        </x-card>
-
-        <x-card title="Sites" sub="Which of the estate this person may see. Everything else is filtered out before a query runs.">
+    <x-card title="Sites" sub="Which of the estate this person may see. Everything else is filtered out before a query runs.">
             @if ($branchCount === 0)
                 <x-notice tone="info" title="Every site">
                     No site is granted individually, and that IS the grant — head office people are not
@@ -89,34 +71,29 @@
                 <ul class="perm-list">
                     @foreach ($grantedBranches as $branch)
                         <li>{{ $branch->Name }} @unless ($branch->IsTrading)<x-chip tone="neutral">not trading</x-chip>@endunless</li>
-                    @endforeach
-                </ul>
-            @endif
-        </x-card>
-    </div>
+                @endforeach
+            </ul>
+        @endif
+    </x-card>
 
     <x-card title="Menu access"
             sub="Which entries of the menu this person sees — and therefore may open."
             collapsible :open="$menuRestricted">
         @if (! $menuRestricted)
             <x-notice tone="info" title="The whole menu">
-                Nothing is ticked for this person or for any role they hold, and that IS the grant — an
-                empty set is the whole menu, the same way an empty set of sites is every site. Entries
-                naming a permission they do not hold are still hidden, because the screen behind one would
-                refuse them anyway.
+                Nothing is ticked for this person, and that IS the grant — an empty set is the whole menu,
+                the same way an empty set of sites is every site. Entries naming a permission they do not
+                hold are still hidden, because the screen behind one would refuse them anyway.
             </x-notice>
         @else
             @foreach ($menuWorkspaces as $code => $workspace)
-                @php($ticked = collect($workspace['rows'])->filter(fn ($row) => in_array((int) $row['item']->Id, $menuDirectIds, true) || in_array((int) $row['item']->Id, $menuRoleIds, true)))
+                @php($ticked = collect($workspace['rows'])->filter(fn ($row) => in_array((int) $row['item']->Id, $menuDirectIds, true)))
                 @continue($ticked->isEmpty())
 
                 <h4 class="perm-module">{{ $workspace['label'] }}</h4>
                 <ul class="perm-list">
                     @foreach ($ticked as $row)
-                        <li>
-                            {{ $row['section']->Label }} · {{ $row['item']->Label }}
-                            @if (in_array((int) $row['item']->Id, $menuDirectIds, true))<x-chip tone="warn">ticked by name</x-chip>@endif
-                        </li>
+                        <li>{{ $row['section']->Label }} · {{ $row['item']->Label }}</li>
                     @endforeach
                 </ul>
             @endforeach
@@ -124,23 +101,20 @@
     </x-card>
 
     <x-card title="What that lets them do"
-            sub="Resolved through every role above, plus anything granted by name. This is the answer to “why can they see that”."
+            sub="Everything granted to this person by name. There is no other source."
             collapsible open>
         @if ($effective === [])
-            <x-empty-state text="No roles and no direct grants, so no permissions. This person can sign in and see nothing." />
+            <x-empty-state text="Nothing is granted, so this person can sign in and do nothing." />
         @else
             @foreach ($permissionRows as $module => $rows)
-                @php($holdsAny = collect($rows)->contains(fn ($row) => $row['direct'] || $row['viaRole']))
+                @php($holdsAny = collect($rows)->contains(fn ($row) => $row['direct']))
                 @continue(! $holdsAny)
 
                 <h4 class="perm-module">{{ ucfirst($module) }}</h4>
                 <ul class="perm-list">
                     @foreach ($rows as $row)
-                        @continue(! $row['direct'] && ! $row['viaRole'])
-                        <li>
-                            <code>{{ $row['permission']->Code }}</code>
-                            @if ($row['direct'])<x-chip tone="warn">granted by name</x-chip>@endif
-                        </li>
+                        @continue(! $row['direct'])
+                        <li><code>{{ $row['permission']->Code }}</code></li>
                     @endforeach
                 </ul>
             @endforeach

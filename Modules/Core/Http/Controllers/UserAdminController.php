@@ -14,11 +14,9 @@ use Modules\Core\Models\Branch;
 use Modules\Core\Models\MenuItem;
 use Modules\Core\Models\MenuSection;
 use Modules\Core\Models\Permission;
-use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserBranch;
 use Modules\Core\Models\UserPermission;
-use Modules\Core\Models\UserRole;
 use Modules\Core\Services\MenuAccessService;
 use Modules\Core\Services\MenuService;
 use Modules\Core\Services\PasswordResetService;
@@ -35,13 +33,18 @@ use RuntimeException;
  * place anything changes. A view screen that also saved would need every
  * reader to hold `setup.users.edit`.
  *
- * THE EDIT SCREEN HAS FOUR SAVE BUTTONS, ONE PER CARD, and that is deliberate.
- * Each card owns a complete set — the roles, the sites, the extra permissions,
- * the person themselves — and each Save REPLACES its set rather than diffing
- * it, because a grant removed is the change that matters. A single Save across
- * all four would mean one refusal (a home branch that is not granted, say)
- * discarding the other three cards' work, and it would make "absent means
- * empty" ambiguous the moment one card fails validation.
+ * THE EDIT SCREEN HAS A SAVE BUTTON PER CARD, and that is deliberate. Each
+ * card owns a complete set — the sites, the permissions, the menu, the person
+ * themselves — and each Save REPLACES its set rather than diffing it, because
+ * a grant removed is the change that matters. A single Save across all of them
+ * would mean one refusal (a home branch that is not granted, say) discarding
+ * the other cards' work, and it would make "absent means empty" ambiguous the
+ * moment one card fails validation.
+ *
+ * ROLES WERE RETIRED ON 22 SEPTEMBER 2026 (Ryan). The Roles card and the role
+ * matrix screen are gone, agora.UserRole is no longer read, and everything a
+ * role carried was copied onto the people who held it by RetireRolesSeeder.
+ * Access is granted to a person by name, here, and nowhere else.
  *
  * WHAT THIS DELIBERATELY DOES NOT DO. It does not create a user: the 88 people
  * come from PumpIT through usp_Core_MigrateUsers, and a hand-made 89th before
@@ -73,7 +76,7 @@ class UserAdminController extends Controller
         ]);
     }
 
-    /** One person, read only: their roles, their sites, and what those add up to. */
+    /** One person, read only: what they may do, which sites, and which menu. */
     public function show(Request $request, int $user): View
     {
         $person = $this->person($user);
@@ -111,38 +114,6 @@ class UserAdminController extends Controller
     }
 
     /**
-     * Change which roles someone holds.
-     *
-     * The route and the payload are unchanged from the first cut of this
-     * screen, so a link or a form written against it still works.
-     */
-    public function update(Request $request, int $user): RedirectResponse
-    {
-        $person = $this->person($user);
-
-        $data = $request->validate([
-            'roles' => ['array'],
-            'roles.*' => ['integer'],
-            'primary' => ['nullable', 'integer'],
-        ]);
-
-        return $this->save($person, 'roles', function () use ($person, $request, $data): string {
-            $result = $this->access->setRoles(
-                $person,
-                $data['roles'] ?? [],
-                isset($data['primary']) ? (int) $data['primary'] : null,
-                $request->user(),
-            );
-
-            $count = count($result['roles']);
-
-            return $count === 0
-                ? $person->UserName.' now holds no roles and can sign in but see nothing.'
-                : $person->UserName.' now holds '.$count.' role'.($count === 1 ? '' : 's').'.';
-        });
-    }
-
-    /**
      * Change which sites someone may see.
      *
      * An EMPTY set is a real answer and means every site — see
@@ -169,7 +140,7 @@ class UserAdminController extends Controller
         });
     }
 
-    /** Change which permissions someone holds by name, beside their roles. */
+    /** Change what this person may do. */
     public function updatePermissions(Request $request, int $user): RedirectResponse
     {
         $person = $this->person($user);
@@ -183,9 +154,8 @@ class UserAdminController extends Controller
             $granted = $this->access->setPermissions($person, $data['permissions'] ?? [], $request->user());
 
             return $granted === []
-                ? $person->UserName.' holds nothing beyond what their roles carry.'
-                : $person->UserName.' holds '.count($granted).' permission'.(count($granted) === 1 ? '' : 's')
-                    .' directly, beside their roles.';
+                ? $person->UserName.' holds no permissions and can sign in but do nothing.'
+                : $person->UserName.' holds '.count($granted).' permission'.(count($granted) === 1 ? '' : 's').'.';
         });
     }
 
@@ -344,94 +314,6 @@ class UserAdminController extends Controller
     }
 
     /**
-     * Change which menu entries each role may see.
-     *
-     * ONE SAVE FOR THE WHOLE MATRIX, unlike the user screen's four cards,
-     * because the matrix IS one set: the reader is comparing roles against
-     * each other down a column, and a Save per role would make "I moved this
-     * entry from Operations to Finance" two saves that can half-fail.
-     *
-     * A role whose column is entirely unticked posts nothing for itself, and
-     * that is READ AS "ticked for nothing", which means the whole menu. The
-     * matrix is one form covering every role, so a missing key is an empty
-     * column rather than a role the form forgot — there is no third state to
-     * confuse it with.
-     */
-    public function updateRoleMenu(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'menu' => ['array'],
-            'menu.*' => ['array'],
-            'menu.*.*' => ['integer'],
-        ]);
-
-        $roles = Role::query()->acrossBranches()->orderBy('SortOrder')->get();
-        $back = route('app.setup.roles.index').'#menu';
-        $posted = $data['menu'] ?? [];
-        $actor = $request->user();
-        $changed = 0;
-
-        try {
-            DB::connection(config('agora.connections.app'))->transaction(function () use (&$changed, $roles, $posted, $actor) {
-                foreach ($roles as $role) {
-                    $wanted = array_values(array_unique(array_map('intval', $posted[(int) $role->Id] ?? [])));
-                    $held = $this->menuAccess->roleItemIds($role);
-
-                    sort($wanted);
-                    sort($held);
-
-                    if ($wanted === $held) {
-                        continue;
-                    }
-
-                    $this->menuAccess->setForRole($role, $wanted);
-                    $changed++;
-                }
-
-                $this->refuseMenuLockout($actor);
-            });
-        } catch (RuntimeException $e) {
-            return redirect($back)->withErrors(['menu' => $e->getMessage()]);
-        } finally {
-            // Every holder of every role, because the guard read uncommitted
-            // rows into their caches and a rollback must not leave them there.
-            foreach ($roles as $role) {
-                $this->menuAccess->forgetRoleHolders($role);
-            }
-        }
-
-        return redirect($back)->with('status', $changed === 0
-            ? 'Nothing changed — the ticks were already what you saved.'
-            : $changed.' role'.($changed === 1 ? '' : 's').' had their menu changed.');
-    }
-
-    /** The role matrix: every role, and every permission it carries. */
-    public function roles(): View
-    {
-        $roles = Role::query()->acrossBranches()->orderBy('SortOrder')->get();
-        $permissions = Permission::query()->acrossBranches()->orderBy('SortOrder')->get();
-
-        $granted = DB::connection(config('agora.connections.app'))
-            ->table(config('agora.schema').'.RolePermission')
-            ->get()
-            ->groupBy('RoleId')
-            ->map(fn ($rows) => $rows->pluck('PermissionId')->flip());
-
-        return view('core::setup.roles.index', [
-            'roles' => $roles,
-            'permissions' => $permissions->groupBy('Module'),
-            'granted' => $granted,
-
-            // The menu half of the same screen. Unfiltered on purpose — an
-            // administrator has to see the entries they are taking away.
-            'menuWorkspaces' => $this->menuWorkspaces(),
-            'menuGranted' => $roles->mapWithKeys(fn (Role $role) => [
-                (int) $role->Id => array_flip($this->menuAccess->roleItemIds($role)),
-            ])->all(),
-        ]);
-    }
-
-    /**
      * Run one card's save, and turn a refusal into a message on the field it
      * belongs to rather than a 500.
      *
@@ -521,9 +403,7 @@ class UserAdminController extends Controller
      */
     private function accessState(User $person): array
     {
-        $rolePatterns = $this->permissions->rolePatternsFor($person);
         $menuDirectIds = $this->menuAccess->userItemIdsFor($person);
-        $menuRoleIds = $this->menuAccess->roleItemIdsFor($person);
 
         $grantedBranchIds = UserBranch::query()->acrossBranches()
             ->where('UserId', $person->Id)
@@ -541,11 +421,6 @@ class UserAdminController extends Controller
         $permissions = Permission::query()->acrossBranches()->orderBy('SortOrder')->get();
 
         return [
-            'roles' => Role::query()->acrossBranches()->orderBy('SortOrder')->get(),
-            'held' => UserRole::query()->acrossBranches()
-                ->where('UserId', $person->Id)
-                ->get()
-                ->keyBy('RoleId'),
             'grantedBranches' => Branch::query()->acrossBranches()
                 ->whereIn('BranchId', $grantedBranchIds ?: [0])
                 ->ordered()
@@ -554,31 +429,27 @@ class UserAdminController extends Controller
             'branchCount' => count($grantedBranchIds),
 
             /*
-             * Every permission, with WHY the person holds it. `viaRole` is
-             * matched against the role half alone, so a direct grant that a
-             * role already carries can be seen for what it is — redundant —
-             * rather than looking like the only thing keeping the door open.
+             * Every permission, and whether this person holds it. There is one
+             * answer now rather than two — before roles were retired a grant
+             * could be held directly, via a role, or both, and the screen had
+             * to say which so a redundant tick was not mistaken for the only
+             * thing keeping the door open.
              */
             'permissionRows' => $permissions
                 ->map(fn (Permission $p) => [
                     'permission' => $p,
                     'direct' => in_array((int) $p->Id, $directIds, true),
-                    'viaRole' => $this->permissions->anyMatches($rolePatterns, $p->Code),
                 ])
                 ->groupBy(fn (array $row) => $row['permission']->Module),
             'directCount' => count($directIds),
 
             /*
              * The menu, unfiltered, flattened per workspace so the card can
-             * indent it — and the two halves of what this person is ticked
-             * for kept apart for the same reason the permission rows are: a
-             * personal tick that a role already carries is redundant rather
-             * than load-bearing, and the screen should say which.
+             * indent it. One list of ticks, against this person's name.
              */
             'menuWorkspaces' => $this->menuWorkspaces(),
             'menuDirectIds' => $menuDirectIds,
-            'menuRoleIds' => $menuRoleIds,
-            'menuRestricted' => array_merge($menuDirectIds, $menuRoleIds) !== [],
+            'menuRestricted' => $menuDirectIds !== [],
             'menuDirectCount' => count($menuDirectIds),
             'effective' => $permissions
                 ->filter(fn (Permission $p) => $this->permissions->userHas($person, $p->Code))

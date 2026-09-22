@@ -340,11 +340,11 @@ and a relabel is an update. A parent is addressed by its own `path`, which lets
 a module hang an item under another module's heading without knowing its key —
 and seeding a child before its parent throws, deliberately.
 
-**Who sees the entry is set in the application, not here.** Setup → Roles
-carries a matrix of every menu entry against every role, and one person's screen
-carries the same list for the exception; both write `agora.RoleMenuItem` /
-`agora.UserMenuItem` and both read as a grant list where **an empty set is the
-whole menu**. `MenuService::tree()` filters what it returns to the person
+**Who sees the entry is set in the application, not here.** One person's screen
+carries the whole menu with a tick against each entry, writing
+`agora.UserMenuItem`, read as a grant list where **an empty set is the whole
+menu**. (There was a role matrix beside it for half a day on 22 Sep 2026;
+roles were retired the same afternoon and it went with them.) `MenuService::tree()` filters what it returns to the person
 asking, and `EnforceMenuAccess` refuses the route behind an entry they are not
 ticked for — so hiding a link and closing the screen are the same act. Two
 consequences when you add an entry:
@@ -356,7 +356,7 @@ consequences when you add an entry:
 - **Pointing an item at a route brings that route under the ticks.** A route no
   menu entry names is not menu-governed at all, which is why the Save endpoints
   and the grid writers are unaffected. The landing routes in
-  `agora.Role.LandingRoute`, and the dashboard behind them, are always allowed —
+  `agora.User.LandingRoute`, and the dashboard behind them, are always allowed —
   a correct sign-in that ends in 403 is a lockout, not a restriction.
 
 ### 8. Getting the seeder to run

@@ -4,14 +4,13 @@ namespace Tests\Feature\Core;
 
 use Illuminate\Support\Str;
 use Modules\Core\Models\MenuItem;
-use Modules\Core\Models\Role;
-use Modules\Core\Models\RoleMenuItem;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserMenuItem;
-use Modules\Core\Models\UserRole;
+use Modules\Core\Models\UserPermission;
 use Modules\Core\Services\MenuAccessService;
 use Modules\Core\Services\MenuService;
-use Modules\Core\Services\PermissionService;
+use Tests\Fixtures\GrantsAccess;
 use Tests\TestCase;
 
 /**
@@ -26,13 +25,12 @@ use Tests\TestCase;
  */
 class MenuAccessTest extends TestCase
 {
+    use GrantsAccess;
+
     private int $branchId;
 
     /** @var array<int, User> */
     private array $made = [];
-
-    /** @var array<int, int> */
-    private array $touchedRoles = [];
 
     /** @var array<int, int> */
     private array $madeItems = [];
@@ -47,45 +45,31 @@ class MenuAccessTest extends TestCase
     {
         foreach ($this->made as $user) {
             UserMenuItem::query()->acrossBranches()->where('UserId', $user->Id)->delete();
-            UserRole::query()->acrossBranches()->where('UserId', $user->Id)->delete();
+            UserPermission::query()->acrossBranches()->where('UserId', $user->Id)->delete();
             User::query()->acrossBranches()->where('Id', $user->Id)->forceDelete();
-        }
-
-        foreach ($this->touchedRoles as $roleId) {
-            RoleMenuItem::query()->acrossBranches()->where('RoleId', $roleId)->delete();
         }
 
         foreach ($this->madeItems as $itemId) {
             UserMenuItem::query()->acrossBranches()->where('MenuItemId', $itemId)->delete();
-            RoleMenuItem::query()->acrossBranches()->where('MenuItemId', $itemId)->delete();
             MenuItem::query()->acrossBranches()->where('Id', $itemId)->delete();
         }
 
         parent::tearDown();
     }
 
-    private function person(string $roleCode): User
+    private function person(string $profile): User
     {
-        $role = Role::query()->acrossBranches()->where('Code', $roleCode)->firstOrFail();
-
         $user = User::query()->acrossBranches()->create([
             'BranchId' => $this->branchId,
             'EmailAddress' => 'TEST-menu-'.uniqid().'@agora.invalid',
-            'UserName' => 'TEST-'.$roleCode,
-            'RoleId' => $role->Id,
+            'UserName' => 'TEST-'.$profile,
             'IsActive' => true,
             'IsLocked' => false,
+            'Workspace' => $this->profileWorkspace($profile),
             'PasswordHash' => 'TEST-only-'.Str::random(24),
         ]);
 
-        UserRole::query()->acrossBranches()->create([
-            'BranchId' => $this->branchId,
-            'UserId' => $user->Id,
-            'RoleId' => $role->Id,
-            'IsPrimary' => true,
-        ]);
-
-        app(PermissionService::class)->forget($user);
+        $this->grantProfile($user, $profile);
         app(MenuAccessService::class)->forget($user);
         $this->made[] = $user;
 
@@ -179,16 +163,15 @@ class MenuAccessTest extends TestCase
          * than no link.
          *
          * `recon.runs.execute` is the slug for it. The four menu entries that
-         * name a PermissionCode today all name one every role holds, so none
-         * of them can show a refusal; this one is granted to Finance and Admin
-         * alone, deliberately and for a reason RolePermissionSeeder writes out
+         * name a PermissionCode today all name one both fixtures hold, so none
+         * of them can show a refusal; this one is in the admin profile and not
+         * in the operations one, for the reason the permission catalogue gives
          * — committing a reconciliation stamps rows in the customer's estate.
          *
-         * Not an invented slug either: a role's grants are stored as the
-         * CONCRETE permissions its patterns matched when the seeder ran, so
-         * even `*.*.*` does not cover a code no Permission row defines, and a
-         * test written against an imaginary one proves the opposite of what it
-         * looks like.
+         * Not an invented slug either: a grant is always a CONCRETE permission
+         * id, so even `*.*.*` does not cover a code no Permission row defines,
+         * and a test written against an imaginary one proves the opposite of
+         * what it looks like.
          */
         $item = MenuService::item('ho', 'setup', [
             'path' => 'people-assets/TEST-locked',
@@ -201,23 +184,6 @@ class MenuAccessTest extends TestCase
 
         $this->assertContains('TEST-locked entry', $this->labels($this->person('admin')));
         $this->assertNotContains('TEST-locked entry', $this->labels($this->person('operations')));
-    }
-
-    public function test_a_role_tick_and_a_personal_tick_are_unioned(): void
-    {
-        $person = $this->person('operations');
-        $role = Role::query()->acrossBranches()->where('Code', 'operations')->firstOrFail();
-        $this->touchedRoles[] = (int) $role->Id;
-
-        $access = app(MenuAccessService::class);
-        $access->setForRole($role, [(int) $this->item('the-day/my-queue')->Id]);
-        $access->setForUser($person, [(int) $this->item('decisions/waste')->Id]);
-
-        $labels = $this->labels($person);
-
-        $this->assertContains('My queue', $labels);
-        $this->assertContains('Waste to approve', $labels);
-        $this->assertNotContains('Overnight loads', $labels);
     }
 
     public function test_an_unticked_screen_is_refused_by_its_url_too(): void
@@ -309,39 +275,8 @@ class MenuAccessTest extends TestCase
             ->assertSee('name="menu[]"', false);
 
         $this->actingAs($admin)
-            ->get(route('app.setup.roles.index'))
-            ->assertOk()
-            ->assertSee('Menu access')
-            ->assertSee('Save menu access');
-
-        $this->actingAs($admin)
             ->get(route('app.setup.users.show', ['user' => $subject->Id]))
             ->assertOk()
             ->assertSee('Menu access');
-    }
-
-    public function test_the_role_matrix_saves_and_refuses_the_same_lockout(): void
-    {
-        $admin = $this->person('admin');
-        $operations = Role::query()->acrossBranches()->where('Code', 'operations')->firstOrFail();
-        $adminRole = Role::query()->acrossBranches()->where('Code', 'admin')->firstOrFail();
-        $this->touchedRoles[] = (int) $operations->Id;
-        $this->touchedRoles[] = (int) $adminRole->Id;
-
-        $queue = (int) $this->item('the-day/my-queue')->Id;
-
-        $this->actingAs($admin)
-            ->put(route('app.setup.roles.menu.update'), ['menu' => [(int) $operations->Id => [$queue]]])
-            ->assertRedirect(route('app.setup.roles.index').'#menu');
-
-        $this->assertSame([$queue], app(MenuAccessService::class)->roleItemIds($operations));
-
-        // Ticking the admin's own role for something that is not the users
-        // screen would take the last administrator off it.
-        $this->actingAs($admin)
-            ->put(route('app.setup.roles.menu.update'), ['menu' => [(int) $adminRole->Id => [$queue]]])
-            ->assertSessionHasErrors('menu');
-
-        $this->assertSame([], app(MenuAccessService::class)->roleItemIds($adminRole));
     }
 }

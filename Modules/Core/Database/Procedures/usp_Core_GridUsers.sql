@@ -2,7 +2,7 @@
  * agora.usp_Core_GridUsers — the people who can sign in, and what they may do.
  *
  * Read by:  Setup -> People and assets -> Users and access (T028)
- * Reads:    agora.User, agora.Role, agora.UserRole, agora.UserBranch
+ * Reads:    agora.User, agora.UserPermission, agora.UserBranch
  * Writes:   nothing.
  *
  * The grid procedure template (feature-rules §2), nine parameters. @FiltersJson
@@ -37,7 +37,7 @@
  * BranchCount below is that count, not this parameter. Conflating the two is
  * how a head-office administrator would vanish from their own screen.
  *
- * RoleNames is a comma-joined list because a person may hold more than one, and
+ * PermissionCount replaced the two role columns when roles were retired, and
  * the primary is named separately: the landing route comes from the primary and
  * a reader needs to see which one that is without opening the row.
  */
@@ -87,7 +87,6 @@ BEGIN
             @fUserNameOp NVARCHAR(20) = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'UserName'),
             @fEmail     NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'EmailAddress'),
             @fEmailOp   NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'EmailAddress'),
-            @fRoleNames NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'RoleNames'),
             @fStatus    NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'Status');
 
     /* UserType is declared as a SET filter on UserGrid, so it arrives as a
@@ -108,23 +107,14 @@ BEGIN
             u.IsLocked,
             u.MustChangePassword,
             u.LastSignInAt,
-            primary_role.Name AS PrimaryRole,
-            STUFF((
-                SELECT ', ' + r2.Name
-                FROM agora.UserRole ur2
-                JOIN agora.Role r2 ON r2.Id = ur2.RoleId
-                WHERE ur2.UserId = u.Id
-                ORDER BY r2.SortOrder
-                FOR XML PATH(''), TYPE
-            ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS RoleNames,
+            /* Roles were retired on 22 Sep 2026, so "primary role" and "all
+               roles" no longer exist to report. What replaces them is the
+               question those columns were really being read for — how much
+               can this person do — answered by counting what is granted to
+               them by name, which is now the whole of it. */
+            (SELECT COUNT(*) FROM agora.UserPermission up WHERE up.UserId = u.Id) AS PermissionCount,
             (SELECT COUNT(*) FROM agora.UserBranch ub WHERE ub.UserId = u.Id) AS BranchCount
         FROM agora.[User] u
-        OUTER APPLY (
-            SELECT TOP 1 r.Name
-            FROM agora.UserRole ur
-            JOIN agora.Role r ON r.Id = ur.RoleId
-            WHERE ur.UserId = u.Id AND ur.IsPrimary = 1
-        ) primary_role
         /* Soft-deleted people are gone from the screens, not from the estate:
            agora.User keeps the row so everything they ever wrote stays
            attributable, and every read has to say so. Eloquent applies this
@@ -144,7 +134,6 @@ BEGIN
           AND (@fEmail     IS NULL OR (CASE WHEN @fEmailOp = 'eq' THEN CASE WHEN p.EmailAddress = @fEmail THEN 1 ELSE 0 END
                                             ELSE CASE WHEN p.EmailAddress LIKE '%' + @fEmail + '%' THEN 1 ELSE 0 END END) = 1)
           AND (@fTypeAny = 0 OR p.UserType IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'UserType'))
-          AND (@fRoleNames IS NULL OR p.RoleNames    LIKE '%' + @fRoleNames + '%')
           AND (@fStatus    IS NULL OR
                (CASE WHEN p.IsLocked = 1 THEN 'Locked'
                      WHEN p.IsActive = 0 THEN 'Inactive'
@@ -163,8 +152,7 @@ BEGIN
         f.UserName,
         f.EmailAddress,
         f.UserType,
-        f.PrimaryRole,
-        f.RoleNames,
+        f.PermissionCount,
         f.BranchCount,
         f.LastSignInAt,
         CASE WHEN f.IsLocked = 1 THEN 'Locked'
@@ -175,26 +163,34 @@ BEGIN
         f.IsActive
     FROM filtered f
     ORDER BY
-        CASE WHEN @SortAsc = 1 THEN
+        /* The TEXT sorts. `ELSE f.UserName` used to catch everything, which
+           meant a numeric sort was ordered by NAME first and the numeric
+           expression below it only ever broke ties — so BranchCount and
+           LastSignInAt did nothing at all when you clicked their headers, and
+           PermissionCount would have shipped with the same dead arrow. The
+           numeric columns are named here and yield NULL, so the text branch
+           steps aside and the one below it decides. Found 22 Sep 2026 while
+           adding PermissionCount. */
+        CASE WHEN @SortAsc = 1 AND @SortColumn NOT IN ('BranchCount', 'PermissionCount', 'LastSignInAt') THEN
             CASE @SortColumn
                 WHEN 'UserCode'     THEN f.UserCode
                 WHEN 'EmailAddress' THEN f.EmailAddress
                 WHEN 'UserType'     THEN f.UserType
-                WHEN 'PrimaryRole'  THEN f.PrimaryRole
                 ELSE f.UserName
             END
         END ASC,
-        CASE WHEN @SortAsc = 0 THEN
+        CASE WHEN @SortAsc = 0 AND @SortColumn NOT IN ('BranchCount', 'PermissionCount', 'LastSignInAt') THEN
             CASE @SortColumn
                 WHEN 'UserCode'     THEN f.UserCode
                 WHEN 'EmailAddress' THEN f.EmailAddress
                 WHEN 'UserType'     THEN f.UserType
-                WHEN 'PrimaryRole'  THEN f.PrimaryRole
                 ELSE f.UserName
             END
         END DESC,
         /* The numeric and date sorts, separately, so they compare as
            themselves rather than as text — '10' after '9', not before it. */
+        CASE WHEN @SortAsc = 1 AND @SortColumn = 'PermissionCount' THEN f.PermissionCount END ASC,
+        CASE WHEN @SortAsc = 0 AND @SortColumn = 'PermissionCount' THEN f.PermissionCount END DESC,
         CASE WHEN @SortAsc = 1 AND @SortColumn = 'BranchCount'  THEN f.BranchCount END ASC,
         CASE WHEN @SortAsc = 0 AND @SortColumn = 'BranchCount'  THEN f.BranchCount END DESC,
         CASE WHEN @SortAsc = 1 AND @SortColumn = 'LastSignInAt' THEN f.LastSignInAt END ASC,
@@ -207,8 +203,8 @@ BEGIN
      * "showing 50 of 88".
      *
      * IT MUST BE THE SAME SET AS THE PAGE. This count used to repeat the
-     * predicates by hand and had drifted: RoleNames and Status were never
-     * applied to it at all, so filtering on either gave a footer that
+     * predicates by hand and had drifted: the role and Status filters were
+     * never applied to it at all, so filtering on either gave a footer that
      * disagreed with the rows above it — and a pager that offered pages with
      * nothing on them. Counting the CTE is the only version of this that
      * cannot drift.
@@ -216,15 +212,7 @@ BEGIN
     ;WITH people AS (
         SELECT
             u.Id, u.UserName, u.EmailAddress, u.UserCode, u.UserType,
-            u.IsActive, u.IsLocked, u.MustChangePassword, u.LastSignInAt,
-            STUFF((
-                SELECT ', ' + r2.Name
-                FROM agora.UserRole ur2
-                JOIN agora.Role r2 ON r2.Id = ur2.RoleId
-                WHERE ur2.UserId = u.Id
-                ORDER BY r2.SortOrder
-                FOR XML PATH(''), TYPE
-            ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS RoleNames
+            u.IsActive, u.IsLocked, u.MustChangePassword, u.LastSignInAt
         FROM agora.[User] u
         WHERE u.DeletedAt IS NULL
     )
@@ -239,7 +227,6 @@ BEGIN
       AND (@fEmail     IS NULL OR (CASE WHEN @fEmailOp = 'eq' THEN CASE WHEN p.EmailAddress = @fEmail THEN 1 ELSE 0 END
                                         ELSE CASE WHEN p.EmailAddress LIKE '%' + @fEmail + '%' THEN 1 ELSE 0 END END) = 1)
       AND (@fTypeAny = 0 OR p.UserType IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'UserType'))
-      AND (@fRoleNames IS NULL OR p.RoleNames LIKE '%' + @fRoleNames + '%')
       AND (@fStatus    IS NULL OR
            (CASE WHEN p.IsLocked = 1 THEN 'Locked'
                  WHEN p.IsActive = 0 THEN 'Inactive'

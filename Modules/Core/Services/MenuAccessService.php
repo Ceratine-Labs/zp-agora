@@ -5,8 +5,6 @@ namespace Modules\Core\Services;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\MenuItem;
-use Modules\Core\Models\Role;
-use Modules\Core\Models\RoleMenuItem;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserMenuItem;
 
@@ -23,7 +21,11 @@ use Modules\Core\Models\UserMenuItem;
  * and reading a grant-list literally would blank the navigation for all 88
  * people at once; agora.UserBranch already settles this question the same way
  * and the screen says so in words. The moment one entry is ticked for a person
- * — or for any role they hold — the ticks become the whole of what they see.
+ * the ticks become the whole of what they see.
+ *
+ * ROLES WERE RETIRED THE SAME DAY (Ryan, 22 Sep 2026), so the role half of
+ * this is gone: agora.RoleMenuItem was flattened onto the people who held the
+ * role by RetireRolesSeeder and is no longer read. Ticks are per person.
  *
  * TWO THINGS CAN HIDE AN ENTRY and they are not the same thing:
  *
@@ -50,8 +52,8 @@ class MenuAccessService
     private array $memo = [];
 
     /**
-     * Every menu item id this person is ticked for, through their roles and
-     * directly. An EMPTY array means no restriction — the whole menu.
+     * Every menu item id this person is ticked for. An EMPTY array means no
+     * restriction — the whole menu.
      *
      * @return array<int, int>
      */
@@ -66,38 +68,14 @@ class MenuAccessService
         /** @var array<int, int> $ids */
         $ids = Cache::rememberForever(
             self::CACHE_PREFIX.$id,
-            fn (): array => array_values(array_unique(array_merge(
-                $this->roleItemIdsFor($user),
-                $this->userItemIdsFor($user),
-            )))
+            fn (): array => array_values(array_unique($this->userItemIdsFor($user)))
         );
 
         return $this->memo[$id] = $ids;
     }
 
     /**
-     * The half that comes from the roles this person holds.
-     *
-     * Public and uncached, like PermissionService::rolePatternsFor, so the
-     * edit screen can show whether a personal tick is doing anything or is
-     * already covered by a role.
-     *
-     * @return array<int, int>
-     */
-    public function roleItemIdsFor(User $user): array
-    {
-        $schema = config('agora.schema');
-
-        return $this->ids(DB::connection(config('agora.connections.app'))->select("
-            SELECT DISTINCT rmi.[MenuItemId]
-            FROM [{$schema}].[UserRole] ur
-            JOIN [{$schema}].[RoleMenuItem] rmi ON rmi.[RoleId] = ur.[RoleId]
-            WHERE ur.[UserId] = ?
-        ", [(int) $user->getKey()]));
-    }
-
-    /**
-     * The half ticked against this person by name.
+     * The entries ticked against this person.
      *
      * @return array<int, int>
      */
@@ -105,20 +83,6 @@ class MenuAccessService
     {
         return UserMenuItem::query()->acrossBranches()
             ->where('UserId', (int) $user->getKey())
-            ->pluck('MenuItemId')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-    }
-
-    /**
-     * What one role is ticked for.
-     *
-     * @return array<int, int>
-     */
-    public function roleItemIds(Role $role): array
-    {
-        return RoleMenuItem::query()->acrossBranches()
-            ->where('RoleId', (int) $role->getKey())
             ->pluck('MenuItemId')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -241,9 +205,9 @@ class MenuAccessService
             }
         }
 
-        // Last, not first: this is the only branch that reads agora.Role, and
-        // asking it up front would put that read on EVERY request instead of
-        // on the handful that are about to be refused.
+        // Last, not first: this is the only branch that reads the landing
+        // routes, and asking up front would put that read on EVERY request
+        // instead of on the handful that are about to be refused.
         return in_array($routeName, $this->alwaysAllowedRoutes(), true);
     }
 
@@ -282,7 +246,7 @@ class MenuAccessService
     /**
      * The routes a signed-in person may always reach, whatever the ticks say.
      *
-     * Somebody who may sign in has to land somewhere: agora.Role.LandingRoute
+     * Somebody who may sign in has to land somewhere: agora.User.LandingRoute
      * is where they are sent and the dashboard is where everything else falls
      * back to. Enforcing the ticks over those would answer a correct sign-in
      * with a 403 and no way forward, which is a lockout rather than a
@@ -295,7 +259,12 @@ class MenuAccessService
     {
         /** @var array<int, string> $landings */
         $landings = Cache::rememberForever('agora.menu.landing.routes', fn (): array => array_values(array_filter(
-            Role::query()->acrossBranches()->pluck('LandingRoute')->map(fn ($r) => (string) $r)->all(),
+            User::query()->acrossBranches()
+                ->whereNotNull('LandingRoute')
+                ->distinct()
+                ->pluck('LandingRoute')
+                ->map(fn ($r) => (string) $r)
+                ->all(),
             fn (string $r): bool => $r !== ''
         )));
 
@@ -333,39 +302,6 @@ class MenuAccessService
         return $valid;
     }
 
-    /**
-     * The same for a role, which is where this is normally set.
-     *
-     * Every person holding the role is dropped from the cache, because a role
-     * changing under somebody is exactly the staleness that leaves them
-     * looking at a menu they were just taken off.
-     *
-     * @param  array<int, int>  $itemIds
-     * @return array<int, int>
-     */
-    public function setForRole(Role $role, array $itemIds): array
-    {
-        $valid = $this->existingItemIds($itemIds);
-        $branchId = (int) config('agora.group_branch_id');
-
-        DB::connection(config('agora.connections.app'))->transaction(function () use ($role, $valid, $branchId) {
-            RoleMenuItem::query()->acrossBranches()->where('RoleId', $role->Id)->delete();
-
-            foreach ($valid as $itemId) {
-                RoleMenuItem::query()->acrossBranches()->create([
-                    'BranchId' => $branchId,
-                    'RoleId' => (int) $role->Id,
-                    'MenuItemId' => $itemId,
-                    'CreatedAt' => now(),
-                ]);
-            }
-        });
-
-        $this->forgetRoleHolders($role);
-
-        return $valid;
-    }
-
     /** Drop one person's cached set — call it whenever their ticks change. */
     public function forget(User|int $user): void
     {
@@ -373,21 +309,6 @@ class MenuAccessService
 
         unset($this->memo[$id]);
         Cache::forget(self::CACHE_PREFIX.$id);
-    }
-
-    /** Drop the cached set of everybody holding this role. */
-    public function forgetRoleHolders(Role $role): void
-    {
-        $schema = config('agora.schema');
-
-        $ids = DB::connection(config('agora.connections.app'))->select(
-            "SELECT DISTINCT [UserId] FROM [{$schema}].[UserRole] WHERE [RoleId] = ?",
-            [(int) $role->getKey()]
-        );
-
-        foreach ($ids as $row) {
-            $this->forget((int) $row->UserId);
-        }
     }
 
     /**
@@ -411,17 +332,5 @@ class MenuAccessService
             ->all();
 
         return array_values(array_filter($wanted, fn (int $id): bool => in_array($id, $exists, true)));
-    }
-
-    /**
-     * @param  array<int, object>  $rows
-     * @return array<int, int>
-     */
-    private function ids(array $rows): array
-    {
-        return array_values(array_map(
-            static fn (object $r): int => (int) $r->MenuItemId,
-            $rows
-        ));
     }
 }

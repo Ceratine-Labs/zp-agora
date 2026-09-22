@@ -7,27 +7,30 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\Permission;
-use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserBranch;
 use Modules\Core\Models\UserPermission;
-use Modules\Core\Models\UserRole;
 use RuntimeException;
 use Throwable;
 
 /**
  * Who someone is, what they may do, and which sites they may see.
  *
+ * ROLES WERE RETIRED ON 22 SEPTEMBER 2026 (Ryan). setRoles() is gone with
+ * them and agora.UserRole is no longer read; RetireRolesSeeder copied what
+ * every role carried onto the people who held it. What is left is three
+ * cards, each owning one complete set.
+ *
  * EVERY SET IS REPLACED, NEVER DIFFED. The screen submits the whole set it
  * owns, and this writes exactly that. A grant REMOVED is the change that
  * matters, and a diff that only ever adds is the classic way access
- * accumulates until everybody is an administrator.
+ * accumulates until everybody is an administrator. With roles gone this is
+ * the only mechanism by which anybody loses access at all.
  *
  * WHY PHP AND NOT A PROCEDURE. The rulebook puts business logic in
- * `agora.usp_*` and it is right to; this is master CRUD over four grant
- * tables with no arithmetic and no money in it, and the role writer this grew
- * out of was already PHP. Splitting one screen's four Save buttons across two
- * languages would be worse than either choice on its own. If a grant ever
+ * `agora.usp_*` and it is right to; this is master CRUD over a few grant
+ * tables with no arithmetic and no money in it. Splitting one screen's Save
+ * buttons across two languages would be worse than either choice on its own. If a grant ever
  * needs an audit trail the customer can query, that is the moment it becomes
  * a procedure — and the moment agora.UserActivity grows a row per change.
  *
@@ -43,53 +46,12 @@ class UserAccessService
     ) {}
 
     /**
-     * The roles this person holds, and which one they land from.
+     * What this person may do.
      *
-     * `agora.User.RoleId` is the denormalised pointer `User::landingRoute()`
-     * reads; it follows the primary grant here so the two cannot disagree.
-     *
-     * @param  array<int, int>  $roleIds
-     * @return array{roles: array<int, int>, primary: int|null}
-     */
-    public function setRoles(User $person, array $roleIds, ?int $primaryId, ?User $actor = null): array
-    {
-        $valid = $this->existingIds(Role::query()->acrossBranches(), $roleIds);
-        $primary = in_array((int) $primaryId, $valid, true) ? (int) $primaryId : ($valid[0] ?? null);
-        $branchId = $this->groupBranchId();
-
-        try {
-            DB::connection($this->connection())->transaction(function () use ($person, $valid, $primary, $branchId, $actor) {
-                UserRole::query()->acrossBranches()->where('UserId', $person->Id)->delete();
-
-                foreach ($valid as $roleId) {
-                    UserRole::query()->acrossBranches()->create([
-                        'BranchId' => $branchId,
-                        'UserId' => $person->Id,
-                        'RoleId' => $roleId,
-                        'IsPrimary' => $roleId === $primary,
-                        'CreatedAt' => now(),
-                    ]);
-                }
-
-                $person->forceFill(['RoleId' => $primary])->saveQuietly();
-
-                $this->permissions->forget($person);
-                $this->refuseSelfLockout($person, $actor);
-            });
-        } finally {
-            // In the finally rather than after the commit: the check above
-            // reads the written-but-uncommitted rows and caches them, and a
-            // rollback must not leave that reading behind.
-            $this->permissions->forget($person);
-        }
-
-        return ['roles' => $valid, 'primary' => $primary];
-    }
-
-    /**
-     * The permissions granted to this person directly, beside their roles.
-     *
-     * Additive only — there is no deny row, and v1__01d says why.
+     * Since roles were retired (22 Sep 2026) this is the WHOLE of their
+     * access rather than the exceptions beside it, so a permission taken away
+     * here is taken away — there is no role underneath still carrying it. That
+     * makes the replace-don't-diff rule above load-bearing rather than tidy.
      *
      * @param  array<int, int>  $permissionIds
      * @return array<int, int>

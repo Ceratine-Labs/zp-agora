@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Contracts\View\View;
 
 /**
- * The two landing pages roles point at before their epics exist.
+ * The two landing pages people are pointed at before their epics exist.
  *
- * `agora.Role.LandingRoute` is data — the business decides where Finance
+ * `agora.User.LandingRoute` is data — the business decides where somebody
  * lands, not a developer — but a named route that resolves to nothing is a 404
  * on the first screen somebody sees after signing in. So the branch console
  * (T030) and the Exco pack (T077) get a route each now, saying plainly what is

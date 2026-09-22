@@ -44,8 +44,10 @@ class UserGrid extends GridDefinition
             new GridColumn(key: 'UserName', label: 'Name', sort: 'UserName', wide: true, link: true),
             new GridColumn(key: 'EmailAddress', label: 'Email', sort: 'EmailAddress', wide: true),
             new GridColumn(key: 'UserType', label: 'Type', sort: 'UserType'),
-            new GridColumn(key: 'PrimaryRole', label: 'Primary role', sort: 'PrimaryRole'),
-            new GridColumn(key: 'RoleNames', label: 'All roles', wide: true, visible: false),
+            // Roles were retired on 22 Sep 2026. What the two role columns
+            // were read for — how much can this person do — is now one number
+            // over agora.UserPermission, which is the whole of their access.
+            new GridColumn(key: 'PermissionCount', label: 'Permissions', format: 'number', sort: 'PermissionCount'),
             new GridColumn(key: 'BranchCount', label: 'Branches', format: 'number', sort: 'BranchCount'),
             new GridColumn(key: 'LastSignInAt', label: 'Last sign-in', format: 'datetime', sort: 'LastSignInAt'),
             new GridColumn(key: 'Status', label: 'Status', format: 'chip'),
@@ -70,7 +72,6 @@ class UserGrid extends GridDefinition
             'UserName' => new GridFilter(column: 'UserName', type: 'text'),
             'EmailAddress' => new GridFilter(column: 'EmailAddress', type: 'text'),
             'UserType' => new GridFilter(column: 'UserType', type: 'set', options: ['ho', 'branch']),
-            'RoleNames' => new GridFilter(column: 'RoleNames', type: 'text'),
             'Status' => new GridFilter(column: 'Status', type: 'text'),
         ];
     }

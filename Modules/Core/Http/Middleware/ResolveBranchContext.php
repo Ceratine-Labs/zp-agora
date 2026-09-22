@@ -18,8 +18,11 @@ use Symfony\Component\HttpFoundation\Response;
  * first use — is how a query slips out unscoped.
  *
  * Workspace comes from the URL first (so a link can carry it, per plan §3.10),
- * then the session, then the user's role. A branch user is pinned to their
- * home site and cannot switch to head office by editing the query string.
+ * then the session, then the person's own agora.User.Workspace — which used
+ * to be their role's, until roles were retired on 22 Sep 2026 and
+ * RetireRolesSeeder copied the value onto them. A branch user is pinned to
+ * their home site and cannot switch to head office by editing the query
+ * string.
  */
 class ResolveBranchContext
 {
@@ -32,15 +35,11 @@ class ResolveBranchContext
             return $next($request);
         }
 
-        $role = $user->role;
-        $forced = $role?->Workspace === 'branch' || $user->HomeBranchId !== null;
+        $forced = $user->Workspace === 'branch' || $user->HomeBranchId !== null;
 
         $workspace = $forced
             ? 'branch'
-            // `->` not `?->`: PHP's ?? already suppresses a read on null, so
-            // the nullsafe would be redundant. The `?->` on the line above is
-            // NOT redundant — it is compared, not coalesced.
-            : ($request->query('ws') ?? $request->session()->get('agora.workspace') ?? $role->Workspace ?? 'ho');
+            : ($request->query('ws') ?? $request->session()->get('agora.workspace') ?? $user->Workspace ?? 'ho');
 
         $context->setWorkspace($workspace);
         $request->session()->put('agora.workspace', $context->workspace());

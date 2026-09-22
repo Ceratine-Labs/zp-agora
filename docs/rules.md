@@ -153,14 +153,25 @@ Driver 18 validates by default and the instance's certificates are self-signed.
 - **Navigation is database-driven** (`agora.MenuSection` / `agora.MenuItem`,
   nested to any depth through `ParentId`). Each module ships a `MenuSeeder`
   calling `MenuService::item()`. **Never list a link in a blade file.**
-- **The menu is ticked per entry, per role and per person** (`agora.RoleMenuItem`
-  / `agora.UserMenuItem`, set on Setup → Roles and on one person's screen).
-  `MenuAccessService` answers it, `MenuService::tree()` filters by it and
-  `EnforceMenuAccess` puts the same answer in front of the route — **an entry
-  that is not ticked is not reachable by typing its address either.** An empty
-  set is the WHOLE menu, like `agora.UserBranch`; grants are additive and there
-  is no deny row. An item's `PermissionCode` hides it independently of the
-  ticks, because the screen behind it would refuse them anyway.
+- **There are no roles.** Retired 22 Sep 2026 (Ryan). Every person's access is
+  granted to them by name in `agora.UserPermission`, set on Setup → Users and
+  access and nowhere else; `agora.Role`, `UserRole`, `RolePermission` and
+  `RoleMenuItem` still exist but **nothing reads them**, and
+  `scripts/check-roles.sh` fails the build if anything starts to.
+  `RetireRolesSeeder` copied what each role carried onto the people who held it,
+  and `agora.User.LandingRoute` / `.Workspace` carry the two facts a role held
+  that were not permissions. **The consequence is real and was accepted
+  knowingly: there is no way to grant a permission to a group.** A new screen is
+  ticked for each person who needs it, so a module permission seeder now
+  creates the permission and stops there.
+- **The menu is ticked per entry, per person** (`agora.UserMenuItem`, on one
+  person's screen). `MenuAccessService` answers it, `MenuService::tree()`
+  filters by it and `EnforceMenuAccess` puts the same answer in front of the
+  route — **an entry that is not ticked is not reachable by typing its address
+  either.** An empty set is the WHOLE menu, like `agora.UserBranch`; grants are
+  additive and there is no deny row. An item's `PermissionCode` hides it
+  independently of the ticks, because the screen behind it would refuse them
+  anyway.
 - **Everything is a component.** No screen writes its own KPI, table or nav
   markup. See [`components.md`](components.md); build the component if
   it is missing, and add it to that file.
@@ -170,7 +181,7 @@ Driver 18 validates by default and the instance's certificates are self-signed.
 Full detail in [`testing.md`](testing.md). The short version:
 
 - `composer check` = pint → phpstan (level 6) → check-migrations → check-procs →
-  phpunit. `composer check-fast` drops the slow two. Run `check` before calling
+  check-roles → phpunit. `composer check-fast` drops the slow two. Run `check` before calling
   anything done.
 - Browser tests are Playwright, `tests/e2e`, two projects (`desktop`, `mobile`
   at 375x812). They are NOT in `composer check` — they need a server and a

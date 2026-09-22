@@ -6,10 +6,10 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Modules\Core\Mail\PasswordResetMail;
 use Modules\Core\Models\PasswordReset;
-use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserActivity;
 use Modules\Core\Services\PasswordResetService;
+use Tests\Fixtures\GrantsAccess;
 use Tests\TestCase;
 
 /**
@@ -30,6 +30,8 @@ use Tests\TestCase;
  */
 class SignInTest extends TestCase
 {
+    use GrantsAccess;
+
     private const PASSWORD = 'Th1s-Is-A-Real-Password!';
 
     private User $manager;
@@ -260,8 +262,6 @@ class SignInTest extends TestCase
 
     private function makeUser(string $email, string $name, string $roleCode): User
     {
-        $role = Role::query()->acrossBranches()->where('Code', $roleCode)->firstOrFail();
-
         $user = User::query()->acrossBranches()->firstOrNew([
             'BranchId' => (int) config('agora.group_branch_id'),
             'EmailAddress' => $email,
@@ -269,15 +269,16 @@ class SignInTest extends TestCase
 
         $user->fill([
             'UserName' => $name,
-            'RoleId' => $role->Id,
             'IsActive' => true,
             'IsLocked' => false,
+            'Workspace' => $this->profileWorkspace($roleCode),
+            'LandingRoute' => $this->profileLanding($roleCode),
         ]);
         $user->BranchId = (int) config('agora.group_branch_id');
         $user->LastSignInAt = null;
         $user->makePasswordUnusable()->save();
 
-        return $user;
+        return $this->grantProfile($user, $roleCode);
     }
 
     /** The token that would have gone out in the mail. */

@@ -1,7 +1,7 @@
 {{--
     Changing one person (T028).
 
-    FOUR CARDS, FOUR SAVE BUTTONS. Each card owns a complete set and each Save
+    A SAVE BUTTON PER CARD. Each card owns a complete set and each Save
     replaces that set rather than adding to it — a grant removed is the change
     that matters, and a diff that only ever adds is how everybody ends up an
     administrator. That only works if the form submits everything it owns,
@@ -29,7 +29,7 @@
 
     {{-- The three refusals UserAccessService can make are decisions, not
          faults, so they arrive as errors on the card that raised them. --}}
-    @foreach (['details' => 'Details', 'roles' => 'Roles', 'branches' => 'Sites', 'permissions' => 'Extra permissions', 'menu' => 'Menu access', 'password' => 'Password'] as $card => $label)
+    @foreach (['details' => 'Details', 'branches' => 'Sites', 'permissions' => 'Permissions', 'menu' => 'Menu access', 'password' => 'Password'] as $card => $label)
         @error($card)
             <x-notice tone="warn" title="{{ $label }} not saved">{{ $message }}</x-notice>
         @enderror
@@ -132,37 +132,7 @@
         </form>
     </x-card>
 
-    <div class="two-col">
-        <x-card id="roles" title="Roles" sub="What this person is. The primary role decides where they land after signing in.">
-            <form method="POST" action="{{ route('app.setup.users.update', ['user' => $person->Id]) }}">
-                @csrf
-                @method('PUT')
-
-                <div class="role-list">
-                    @foreach ($roles as $role)
-                        @php($isHeld = $held->has($role->Id))
-                        <label class="role-row {{ $isHeld ? 'on' : '' }}">
-                            <input type="checkbox" name="roles[]" value="{{ $role->Id }}" @checked($isHeld)>
-                            <span class="role-name">
-                                {{ $role->Name }}
-                                @if ($role->IsReadOnly)<x-chip tone="neutral">read only</x-chip>@endif
-                            </span>
-                            <span class="role-primary">
-                                <input type="radio" name="primary" value="{{ $role->Id }}"
-                                       @checked($held->get($role->Id)?->IsPrimary)>
-                                primary
-                            </span>
-                        </label>
-                    @endforeach
-                </div>
-
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary">Save roles</button>
-                </div>
-            </form>
-        </x-card>
-
-        <x-card id="branches" title="Sites" sub="Which of the estate this person may see. Everything else is filtered out before a query runs.">
+    <x-card id="branches" title="Sites" sub="Which of the estate this person may see. Everything else is filtered out before a query runs.">
             <form method="POST" action="{{ route('app.setup.users.branches.update', ['user' => $person->Id]) }}">
                 @csrf
                 @method('PUT')
@@ -190,26 +160,24 @@
                     </p>
                 </div>
 
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary">Save sites</button>
-                </div>
-            </form>
-        </x-card>
-    </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Save sites</button>
+            </div>
+        </form>
+    </x-card>
 
-    <x-card id="permissions" title="Extra permissions"
-            sub="Granted to this person by name, beside whatever their roles carry."
+    <x-card id="permissions" title="Permissions"
+            sub="What this person may do. Granted to them by name — there is nothing else."
             collapsible :open="$directCount > 0">
         <form method="POST" action="{{ route('app.setup.users.permissions.update', ['user' => $person->Id]) }}">
             @csrf
             @method('PUT')
 
-            <x-notice tone="info" title="For the exception, not the shape">
-                Six roles cover the shape of the business; these cover the exceptions — the controller who
-                must also reverse a reconciliation, without being handed everything else an administrator
-                holds. Grants here are <strong>additive only</strong>: there is no deny, so a permission
-                somebody must not have is removed by taking away the role that carries it. A row marked
-                <em>via role</em> is already held and ticking it changes nothing.
+            <x-notice tone="info" title="This list is the whole of what they may do">
+                Roles were retired on 22 September 2026, so there is no second place access can come from
+                and no <em>via role</em> to read past. A permission somebody must not have is
+                <strong>unticked here</strong>. The cost of that directness is real and worth knowing:
+                a new screen has to be ticked for each person who needs it, one at a time.
             </x-notice>
 
             @foreach ($permissionRows as $module => $rows)
@@ -221,7 +189,6 @@
                                    @checked($row['direct'])>
                             <span class="role-name">
                                 <code>{{ $row['permission']->Code }}</code>
-                                @if ($row['viaRole'])<x-chip tone="neutral">via role</x-chip>@endif
                             </span>
                             <span class="role-primary">{{ $row['permission']->Name }}</span>
                         </label>
@@ -247,9 +214,8 @@
                 nobody starts out restricted, and reading it the other way would blank the navigation for
                 everyone at once. <strong>Tick one entry and the ticks become the whole of what this person
                 sees.</strong> A tick is access, not decoration: an entry that is not ticked is not reachable
-                by typing its address either. Entries carrying a <x-chip tone="neutral">via role</x-chip>
-                are already ticked by a role this person holds — set the shape of the business on
-                <a href="{{ route('app.setup.roles.index') }}#menu">Roles</a> and use this for the exception.
+                by typing its address either. An entry naming a permission this person does not hold is
+                hidden whatever the ticks say, because the screen behind it would refuse them anyway.
             </x-notice>
 
             @foreach ($menuWorkspaces as $code => $workspace)
@@ -275,7 +241,6 @@
                                    @checked(in_array($id, $menuDirectIds, true))>
                             <span class="role-name">
                                 {{ $row['item']->Label }}
-                                @if (in_array($id, $menuRoleIds, true))<x-chip tone="neutral">via role</x-chip>@endif
                                 @if ($row['item']->PermissionCode)<code>{{ $row['item']->PermissionCode }}</code>@endif
                             </span>
                             <span class="role-primary">

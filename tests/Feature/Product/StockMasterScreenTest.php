@@ -5,12 +5,10 @@ namespace Tests\Feature\Product;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserBranch;
 use Modules\Core\Models\UserPermission;
-use Modules\Core\Models\UserRole;
-use Modules\Core\Services\PermissionService;
+use Tests\Fixtures\GrantsAccess;
 use Tests\TestCase;
 
 /**
@@ -31,6 +29,8 @@ use Tests\TestCase;
  */
 class StockMasterScreenTest extends TestCase
 {
+    use GrantsAccess;
+
     private const BRANCH = 999;
 
     private int $branchId;
@@ -54,7 +54,7 @@ class StockMasterScreenTest extends TestCase
             $this->cleanUp();
 
             foreach ($this->made as $user) {
-                UserRole::query()->acrossBranches()->where('UserId', $user->Id)->delete();
+                UserPermission::query()->acrossBranches()->where('UserId', $user->Id)->delete();
                 UserBranch::query()->acrossBranches()->where('UserId', $user->Id)->delete();
                 UserPermission::query()->acrossBranches()->where('UserId', $user->Id)->delete();
                 User::query()->acrossBranches()->where('Id', $user->Id)->forceDelete();
@@ -221,26 +221,17 @@ class StockMasterScreenTest extends TestCase
 
     private function person(string $roleCode): User
     {
-        $role = Role::query()->acrossBranches()->where('Code', $roleCode)->firstOrFail();
-
         $user = User::query()->acrossBranches()->create([
             'BranchId' => $this->branchId,
             'EmailAddress' => 'TEST-t025-'.uniqid().'@agora.invalid',
             'UserName' => 'TEST-'.$roleCode,
-            'RoleId' => $role->Id,
             'IsActive' => true,
             'IsLocked' => false,
+            'Workspace' => $this->profileWorkspace($roleCode),
             'PasswordHash' => 'TEST-only-'.Str::random(24),
         ]);
 
-        UserRole::query()->acrossBranches()->create([
-            'BranchId' => $this->branchId,
-            'UserId' => $user->Id,
-            'RoleId' => $role->Id,
-            'IsPrimary' => true,
-        ]);
-
-        app(PermissionService::class)->forget($user);
+        $this->grantProfile($user, $roleCode);
         $this->made[] = $user;
 
         return $user;

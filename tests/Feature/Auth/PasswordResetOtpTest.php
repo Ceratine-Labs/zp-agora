@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Modules\Core\Mail\PasswordResetMail;
 use Modules\Core\Models\PasswordReset;
-use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Services\PasswordResetService;
 use Tests\TestCase;
@@ -40,15 +39,12 @@ class PasswordResetOtpTest extends TestCase
 
         Mail::fake();
 
-        $role = Role::query()->acrossBranches()->where('Code', 'branch-manager')->firstOrFail();
-
         $this->user = User::query()->acrossBranches()->firstOrNew([
             'BranchId' => (int) config('agora.group_branch_id'),
             'EmailAddress' => 'TEST-otp@agora.invalid',
         ]);
         $this->user->fill([
             'UserName' => 'TEST-OTP',
-            'RoleId' => $role->Id,
             'IsActive' => true,
             'IsLocked' => false,
         ]);
