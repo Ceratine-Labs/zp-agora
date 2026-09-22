@@ -153,6 +153,14 @@ Driver 18 validates by default and the instance's certificates are self-signed.
 - **Navigation is database-driven** (`agora.MenuSection` / `agora.MenuItem`,
   nested to any depth through `ParentId`). Each module ships a `MenuSeeder`
   calling `MenuService::item()`. **Never list a link in a blade file.**
+- **The menu is ticked per entry, per role and per person** (`agora.RoleMenuItem`
+  / `agora.UserMenuItem`, set on Setup → Roles and on one person's screen).
+  `MenuAccessService` answers it, `MenuService::tree()` filters by it and
+  `EnforceMenuAccess` puts the same answer in front of the route — **an entry
+  that is not ticked is not reachable by typing its address either.** An empty
+  set is the WHOLE menu, like `agora.UserBranch`; grants are additive and there
+  is no deny row. An item's `PermissionCode` hides it independently of the
+  ticks, because the screen behind it would refuse them anyway.
 - **Everything is a component.** No screen writes its own KPI, table or nav
   markup. See [`components.md`](components.md); build the component if
   it is missing, and add it to that file.

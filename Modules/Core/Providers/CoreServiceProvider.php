@@ -12,9 +12,11 @@ use Modules\Core\Badges\LoadsFailedBadge;
 use Modules\Core\Badges\PurchaseRequestsAwaitingBadge;
 use Modules\Core\Badges\ZReadsUnallocatedBadge;
 use Modules\Core\Console\MigrateUsersCommand;
+use Modules\Core\Http\Middleware\EnforceMenuAccess;
 use Modules\Core\Http\Middleware\RequirePasswordChange;
 use Modules\Core\Http\Middleware\ResolveBranchContext;
 use Modules\Core\Models\User;
+use Modules\Core\Services\MenuAccessService;
 use Modules\Core\Services\MenuService;
 use Modules\Core\Services\PermissionService;
 use Modules\Core\View\Composers\ShellComposer;
@@ -42,6 +44,13 @@ class CoreServiceProvider extends ServiceProvider
          | @can checks should hit the database once, not forty times.
          */
         $this->app->singleton(PermissionService::class);
+
+        /*
+         | And one MenuAccessService, for the same reason: the shell asks it
+         | about every entry of a 127-row menu on every page, and each answer
+         | is the same person's one grant set.
+         */
+        $this->app->singleton(MenuAccessService::class);
     }
 
     public function boot(): void
@@ -57,10 +66,16 @@ class CoreServiceProvider extends ServiceProvider
          | RequirePasswordChange: nobody gets past the change-password screen
          | while their password is one somebody else chose. One boolean read
          | for everybody who has set one.
+         |
+         | EnforceMenuAccess: a menu entry the person is not ticked for is not
+         | reachable by typing its address either. LAST of the three, so the
+         | branch context is resolved and a forced password change is dealt
+         | with before anything is refused on the menu's account.
          */
         $this->pushWebMiddleware([
             ResolveBranchContext::class,
             RequirePasswordChange::class,
+            EnforceMenuAccess::class,
         ]);
 
         /*

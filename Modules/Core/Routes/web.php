@@ -59,6 +59,11 @@ Route::middleware('auth')->group(function () {
         Route::put('users/{user}/permissions', [UserAdminController::class, 'updatePermissions'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.permissions.update');
 
+        // The menu card. A fifth save on the same screen, and the same rule:
+        // it REPLACES the whole set, and an empty set means the whole menu.
+        Route::put('users/{user}/menu', [UserAdminController::class, 'updateMenu'])
+            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.menu.update');
+
         // POST, not PUT: mailing a link and minting a credential are things
         // that HAPPEN rather than a resource being replaced, and neither is
         // safe to repeat by refreshing.
@@ -67,6 +72,17 @@ Route::middleware('auth')->group(function () {
 
         Route::get('roles', [UserAdminController::class, 'roles'])
             ->middleware('can:setup.roles.view')->name('roles.index');
+
+        /*
+         | The menu half of the roles screen, and the FIRST thing on it that
+         | can be edited. The permission matrix beside it stays read-only —
+         | those grants are the system's own definition of the six roles and
+         | change in a seeder. The menu is the customer's own structure, so
+         | who sees which entry is theirs to set, and `setup.roles.edit` is
+         | the permission that already existed for exactly this.
+         */
+        Route::put('roles/menu', [UserAdminController::class, 'updateRoleMenu'])
+            ->middleware('can:setup.roles.edit')->name('roles.menu.update');
     });
 
     Route::get('console', [LandingStubController::class, 'console'])->name('console');

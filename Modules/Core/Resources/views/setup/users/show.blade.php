@@ -95,6 +95,34 @@
         </x-card>
     </div>
 
+    <x-card title="Menu access"
+            sub="Which entries of the menu this person sees — and therefore may open."
+            collapsible :open="$menuRestricted">
+        @if (! $menuRestricted)
+            <x-notice tone="info" title="The whole menu">
+                Nothing is ticked for this person or for any role they hold, and that IS the grant — an
+                empty set is the whole menu, the same way an empty set of sites is every site. Entries
+                naming a permission they do not hold are still hidden, because the screen behind one would
+                refuse them anyway.
+            </x-notice>
+        @else
+            @foreach ($menuWorkspaces as $code => $workspace)
+                @php($ticked = collect($workspace['rows'])->filter(fn ($row) => in_array((int) $row['item']->Id, $menuDirectIds, true) || in_array((int) $row['item']->Id, $menuRoleIds, true)))
+                @continue($ticked->isEmpty())
+
+                <h4 class="perm-module">{{ $workspace['label'] }}</h4>
+                <ul class="perm-list">
+                    @foreach ($ticked as $row)
+                        <li>
+                            {{ $row['section']->Label }} · {{ $row['item']->Label }}
+                            @if (in_array((int) $row['item']->Id, $menuDirectIds, true))<x-chip tone="warn">ticked by name</x-chip>@endif
+                        </li>
+                    @endforeach
+                </ul>
+            @endforeach
+        @endif
+    </x-card>
+
     <x-card title="What that lets them do"
             sub="Resolved through every role above, plus anything granted by name. This is the answer to “why can they see that”."
             collapsible open>

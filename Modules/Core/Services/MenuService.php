@@ -4,8 +4,10 @@ namespace Modules\Core\Services;
 
 use App\Support\BranchContext;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Modules\Core\Models\MenuItem;
 use Modules\Core\Models\MenuSection;
+use Modules\Core\Models\User;
 
 /**
  * Builds the navigation tree, and is the only way a module adds to it.
@@ -18,12 +20,20 @@ use Modules\Core\Models\MenuSection;
  * `tree()` returns sections each carrying a nested item tree of unbounded
  * depth. The renderer recurses; nothing here or in the schema caps how deep
  * the customer's menu can go.
+ *
+ * WHAT COMES BACK IS FILTERED TO THE PERSON ASKING (customer request,
+ * 22 Sep 2026). MenuAccessService answers which entries they are ticked for
+ * and whether they hold the permission an entry names; entries that fail
+ * either are not in the tree. `rawTree()` is the unfiltered one, and the ONLY
+ * caller that should want it is the screen where the ticks are set.
  */
 class MenuService
 {
     /** Cache the built tree for the life of the request — the shell asks twice. */
     /** @var array<string, Collection<int, MenuSection>> */
     protected array $trees = [];
+
+    public function __construct(protected MenuAccessService $access) {}
 
     /** Upsert a section (a top-level app bar button). */
     public static function section(string $workspace, string $code, string $label, int $sort = 0): MenuSection
@@ -101,7 +111,18 @@ class MenuService
         ]);
         $item->BranchId = $branchId;
         $item->SectionId = $section->Id;
+
+        // Before the save, because after it the model no longer knows what it
+        // used to point at. EnforceMenuAccess caches route name -> item ids
+        // forever, on the grounds that the map only changes when a seeder runs
+        // — so a seeder that repoints an item is exactly the moment that cache
+        // has to go, and both the old route and the new one are affected.
+        $previous = (string) $item->getOriginal('RouteName');
         $item->save();
+
+        foreach (array_filter([$previous, (string) $item->RouteName]) as $route) {
+            Cache::forget('agora.menu.route.'.$route);
+        }
 
         return $item;
     }
@@ -112,15 +133,64 @@ class MenuService
      *
      * @return Collection<int, MenuSection>
      */
-    public function tree(?string $workspace = null): Collection
+    public function tree(?string $workspace = null, ?User $user = null): Collection
     {
         $workspace ??= app(BranchContext::class)->workspace();
+        $user ??= auth()->user();
 
-        return $this->trees[$workspace] ??= $this->build($workspace);
+        // Keyed by the person as well as the workspace: the shell asks twice
+        // per request, but a console command or a test may walk two people's
+        // menus in one process and must not be handed the first one's.
+        $key = $workspace.'|'.($user?->getKey() ?? 'guest');
+
+        return $this->trees[$key] ??= $this->build($workspace, $user);
+    }
+
+    /**
+     * The whole menu, unfiltered, for the screen that SETS the ticks.
+     *
+     * An administrator has to see the entries they are taking away, so this
+     * one deliberately does not ask MenuAccessService anything.
+     *
+     * @return Collection<int, MenuSection>
+     */
+    public function rawTree(string $workspace): Collection
+    {
+        return $this->build($workspace, null);
+    }
+
+    /**
+     * The unfiltered menu of one workspace, flattened in reading order with
+     * the depth each entry sits at.
+     *
+     * The two screens that SET the ticks — one person, and the role matrix —
+     * both want a list they can indent, not a nested structure they have to
+     * recurse. Reading order matters: an administrator scans the list against
+     * the menu they know, and a set that arrives grouped by parent id does not
+     * look like the menu at all.
+     *
+     * @return array<int, array{section: MenuSection, item: MenuItem, depth: int}>
+     */
+    public function flatten(string $workspace): array
+    {
+        $rows = [];
+
+        $walk = function (Collection $nodes, MenuSection $section, int $depth) use (&$walk, &$rows): void {
+            foreach ($nodes as $node) {
+                $rows[] = ['section' => $section, 'item' => $node, 'depth' => $depth];
+                $walk($node->childItems ?? collect(), $section, $depth + 1);
+            }
+        };
+
+        foreach ($this->rawTree($workspace) as $section) {
+            $walk($section->items, $section, 1);
+        }
+
+        return $rows;
     }
 
     /** @return Collection<int, MenuSection> */
-    protected function build(string $workspace): Collection
+    protected function build(string $workspace, ?User $user): Collection
     {
         $sections = MenuSection::query()
             ->acrossBranches()
@@ -140,6 +210,19 @@ class MenuService
             ->orderBy('SortOrder')
             ->orderBy('Label')
             ->get();
+
+        /*
+         * The access filter, one pass over the flat set before the tree is
+         * built rather than a check inside the renderer. It has to be flat:
+         * keeping a heading depends on whether anything under it survived, and
+         * a per-node check in the blade can only see downwards one level at a
+         * time. A person with no ticks anywhere is unrestricted and nothing is
+         * removed — see MenuAccessService.
+         */
+        if ($user !== null) {
+            $keep = $this->access->keepMap($user, $items);
+            $items = $items->filter(fn (MenuItem $item): bool => $keep[(int) $item->Id] ?? false)->values();
+        }
 
         // One pass to group by parent, then attach — building the tree with a
         // query per level would issue one round trip per menu column against a

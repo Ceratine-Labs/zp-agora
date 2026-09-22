@@ -29,7 +29,7 @@
 
     {{-- The three refusals UserAccessService can make are decisions, not
          faults, so they arrive as errors on the card that raised them. --}}
-    @foreach (['details' => 'Details', 'roles' => 'Roles', 'branches' => 'Sites', 'permissions' => 'Extra permissions', 'password' => 'Password'] as $card => $label)
+    @foreach (['details' => 'Details', 'roles' => 'Roles', 'branches' => 'Sites', 'permissions' => 'Extra permissions', 'menu' => 'Menu access', 'password' => 'Password'] as $card => $label)
         @error($card)
             <x-notice tone="warn" title="{{ $label }} not saved">{{ $message }}</x-notice>
         @enderror
@@ -234,4 +234,81 @@
             </div>
         </form>
     </x-card>
+
+    <x-card id="menu" title="Menu access"
+            sub="Which entries of the menu this person sees — and therefore may open."
+            collapsible :open="$menuDirectCount > 0">
+        <form method="POST" action="{{ route('app.setup.users.menu.update', ['user' => $person->Id]) }}">
+            @csrf
+            @method('PUT')
+
+            <x-notice tone="info" title="Ticking nothing ticks everything">
+                An empty list means the whole menu, the same way an empty list of sites means every site —
+                nobody starts out restricted, and reading it the other way would blank the navigation for
+                everyone at once. <strong>Tick one entry and the ticks become the whole of what this person
+                sees.</strong> A tick is access, not decoration: an entry that is not ticked is not reachable
+                by typing its address either. Entries carrying a <x-chip tone="neutral">via role</x-chip>
+                are already ticked by a role this person holds — set the shape of the business on
+                <a href="{{ route('app.setup.roles.index') }}#menu">Roles</a> and use this for the exception.
+            </x-notice>
+
+            @foreach ($menuWorkspaces as $code => $workspace)
+                <h4 class="perm-module">{{ $workspace['label'] }}</h4>
+
+                <div class="menu-ticks" data-menu-ticks>
+                    <div class="menu-ticks-bulk">
+                        <button type="button" class="btn sm" data-tick-all>Tick all</button>
+                        <button type="button" class="btn sm" data-tick-none>Tick none</button>
+                    </div>
+
+                    @php($section = null)
+                    @foreach ($workspace['rows'] as $row)
+                        @if ($section !== $row['section']->Code)
+                            @php($section = $row['section']->Code)
+                            <p class="menu-ticks-section">{{ $row['section']->Label }}</p>
+                        @endif
+
+                        @php($id = (int) $row['item']->Id)
+                        <label class="role-row menu-tick {{ in_array($id, $menuDirectIds, true) ? 'on' : '' }}"
+                               style="--depth: {{ $row['depth'] }}">
+                            <input type="checkbox" name="menu[]" value="{{ $id }}"
+                                   @checked(in_array($id, $menuDirectIds, true))>
+                            <span class="role-name">
+                                {{ $row['item']->Label }}
+                                @if (in_array($id, $menuRoleIds, true))<x-chip tone="neutral">via role</x-chip>@endif
+                                @if ($row['item']->PermissionCode)<code>{{ $row['item']->PermissionCode }}</code>@endif
+                            </span>
+                            <span class="role-primary">
+                                {{ $row['item']->isLink() ? 'screen' : 'not built yet' }}
+                            </span>
+                        </label>
+                    @endforeach
+                </div>
+            @endforeach
+
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Save menu access</button>
+            </div>
+        </form>
+    </x-card>
+
+    {{-- Tick all / none, per workspace. Vanilla, because two buttons that set
+         a set of checkboxes is not a reason to reach for anything. --}}
+    <script>
+        document.querySelectorAll('[data-menu-ticks]').forEach(function (group) {
+            function setAll(on) {
+                group.querySelectorAll('input[type="checkbox"]').forEach(function (box) {
+                    box.checked = on;
+                    box.closest('.role-row')?.classList.toggle('on', on);
+                });
+            }
+            group.querySelector('[data-tick-all]')?.addEventListener('click', function () { setAll(true); });
+            group.querySelector('[data-tick-none]')?.addEventListener('click', function () { setAll(false); });
+            group.addEventListener('change', function (event) {
+                if (event.target.matches('input[type="checkbox"]')) {
+                    event.target.closest('.role-row')?.classList.toggle('on', event.target.checked);
+                }
+            });
+        });
+    </script>
 </x-app-shell>

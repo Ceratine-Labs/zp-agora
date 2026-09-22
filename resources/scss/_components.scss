@@ -1393,3 +1393,49 @@ dialog.modal {
 
 /* The half that is in force reads louder than the half that is not. */
 .compare-side.is-live { border-color: var(--line-strong); }
+
+/* ---------------------------------------------------------------------------
+   Menu access (customer request, 22 Sep 2026)
+
+   The menu ticked entry by entry, in two places: a list on one person's screen
+   and a matrix of every role on the Roles screen. Both indent by the depth the
+   entry sits at, off a `--depth` custom property the blade sets — the menu is
+   127 entries and four levels deep, and a flat list of labels is unreadable
+   against the menu the administrator actually knows.
+   --------------------------------------------------------------------------- */
+
+/* A padded strip inside a `flush` card, for the prose and the actions that sit
+   either side of a full-bleed table. */
+.card-pad { padding: 14px; }
+.card-pad.form-actions { border-top: 1px solid var(--line-soft); }
+
+.menu-ticks { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.menu-ticks-bulk { display: flex; gap: 6px; margin-bottom: 4px; }
+
+.menu-ticks-section {
+  margin: 10px 0 2px; font-size: 11px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted);
+}
+
+/* Depth 1 is a column heading, 2 a link, 3+ a nested group — the same ladder
+   the mega panel draws, so the list reads as the menu rather than as a table
+   of rows that happen to be sorted. */
+.menu-tick { padding-left: calc(10px + (var(--depth, 1) - 1) * 18px); }
+.menu-tick .role-name { font-weight: calc(400 + (2 - min(var(--depth, 1), 2)) * 300); }
+
+.menu-matrix .matrix-perm { min-width: 320px; }
+.menu-matrix-label { display: block; padding-left: calc((var(--depth, 1) - 1) * 18px); font-weight: 600; }
+.menu-matrix .matrix-hint { padding-left: calc((var(--depth, 1) - 1) * 18px); font-family: var(--font-mono); }
+
+.menu-matrix-section td {
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); background: var(--surface-2);
+}
+
+/* The tick fills its cell, so the target is the cell rather than a 13px box
+   in the middle of it — six columns of checkboxes are otherwise a test of aim.
+   Ryan is often on a laptop trackpad and the customer's admin is not. */
+.menu-matrix-tick {
+  display: flex; align-items: center; justify-content: center;
+  padding: 6px; margin: -6px; cursor: pointer;
+}

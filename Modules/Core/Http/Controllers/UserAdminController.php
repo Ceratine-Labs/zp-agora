@@ -11,12 +11,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\Branch;
+use Modules\Core\Models\MenuItem;
+use Modules\Core\Models\MenuSection;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserBranch;
 use Modules\Core\Models\UserPermission;
 use Modules\Core\Models\UserRole;
+use Modules\Core\Services\MenuAccessService;
+use Modules\Core\Services\MenuService;
 use Modules\Core\Services\PasswordResetService;
 use Modules\Core\Services\PermissionService;
 use Modules\Core\Services\UserAccessService;
@@ -53,6 +57,8 @@ class UserAdminController extends Controller
         private GridService $grids,
         private PermissionService $permissions,
         private UserAccessService $access,
+        private MenuAccessService $menuAccess,
+        private MenuService $menus,
     ) {}
 
     /** The user list. */
@@ -184,6 +190,55 @@ class UserAdminController extends Controller
     }
 
     /**
+     * Change which menu entries this person may see — and therefore reach.
+     *
+     * The customer's own words: a tick for the view, or no access (22 Sep
+     * 2026). An EMPTY set is a real answer and means the whole menu, exactly
+     * as an empty set of sites means every site — v1__01f says why, and the
+     * card says it in words above the list.
+     *
+     * The self-lockout guard asks EnforceMenuAccess's own question rather than
+     * a permission question: an administrator who unticks "Users and access"
+     * for themselves still holds `setup.users.edit`, so the permission check
+     * would wave it through and the very next request would 403 them off the
+     * screen they made the change on.
+     */
+    public function updateMenu(Request $request, int $user): RedirectResponse
+    {
+        $person = $this->person($user);
+
+        $data = $request->validate([
+            'menu' => ['array'],
+            'menu.*' => ['integer'],
+        ]);
+
+        return $this->save($person, 'menu', function () use ($person, $request, $data): string {
+            $actor = $request->user();
+            $granted = [];
+
+            try {
+                DB::connection(config('agora.connections.app'))->transaction(function () use (&$granted, $person, $data, $actor) {
+                    $granted = $this->menuAccess->setForUser($person, $data['menu'] ?? []);
+                    $this->refuseMenuLockout($actor);
+                });
+            } finally {
+                // In the finally, not after the commit: the guard above reads
+                // the written-but-uncommitted rows and caches them, and a
+                // rollback must not leave that reading behind.
+                $this->menuAccess->forget($person);
+
+                if ($actor !== null) {
+                    $this->menuAccess->forget($actor);
+                }
+            }
+
+            return $granted === []
+                ? $person->UserName.' is ticked for nothing individually, which means the whole menu.'
+                : $person->UserName.' is ticked for '.count($granted).' menu entr'.(count($granted) === 1 ? 'y' : 'ies').'.';
+        });
+    }
+
+    /**
      * Change the person: their name, how they are reached, and whether they may
      * sign in at all.
      *
@@ -288,6 +343,68 @@ class UserAdminController extends Controller
         }
     }
 
+    /**
+     * Change which menu entries each role may see.
+     *
+     * ONE SAVE FOR THE WHOLE MATRIX, unlike the user screen's four cards,
+     * because the matrix IS one set: the reader is comparing roles against
+     * each other down a column, and a Save per role would make "I moved this
+     * entry from Operations to Finance" two saves that can half-fail.
+     *
+     * A role whose column is entirely unticked posts nothing for itself, and
+     * that is READ AS "ticked for nothing", which means the whole menu. The
+     * matrix is one form covering every role, so a missing key is an empty
+     * column rather than a role the form forgot — there is no third state to
+     * confuse it with.
+     */
+    public function updateRoleMenu(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'menu' => ['array'],
+            'menu.*' => ['array'],
+            'menu.*.*' => ['integer'],
+        ]);
+
+        $roles = Role::query()->acrossBranches()->orderBy('SortOrder')->get();
+        $back = route('app.setup.roles.index').'#menu';
+        $posted = $data['menu'] ?? [];
+        $actor = $request->user();
+        $changed = 0;
+
+        try {
+            DB::connection(config('agora.connections.app'))->transaction(function () use (&$changed, $roles, $posted, $actor) {
+                foreach ($roles as $role) {
+                    $wanted = array_values(array_unique(array_map('intval', $posted[(int) $role->Id] ?? [])));
+                    $held = $this->menuAccess->roleItemIds($role);
+
+                    sort($wanted);
+                    sort($held);
+
+                    if ($wanted === $held) {
+                        continue;
+                    }
+
+                    $this->menuAccess->setForRole($role, $wanted);
+                    $changed++;
+                }
+
+                $this->refuseMenuLockout($actor);
+            });
+        } catch (RuntimeException $e) {
+            return redirect($back)->withErrors(['menu' => $e->getMessage()]);
+        } finally {
+            // Every holder of every role, because the guard read uncommitted
+            // rows into their caches and a rollback must not leave them there.
+            foreach ($roles as $role) {
+                $this->menuAccess->forgetRoleHolders($role);
+            }
+        }
+
+        return redirect($back)->with('status', $changed === 0
+            ? 'Nothing changed — the ticks were already what you saved.'
+            : $changed.' role'.($changed === 1 ? '' : 's').' had their menu changed.');
+    }
+
     /** The role matrix: every role, and every permission it carries. */
     public function roles(): View
     {
@@ -304,6 +421,13 @@ class UserAdminController extends Controller
             'roles' => $roles,
             'permissions' => $permissions->groupBy('Module'),
             'granted' => $granted,
+
+            // The menu half of the same screen. Unfiltered on purpose — an
+            // administrator has to see the entries they are taking away.
+            'menuWorkspaces' => $this->menuWorkspaces(),
+            'menuGranted' => $roles->mapWithKeys(fn (Role $role) => [
+                (int) $role->Id => array_flip($this->menuAccess->roleItemIds($role)),
+            ])->all(),
         ]);
     }
 
@@ -333,6 +457,53 @@ class UserAdminController extends Controller
         return redirect($back)->with('status', $status);
     }
 
+    /**
+     * Refuse a menu change that takes the person making it off this screen.
+     *
+     * It asks EnforceMenuAccess's own question rather than a permission
+     * question, because they are not the same: an administrator who unticks
+     * "Users and access" for themselves still HOLDS `setup.users.edit`, so a
+     * permission check would wave the change through and the next request
+     * would 403 them off the only screen that could undo it. There is no
+     * console command to put it back and the customer's instance has one
+     * administrator.
+     */
+    private function refuseMenuLockout(?User $actor): void
+    {
+        if ($actor === null) {
+            return;
+        }
+
+        if ($this->menuAccess->canReachRoute($actor, 'app.setup.users.index')) {
+            return;
+        }
+
+        throw new RuntimeException(
+            'That would take Users and access off your own menu, and this is the only screen that can put it back. '
+            .'Leave it ticked for yourself, or have another administrator make the change.'
+        );
+    }
+
+    /**
+     * The whole menu of every workspace, flattened, for the two screens that
+     * set the ticks.
+     *
+     * @return array<string, array{label: string, rows: array<int, array{section: MenuSection, item: MenuItem, depth: int}>}>
+     */
+    private function menuWorkspaces(): array
+    {
+        $workspaces = [];
+
+        foreach ((array) config('core.workspaces', []) as $code => $label) {
+            $workspaces[(string) $code] = [
+                'label' => (string) $label,
+                'rows' => $this->menus->flatten((string) $code),
+            ];
+        }
+
+        return $workspaces;
+    }
+
     private function person(int $id): User
     {
         return User::query()->acrossBranches()->findOrFail($id);
@@ -351,6 +522,8 @@ class UserAdminController extends Controller
     private function accessState(User $person): array
     {
         $rolePatterns = $this->permissions->rolePatternsFor($person);
+        $menuDirectIds = $this->menuAccess->userItemIdsFor($person);
+        $menuRoleIds = $this->menuAccess->roleItemIdsFor($person);
 
         $grantedBranchIds = UserBranch::query()->acrossBranches()
             ->where('UserId', $person->Id)
@@ -394,6 +567,19 @@ class UserAdminController extends Controller
                 ])
                 ->groupBy(fn (array $row) => $row['permission']->Module),
             'directCount' => count($directIds),
+
+            /*
+             * The menu, unfiltered, flattened per workspace so the card can
+             * indent it — and the two halves of what this person is ticked
+             * for kept apart for the same reason the permission rows are: a
+             * personal tick that a role already carries is redundant rather
+             * than load-bearing, and the screen should say which.
+             */
+            'menuWorkspaces' => $this->menuWorkspaces(),
+            'menuDirectIds' => $menuDirectIds,
+            'menuRoleIds' => $menuRoleIds,
+            'menuRestricted' => array_merge($menuDirectIds, $menuRoleIds) !== [],
+            'menuDirectCount' => count($menuDirectIds),
             'effective' => $permissions
                 ->filter(fn (Permission $p) => $this->permissions->userHas($person, $p->Code))
                 ->groupBy('Module')
