@@ -13,6 +13,7 @@ import tip from './components/tip';
 import dataGrid from './components/data-grid';
 import reconGroup from './components/recon-group';
 import reconMatch from './components/recon-match';
+import reconSuggest from './components/recon-suggest';
 import modal from './components/modal';
 import tableTools from './components/table-tools';
 import linkedSelect from './components/linked-select';
@@ -67,6 +68,10 @@ window.Agora = { notify, format, tip: tip() };
 // After the global exists — it asks through window.Agora.notify, so that the
 // dialog is the same one every other confirmation in the application uses.
 confirmForm();
+
+// Same reason: "match all strong" on the recon Suggestions tab asks in the
+// same dialog before it posts each one. Nothing on any other page.
+reconSuggest();
 
 // Same reason: the column chooser's reset asks before it forgets a layout, and
 // the drawer's copy button reports through the shared toast.

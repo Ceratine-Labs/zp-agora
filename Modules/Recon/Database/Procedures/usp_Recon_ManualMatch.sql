@@ -37,6 +37,14 @@
  *            indistinguishable, TOP (n) stamps exactly as many as were ticked
  *            — never all of them.
  *
+ * @Basis     Set when the clerk accepted a suggestion from
+ *            agora.usp_Recon_SuggestMatches rather than ticking the rows
+ *            themselves — the suggestion's reading, in words. It changes
+ *            nothing about what is checked or stamped; it is recorded on the
+ *            run (Note, ParamsJson, Outcome 'Matched by suggestion') so the
+ *            ledger can always say which pairings an algorithm proposed and
+ *            which a person built. (23 Sep 2026.)
+ *
  * Refusals: NOTHING_SELECTED · BANK_ROW_MOVED · MOPS_ROW_MOVED ·
  *           FORCE_REASON_REQUIRED · UNKNOWN_AREA · NO_COUNTER
  */
@@ -49,7 +57,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_ManualMatch]
     @MopsJson    nvarchar(max),
     @Reason      nvarchar(300) = NULL,
     @StampMode   varchar(10)   = 'journal',
-    @UserId      int           = NULL
+    @UserId      int           = NULL,
+    @Basis       nvarchar(200) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -193,10 +202,14 @@ BEGIN
 
     DECLARE @Forced bit = CASE WHEN @Diff <> 0 THEN 1 ELSE 0 END;
 
+    SET @Basis = NULLIF(LTRIM(RTRIM(@Basis)), '');
+
     /* ---- 5. Write it, as a run like any other ----------------------------- */
 
     DECLARE @Now datetime2(0) = SYSDATETIME();
-    DECLARE @Outcome nvarchar(60) = CASE WHEN @Forced = 1 THEN 'Matched by hand - forced' ELSE 'Matched by hand' END;
+    DECLARE @Outcome nvarchar(60) = CASE WHEN @Forced = 1 THEN 'Matched by hand - forced'
+                                         WHEN @Basis IS NOT NULL THEN 'Matched by suggestion'
+                                         ELSE 'Matched by hand' END;
     DECLARE @RunId bigint, @LineId bigint, @BatchId bigint, @No int;
 
     BEGIN TRANSACTION;
@@ -208,10 +221,12 @@ BEGIN
          CommittedTotal, CreatedAt, CreatedBy)
     SELECT @BranchId, NEWID(), @ReconArea, @FromDate, CONVERT(date, @ToDate), 'committed', @StampMode,
            'agora.usp_Recon_ManualMatch',
-           (SELECT @Reason AS reason, @Forced AS forced, @Diff AS diff FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
+           (SELECT @Reason AS reason, @Forced AS forced, @Diff AS diff, @Basis AS basis FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
            1, CASE WHEN @Forced = 1 THEN 0 ELSE 1 END, @Forced, 0, 0, 0,
            @BankTotal, @MopsTotal, @BankTotal,
-           CASE WHEN @Forced = 1 THEN 'Manual match (forced)' ELSE 'Manual match' END,
+           CASE WHEN @Forced = 1 THEN 'Manual match (forced)'
+                WHEN @Basis IS NOT NULL THEN LEFT(N'Suggested match — ' + @Basis, 400)
+                ELSE 'Manual match' END,
            @Now, @UserId, 1, @BankTotal, @Now, @UserId;
 
     SET @RunId = SCOPE_IDENTITY();
@@ -390,6 +405,8 @@ BEGIN
            CASE WHEN @Forced = 1
                 THEN 'Matched by hand as batch ' + CONVERT(nvarchar(20), @No)
                      + ', forced with a variance of ' + CONVERT(nvarchar(30), @Diff) + '.'
+                WHEN @Basis IS NOT NULL
+                THEN 'Matched by suggestion as batch ' + CONVERT(nvarchar(20), @No) + '.'
                 ELSE 'Matched by hand as batch ' + CONVERT(nvarchar(20), @No) + '.' END AS Message,
            @RunId AS Id,
            @No AS BatchNo,

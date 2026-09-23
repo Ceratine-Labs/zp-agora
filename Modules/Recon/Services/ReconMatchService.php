@@ -54,12 +54,48 @@ class ReconMatchService
     }
 
     /**
+     * What the batch number could not pair, proposed by value.
+     *
+     * Everything is decided in agora.usp_Recon_SuggestMatches — the passes,
+     * what counts as strong, what is left. This only hangs each suggestion's
+     * members (result set 2) off the suggestion they belong to, so the screen
+     * can list them and post them to the match unchanged.
+     *
+     * @return array{suggestions: Collection<int, object>, summary: object|null}
+     */
+    public function suggestions(string $area, int $branchId, Carbon $from, Carbon $to): array
+    {
+        $sets = $this->procedures->callSets('usp_Recon_SuggestMatches', [
+            'BranchId' => $branchId,
+            'ReconArea' => $area,
+            'FromDate' => $from->toDateString(),
+            'ToDate' => $to->endOfDay()->toDateTimeString(),
+        ]);
+
+        $members = ($sets[1] ?? collect())->groupBy('SuggestionNo');
+
+        return [
+            'suggestions' => ($sets[0] ?? collect())->map(function (object $suggestion) use ($members) {
+                $rows = $members->get($suggestion->SuggestionNo, collect());
+                $suggestion->bank = $rows->where('Side', 'bank')->values();
+                $suggestion->mops = $rows->where('Side', 'mops')->values();
+
+                return $suggestion;
+            }),
+            'summary' => ($sets[2] ?? collect())->first(),
+        ];
+    }
+
+    /**
      * Make the match.
      *
      * The stamp mode is read from config and PASSED IN rather than looked up
      * by the procedure, so there is exactly one place in the codebase that
      * decides whether Agora writes to the customer's estate — the same rule
      * ReconService::commit() follows.
+     *
+     * `$basis` is set when the rows came from an accepted suggestion. It is
+     * recorded on the run and changes nothing about what is checked.
      *
      * @param  array<int, int>  $bankLineIds
      * @param  array<int, array{id: int|null, key: string, dt: string, amt: float}>  $deposits
@@ -72,6 +108,7 @@ class ReconMatchService
         array $bankLineIds,
         array $deposits,
         ?string $reason = null,
+        ?string $basis = null,
     ): object {
         return $this->procedures->write('usp_Recon_ManualMatch', [
             'BranchId' => $branchId,
@@ -83,6 +120,7 @@ class ReconMatchService
             'Reason' => $reason,
             'StampMode' => (string) config('recon.stamp_mode'),
             'UserId' => auth()->id(),
+            'Basis' => $basis,
         ]);
     }
 }

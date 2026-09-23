@@ -8,9 +8,11 @@ use App\Grid\GridService;
 use App\Http\Controllers\Controller;
 use App\Support\BranchContext;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Modules\Recon\Grids\ReconCriteriaGrid;
 use Modules\Recon\Http\Controllers\Concerns\AreaWorkbench;
 use Modules\Recon\Http\Requests\PreviewRequest;
@@ -140,14 +142,55 @@ class ReconController extends Controller
     }
 
     /**
+     * Suggestions — what the batch number could not pair, proposed by value.
+     *
+     * A tab between the automatic preview and the manual match because it is
+     * the step between them: the batch number settles what it can, this
+     * proposes pairings for what is left, and the manual match is for whatever
+     * neither can reach. Only areas whose definition says `suggest` have it.
+     *
+     * Nothing is stored. The procedure is read live every time, because the
+     * estate moves underneath a list like this one — every accepted suggestion
+     * changes what is left, and a stored list would be offering rows somebody
+     * has already matched.
+     */
+    public function suggestions(string $area, Request $request, BranchContext $context): View
+    {
+        $frame = $this->workbench($area, 'suggest', $context);
+
+        abort_unless((bool) ($frame['area']['suggest'] ?? false), 404);
+
+        $branchId = $this->resolveBranch((int) $request->query('branch_id', $frame['branchId']), $context);
+
+        return view('recon::area', $frame + [
+            'branchId' => $branchId,
+            // As on the manual match: no site, no answer — an empty list before
+            // a site is chosen would read as "nothing to suggest".
+            ...($branchId > 0
+                ? $this->matches->suggestions(
+                    $area,
+                    $branchId,
+                    Carbon::parse($frame['from']),
+                    Carbon::parse($frame['to']),
+                )
+                : ['suggestions' => collect(), 'summary' => null]),
+        ]);
+    }
+
+    /**
      * Match what the operator ticked on both sides.
      *
      * Everything that decides whether this is allowed lives in the procedure —
      * that both sides are still outstanding, that exactly as many rows are
      * claimed as were ticked, that a variance carries a reason. A refusal
      * comes back to the screen as a refusal rather than as a silent no-op.
+     *
+     * An accepted suggestion posts here too, with its `basis`. It goes back to
+     * the Suggestions tab rather than to the run, because the clerk is working
+     * down a list; and the "match every strong suggestion" press posts each one
+     * as JSON, so a refusal is one row's answer rather than a dead page.
      */
-    public function match(Request $request, string $area, BranchContext $context): RedirectResponse
+    public function match(Request $request, string $area, BranchContext $context): RedirectResponse|JsonResponse
     {
         $definition = $this->service->area($area);
         $branchId = $this->resolveBranch($request->integer('branch_id'), $context);
@@ -177,6 +220,8 @@ class ReconController extends Controller
             ->values()
             ->all();
 
+        $basis = Str::limit(trim((string) $request->input('basis')), 200, '') ?: null;
+
         try {
             $status = $this->matches->match(
                 $definition['key'],
@@ -186,9 +231,41 @@ class ReconController extends Controller
                 $bankIds,
                 $deposits,
                 trim((string) $request->input('reason')) ?: null,
+                $basis,
             );
         } catch (AgoraProcException $e) {
-            return back()->with('refusal', $e->getMessage());
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'code' => $e->code(), 'message' => $e->getMessage()], 422);
+            }
+
+            // Its own key on the Suggestions tab: the area's generic refusal
+            // notice says "the procedure could not run for this branch",
+            // which is not what a refused match is.
+            return back()->with($request->input('back') === 'suggest' ? 'suggestRefusal' : 'refusal', $e->getMessage());
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'code' => $status->Code,
+                'message' => $status->Message,
+                'batch' => $status->BatchNo,
+                'run' => route('app.recon.run', $status->Id),
+            ]);
+        }
+
+        if ($request->input('back') === 'suggest') {
+            // Back to the PERIOD the list was drawn for, not to the window of
+            // the one suggestion just matched.
+            return redirect()
+                ->route('app.recon.suggest', array_filter([
+                    $area,
+                    'branch_id' => $branchId,
+                    'from' => (string) $request->input('period_from'),
+                    'to' => (string) $request->input('period_to'),
+                ]))
+                ->with('suggestMatched', $status->Message)
+                ->with('suggestRun', route('app.recon.run', $status->Id));
         }
 
         return redirect()

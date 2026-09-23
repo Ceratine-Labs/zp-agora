@@ -17,12 +17,19 @@
  * a month of ABSA is a few hundred proposals and drilling all of them up
  * front would be a few hundred queries nobody asked for.
  *
+ *   <tr data-detail-template="tpl-12"> … </tr>   and   <template id="tpl-12">
+ *
+ * is the same behaviour for a detail that ARRIVED WITH THE PAGE. The recon
+ * suggestions are one procedure call that returns every suggestion and every
+ * row behind it at once; fetching each one again would re-run the whole
+ * algorithm per click to answer a question the page already holds.
+ *
  * The server returns HTML, not JSON. The number formats live in
  * App\Support\Format and rebuilding them here is how the two drift apart.
  */
 export default function rowDetail() {
     document.querySelectorAll('table[data-row-detail]').forEach((table) => {
-        table.querySelectorAll('tr[data-detail-url]').forEach((row) => prepare(table, row));
+        table.querySelectorAll('tr[data-detail-url], tr[data-detail-template]').forEach((row) => prepare(table, row));
     });
 }
 
@@ -74,6 +81,13 @@ function open(table, row, columns) {
 
     row.classList.add('is-open');
     row.setAttribute('aria-expanded', 'true');
+
+    const template = row.dataset.detailTemplate ? document.getElementById(row.dataset.detailTemplate) : null;
+
+    if (template) {
+        cell.replaceChildren(template.content.cloneNode(true));
+        return;
+    }
 
     fetch(row.dataset.detailUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then((response) => {

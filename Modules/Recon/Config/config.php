@@ -92,11 +92,15 @@ return [
             'legacy' => 'sp_AUTOReconcile_FNB_BankRecon',
             'blurb' => 'The largest area and the least settled. 58% of FNB bank lines carry no batch '
                 .'and no merchant number — only a device id — and the rule they settle on is question 3.2, '
-                .'still open with ZP. Those lines are reported as a separate population and can never '
-                .'reconcile until the rule is confirmed.',
+                .'still open with ZP. No rule reconciles those lines automatically; the Suggestions tab '
+                .'proposes pairings for them by value, to the cent, and a clerk accepts each one.',
             'key_label' => 'Batch',
             'key2_label' => 'Merchant',
             'options' => ['BatchKey', 'RuleOrder', 'MopsConvention', 'StandaloneRule', 'StandaloneLagDays'],
+            // The Suggestions tab: agora.usp_Recon_SuggestMatches proposes
+            // pairings by value for what the batch number could not pair.
+            // ZP asked for it on 23 Sep 2026; a person accepts each one.
+            'suggest' => true,
         ],
 
         'CashMachine' => [

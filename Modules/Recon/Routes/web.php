@@ -59,6 +59,10 @@ Route::middleware('auth')->prefix('recon')->name('recon.')->group(function () {
      | Last in the group, so `auto/{area}` cannot swallow `runs/{run}`.
      */
     Route::get('auto/{area}', [ReconController::class, 'area'])->middleware('can:recon.runs.view')->name('area');
+    // Suggestions by value, for what the batch number could not pair. Reading
+    // them is `view`; accepting one posts to `match.save` below, behind
+    // `execute`, exactly like a match made by hand.
+    Route::get('auto/{area}/suggest', [ReconController::class, 'suggestions'])->middleware('can:recon.runs.view')->name('suggest');
     Route::get('auto/{area}/match', [ReconController::class, 'manualMatch'])->middleware('can:recon.runs.view')->name('match');
     // Matching by hand writes to the customer's estate exactly as Execute
     // does — the same batch counter, the same ledger, the same reversal — so

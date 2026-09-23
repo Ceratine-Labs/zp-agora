@@ -29,9 +29,14 @@ trait AreaWorkbench
      * `ho` marks a tab that only means something in head office. "Every site"
      * in a workspace pinned to one site is that site, which is the Auto tab
      * with more steps.
+     *
+     * `needs` names a flag on the area's definition in config/recon.php. The
+     * Suggestions tab exists only where most bank lines carry no reference —
+     * FNB — so an area without the flag does not offer it.
      */
     protected const TABS = [
         'auto' => ['label' => 'Auto reconciliation', 'route' => 'app.recon.area', 'can' => 'recon.runs.view'],
+        'suggest' => ['label' => 'Suggestions', 'route' => 'app.recon.suggest', 'can' => 'recon.runs.view', 'needs' => 'suggest'],
         'match' => ['label' => 'Manual match', 'route' => 'app.recon.match', 'can' => 'recon.runs.view'],
         'all' => ['label' => 'Every site', 'route' => 'app.recon.all', 'can' => 'recon.runs.view', 'ho' => true],
         'runs' => ['label' => 'Runs', 'route' => 'app.recon.runs', 'can' => 'recon.runs.view'],
@@ -79,9 +84,11 @@ trait AreaWorkbench
     protected function tabs(string $area, BranchContext $context): array
     {
         $user = request()->user();
+        $definition = $this->service->area($area);
 
         return collect(self::TABS)
             ->reject(fn (array $tab) => ($tab['ho'] ?? false) && $context->isBranchWorkspace())
+            ->reject(fn (array $tab) => isset($tab['needs']) && ! ($definition[$tab['needs']] ?? false))
             ->filter(fn (array $tab) => (bool) $user?->can($tab['can']))
             ->map(fn (array $tab, string $key) => [
                 'key' => $key,
