@@ -73,6 +73,7 @@
     @endif
 
     <form method="POST" action="{{ route('app.recon.execute', $run) }}" id="execute-{{ $run->Id }}"
+          data-loader="{{ $stampMode === 'live' ? 'Reconciling in PumpIT…' : 'Recording…' }}"
           {{-- Names the table so the confirmation can say out loud that a
                column filter is holding rows back. Silent when none is. --}}
           data-confirm-filtered="recon-lines-{{ $run->Id }}"
@@ -83,6 +84,8 @@
           data-confirm-action="{{ $stampMode === 'live' ? 'Reconcile' : 'Record' }}"
           @if ($stampMode === 'live') data-confirm-danger @endif>
     @csrf
+    {{-- Inside the recon centre: back to its Auto tab, not to the run page. --}}
+    @include('recon::partials.centre-back')
 
     @isset($extract)
         {{-- The same bar the grid shell puts above its table, and the same
@@ -321,11 +324,12 @@
     @unless ($run->Status === 'previewed')
     <footer class="run-actions">
         @if ($run->Status === 'committed')
-            <form method="POST" action="{{ route('app.recon.reverse', $run) }}" class="reverse-form"
+            <form method="POST" action="{{ route('app.recon.reverse', $run) }}" class="reverse-form" data-loader="Reversing…"
                   data-confirm="Reverse run #{{ $run->Id }}?"
                   data-confirm-text="Every bank line and deposit row this run stamped goes back to what it held before. The batch numbers are not reused."
                   data-confirm-action="Reverse" data-confirm-danger>
                 @csrf
+                @include('recon::partials.centre-back')
                 <input type="text" name="reason" required maxlength="300"
                        placeholder="Why is this being reversed?" aria-label="Reason for the reversal">
                 <button type="submit" class="btn-ghost">Reverse</button>

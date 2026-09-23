@@ -471,3 +471,136 @@ table.gal-props {
      nothing and stops it covering the answer. */
   .tip { display: none; }
 }
+
+/* ============================================================ scope line */
+/* <x-scope-line>: the scope a screen is answering, folded to one line once it
+   is chosen. It sits where the form was, so it takes the card's frame; its
+   summary is the answer to "what am I looking at", so it reads as text, not
+   as the small-caps label a parameter fold carries. */
+.scope-line {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r); box-shadow: var(--shadow);
+
+  > summary {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 14px; cursor: pointer; list-style: none;
+    &::marker, &::-webkit-details-marker { display: none; }
+    &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  }
+  .scope-line-parts { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+  .scope-line-part:first-child { font-weight: 600; color: var(--ink); }
+  .scope-line-part { color: var(--ink-2); }
+  .scope-line-sep { color: var(--muted); }
+  .scope-line-change {
+    margin-left: auto; font-size: 12.5px; font-weight: 500; color: var(--brand-ink);
+    text-decoration: underline; text-underline-offset: 2px;
+  }
+  > summary:hover .scope-line-change { color: var(--brand); }
+  &[open] > summary { border-bottom: 1px solid var(--line-soft); }
+  &[open] .scope-line-change { visibility: hidden; }
+  .scope-line-body { padding: 14px; }
+}
+
+/* ============================================================ lazy tab panes */
+/* What a lazy pane holds before its fragment lands (and with scripting off),
+   and what it says when the fragment could not be read. */
+.tabpane-fallback, .tabpane-error { padding: 18px 14px; font-size: 13px; color: var(--muted); }
+.tabpane-error { color: var(--crit-ink); }
+.tabpane-pad { padding: 16px 0; }
+
+/* The recon centre's tabs sit on the page, not in a card: each fragment
+   brings its own. The strip is framed like a card head so it reads as the
+   top of what is below it. */
+.centre-tabs {
+  > .tabs { border: 1px solid var(--line); border-radius: var(--r) var(--r) 0 0; margin-bottom: 16px; }
+}
+
+/* A run on the centre's Auto tab: which run, and the two things to do with it
+   that are not a press on its rows. */
+.run-panel-head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 12px;
+  p { margin: 0; font-size: 13px; color: var(--ink-2); }
+  .run-panel-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; form { margin: 0; } }
+}
+
+/* ============================================================ loader */
+/* <x-loader>: the coffee cup. One overlay per page (the app shell), shown by
+   loader.js for a navigation; clones of its cup for a wait inside a pane.
+
+   ONE CYCLE, 2.8 s, four beats on one clock so they never drift apart:
+     0–55%   the coffee rises from an empty cup
+     55–88%  full; the steam rises and fades
+     88–100% it is drunk, and the cup is empty for the next pour
+   Every part shares the duration so the steam only ever rises off a full cup. */
+.loader {
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 12px;
+}
+.loader-box { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.loader-cup { width: 88px; height: 88px; overflow: visible; }
+.loader-label { margin: 0; font-size: 13px; color: var(--ink-2); text-align: center; max-width: 28ch; }
+
+.loader-saucer { fill: var(--line); }
+.loader-glass { fill: var(--surface-2); }
+.loader-rim, .loader-handle {
+  fill: none; stroke: var(--ink-2); stroke-width: 4; stroke-linejoin: round; stroke-linecap: round;
+}
+.loader-brew { fill: var(--coffee); }
+.loader-crema { fill: var(--crema); animation: loader-slosh 1.4s linear infinite; }
+.loader-badge-ring { fill: var(--badge); stroke: var(--line); stroke-width: 1; }
+.loader-steam path {
+  fill: none; stroke: var(--steam); stroke-width: 4; stroke-linecap: round;
+  opacity: 0; animation: loader-steam 2.8s ease-out infinite;
+}
+.loader-steam path:nth-child(2) { animation-delay: .12s; }
+.loader-steam path:nth-child(3) { animation-delay: .24s; }
+.loader-coffee { animation: loader-pour 2.8s ease-in-out infinite; }
+
+@keyframes loader-pour {
+  0%   { transform: translateY(82px); }
+  55%  { transform: translateY(0); }
+  88%  { transform: translateY(0); }
+  100% { transform: translateY(82px); }
+}
+@keyframes loader-slosh {
+  from { transform: translateX(-40px); }
+  to   { transform: translateX(0); }
+}
+@keyframes loader-steam {
+  0%, 55% { opacity: 0; transform: translateY(8px); }
+  66%     { opacity: .85; }
+  86%     { opacity: 0; transform: translateY(-12px); }
+  100%    { opacity: 0; transform: translateY(-12px); }
+}
+
+/* The words carry the meaning; the motion only says "still going". Without
+   it: a full cup, the steam standing still, and the label. */
+@media (prefers-reduced-motion: reduce) {
+  .loader-coffee, .loader-crema, .loader-steam path { animation: none; }
+  .loader-steam path { opacity: .6; }
+}
+
+/* The page-level wait. Over everything, because a navigation is under way and
+   a second press would be a second run; the backdrop lets the page show
+   through so it reads as "this page, busy" rather than a new screen. */
+.loader-overlay {
+  position: fixed; inset: 0; z-index: 2000;
+  background: var(--backdrop);
+  backdrop-filter: blur(1.5px);
+  .loader-box {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: var(--shadow-pop); padding: 22px 28px 18px;
+  }
+  .loader-cup { width: 112px; height: 112px; }
+  .loader-label { font-size: 14px; color: var(--ink); }
+}
+.loader-overlay[hidden] { display: none; }
+
+/* Inside a pane that is being filled: the cup where the answer will be. */
+.loader-inline { min-height: 180px; }
+
+/* In front of a line that already says what is happening. */
+.loader-mini {
+  display: inline-flex; vertical-align: middle; margin-right: 8px;
+  .loader-cup { width: 30px; height: 30px; }
+}

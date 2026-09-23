@@ -39,22 +39,26 @@
  *     <form data-suggest-kind="strong|possible" data-amount="…" data-caution="…">…</form>
  *   </td>
  */
-export default function reconSuggest() {
-    const panel = document.querySelector('[data-suggest-bulk]');
+export default function reconSuggest(root = document) {
+    // `root` is the recon centre's Suggestions tab when the list arrives as a
+    // fragment; the whole document on the standalone page.
+    const panel = root.querySelector('[data-suggest-bulk]:not([data-suggest-ready])');
 
     if (!panel) return;
+
+    panel.setAttribute('data-suggest-ready', '');
 
     const buttons = [...panel.querySelectorAll('[data-suggest-run]')];
     const status = panel.querySelector('[data-suggest-status]');
 
     buttons.forEach((button) => {
-        button.addEventListener('click', () => run(panel, button, buttons, status));
+        button.addEventListener('click', () => run(root, panel, button, buttons, status));
     });
 }
 
-async function run(panel, button, buttons, status) {
+async function run(root, panel, button, buttons, status) {
     const kind = button.dataset.suggestRun;
-    const forms = [...document.querySelectorAll(`form[data-suggest-kind="${kind}"]`)]
+    const forms = [...root.querySelectorAll(`form[data-suggest-kind="${kind}"]`)]
         .filter((form) => !form.querySelector('[type="submit"]')?.disabled);
 
     if (forms.length === 0) {
@@ -85,6 +89,10 @@ async function run(panel, button, buttons, status) {
     // Both presses wait while one runs: they share the page and the status line.
     buttons.forEach((b) => { b.disabled = true; });
 
+    // The cup over the page while the posts go: nothing else on it can be
+    // pressed meanwhile, and its line is the progress.
+    const wait = window.Agora.loader?.show(`Matching 1 of ${forms.length} ${kind}…`);
+
     let done = 0;
     let matched = 0;
     let refused = 0;
@@ -92,6 +100,7 @@ async function run(panel, button, buttons, status) {
     for (const form of forms) {
         done += 1;
         say(status, `Matching ${done} of ${forms.length}…`);
+        wait?.update(`Matching ${done} of ${forms.length} ${kind}…`);
 
         const cell = form.closest('[data-suggest-state]');
 
@@ -113,7 +122,13 @@ async function run(panel, button, buttons, status) {
         }
     }
 
+    wait?.hide();
     say(status, `${matched} ${kind} matched${refused ? `, ${refused} refused — the reason is in each row` : ''}.`);
+
+    // Something was written, so any other tab already open over this scope —
+    // the recon centre's Auto and Manual — is showing the estate as it was.
+    // tabs.js marks them stale and fetches them again on the next open.
+    if (matched > 0) panel.dispatchEvent(new CustomEvent('tabs:changed', { bubbles: true }));
 
     // What is left has changed, and only the procedure can say what it is
     // now. Offered rather than done, so the rows above can still be read. The

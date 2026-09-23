@@ -27,8 +27,11 @@
  * The server returns HTML, not JSON. The number formats live in
  * App\Support\Format and rebuilding them here is how the two drift apart.
  */
-export default function rowDetail() {
-    document.querySelectorAll('table[data-row-detail]').forEach((table) => {
+export default function rowDetail(root = document) {
+    // `root` and the ready mark are for a fragment arriving after load — a
+    // recon centre tab — which window.Agora.hydrate() hands in on its own.
+    root.querySelectorAll('table[data-row-detail]:not([data-row-detail-ready])').forEach((table) => {
+        table.setAttribute('data-row-detail-ready', '');
         table.querySelectorAll('tr[data-detail-url], tr[data-detail-template]').forEach((row) => prepare(table, row));
     });
 }

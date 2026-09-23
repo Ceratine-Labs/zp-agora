@@ -1033,6 +1033,19 @@ tr.is-expandable > td.pick { position: relative; }
   }
 }
 
+// A reason typed beside the one action that needs it — a close suggestion's
+// forced match. Same field as the reverse form, stacked above its button so a
+// table cell stays narrow.
+.inline-reason {
+  display: flex; flex-direction: column; gap: 4px; align-items: stretch;
+  input[type="text"] {
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line); border-radius: var(--r);
+    padding: 5px 8px; font: inherit; font-size: 12px; min-width: 190px;
+    &:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+  }
+}
+
 /* A row that is about two references. The second is muted: the bank's is the
    one the operator will recognise, and the deposit's is the anomaly. */
 .paired-ref { color: var(--warn-ink); font-family: var(--font-mono); font-size: 12px; }

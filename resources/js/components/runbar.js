@@ -45,6 +45,11 @@ export default function runbar(root = document) {
             bar.setAttribute('aria-busy', 'true');
             if (status) status.textContent = bar.dataset.busy || 'Executing…';
 
+            // The coffee cup, for a run long enough to notice (loader.js
+            // decides). Said through the form so a confirmation in front of
+            // it still gets the last word on whether this is a navigation.
+            if (! form.hasAttribute('data-loader')) form.setAttribute('data-loader', bar.dataset.busy || 'Executing…');
+
             // Next tick: a button disabled inside the submit handler is left
             // out of the submitted data.
             window.setTimeout(() => { go.disabled = true; }, 0);

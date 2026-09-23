@@ -506,6 +506,21 @@
             </div>
         </x-core::gallery-entry>
 
+        <x-core::gallery-entry name="x-scope-line">
+            <div class="gal-variant">
+                <p class="eyebrow">Folded — what the recon centre shows once a site and period are chosen</p>
+                <x-scope-line :parts="['Caltex Ulundi', '1 Aug – 31 Aug 2026', 'Run #41370']">
+                    <p class="field-help">The form the screen started with, filled in, goes here.</p>
+                </x-scope-line>
+            </div>
+            <div class="gal-variant">
+                <p class="eyebrow">Open — changing one date is one field and one press</p>
+                <x-scope-line :parts="['Ngwenya', '23 Aug – 23 Sep 2026', 'Not previewed yet']" open>
+                    <p class="field-help">The form the screen started with, filled in, goes here.</p>
+                </x-scope-line>
+            </div>
+        </x-core::gallery-entry>
+
         {{-- ============================================================ Queues --}}
         <h2 id="g-queues" class="sg-group">Queues</h2>
 
@@ -664,6 +679,17 @@
             </div>
         </x-core::gallery-entry>
 
+        <x-core::gallery-entry name="x-loader">
+            <div class="gal-variant">
+                <p class="eyebrow">Inline — where a fragment will land. The page's own overlay is this, over the page, after 300 ms</p>
+                <x-loader label="Reading the suggestions…" />
+            </div>
+            <div class="gal-variant">
+                <p class="eyebrow">Try it: the overlay, for three seconds</p>
+                <button type="button" class="btn" onclick="const w = window.Agora.loader.show('Balancing FNB card settlement…'); setTimeout(() => w.hide(), 3000)">Show the overlay</button>
+            </div>
+        </x-core::gallery-entry>
+
         <x-core::gallery-entry name="x-tip">
             <div class="gal-variant">
                 <p class="eyebrow">Hover or tab onto the marked words — one element, shared by the whole page</p>
@@ -813,5 +839,7 @@
     });
 </script>
 
+{{-- The page-level cup, as <x-app-shell> mounts it: this page is standalone. --}}
+<x-loader overlay />
 </body>
 </html>

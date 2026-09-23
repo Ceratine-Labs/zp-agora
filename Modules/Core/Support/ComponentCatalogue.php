@@ -205,12 +205,13 @@ class ComponentCatalogue
                 'group' => 'Structure',
                 'summary' => 'A strip of tabs, in link mode or panel mode.',
                 'mockup' => 'tabs',
-                'notes' => 'Give the items an `href` and it renders anchors and uses no JavaScript at all — the right mode whenever the panes are separate result sets, because a link carries its scope. Leave `href` out, put `<x-tab-panel>` children in the slot, and `tabs.js` adds the two things the platform does not give: memory of the last choice (`persist`) and arrow-key movement across the strip.',
+                'notes' => 'Give the items an `href` and it renders anchors and uses no JavaScript at all — the right mode whenever the panes are separate result sets, because a link carries its scope. Leave `href` out, put `<x-tab-panel>` children in the slot, and `tabs.js` adds the two things the platform does not give: memory of the last choice (`persist`) and arrow-key movement across the strip. **`query`** writes the open tab into that URL parameter as it changes (replaceState), so a reload, a copied link and the return from a form land on the same tab; the server reads the same parameter to set `active`. Use it instead of `persist` when the tab belongs to the thing on screen rather than to the person — the recon centre (23 Sep 2026), whose every press redirects back with `tab=`.',
                 'js' => 'tabs.js',
                 'props' => [
                     ['items', 'array', '[]', "['key','label','href','count'] each, or plain strings"],
                     ['active', '?string', 'first key', 'Which one is on. **Required in panel mode**'],
                     ['persist', '?string', 'null', 'localStorage key for the last choice'],
+                    ['query', '?string', 'null', 'URL parameter the open tab is written to'],
                     ['label', 'string', "'Sections'", 'Accessible name for the strip'],
                 ],
             ],
@@ -219,9 +220,11 @@ class ComponentCatalogue
                 'group' => 'Structure',
                 'summary' => 'One pane behind a tab.',
                 'mockup' => 'tabs',
-                'notes' => 'Takes `active` off the parent `<x-tabs>` with `@aware`, so a page lists its panes without repeating the selection. The inactive ones carry `hidden` from the server — that is what makes the first paint correct with no JavaScript.',
+                'notes' => 'Takes `active` off the parent `<x-tabs>` with `@aware`, so a page lists its panes without repeating the selection. The inactive ones carry `hidden` from the server — that is what makes the first paint correct with no JavaScript. **`src` makes the pane lazy** (23 Sep 2026, the recon centre): its content is an HTML fragment fetched the first time the tab is opened and not before, so three procedures over one site-month cost only the one the clerk opens. The server renders the fragment — HTML, never JSON-to-markup — and `window.Agora.hydrate(pane)` wires its tables, row details, tick boxes, confirmations and bulk presses exactly as the page was wired at load. The slot is what shows until then and with scripting off, so put a plain link to the same content in it. Something inside a pane that writes and stays on the page dispatches `tabs:changed`, and every OTHER loaded pane in the set is fetched again on its next open — never behind the reader while they look at it. A redirected response (the session ended) is refused rather than pasted in, and a failed read says so in the pane with a Try again.',
+                'js' => 'tabs.js',
                 'props' => [
                     ['key', 'string', '—', 'Matches an item key on the parent'],
+                    ['src', '?string', 'null', 'Fragment URL; the pane loads on first open'],
                 ],
             ],
             [
@@ -483,6 +486,18 @@ class ComponentCatalogue
                 ],
             ],
             [
+                'name' => 'x-scope-line',
+                'group' => 'Parameters',
+                'summary' => 'The scope a screen is answering, folded to one line once it is chosen.',
+                'mockup' => 'params-fold',
+                'notes' => 'Built for the recon centre (ZP via Ryan, 23 Sep 2026): pick a site and a period once and the form gets out of the way — "Caltex Ulundi · 1 Aug – 31 Aug 2026 · Run #41370 · Change" — so the answer is what the eye lands on. Opening it shows the same form the screen started with, filled in, so changing one date is one field and one press. A `<details>`, so it works with no JavaScript and opens on Enter and Space. **Not `<x-params collapsible>`**: that folds a grid of report parameters behind a small-caps label, and its summary says "Parameters"; this one\'s summary IS the answer to "what am I looking at", which is the whole reason to fold it. The caller formats the parts, because only it knows which are dates; empty parts are dropped.',
+                'props' => [
+                    ['parts', 'array', '[]', 'The facts of the scope, in the order a person says them'],
+                    ['open', 'bool', 'false', 'Which way it starts'],
+                    ['change', 'string', "'Change'", 'The word that opens it'],
+                ],
+            ],
+            [
                 'name' => 'x-checklist',
                 'group' => 'Queues',
                 'summary' => 'The steps that have to be done before something can be closed.',
@@ -613,6 +628,18 @@ class ComponentCatalogue
                     ['summary', 'string', "'How this screen works'", 'The line that stays visible'],
                     ['open', 'bool', 'false', 'Which way it starts'],
                     ['remember', '?string', 'null', 'Key for disclosure.js'],
+                ],
+            ],
+            [
+                'name' => 'x-loader',
+                'group' => 'Messages',
+                'summary' => 'A wait, drawn as a cup of coffee: it fills, carries the ZRP badge, steams when full and goes round again until the action completes.',
+                'mockup' => '—',
+                'notes' => 'ZP\'s ask through Ryan, 23 Sep 2026, replacing the busy states. **One per page**: `<x-app-shell>` renders it once as the `overlay`, hidden, and `loader.js` is the one place that decides when a wait is seen — nothing appears under 300 ms, because a cup that flashes on every quick press teaches people to stop looking at it. A screen never writes a second one: it puts `data-loader="What is happening…"` on a form that navigates (shown on submit, cleared by the next page, taken down on a bfcache `pageshow`), or calls `window.Agora.loader` — `show(label)` returns `{update, hide}` for the page-level overlay, `within(el, label)` puts a cup where a fragment will land (the recon centre\'s tabs), `beside(el)` puts a small one in front of a status line that already says what is happening (the Every site runner, whose table filling in IS the progress), and `submitting(form)` is for code that submits a form itself (`confirm-form.js`, whose `form.submit()` fires no event). Clones get their clip-path ids renamed, so a cup never depends on one that is hidden. **Reduced motion** gets a full, still cup and the words — the label carries the meaning, the motion only says "still going". Colours are tokens (`--coffee` `--crema` `--steam` `--backdrop` `--badge`), so both themes are the theme\'s. The badge is `public/images/zrp-logo.png`, copied from ZP-NQL.',
+                'js' => 'loader.js',
+                'props' => [
+                    ['label', 'string', "'Working…'", 'What is being waited for'],
+                    ['overlay', 'bool', 'false', 'The page-level instance (the shell\'s)'],
                 ],
             ],
             [

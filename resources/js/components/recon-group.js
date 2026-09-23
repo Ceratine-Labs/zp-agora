@@ -74,6 +74,10 @@ async function run(panel, button, status) {
     button.disabled = true;
     button.textContent = 'Previewing…';
 
+    // A small cup in front of the status line rather than over the page: the
+    // table filling in site by site IS the progress, and must stay in view.
+    const stop = window.Agora?.loader?.beside(status) ?? (() => {});
+
     for (const branch of branches) {
         const row = document.querySelector(`tr[data-group-branch="${branch}"]`);
         const name = row ? row.cells[1]?.textContent.trim() : branch;
@@ -94,6 +98,7 @@ async function run(panel, button, status) {
         done += 1;
     }
 
+    stop();
     say(status, `Every site attempted — ${total} of ${total}. Tick the ones to post.`);
     button.remove();
 

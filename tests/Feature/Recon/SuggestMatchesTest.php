@@ -164,16 +164,129 @@ class SuggestMatchesTest extends TestCase
         $this->assertNull($this->suggestionFor(777.77, null, false));
     }
 
-    /** Nothing is ever proposed whose sides differ by a cent. */
-    public function test_every_suggestion_balances_to_the_cent(): void
+    /** Nothing strong or possible is ever proposed whose sides differ by a cent. */
+    public function test_every_exact_suggestion_balances_to_the_cent(): void
     {
-        foreach ($this->suggest()['suggestions'] as $s) {
+        foreach ($this->suggest()['suggestions']->whereIn('Confidence', ['strong', 'possible']) as $s) {
             $this->assertSame(
                 round((float) $s->bank->sum('Amount'), 2),
                 round((float) $s->mops->sum('Amount'), 2),
                 "Suggestion {$s->SuggestionNo} ({$s->Shape}) does not balance."
             );
         }
+    }
+
+    /**
+     * Site 8, 4 Aug 2026, as a single line: R19,197.34 on the statement
+     * against R19,179.28 of takings the day before. Neither exact tier can
+     * have it; the close tier says what it is and by how much.
+     */
+    public function test_a_line_a_few_rand_off_its_takings_is_close(): void
+    {
+        $s = $this->suggestionFor(19197.34);
+
+        $this->assertSame('close', $s->Confidence);
+        $this->assertSame('line~row', $s->Shape);
+        $this->assertSame(-18.06, round((float) $s->DiffAmount, 2), 'Deposits less bank, the sign ManualMatch records.');
+        $this->assertSame(1, (int) $s->LagDays);
+        $this->assertStringStartsWith('The bank is R18.06 over the takings', (string) $s->Caution);
+        $this->assertSame(round((float) $s->MopsTotal - (float) $s->BankTotal, 2), round((float) $s->DiffAmount, 2));
+    }
+
+    /**
+     * The R3,689.76 line ties to the cent with one deposit and is within R11
+     * of another. The exact reading is taken, and the near one never sees the
+     * line at all.
+     */
+    public function test_close_never_displaces_an_exact_match(): void
+    {
+        $answer = $this->suggest();
+
+        $this->assertSame('strong', $this->suggestionFor(3689.76, $answer)->Confidence);
+        $this->assertNull(
+            $answer['suggestions']->first(fn (object $s) => round((float) $s->MopsTotal, 2) === 3700.00),
+            'The R3,700.00 deposit was offered against a line an exact suggestion already holds.'
+        );
+
+        $exact = $answer['suggestions']->whereIn('Confidence', ['strong', 'possible']);
+        $close = $answer['suggestions']->where('Confidence', 'close');
+        $held = $exact->flatMap(fn (object $s) => $s->bank->pluck('BankStatementLineID'))->all();
+
+        foreach ($close as $s) {
+            $this->assertEmpty(array_intersect($held, $s->bank->pluck('BankStatementLineID')->all()));
+        }
+    }
+
+    /** @CloseMax = 0 is the procedure as it was: the exact tiers do not move. */
+    public function test_the_close_tier_switched_off_leaves_the_exact_tiers_as_they_were(): void
+    {
+        $shape = fn (Collection $rows) => $rows->whereIn('Confidence', ['strong', 'possible'])
+            ->map(fn (object $s) => $s->Confidence.'|'.$s->Shape.'|'.$s->BankTotal.'|'.$s->MopsTotal)->values()->all();
+
+        $on = $this->procedures->callSets('usp_Recon_SuggestMatches', [
+            'BranchId' => self::BRANCH, 'ReconArea' => 'FNB', 'FromDate' => self::FROM, 'ToDate' => self::TO.' 23:59:59',
+        ]);
+        $off = $this->procedures->callSets('usp_Recon_SuggestMatches', [
+            'BranchId' => self::BRANCH, 'ReconArea' => 'FNB', 'FromDate' => self::FROM, 'ToDate' => self::TO.' 23:59:59',
+            'CloseMax' => 0,
+        ]);
+
+        $this->assertNotEmpty($on[0]->where('Confidence', 'close'));
+        $this->assertEmpty($off[0]->where('Confidence', 'close'));
+        $this->assertSame($shape($on[0]), $shape($off[0]));
+        $this->assertSame(0, (int) $off[2]->first()->CloseSuggestions);
+    }
+
+    /** A close one is a forced match: the procedure will not take it on the algorithm's word. */
+    public function test_a_close_suggestion_needs_a_reason(): void
+    {
+        config(['recon.stamp_mode' => 'journal']);
+
+        $s = $this->suggestionFor(19197.34);
+
+        $this->actingAs($this->admin())
+            ->postJson('/app/recon/auto/FNB/match', $this->form($s))
+            ->assertStatus(422)
+            ->assertJson(['ok' => false, 'code' => 'FORCE_REASON_REQUIRED']);
+    }
+
+    public function test_an_accepted_close_suggestion_is_forced_and_says_it_was_suggested(): void
+    {
+        config(['recon.stamp_mode' => 'journal']);
+
+        $s = $this->suggestionFor(19197.34);
+        $form = ['basis' => $s->Basis.' — close: '.$s->Caution, 'reason' => 'TEST- card fee on the settlement'] + $this->form($s);
+
+        $this->actingAs($this->admin())
+            ->postJson('/app/recon/auto/FNB/match', $form)
+            ->assertOk()
+            ->assertJson(['ok' => true, 'code' => 'MATCHED_FORCED']);
+
+        $run = ReconRun::query()->acrossBranches()->where('BranchId', self::BRANCH)->latest('Id')->firstOrFail();
+        $line = ReconRunLine::query()->acrossBranches()->where('RunId', $run->Id)->firstOrFail();
+
+        $this->assertSame('Matched by suggestion - forced', $line->Outcome);
+        $this->assertStringStartsWith('Suggested match (forced) — ', (string) $run->Note);
+        $this->assertStringContainsString('— close: The bank is R18.06 over the takings', (string) $run->Note);
+        $this->assertSame(-18.06, round((float) $line->DiffAmount, 2));
+        $this->assertSame('TEST- card fee on the settlement', $line->BlockReason);
+    }
+
+    /**
+     * Each close row carries its own reason box, and there is no press that
+     * forces them all — that one waits on Ryan.
+     */
+    public function test_close_suggestions_are_offered_one_at_a_time_with_a_reason(): void
+    {
+        $this->actingAs($this->admin())
+            ->get('/app/recon/auto/FNB/suggest?branch_id='.self::BRANCH.'&from='.self::FROM.'&to='.self::TO)
+            ->assertOk()
+            ->assertSee('Close — needs a reason')
+            ->assertSee('data-suggest-kind="close"', false)
+            ->assertSee('name="reason" required', false)
+            ->assertSee('Force match')
+            ->assertSee('−R18.06')
+            ->assertDontSee('data-suggest-run="close"', false);
     }
 
     public function test_an_area_other_than_fnb_is_refused(): void
@@ -198,9 +311,11 @@ class SuggestMatchesTest extends TestCase
             ->assertSee('Suggested matches')
             ->assertSee('agora.usp_Recon_SuggestMatches');
 
-        // The tab is a link to the route, so the route is what to look for.
-        $this->actingAs($admin)->get('/app/recon/auto/FNB')->assertSee(route('app.recon.suggest', 'FNB'), false);
-        $this->actingAs($admin)->get('/app/recon/auto/ABSA')->assertDontSee(route('app.recon.suggest', 'ABSA'), false);
+        // A tab of the recon centre once a scope is chosen (23 Sep 2026); the
+        // pane fetches the route, so the route is what to look for.
+        $scope = '?branch_id='.self::BRANCH.'&from='.self::FROM.'&to='.self::TO;
+        $this->actingAs($admin)->get('/app/recon/auto/FNB'.$scope)->assertSee(route('app.recon.suggest', 'FNB'), false);
+        $this->actingAs($admin)->get('/app/recon/auto/ABSA'.$scope)->assertDontSee(route('app.recon.suggest', 'ABSA'), false);
         $this->actingAs($admin)->get('/app/recon/auto/ABSA/suggest')->assertNotFound();
     }
 
@@ -370,6 +485,8 @@ class SuggestMatchesTest extends TestCase
             $this->bankLine('2026-08-03', $fn('00707876'), 777.77),
             // In the period, same amount, same deposit in reach.
             $this->bankLine('2026-08-05', $fn('00707876'), 777.77),
+            // Site 8, 4 Aug, as one line: R18.06 over the day before's takings.
+            $this->bankLine('2026-08-08', $fn('00707877'), 19197.34),
         ]);
 
         $db->table('PumpIT.dbo.BRN_DailyBankingFNB')->insert([
@@ -383,6 +500,9 @@ class SuggestMatchesTest extends TestCase
             $this->deposit('2026-08-05', '0000000203', '850250', 500.00),
             $this->deposit('2026-08-08', '0000000451', '850250', 150.00),
             $this->deposit('2026-08-02', '1', '999999', 777.77),
+            $this->deposit('2026-08-07', '126', '999999', 19179.28),
+            // Within R11 of the R3,689.76 line, which ties exactly elsewhere.
+            $this->deposit('2026-08-03', '74', '999999', 3700.00),
         ]);
     }
 

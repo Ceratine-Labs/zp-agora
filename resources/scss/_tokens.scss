@@ -44,6 +44,14 @@
   --sand:#e6c15c;
   --r:6px;
 
+  /* The coffee-cup loader (<x-loader>, 23 Sep 2026). The coffee is the
+     shape, so it takes a fill that holds its own against both grounds; the
+     crema and steam are highlights on it. */
+  --coffee:#6b3f22; --crema:#c8925e; --steam:#9fb0b5; --backdrop:rgba(234,239,240,.72);
+  /* The ZRP badge is printed on white in both themes: it is the customer's
+     mark, and its navy ring disappears on a dark ground. */
+  --badge:#ffffff;
+
   --font-display:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;
   --font-text:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
@@ -62,6 +70,7 @@
   --grid:#232c30; --axis:#33403f;
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.8);
   --shadow-pop:0 12px 40px -8px rgba(0,0,0,.75);
+  --coffee:#8a5530; --crema:#d9a877; --steam:#6d7f85; --backdrop:rgba(8,12,13,.72);
 }
 
 @media (prefers-color-scheme: dark) {

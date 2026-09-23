@@ -68,34 +68,51 @@ class ReconTabsTest extends TestCase
     /**
      * The strip is the whole map of the area from every one of its tabs.
      *
-     * Five of them — "Every site" joined with the master controller and is
+     * Four of them — "Every site" joined with the master controller and is
      * head-office only, which is why this signs in as an administrator without
-     * pinning a workspace.
+     * pinning a workspace. Manual match and Suggestions are no longer on it
+     * (23 Sep 2026): they are tabs INSIDE the recon centre, and a second door
+     * to them here is how a clerk ends up looking at two scopes.
      */
     public function test_the_strip_carries_every_tab_on_every_tab(): void
     {
         foreach (array_column(self::tabs(), 0) as $url) {
             $response = $this->actingAs($this->admin())->get($url);
 
-            foreach (['Auto reconciliation', 'Manual match', 'Every site', 'Runs', 'Configuration'] as $label) {
+            foreach (['Recon centre', 'Every site', 'Runs', 'Configuration'] as $label) {
                 $response->assertSee($label);
             }
 
             // Link mode, not panel mode: a tab is somewhere you can send
             // someone. Panel mode would render `data-tabs` and no anchors.
-            $response->assertSee('href="'.route('app.recon.match', 'ABSA').'"', false);
+            $response->assertSee('href="'.route('app.recon.runs', 'ABSA').'"', false);
+            $response->assertDontSee('href="'.route('app.recon.match', 'ABSA').'"', false);
         }
     }
 
+    /** The site and the dates travel with every tab on the strip. */
+    public function test_the_strip_carries_the_scope(): void
+    {
+        $scope = ['branch_id' => 18, 'from' => '2026-08-01', 'to' => '2026-08-31'];
+
+        $this->actingAs($this->admin())->get(route('app.recon.runs', ['ABSA'] + $scope))
+            ->assertOk()
+            ->assertSee('href="'.e(route('app.recon.area', ['ABSA'] + $scope)).'"', false)
+            ->assertSee('href="'.e(route('app.recon.config', ['ABSA'] + $scope)).'"', false);
+    }
+
     /**
-     * The area URL the menu and every existing link point at is still the
-     * automatic preview, not a landing page in front of it.
+     * The area URL the menu and every existing link point at is the recon
+     * centre, asking for its scope — and asking for it on the preview form, so
+     * choosing a site and dates IS running the automatic balancing.
      */
-    public function test_the_bare_area_url_is_still_the_preview(): void
+    public function test_the_bare_area_url_is_the_centre_asking_for_its_scope(): void
     {
         $this->actingAs($this->admin())->get('/app/recon/auto/ABSA')
             ->assertOk()
-            ->assertSee('Preview')
-            ->assertSee('Nothing in PumpIT changes.');
+            ->assertSee('What to reconcile')
+            ->assertSee('Rules and readings')
+            ->assertSee('name="centre" value="1"', false)
+            ->assertSee('nothing in PumpIT changes until');
     }
 }

@@ -70,5 +70,9 @@
     </div>
 </footer>
 
+{{-- The page's one coffee cup, hidden until a wait is long enough to show
+     (loader.js). Every other cup on the page is a clone of this one. --}}
+<x-loader overlay />
+
 </body>
 </html>

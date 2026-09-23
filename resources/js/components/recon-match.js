@@ -22,15 +22,19 @@
  * The formatting goes through window.Agora.format, which is the twin of
  * App\Support\Format — rebuilding the number format here is how the two drift.
  */
-export default function reconMatch() {
-    const pane = document.querySelector('[data-two-pane]');
+export default function reconMatch(root = document) {
+    // `root` is the recon centre's Manual tab when the pane arrives as a
+    // fragment; the whole document on the standalone page.
+    const pane = root.querySelector('[data-two-pane]:not([data-two-pane-ready])');
 
     if (!pane) return;
 
+    pane.setAttribute('data-two-pane-ready', '');
+
     const form = pane.closest('form');
-    const strip = document.querySelector('[data-match-totals]');
-    const reason = document.querySelector('[data-match-reason]');
-    const submit = document.querySelector('[data-match-submit]');
+    const strip = root.querySelector('[data-match-totals]');
+    const reason = root.querySelector('[data-match-reason]');
+    const submit = root.querySelector('[data-match-submit]');
 
     const recount = () => report(pane, strip, reason, submit);
 

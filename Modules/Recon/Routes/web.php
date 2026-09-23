@@ -33,6 +33,8 @@ Route::middleware('auth')->prefix('recon')->name('recon.')->group(function () {
     // fetched only when somebody asks for it — a month of ABSA is a few hundred
     // proposals and drilling all of them up front is a few hundred queries.
     Route::get('runs/{run}/lines/{line}', [ReconController::class, 'line'])->middleware('can:recon.runs.view')->name('line');
+    // The same answer as the fragment the recon centre's Auto tab opens onto.
+    Route::get('runs/{run}/panel', [ReconController::class, 'runPanel'])->middleware('can:recon.runs.view')->name('run.panel');
     Route::post('runs/{run}/execute', [ReconController::class, 'execute'])->middleware('can:recon.runs.execute')->name('execute');
     Route::post('runs/{run}/reverse', [ReconController::class, 'reverse'])->middleware('can:recon.runs.reverse')->name('reverse');
 

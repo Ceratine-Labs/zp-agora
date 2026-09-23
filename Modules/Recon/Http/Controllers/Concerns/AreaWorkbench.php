@@ -8,7 +8,7 @@ use Illuminate\Support\Collection;
 use Modules\Core\Models\Branch;
 
 /**
- * The chrome one reconciliation area shares across its five tabs.
+ * The chrome one reconciliation area shares across its tabs.
  *
  * A trait rather than a base controller, because the two controllers that use
  * it are not versions of one another: ReconController is about a run and
@@ -19,28 +19,44 @@ use Modules\Core\Models\Branch;
 trait AreaWorkbench
 {
     /**
-     * The five faces of one reconciliation area, in the order a morning goes.
+     * The faces of one reconciliation area, in the order a morning goes.
      *
      * Declared once rather than repeated in the blade, because the strip has
      * to agree with the routes and with the permissions three times over — on
      * the tab, on the route's `can:` middleware, and on whatever the pane
      * itself offers. A list is the cheapest way to keep those three honest.
      *
+     * THE CENTRE IS ONE FACE (23 Sep 2026). Auto reconciliation, Suggestions
+     * and Manual match used to be three tabs here, each its own page with its
+     * own site-and-dates form. ZP asked for them consolidated: pick the site
+     * and the period once, and the three become tabs INSIDE the centre, over
+     * the one scope. Their routes still answer, for every link already out
+     * there, but the strip no longer offers them beside the centre — two
+     * doors to the same room is how a clerk ends up with two scopes.
+     *
      * `ho` marks a tab that only means something in head office. "Every site"
-     * in a workspace pinned to one site is that site, which is the Auto tab
+     * in a workspace pinned to one site is that site, which is the centre
      * with more steps.
+     */
+    protected const TABS = [
+        'auto' => ['label' => 'Recon centre', 'route' => 'app.recon.area', 'can' => 'recon.runs.view'],
+        'all' => ['label' => 'Every site', 'route' => 'app.recon.all', 'can' => 'recon.runs.view', 'ho' => true],
+        'runs' => ['label' => 'Runs', 'route' => 'app.recon.runs', 'can' => 'recon.runs.view'],
+        'config' => ['label' => 'Configuration', 'route' => 'app.recon.config', 'can' => 'recon.criteria.view'],
+    ];
+
+    /**
+     * The tabs inside the centre, each a fragment fetched the first time it is
+     * opened — so a site-month costs only what the clerk looks at.
      *
      * `needs` names a flag on the area's definition in config/recon.php. The
      * Suggestions tab exists only where most bank lines carry no reference —
      * FNB — so an area without the flag does not offer it.
      */
-    protected const TABS = [
-        'auto' => ['label' => 'Auto reconciliation', 'route' => 'app.recon.area', 'can' => 'recon.runs.view'],
-        'suggest' => ['label' => 'Suggestions', 'route' => 'app.recon.suggest', 'can' => 'recon.runs.view', 'needs' => 'suggest'],
-        'match' => ['label' => 'Manual match', 'route' => 'app.recon.match', 'can' => 'recon.runs.view'],
-        'all' => ['label' => 'Every site', 'route' => 'app.recon.all', 'can' => 'recon.runs.view', 'ho' => true],
-        'runs' => ['label' => 'Runs', 'route' => 'app.recon.runs', 'can' => 'recon.runs.view'],
-        'config' => ['label' => 'Configuration', 'route' => 'app.recon.config', 'can' => 'recon.criteria.view'],
+    protected const CENTRE_TABS = [
+        'auto' => ['label' => 'Auto reconciliation'],
+        'suggest' => ['label' => 'Suggestions', 'needs' => 'suggest'],
+        'match' => ['label' => 'Manual match'],
     ];
 
     /**
@@ -61,6 +77,7 @@ trait AreaWorkbench
             'area' => $this->service->area($area),
             'tab' => $tab,
             'tabs' => $this->tabs($area, $context),
+            'scope' => $this->scopeQuery(),
             'branches' => $this->branches(),
             'branchId' => (int) request('branch_id', $context->id() ?? 0),
             'pinned' => $context->isBranchWorkspace(),
@@ -93,10 +110,46 @@ trait AreaWorkbench
             ->map(fn (array $tab, string $key) => [
                 'key' => $key,
                 'label' => $tab['label'],
-                'href' => route($tab['route'], $area),
+                // The site and dates travel with every tab, so moving from
+                // the centre to the Runs tab and back does not drop them.
+                'href' => route($tab['route'], [$area] + $this->scopeQuery()),
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * The tabs inside the centre, minus any this area does not offer.
+     *
+     * @return array<int, array<string, string>>
+     */
+    protected function centreTabs(string $area): array
+    {
+        $definition = $this->service->area($area);
+
+        return collect(self::CENTRE_TABS)
+            ->reject(fn (array $tab) => isset($tab['needs']) && ! ($definition[$tab['needs']] ?? false))
+            ->map(fn (array $tab, string $key) => ['key' => $key, 'label' => $tab['label']])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The scope as it arrived, for putting back onto a link.
+     *
+     * Only what the request actually carried: a link that invents dates the
+     * person never chose would open the next screen on a period they did not
+     * ask for.
+     *
+     * @return array<string, string>
+     */
+    protected function scopeQuery(): array
+    {
+        return array_filter([
+            'branch_id' => (string) request('branch_id', ''),
+            'from' => (string) request('from', ''),
+            'to' => (string) request('to', ''),
+        ], fn (string $value) => $value !== '');
     }
 
     /**

@@ -19,6 +19,7 @@ import tableTools from './components/table-tools';
 import linkedSelect from './components/linked-select';
 import bulkSelection from './components/bulk-selection';
 import postLink from './components/post-link';
+import loader from './components/loader';
 import * as format from './format';
 
 megaMenu();
@@ -64,7 +65,9 @@ bulkSelection();
 // agreeing, so it was the guard that was broken. Reading the twin off the
 // shipped bundle is also the stronger test: it checks the module the
 // application actually runs, not a second copy of it built for one page.
-window.Agora = { notify, format, tip: tip() };
+// `loader` is the coffee cup (<x-loader>): the one place that decides when a
+// wait is long enough to be shown. See loader.js.
+window.Agora = { notify, format, tip: tip(), loader: loader() };
 
 // After the global exists — it asks through window.Agora.notify, so that the
 // dialog is the same one every other confirmation in the application uses.
@@ -80,3 +83,27 @@ reconSuggest();
 // Same reason: the column chooser's reset asks before it forgets a layout, and
 // the drawer's copy button reports through the shared toast.
 dataGrid();
+
+/*
+ * Wiring for markup that arrives AFTER load.
+ *
+ * Everything above ran once, over the page the server sent. A recon centre
+ * tab is a fragment fetched when it is opened (tabs.js), and its tables, row
+ * details, tick boxes, confirmations and bulk presses need exactly the same
+ * wiring — so each component that can appear in one takes a root, marks what
+ * it has wired, and is run again over just the new markup. The order is the
+ * order above, for the same reasons: the action bar before the table tools,
+ * the confirmations after window.Agora exists.
+ */
+window.Agora.hydrate = (root) => {
+    selects(root);
+    rowDetail(root);
+    checkAll(root);
+    tabs(root);
+    disclosure(root);
+    runbar(root);
+    reconMatch(root);
+    tableTools(root);
+    confirmForm(root);
+    reconSuggest(root);
+};

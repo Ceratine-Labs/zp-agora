@@ -5,7 +5,10 @@
         blurb="A preview as it was recorded. The parameters are stored with it, so this answer can be
                reproduced even after the customer edits their extraction rules.">
         <x-slot:actions>
-            <a class="btn-ghost" href="{{ route('app.recon.area', $run->ReconArea) }}">Run another</a>
+            {{-- The centre, on this run's site, period and answer — where the
+                 suggestions and the manual match sit beside it. --}}
+            <a class="btn-ghost" href="{{ route('app.recon.area', [$run->ReconArea, 'branch_id' => $run->BranchId,
+                'from' => $run->FromDate->toDateString(), 'to' => $run->ToDate->toDateString(), 'run' => $run->Id]) }}">Open in the recon centre</a>
             @can('recon.runs.close')
                 {{-- Set aside, not thrown away. Offered on a finished preview;
                      the procedure refuses the rare one with anything processed

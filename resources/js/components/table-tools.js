@@ -53,13 +53,19 @@
 const NOTHING = '—';
 const MAX_SET = 400;
 
-export default function tableTools() {
+export default function tableTools(root = document) {
     stickyOffset();
+
+    // `root` and the ready marks are for a fragment that arrives after load —
+    // a recon centre tab — handed in by window.Agora.hydrate(). A table is
+    // only ever wired once, so hydrating twice cannot double its handlers.
+    const fresh = (selector, mark) => Array.from(root.querySelectorAll(`${selector}:not([${mark}])`))
+        .map((el) => { el.setAttribute(mark, ''); return el; });
 
     // Every .dt, not only the ones with tools: the data grid's own filter row
     // is a second head row too, and it has been sliding under the first since
     // the day the scroll container got a height.
-    document.querySelectorAll('table.dt').forEach(stickyHead);
+    fresh('table.dt', 'data-sticky-ready').forEach(stickyHead);
 
     /*
      * BEFORE the tables mount, not after.
@@ -71,9 +77,9 @@ export default function tableTools() {
      * 68 of 144 shifts out of the press. Wiring it first costs one recount
      * against an unfiltered table and then it hears the real one.
      */
-    document.querySelectorAll('[data-action-bar]').forEach(actionBar);
+    fresh('[data-action-bar]', 'data-action-bar-ready').forEach(actionBar);
 
-    document.querySelectorAll('table[data-table-tools]').forEach((table) => {
+    fresh('table[data-table-tools]', 'data-table-tools-ready').forEach((table) => {
         const tools = new TableTools(table);
 
         if (!tools.usable) return;

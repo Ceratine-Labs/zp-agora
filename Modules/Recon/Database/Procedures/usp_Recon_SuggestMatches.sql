@@ -69,9 +69,54 @@
  *   first) so that no row is ever in two suggestions. Each says how many
  *   other readings it beat. A person decides.
  *
- * EXACT TO THE CENT, ALWAYS. Nothing here proposes a pairing whose two sides
- * differ. A variance is a forced match, forced matches need a reason, and a
- * reason is a person's — not an algorithm's.
+ * STRONG AND POSSIBLE ARE EXACT TO THE CENT, ALWAYS. Neither proposes a
+ * pairing whose two sides differ.
+ *
+ * CLOSE — the third tier (ZP and Ryan, 23 Sep 2026). Sites 8, 23, 25 and 26
+ * got almost nothing from the two exact tiers because their bank days never
+ * tie to the cent: site 26 banked R143,238.26 on 5 Aug against takings of
+ * R143,338.26 on 3 Aug, R100.00 short; site 8 banked R19,197.34 on 4 Aug
+ * against R19,179.28 on 3 Aug, R18.06 over. So, last, and over what the exact
+ * tiers left ONLY:
+ *
+ *   Two sides are close when they differ by more than nothing and by no more
+ *   than @ClosePct of the bank side, capped at @CloseMax (1%, R500), and the
+ *   takings are from 1 to @MaxLagDays days before the bank day.
+ *
+ *   Pass 4 — days first: a bank line, a device's day or a whole bank day
+ *     against a run of takings days; or a whole bank day against one deposit
+ *     or batch.
+ *   Pass 5 — then units, from what is left: a bank line or a device's day
+ *     against a deposit, a batch, or a batch over two days.
+ *
+ *   Each pass taken greedily, never a row twice: a reading whose batch
+ *   number agrees first, then the smallest difference, then the shortest
+ *   lag. Days go first because a near tie between one line and one deposit
+ *   inside a day that is itself a few rand off is a coincidence of size —
+ *   site 8, 4 Aug, is the case (see pass 4 in the body). Every close
+ *   suggestion says its difference in rand and which way it runs.
+ *
+ *   Measured on the estate, 1 Aug - 22 Sep 2026, every FNB branch, one
+ *   month at a time: 4,281 lines outstanding; strong covers 2,041, possible
+ *   357, and close adds 260 suggestions over 529 lines (R5.32M), median
+ *   difference R29.00, 90% within R162, 55 of them with a competing reading.
+ *   Lines first instead of days first gave 322 suggestions, 178 contested.
+ *   Slowest branch-month 1.9 s.
+ *
+ *   The blind replay below, with the tier on, returns the exact tiers row for
+ *   row as it did without it — 29,509 member rows, 0 different — and close
+ *   never touches a row an exact suggestion holds. History has no forced FNB
+ *   reconciliations to score close against; of the 559 close suggestions the
+ *   replay made, 6 touch rows history reconciled exactly (the few the exact
+ *   tiers missed) and 4 of those mix two reconciliations. That is the case
+ *   for the reason a person has to give.
+ *
+ * A close suggestion can never displace an exact one — it only ever sees rows
+ * both exact tiers finished with — and it is never taken on the algorithm's
+ * word. A variance is a forced match; agora.usp_Recon_ManualMatch refuses one
+ * without a reason (FORCE_REASON_REQUIRED), and a reason is a person's.
+ * @CloseMax = 0 turns the tier off, which is how the blind replay proves the
+ * exact tiers did not move.
  *
  * ---------------------------------------------------------------------------
  * Validation, 23 September 2026 — a blind replay of four months of history
@@ -97,9 +142,11 @@
  * pool section). 76 branch-months took 97 seconds on the local instance.
  *
  * Result sets:
- *   1  one row per suggestion
+ *   1  one row per suggestion — strong, then possible, then close; DiffAmount
+ *      is the deposits less the bank side, zero on every exact one
  *   2  one row per member (bank line or deposit) of every suggestion — enough
- *      to post it to agora.usp_Recon_ManualMatch unchanged
+ *      to post it to agora.usp_Recon_ManualMatch unchanged (a close one also
+ *      needs a reason)
  *   3  one summary row: what was outstanding, what the batch number settles,
  *      what was suggested, what is left
  *
@@ -112,7 +159,9 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_SuggestMatches]
     @ToDate      datetime,
     @MaxLagDays  int = 4,
     @MaxParts    int = 4,
-    @MaxSweeps   int = 20
+    @MaxSweeps   int = 20,
+    @CloseMax    money        = 500.00,
+    @ClosePct    decimal(5,2) = 1.00
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -124,6 +173,13 @@ BEGIN
     SET @MaxLagDays = CASE WHEN @MaxLagDays BETWEEN 1 AND 10 THEN @MaxLagDays ELSE 4 END;
     SET @MaxParts   = CASE WHEN @MaxParts   BETWEEN 2 AND 4  THEN @MaxParts   ELSE 4 END;
     SET @MaxSweeps  = CASE WHEN @MaxSweeps  BETWEEN 1 AND 50 THEN @MaxSweeps  ELSE 20 END;
+    SET @CloseMax   = CASE WHEN @CloseMax   BETWEEN 0 AND 5000 THEN @CloseMax ELSE 500.00 END;
+    SET @ClosePct   = CASE WHEN @ClosePct   > 0 AND @ClosePct <= 5 THEN @ClosePct ELSE 1.00 END;
+
+    /* The close tolerance in cents: the cap, and the share of the bank side
+       it may never exceed (per mille of cents, so integer arithmetic). */
+    DECLARE @CloseCapCents bigint = CONVERT(bigint, ROUND(@CloseMax * 100, 0));
+    DECLARE @ClosePerMille bigint = CONVERT(bigint, ROUND(@ClosePct * 10, 0));
 
     DECLARE @Started  datetime2(3) = SYSDATETIME();
 
@@ -372,7 +428,9 @@ BEGIN
         MerchantKey nvarchar(50) COLLATE DATABASE_DEFAULT  NULL,
         RefId       int           NULL,
         IsUnit      bit           NOT NULL,
-        Cents       bigint        NOT NULL
+        Cents       bigint        NOT NULL,
+        /* Pass 4 reads a band of cents, not one value. */
+        INDEX IX_MK_Cents (Cents)
     );
     CREATE TABLE #MKM (BlockId int NOT NULL, RowNo int NOT NULL, PRIMARY KEY (BlockId, RowNo));
 
@@ -417,13 +475,14 @@ BEGIN
 
     CREATE TABLE #S (
         SuggestionNo int         NOT NULL PRIMARY KEY,
-        Confidence   varchar(8) COLLATE DATABASE_DEFAULT  NOT NULL,   -- strong | possible
+        Confidence   varchar(8) COLLATE DATABASE_DEFAULT  NOT NULL,   -- strong | possible | close
         Sweep        int         NOT NULL,
         Pass         int         NOT NULL,
         Shape        varchar(24) COLLATE DATABASE_DEFAULT NOT NULL,
         Alts         int         NOT NULL,
         TokenOk      bit         NOT NULL,
-        InPeriod     bit         NOT NULL
+        InPeriod     bit         NOT NULL,
+        DiffCents    bigint      NOT NULL DEFAULT 0              -- deposits less bank; 0 unless close
     );
 
     DECLARE @Nums TABLE (n int PRIMARY KEY);
@@ -438,15 +497,17 @@ BEGIN
     BEGIN
         SET @Sweep += 1;
         SET @Took = 0;
-        SET @Pass = 1;
+        /* Close is two passes of its own: 4, a day's worth on at least one
+           side, then 5, a line or device day against a deposit or batch. */
+        SET @Pass = CASE WHEN @Mode = 'close' THEN 4 ELSE 1 END;
 
         UPDATE #B SET Held = 0 WHERE Held = 1 OPTION (KEEPFIXED PLAN);
         UPDATE #M SET Held = 0 WHERE Held = 1 OPTION (KEEPFIXED PLAN);
 
         /* Strong: stop at the first pass that takes anything and start the
            sweep again from pass 1 over what is left. Possible: one round of
-           all three. */
-        WHILE @Pass <= 3 AND (@Took = 0 OR @Mode = 'possible')
+           all three. Close: passes 4 and 5, once each. */
+        WHILE @Pass <= CASE WHEN @Mode = 'close' THEN 5 ELSE 3 END AND (@Took = 0 OR @Mode <> 'strong')
         BEGIN
             TRUNCATE TABLE #BK; TRUNCATE TABLE #BKM; TRUNCATE TABLE #MK; TRUNCATE TABLE #MKM;
             TRUNCATE TABLE #MP; TRUNCATE TABLE #BP; TRUNCATE TABLE #X;
@@ -454,9 +515,10 @@ BEGIN
 
             /* -- blocks, from what is open and not held --
                Only the kinds this pass reads: lines and rows are passes 1
-               and 2, runs of days are pass 3. */
+               and 2, runs of days are pass 3; pass 4 reads days against
+               anything and pass 5 the units. */
 
-            IF @Pass < 3
+            IF @Pass <> 3
                 INSERT INTO #BK (Kind, D, GroupKey, RefId, Cents)
                 SELECT 'line', b.D, b.GroupKey, b.Id, b.Cents
                 FROM #B b WHERE b.State = 'open' AND b.Held = 0 AND b.Cents > 0 OPTION (KEEPFIXED PLAN);
@@ -466,7 +528,7 @@ BEGIN
             FROM #B b WHERE b.State = 'open' AND b.Held = 0 AND b.Cents > 0
             GROUP BY b.D, b.GroupKey HAVING COUNT(*) >= 2 OPTION (KEEPFIXED PLAN);
 
-            IF @Pass = 3
+            IF @Pass IN (3, 4)
                 INSERT INTO #BK (Kind, D, Cents)
                 SELECT 'bankday', b.D, SUM(b.Cents)
                 FROM #B b WHERE b.State = 'open' AND b.Held = 0 AND b.Cents > 0
@@ -488,7 +550,7 @@ BEGIN
 
             /* A deposit with no BatchNo cannot be named to ManualMatch, so it
                is never offered. */
-            IF @Pass < 3
+            IF @Pass <> 3
             BEGIN
                 INSERT INTO #MK (Kind, D0, D1, BatchKey, MerchantKey, RefId, IsUnit, Cents)
                 SELECT 'row', m.D, m.D, m.BatchKey, ISNULL(m.Merchant, N''), m.RowNo,
@@ -502,7 +564,7 @@ BEGIN
                 GROUP BY m.D, m.BatchKey, ISNULL(m.Merchant, N'') HAVING COUNT(*) >= 2 OPTION (KEEPFIXED PLAN);
             END
 
-            IF @Pass = 1
+            IF @Pass IN (1, 4, 5)
                 /* A batch that ran over midnight: the same batch and merchant
                    on two consecutive days. 250 of the 3,767 balanced
                    historical batches have this shape. Built from each day's
@@ -518,7 +580,7 @@ BEGIN
                   ON b.BatchKey = a.BatchKey AND b.MerchantKey = a.MerchantKey AND b.D = DATEADD(day, 1, a.D)
                 OPTION (KEEPFIXED PLAN);
 
-            IF @Pass = 3
+            IF @Pass IN (3, 4)
                 /* Runs of days: everything left from D0 to D0 + n. */
                 INSERT INTO #MK (Kind, D0, D1, IsUnit, Cents)
                 SELECT 'days', s.D0, DATEADD(day, k.n, s.D0), 0, SUM(m.Cents)
@@ -637,6 +699,39 @@ BEGIN
                   AND mk.D1 <= bk.D
                   AND mk.D0 >= DATEADD(day, -@MaxLagDays, bk.D) OPTION (KEEPFIXED PLAN);
 
+            IF @Pass >= 4
+                /* Close: bank blocks against deposit blocks whose total is
+                   within the tolerance, and not equal — an equal one is the
+                   exact tiers' and they have had it. The tolerance scales with
+                   the bank side, so a R220 line is close only to
+                   R217.80..R222.20 and a R143,000 day to within R500. '~' in
+                   the shape marks a close reading.
+
+                   DAYS FIRST. Pass 4 takes the readings with a day's worth on
+                   at least one side — takings over a run of days, or a whole
+                   bank day — and pass 5 then pairs lines and batches from what
+                   is left. The other way round broke the case the tier was
+                   asked for: site 8's open lines on 4 Aug total R19,197.34
+                   against R19,179.28 of takings on 3 Aug, and a R0.42 tie
+                   between one of those lines and one of those deposits, taken
+                   first for being the smaller difference, split the day.
+
+                   The takings must be from BEFORE the bank day. An exact tie
+                   on the same day is rare but real (17 of 3,999 balanced
+                   historical batches); a near one on the same day is a
+                   coincidence of size, and on site 8 it was most of them. */
+                INSERT INTO #C (Shape, BankBlock, MopsBlock, BankD, MopsD1)
+                SELECT bk.Kind + '~' + mk.Kind, bk.BlockId, mk.BlockId, bk.D, mk.D1
+                FROM #BK bk
+                CROSS APPLY (SELECT CASE WHEN bk.Cents * @ClosePerMille / 1000 < @CloseCapCents
+                                         THEN bk.Cents * @ClosePerMille / 1000 ELSE @CloseCapCents END AS Tol) t
+                JOIN #MK mk ON mk.Cents BETWEEN bk.Cents - t.Tol AND bk.Cents + t.Tol
+                           AND mk.Cents <> bk.Cents
+                WHERE mk.D1 < bk.D
+                  AND mk.D0 >= DATEADD(day, -@MaxLagDays, bk.D)
+                  AND ((@Pass = 4 AND (mk.Kind = 'days' OR bk.Kind = 'bankday'))
+                    OR (@Pass = 5 AND mk.Kind <> 'days' AND bk.Kind <> 'bankday')) OPTION (KEEPFIXED PLAN);
+
             /* -- members -- */
 
             IF @Pass <> 2
@@ -701,14 +796,23 @@ BEGIN
                   GROUP BY x.CandId) s ON s.CandId = c.CandId
             OPTION (KEEPFIXED PLAN);
 
-            /* Guard, not filter: every generator above joins on equal cents,
-               so a candidate whose members disagree is a bug in this file. It
+            /* Guard, not filter: every exact generator above joins on equal
+               cents, and pass 4 on a band that excludes equality, so a
+               candidate whose members say otherwise is a bug in this file. It
                is dropped rather than offered. */
             DELETE cm FROM #CM cm JOIN #C c ON c.CandId = cm.CandId
-            WHERE c.BankCents IS NULL OR c.MopsCents IS NULL OR c.BankCents <> c.MopsCents
+            WHERE c.BankCents IS NULL OR c.MopsCents IS NULL
+               OR (@Pass < 4 AND c.BankCents <> c.MopsCents)
+               OR (@Pass >= 4 AND (c.BankCents = c.MopsCents OR c.Lag < 1
+                                  OR ABS(c.MopsCents - c.BankCents) > c.BankCents * @ClosePerMille / 1000
+                                  OR ABS(c.MopsCents - c.BankCents) > @CloseCapCents))
                OR c.Lag IS NULL OR c.Lag < 0 OR c.Lag > @MaxLagDays OPTION (KEEPFIXED PLAN);
             DELETE FROM #C
-            WHERE BankCents IS NULL OR MopsCents IS NULL OR BankCents <> MopsCents
+            WHERE BankCents IS NULL OR MopsCents IS NULL
+               OR (@Pass < 4 AND BankCents <> MopsCents)
+               OR (@Pass >= 4 AND (BankCents = MopsCents OR Lag < 1
+                                  OR ABS(MopsCents - BankCents) > BankCents * @ClosePerMille / 1000
+                                  OR ABS(MopsCents - BankCents) > @CloseCapCents))
                OR Lag IS NULL OR Lag < 0 OR Lag > @MaxLagDays OPTION (KEEPFIXED PLAN);
 
             /* One representative per reading. Several candidates can describe
@@ -759,10 +863,16 @@ BEGIN
             END
             ELSE
             BEGIN
-                /* Greedy, in order, and never a row twice. */
+                /* Greedy, in order, and never a row twice. Close orders by
+                   the smallest difference, then the shortest lag, ahead of
+                   everything else; on the exact tiers both keys are zero and
+                   the order is what it always was. */
                 DECLARE pick CURSOR LOCAL FAST_FORWARD FOR
                     SELECT CandId FROM #C WHERE Rep = 1
-                    ORDER BY TokenOk DESC, Alts, BankN + MopsN,
+                    ORDER BY TokenOk DESC,
+                             CASE WHEN @Pass >= 4 THEN ABS(MopsCents - BankCents) ELSE 0 END,
+                             CASE WHEN @Pass >= 4 THEN CASE WHEN Lag = 0 THEN 99 ELSE Lag END ELSE 0 END,
+                             Alts, BankN + MopsN,
                              CASE WHEN Lag = 0 THEN 99 ELSE Lag END,
                              BankD, CandId;
                 OPEN pick;
@@ -786,8 +896,9 @@ BEGIN
                 CLOSE pick; DEALLOCATE pick;
             END
 
-            INSERT INTO #S (SuggestionNo, Confidence, Sweep, Pass, Shape, Alts, TokenOk, InPeriod)
-            SELECT c.Sug, @Mode, @Sweep, @Pass, c.Shape, ISNULL(c.Alts, 0), c.TokenOk, c.InPeriod
+            INSERT INTO #S (SuggestionNo, Confidence, Sweep, Pass, Shape, Alts, TokenOk, InPeriod, DiffCents)
+            SELECT c.Sug, @Mode, @Sweep, @Pass, c.Shape, ISNULL(c.Alts, 0), c.TokenOk, c.InPeriod,
+                   c.MopsCents - c.BankCents
             FROM #C c WHERE c.Sug IS NOT NULL OPTION (KEEPFIXED PLAN);
 
             SET @N = @@ROWCOUNT;
@@ -817,7 +928,8 @@ BEGIN
             SET @Pass += 1;
         END
 
-        IF @Mode = 'possible' SET @Mode = NULL;
+        IF @Mode = 'close' SET @Mode = NULL;
+        ELSE IF @Mode = 'possible' SET @Mode = CASE WHEN @CloseCapCents > 0 THEN 'close' END;
         ELSE IF @Took = 0 OR @Sweep >= @MaxSweeps SET @Mode = 'possible';
     END
 
@@ -847,11 +959,33 @@ BEGIN
                WHEN s.Shape LIKE '% lines=batch'    THEN REPLACE(s.Shape, ' lines=batch', '') + ' bank lines from one day add up to one deposit batch'
                WHEN s.Shape = 'devday=days'   THEN 'What is left of one device''s day equals what is left of the takings over those days'
                WHEN s.Shape = 'bankday=days'  THEN 'What is left of the bank day equals what is left of the takings over those days'
+               /* Close: the two halves of the shape, in words. */
+               WHEN s.Shape LIKE '%~%' THEN
+                   CASE LEFT(s.Shape, CHARINDEX('~', s.Shape) - 1)
+                        WHEN 'line'    THEN 'One bank line'
+                        WHEN 'devday'  THEN 'One device''s lines for the day'
+                        ELSE                'What is left of the bank day' END
+                   + ' is within a few rand of '
+                   + CASE SUBSTRING(s.Shape, CHARINDEX('~', s.Shape) + 1, 24)
+                          WHEN 'row'    THEN 'one deposit'
+                          WHEN 'batch'  THEN 'one deposit batch'
+                          WHEN 'batch2' THEN 'a deposit batch that ran over two days'
+                          ELSE               'what is left of the takings over those days' END
                ELSE s.Shape END                                AS Basis,
            /* Why a possible one is only possible, in words. A strong one has
-              no caution: nothing else wanted any of its rows. */
+              no caution: nothing else wanted any of its rows. A close one
+              leads with its difference, which is the thing a person has to
+              give a reason for. */
            CASE
                WHEN s.Confidence = 'strong' THEN NULL
+               WHEN s.Confidence = 'close' THEN
+                   /* Never more than R5,000, so no grouping to get wrong. */
+                   'The bank is R' + CONVERT(varchar(20), CONVERT(decimal(19, 2), ABS(s.DiffCents) / 100.0))
+                   + CASE WHEN s.DiffCents > 0 THEN ' short of the takings' ELSE ' over the takings' END
+                   + CASE WHEN s.TokenOk = 0 THEN '; the batch number on the bank line is not on these deposits'
+                          WHEN s.Alts = 1    THEN '; one other close reading wants some of these rows'
+                          WHEN s.Alts > 1    THEN '; ' + CONVERT(varchar(10), s.Alts) + ' other close readings want some of these rows'
+                          ELSE '' END
                WHEN s.TokenOk = 0 THEN 'The batch number on the bank line is not on these deposits'
                WHEN s.Alts = 1    THEN 'One other pairing wants some of these rows'
                WHEN s.Alts > 1    THEN CONVERT(varchar(10), s.Alts) + ' other pairings want some of these rows'
@@ -871,7 +1005,10 @@ BEGIN
            /* The window agora.usp_Recon_ManualMatch has to be given for it to
               find every deposit in this suggestion. */
            CASE WHEN m.FromD < b.FromD THEN m.FromD ELSE b.FromD END AS MatchFrom,
-           CASE WHEN m.ToD   > b.ToD   THEN m.ToD   ELSE b.ToD   END AS MatchTo
+           CASE WHEN m.ToD   > b.ToD   THEN m.ToD   ELSE b.ToD   END AS MatchTo,
+           /* Deposits less bank, the sign agora.usp_Recon_ManualMatch records
+              its variance in. Zero on every exact suggestion. */
+           CONVERT(money, s.DiffCents / 100.0)                 AS DiffAmount
     FROM #S s
     CROSS APPLY (
         SELECT COUNT(*) AS Lines, SUM(x.Amount) AS Total, MIN(x.D) AS FromD, MAX(x.D) AS ToD,
@@ -885,7 +1022,7 @@ BEGIN
                 FROM (SELECT DISTINCT y.SourceKey FROM #M y WHERE y.Sug = s.SuggestionNo) g) AS Batches
         FROM #M x WHERE x.Sug = s.SuggestionNo
     ) m
-    ORDER BY CASE s.Confidence WHEN 'strong' THEN 0 ELSE 1 END, b.FromD, s.SuggestionNo;
+    ORDER BY CASE s.Confidence WHEN 'strong' THEN 0 WHEN 'possible' THEN 1 ELSE 2 END, b.FromD, s.SuggestionNo;
 
     SELECT x.SuggestionNo, x.Side, x.BankStatementLineID, x.SourceKey, x.SourceDate,
            x.Merchant, x.Amount, x.Description, x.GroupKey
@@ -919,6 +1056,12 @@ BEGIN
            (SELECT ISNULL(SUM(b.Amount), 0) FROM #B b JOIN #S s ON s.SuggestionNo = b.Sug WHERE s.Confidence = 'strong')   AS StrongBankTotal,
            (SELECT COUNT(*) FROM #B b JOIN #S s ON s.SuggestionNo = b.Sug WHERE s.Confidence = 'possible')               AS PossibleBankRows,
            (SELECT ISNULL(SUM(b.Amount), 0) FROM #B b JOIN #S s ON s.SuggestionNo = b.Sug WHERE s.Confidence = 'possible') AS PossibleBankTotal,
+           (SELECT COUNT(*) FROM #S WHERE Confidence = 'close')                               AS CloseSuggestions,
+           (SELECT COUNT(*) FROM #B b JOIN #S s ON s.SuggestionNo = b.Sug WHERE s.Confidence = 'close')                  AS CloseBankRows,
+           (SELECT ISNULL(SUM(b.Amount), 0) FROM #B b JOIN #S s ON s.SuggestionNo = b.Sug WHERE s.Confidence = 'close')    AS CloseBankTotal,
+           (SELECT CONVERT(money, ISNULL(SUM(DiffCents), 0) / 100.0) FROM #S WHERE Confidence = 'close')                   AS CloseVariance,
+           @CloseMax                                                                          AS CloseMax,
+           @ClosePct                                                                          AS ClosePct,
            (SELECT COUNT(*) FROM #M WHERE Sug IS NOT NULL)                                    AS SuggestedMopsRows,
            (SELECT COUNT(*) FROM #B WHERE InPeriod = 1 AND State = 'open')                    AS LeftBankRows,
            (SELECT ISNULL(SUM(Amount), 0) FROM #B WHERE InPeriod = 1 AND State = 'open')      AS LeftBankTotal,

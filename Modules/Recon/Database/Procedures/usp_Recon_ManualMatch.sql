@@ -44,6 +44,9 @@
  *            run (Note, ParamsJson, Outcome 'Matched by suggestion') so the
  *            ledger can always say which pairings an algorithm proposed and
  *            which a person built. (23 Sep 2026.)
+ *            A CLOSE suggestion arrives with a variance, so it also needs
+ *            @Reason, exactly as a forced match by hand does; its run says
+ *            'Matched by suggestion - forced' and carries both. (23 Sep 2026.)
  *
  * Refusals: NOTHING_SELECTED · BANK_ROW_MOVED · MOPS_ROW_MOVED ·
  *           FORCE_REASON_REQUIRED · UNKNOWN_AREA · NO_COUNTER
@@ -207,7 +210,8 @@ BEGIN
     /* ---- 5. Write it, as a run like any other ----------------------------- */
 
     DECLARE @Now datetime2(0) = SYSDATETIME();
-    DECLARE @Outcome nvarchar(60) = CASE WHEN @Forced = 1 THEN 'Matched by hand - forced'
+    DECLARE @Outcome nvarchar(60) = CASE WHEN @Forced = 1 AND @Basis IS NOT NULL THEN 'Matched by suggestion - forced'
+                                         WHEN @Forced = 1 THEN 'Matched by hand - forced'
                                          WHEN @Basis IS NOT NULL THEN 'Matched by suggestion'
                                          ELSE 'Matched by hand' END;
     DECLARE @RunId bigint, @LineId bigint, @BatchId bigint, @No int;
@@ -224,7 +228,8 @@ BEGIN
            (SELECT @Reason AS reason, @Forced AS forced, @Diff AS diff, @Basis AS basis FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
            1, CASE WHEN @Forced = 1 THEN 0 ELSE 1 END, @Forced, 0, 0, 0,
            @BankTotal, @MopsTotal, @BankTotal,
-           CASE WHEN @Forced = 1 THEN 'Manual match (forced)'
+           CASE WHEN @Forced = 1 AND @Basis IS NOT NULL THEN LEFT(N'Suggested match (forced) — ' + @Basis, 400)
+                WHEN @Forced = 1 THEN 'Manual match (forced)'
                 WHEN @Basis IS NOT NULL THEN LEFT(N'Suggested match — ' + @Basis, 400)
                 ELSE 'Manual match' END,
            @Now, @UserId, 1, @BankTotal, @Now, @UserId;
@@ -403,7 +408,8 @@ BEGIN
     SELECT CONVERT(bit, 1) AS Ok,
            CASE WHEN @Forced = 1 THEN 'MATCHED_FORCED' ELSE 'MATCHED' END AS Code,
            CASE WHEN @Forced = 1
-                THEN 'Matched by hand as batch ' + CONVERT(nvarchar(20), @No)
+                THEN CASE WHEN @Basis IS NOT NULL THEN 'Matched by suggestion' ELSE 'Matched by hand' END
+                     + ' as batch ' + CONVERT(nvarchar(20), @No)
                      + ', forced with a variance of ' + CONVERT(nvarchar(30), @Diff) + '.'
                 WHEN @Basis IS NOT NULL
                 THEN 'Matched by suggestion as batch ' + CONVERT(nvarchar(20), @No) + '.'

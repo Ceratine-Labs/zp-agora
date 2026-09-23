@@ -19,12 +19,19 @@
         behaviour here that a native control cannot supply, and the only reason
         the module exists.
 
+      * `query` (panel mode) writes the open tab into that query parameter as
+        it changes, with replaceState, so a reload, a copied link and the
+        return from a form all land on the same tab. The server reads the same
+        parameter to decide `active`. Use it instead of `persist` when the tab
+        belongs to the thing on screen rather than to the person.
+
     `items` is a list of ['key' =>, 'label' =>, 'href' =>, 'count' =>].
 --}}
 @props([
     'items' => [],
     'active' => null,
     'persist' => null,
+    'query' => null,
     'label' => 'Sections',
 ])
 
@@ -37,7 +44,8 @@
 
 <div {{ $attributes->merge(['class' => 'tabset']) }}
      @unless ($linked) data-tabs @endunless
-     @if ($persist) data-tabs-persist="{{ $persist }}" @endif>
+     @if ($persist) data-tabs-persist="{{ $persist }}" @endif
+     @if ($query) data-tabs-query="{{ $query }}" @endif>
 
     <div class="tabs" role="{{ $linked ? 'group' : 'tablist' }}" aria-label="{{ $label }}">
         @foreach ($items as $item)

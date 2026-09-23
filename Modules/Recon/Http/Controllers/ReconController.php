@@ -75,33 +75,100 @@ class ReconController extends Controller
     }
 
     /**
-     * The workbench for one area — the automatic preview, which is tab one.
+     * The recon centre: one area, one site, one period, three tabs.
+     *
+     * ZP asked on 23 Sep 2026 for the run types consolidated: pick a site and
+     * a date range once, the filters fold away, auto balancing runs, and the
+     * Suggestions and the Manual match sit beside it with the scope already
+     * passed. So this is the default face of the area and every link that
+     * already points at /app/recon/auto/{area} lands on it.
+     *
+     * Two states. With no scope chosen it is the form — site, dates, the rules
+     * and readings — which POSTs the preview exactly as before; the preview
+     * redirects back here carrying its run. With a scope, the form folds into
+     * one line and the three tabs appear, each fetched the first time it is
+     * opened (see the pane).
+     *
+     * AUTO IS A RECORDED RUN, never a read done behind the page: a preview is
+     * what makes a reconciliation reproducible and reversible, so the tab
+     * shows the run the scope was previewed as. With no `run` in the URL it
+     * picks up this person's open preview of exactly this scope rather than
+     * writing a new one on every visit — a reload must not mint a run.
      *
      * The branch is chosen HERE, on the result set, which is where
-     * feature-rules §3.3 puts it. The chrome carries no branch selector: head
-     * office is an estate-wide workspace, and a selector in both places is not
-     * two ways to say the same thing but two answers that disagree — which is
-     * precisely what happened on the first cut of this screen.
-     *
-     * It still defaults to whatever BranchContext has pinned, so a branch user
-     * never picks their own site and a head-office user who arrived by a link
-     * carrying `?branch=` lands on the site the sender meant.
+     * feature-rules §3.3 puts it. It still defaults to whatever BranchContext
+     * has pinned, so a branch user never picks their own site.
      */
-    public function area(string $area, BranchContext $context): View
+    public function area(string $area, Request $request, BranchContext $context): View
     {
-        return view('recon::area', $this->workbench($area, 'auto', $context) + [
+        $frame = $this->workbench($area, 'auto', $context);
+        $key = $frame['area']['key'];
+
+        // Scoped by BranchScope, so a run on a site this person may not see
+        // is simply not found.
+        $run = $request->filled('run')
+            ? ReconRun::query()->where('ReconArea', $key)->find($request->integer('run'))
+            : null;
+
+        // A run carries its own scope; an explicit one in the URL wins.
+        if ($run !== null) {
+            $frame['branchId'] = $request->filled('branch_id') ? $frame['branchId'] : (int) $run->BranchId;
+            $frame['from'] = $request->filled('from') ? $frame['from'] : $run->FromDate->toDateString();
+            $frame['to'] = $request->filled('to') ? $frame['to'] : $run->ToDate->toDateString();
+        }
+
+        $branchId = (int) $frame['branchId'];
+        $scoped = $branchId > 0 && ($run !== null || $request->filled('from'));
+
+        if ($scoped) {
+            abort_unless($context->maySee($branchId), 403, 'You may not reconcile that branch.');
+
+            $run ??= ReconRun::query()
+                ->where('ReconArea', $key)
+                ->where('BranchId', $branchId)
+                ->where('FromDate', $frame['from'])
+                ->where('ToDate', $frame['to'])
+                ->where('CreatedBy', auth()->id())
+                ->where('Status', 'previewed')
+                ->orderByDesc('Id')
+                ->first();
+        }
+
+        $centreScope = ['branch_id' => $branchId, 'from' => $frame['from'], 'to' => $frame['to']];
+        $tabs = $this->centreTabs($area);
+        $active = collect($tabs)->pluck('key')->contains($request->query('tab'))
+            ? (string) $request->query('tab')
+            : 'auto';
+
+        return view('recon::area', $frame + [
+            'pane' => 'centre',
+            'scoped' => $scoped,
+            'run' => $run,
+            'centreScope' => $centreScope,
+            'centreTabs' => $tabs,
+            'centreTab' => $active,
             'options' => $this->service->optionsFor($area),
-            // Where the clerk left off IN THIS AREA. The hub answers the same
-            // question across all five, and both come off CreatedBy — a column
-            // the ledger has recorded since the module landed and nothing has
-            // ever read.
-            'open' => ReconRun::openFor(auth()->id(), $area),
-            // Scoped by BranchScope already; the area filter is this screen's.
-            'recent' => ReconRun::query()
-                ->where('ReconArea', $area)
-                ->orderByDesc('CreatedAt')
-                ->limit(5)
-                ->get(),
+            // Where the clerk left off IN THIS AREA, offered only before a
+            // scope is chosen — once it is, the Auto tab IS the open run.
+            'open' => $scoped ? null : ReconRun::openFor(auth()->id(), $area),
+        ]);
+    }
+
+    /**
+     * A run's answer as the fragment the centre's Auto tab opens onto.
+     *
+     * The same partial the run page renders, less the page around it and the
+     * extract drawer (that lives on the run page, one link away). Its execute
+     * and reverse forms carry the centre's scope, so pressing either lands
+     * back on the tab rather than on a different page.
+     */
+    public function runPanel(ReconRun $run, Request $request): View
+    {
+        return view('recon::partials.run-panel', [
+            'run' => $run->load('lines'),
+            'area' => $this->service->area($run->ReconArea),
+            'freshness' => $this->service->freshness($run),
+            'centre' => $this->centreBack($request, 'auto', $run),
         ]);
     }
 
@@ -122,7 +189,7 @@ class ReconController extends Controller
             ? (string) $request->query('state')
             : 'outstanding';
 
-        return view('recon::area', $frame + [
+        $data = $frame + [
             'branchId' => $branchId,
             'state' => $state,
             // A site has to be chosen before there are two sides to show. Head
@@ -138,7 +205,14 @@ class ReconController extends Controller
                     $state,
                 )
                 : ['bank' => collect(), 'mops' => collect(), 'summary' => null]),
-        ]);
+            'centre' => $this->centreBack($request, 'match'),
+        ];
+
+        // The centre's Manual tab fetches the pair-by-hand card on its own;
+        // anything else is a person on the standalone page.
+        return $request->ajax()
+            ? view('recon::partials.match-pane', $data)
+            : view('recon::area', ['pane' => 'match', 'tab' => 'auto'] + $data);
     }
 
     /**
@@ -162,7 +236,7 @@ class ReconController extends Controller
 
         $branchId = $this->resolveBranch((int) $request->query('branch_id', $frame['branchId']), $context);
 
-        return view('recon::area', $frame + [
+        $data = $frame + [
             'branchId' => $branchId,
             // As on the manual match: no site, no answer — an empty list before
             // a site is chosen would read as "nothing to suggest".
@@ -174,7 +248,12 @@ class ReconController extends Controller
                     Carbon::parse($frame['to']),
                 )
                 : ['suggestions' => collect(), 'summary' => null]),
-        ]);
+            'centre' => $this->centreBack($request, 'suggest'),
+        ];
+
+        return $request->ajax()
+            ? view('recon::partials.suggest-results', $data)
+            : view('recon::area', ['pane' => 'suggest', 'tab' => 'auto'] + $data);
     }
 
     /**
@@ -238,6 +317,10 @@ class ReconController extends Controller
                 return response()->json(['ok' => false, 'code' => $e->code(), 'message' => $e->getMessage()], 422);
             }
 
+            if ($request->input('back') === 'centre') {
+                return $this->toCentre($request, $area, $branchId)->with('centreRefusal', $e->getMessage());
+            }
+
             // Its own key on the Suggestions tab: the area's generic refusal
             // notice says "the procedure could not run for this branch",
             // which is not what a refused match is.
@@ -252,6 +335,12 @@ class ReconController extends Controller
                 'batch' => $status->BatchNo,
                 'run' => route('app.recon.run', $status->Id),
             ]);
+        }
+
+        if ($request->input('back') === 'centre') {
+            return $this->toCentre($request, $area, $branchId)
+                ->with('centreDone', $status->Message)
+                ->with('centreRun', route('app.recon.run', $status->Id));
         }
 
         if ($request->input('back') === 'suggest') {
@@ -493,11 +582,28 @@ class ReconController extends Controller
                 note: $request->note(),
             );
         } catch (ReconPreviewRefused $e) {
-            return back()
-                ->withInput()
+            // From the centre, the refusal lands on the centre WITH its scope:
+            // a site with no rule can still be paired by hand and offered
+            // suggestions, and sending the clerk back to an empty form would
+            // hide both.
+            $to = $request->boolean('centre')
+                ? redirect()->route('app.recon.area', [$area['key'],
+                    'branch_id' => $branchId, 'from' => $request->from()->toDateString(), 'to' => $request->to()->toDateString()])
+                : back()->withInput();
+
+            return $to
                 ->with('refusal', $e->getMessage())
                 ->with('refusalProcedure', $e->procedure())
                 ->with('refusalDetail', $e->detail());
+        }
+
+        if ($request->boolean('centre')) {
+            return redirect()->route('app.recon.area', [$area['key'],
+                'branch_id' => $branchId,
+                'from' => $request->from()->toDateString(),
+                'to' => $request->to()->toDateString(),
+                'run' => $run->Id,
+            ]);
         }
 
         return redirect()->route('app.recon.run', $run);
@@ -671,6 +777,13 @@ class ReconController extends Controller
             return back()->with('refusal', $e->getMessage());
         }
 
+        if ($request->input('back') === 'centre') {
+            return $this->toCentre($request, $run->ReconArea, (int) $run->BranchId, $run)
+                ->with('executed', $result['status']->Message)
+                ->with('executedCode', $result['status']->Code)
+                ->with('executedLines', $result['lines']->toArray());
+        }
+
         return redirect()
             ->route('app.recon.run', $run)
             ->with('executed', $result['status']->Message)
@@ -696,7 +809,51 @@ class ReconController extends Controller
             return back()->with('refusal', $e->getMessage());
         }
 
+        if ($request->input('back') === 'centre') {
+            return $this->toCentre($request, $run->ReconArea, (int) $run->BranchId, $run)->with('executed', $status->Message);
+        }
+
         return redirect()->route('app.recon.run', $run)->with('executed', $status->Message);
+    }
+
+    /**
+     * What a form inside the centre needs to come back to it: the tab it sits
+     * on, the scope, and the run on the Auto tab. Null off the centre, which
+     * is what keeps every standalone page's redirects exactly as they were.
+     *
+     * The period is `period_from` / `period_to` on the way back because a
+     * suggestion's own `from` / `to` is the window its deposits sit in, not
+     * the period the clerk chose.
+     *
+     * @return array<string, string|int>|null
+     */
+    protected function centreBack(Request $request, string $tab, ?ReconRun $run = null): ?array
+    {
+        if ($request->query('centre') !== '1' && ! $request->ajax()) {
+            return null;
+        }
+
+        return array_filter([
+            'back' => 'centre',
+            'tab' => $tab,
+            'branch_id' => (int) $request->query('branch_id', $run?->BranchId),
+            'period_from' => (string) $request->query('from', $run?->FromDate?->toDateString()),
+            'period_to' => (string) $request->query('to', $run?->ToDate?->toDateString()),
+            'run' => (int) $request->query('run', $run?->Id),
+        ]);
+    }
+
+    /** Back to the centre, on the tab the form came from, with its scope. */
+    protected function toCentre(Request $request, string $area, int $branchId, ?ReconRun $run = null): RedirectResponse
+    {
+        return redirect()->route('app.recon.area', array_filter([
+            $area,
+            'branch_id' => $branchId,
+            'from' => (string) $request->input('period_from', $run?->FromDate?->toDateString()),
+            'to' => (string) $request->input('period_to', $run?->ToDate?->toDateString()),
+            'run' => $request->integer('run') ?: $run?->Id,
+            'tab' => in_array($request->input('tab'), ['auto', 'suggest', 'match'], true) ? $request->input('tab') : null,
+        ]));
     }
 
     /**

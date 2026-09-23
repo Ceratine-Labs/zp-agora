@@ -9,8 +9,9 @@
  * It stops the click from reaching the row, because a row in a grid with
  * row-detail expands when clicked and ticking a box is not asking for that.
  */
-export default function checkAll() {
-    document.querySelectorAll('[data-check-all]').forEach((master) => {
+export default function checkAll(root = document) {
+    root.querySelectorAll('[data-check-all]:not([data-check-all-ready])').forEach((master) => {
+        master.setAttribute('data-check-all-ready', '');
         const table = master.closest('table');
         if (!table) return;
 

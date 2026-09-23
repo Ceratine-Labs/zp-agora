@@ -35,8 +35,9 @@
  * It says nothing at all when no filter is narrowing anything, so a normal
  * commit is not made to look dangerous.
  */
-export default function confirmForm() {
-    document.querySelectorAll('form[data-confirm]').forEach((form) => {
+export default function confirmForm(root = document) {
+    root.querySelectorAll('form[data-confirm]:not([data-confirm-ready])').forEach((form) => {
+        form.setAttribute('data-confirm-ready', '');
         form.addEventListener('submit', async (event) => {
             if (form.dataset.confirmed === 'yes') return;
 
@@ -78,6 +79,10 @@ export default function confirmForm() {
             });
 
             if (!ok) return;
+
+            // The submit below fires no submit event, so the loader is told
+            // directly — a form that asked for the cup still gets it.
+            window.Agora.loader?.submitting(form);
 
             form.dataset.confirmed = 'yes';
 
