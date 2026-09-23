@@ -6,6 +6,25 @@
                reproduced even after the customer edits their extraction rules.">
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.recon.area', $run->ReconArea) }}">Run another</a>
+            @can('recon.runs.close')
+                {{-- Set aside, not thrown away. Offered on a finished preview;
+                     the procedure refuses the rare one with anything processed
+                     against it, and says why. --}}
+                @if (in_array($run->Status, ['previewed', 'failed'], true))
+                    <form method="POST" action="{{ route('app.recon.close', $run) }}"
+                          data-confirm="Mark run #{{ $run->Id }} complete?"
+                          data-confirm-text="It leaves the open work list and stays on record, proposals and all. Nothing in PumpIT moves, and it can be reopened. To reconcile anything on it later, reopen it first."
+                          data-confirm-action="Mark complete">
+                        @csrf
+                        <button type="submit" class="btn-ghost">Mark complete</button>
+                    </form>
+                @elseif ($run->Status === 'closed')
+                    <form method="POST" action="{{ route('app.recon.reopen', $run) }}">
+                        @csrf
+                        <button type="submit" class="btn-ghost">Reopen</button>
+                    </form>
+                @endif
+            @endcan
             @unless ($run->isReconciled())
                 <form method="POST" action="{{ route('app.recon.discard', $run) }}"
                       data-confirm="Discard run #{{ $run->Id }}?"
@@ -42,8 +61,15 @@
         </x-notice>
     @endif
 
+    @if (session('tidied'))
+        <x-notice tone="info" :title="session('tidied')" style="margin-bottom:16px" />
+    @endif
+
     @if (session('refusal'))
-        <x-notice tone="stop" title="That run cannot be discarded" style="margin-bottom:16px">
+        {{-- Discard, execute, reverse, close and reopen all land here, so the
+             title names none of them; the procedure's own sentence says what
+             was refused and why. --}}
+        <x-notice tone="stop" title="That did not go through" style="margin-bottom:16px">
             <p>{{ session('refusal') }}</p>
         </x-notice>
     @endif

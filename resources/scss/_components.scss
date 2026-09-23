@@ -853,6 +853,28 @@ tr.tt-page-out { display: none; }
   > .notice-body { padding: 0 14px 12px 14px; }
 }
 
+/* A group of explanatory panels folded behind one line — <x-explainer>.
+   The summary is deliberately quiet: it is the one thing on the screen that
+   should read as a way out of the reading rather than more of it. Matches
+   .params-fold, which is the same gesture above a parameter block. */
+.explainer {
+  margin-bottom: 16px;
+  > summary {
+    cursor: pointer; list-style: none; padding: 4px 0 6px;
+    font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+    &::marker, &::-webkit-details-marker { display: none; }
+    &::before { content: '▸'; margin-right: 7px; }
+    &:hover { color: var(--brand-ink); }
+    &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  }
+  &[open] > summary { padding-bottom: 10px; }
+  &[open] > summary::before { content: '▾'; }
+  /* The panels space themselves here rather than each carrying its own
+     bottom margin, so the last one cannot leave a gap under the group. */
+  > .explainer-body { display: flex; flex-direction: column; gap: 16px; }
+}
+
 /* The five reconciliation areas on the recon hub. */
 .area-grid {
   display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

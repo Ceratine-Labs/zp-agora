@@ -109,7 +109,12 @@ class ReconGroupTest extends TestCase
         $response->assertRedirect(route('app.recon.group', $group->GroupRef));
 
         $this->assertSame('running', $group->Status);
-        $this->assertGreaterThan(1, $group->BranchCount, 'A group covers every trading site.');
+        // Every trading site that has a rule for the area — a site without one
+        // is left out and named rather than run to a guaranteed refusal
+        // (Ryan, 23 Sep 2026).
+        $this->assertGreaterThan(0, $group->BranchCount);
+        $this->assertSame(count($this->sitesWithCriteria()), $group->BranchCount,
+            'A group covers every trading site with a rule for the area, and no other.');
         $this->assertSame(0, $group->CompletedCount);
         // The group carries the group entity, never one of its sites.
         $this->assertSame((int) config('agora.group_branch_id'), $group->BranchId);
@@ -117,14 +122,17 @@ class ReconGroupTest extends TestCase
     }
 
     /**
-     * A site that cannot run is a ROW saying why, not an empty result.
+     * A site that cannot run is NAMED, not run to a refusal and not hidden.
      *
-     * On the live system twenty-four of twenty-six branches produce nothing
-     * and the screen never says why (finding 1). In a group that distinction
-     * is the entire answer, so a refusal is recorded as a run with a code on
-     * it and rendered as its own state.
+     * On the live system twenty-four of twenty-six branches once produced
+     * nothing and the screen never said why (finding 1), so the first cut of
+     * this screen recorded a failed run per site with no rule. By 23 Sep 2026
+     * that was 236 failed runs on live, all NO_CRITERIA, all the same four
+     * sites, filling the clerks' run lists. Ryan approved leaving them out —
+     * and the distinction survives as a notice naming each one, because "no
+     * rule here" and "nothing to reconcile" are still opposite answers.
      */
-    public function test_a_site_with_no_criteria_row_is_recorded_as_a_refusal(): void
+    public function test_a_site_with_no_criteria_row_is_left_out_and_named(): void
     {
         $group = $this->startGroup();
         $site = $this->siteWithoutCriteria($group);
@@ -133,26 +141,27 @@ class ReconGroupTest extends TestCase
             $this->markTestSkipped('Every trading site has a criteria row on this instance.');
         }
 
+        // Not previewed: there is nothing it could answer but a refusal.
         $this->actingAs($this->admin())
             ->post(route('app.recon.group.branch', [$group->GroupRef, $site]))
+            ->assertNotFound();
+
+        $this->assertSame(0, $group->runs()->where('BranchId', $site)->count(), 'No failed run is recorded for it.');
+
+        // And the group screen says which sites were left out, and why.
+        $name = (string) Branch::query()->acrossBranches()->where('BranchId', $site)->value('Name');
+
+        $this->actingAs($this->admin())->get(route('app.recon.group', $group->GroupRef))
             ->assertOk()
-            ->assertSee('NO_CRITERIA');
-
-        $run = $group->runs()->where('BranchId', $site)->firstOrFail();
-
-        $this->assertSame('failed', $run->Status);
-        $this->assertSame('NO_CRITERIA', $run->FailureCode);
-        $this->assertNotNull($run->FailureMessage);
-
-        // And the group counted it as answered rather than as still pending.
-        $this->assertSame(1, $group->fresh()?->FailedCount);
+            ->assertSee('left out — no')
+            ->assertSee($name);
     }
 
     /** Asking for the same site twice does not preview it twice. */
     public function test_running_a_site_is_idempotent(): void
     {
         $group = $this->startGroup();
-        $site = $this->siteWithoutCriteria($group) ?? 18;
+        $site = $this->siteWithCriteria();
 
         foreach ([1, 2] as $ignored) {
             $this->actingAs($this->admin())
@@ -211,18 +220,47 @@ class ReconGroupTest extends TestCase
      */
     private function siteWithoutCriteria(ReconRunGroup $group): ?int
     {
-        $configured = DB::connection(config('agora.connections.app'))
+        $configured = $this->configured();
+
+        return collect($this->tradingSites())->first(fn (int $id) => ! in_array($id, $configured, true));
+    }
+
+    /** A trading site that does have an ABSA rule — one a group actually runs. */
+    private function siteWithCriteria(): int
+    {
+        $site = collect($this->sitesWithCriteria())->first();
+
+        if ($site === null) {
+            $this->markTestSkipped('No trading site has an ABSA criteria row on this instance.');
+        }
+
+        return $site;
+    }
+
+    /** @return array<int, int> */
+    private function sitesWithCriteria(): array
+    {
+        return array_values(array_intersect($this->tradingSites(), $this->configured()));
+    }
+
+    /** @return array<int, int> */
+    private function configured(): array
+    {
+        return DB::connection(config('agora.connections.app'))
             ->table(config('agora.schema').'.vw_AutoReconCriteria')
             ->where('BankReconArea', 'ABSA')
+            ->distinct()
             ->pluck('BranchId')
             ->map(fn (mixed $id) => (int) $id)
             ->all();
+    }
 
-        $sites = Branch::query()->acrossBranches()
+    /** @return array<int, int> */
+    private function tradingSites(): array
+    {
+        return Branch::query()->acrossBranches()
             ->where('IsActive', true)->where('IsTrading', true)
             ->pluck('BranchId')->map(fn (mixed $id) => (int) $id)->all();
-
-        return collect($sites)->first(fn (int $id) => ! in_array($id, $configured, true));
     }
 
     /**
@@ -244,7 +282,7 @@ class ReconGroupTest extends TestCase
     public function test_the_runs_relation_finds_what_the_query_finds(): void
     {
         $group = $this->startGroup();
-        $site = $this->siteWithoutCriteria($group) ?? 18;
+        $site = $this->siteWithCriteria();
 
         $this->actingAs($this->admin())
             ->post(route('app.recon.group.branch', [$group->GroupRef, $site]))

@@ -23,6 +23,16 @@
  *                      A head-office user with a partial grant and no
  *                      selection must still not see the rest of the estate,
  *                      and @BranchIds is empty in exactly that case.
+ *   @OpenOnly          the Open work / Everything switch (23 Sep 2026). 1
+ *                      shows only runs still in hand — 'previewing' and
+ *                      'previewed'. A runs list that grows forever is why
+ *                      "clear old runs" was asked for: on live that morning the
+ *                      clerks' lists held 1,136 open previews and 236 failed
+ *                      runs between them. Default 0 here, so every caller that
+ *                      predates it is unchanged; the screen passes 1 unless
+ *                      the person asked for everything. Committed, reversed,
+ *                      closed and failed runs are one switch away, and the
+ *                      Status filter still narrows within either setting.
  *
  * THE @FiltersJson SHAPE, which is the thing to get right here.
  * GridQuery::filtersJson() sends a JSON ARRAY of objects that GridFilter
@@ -56,7 +66,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_GridRuns]
     @ReconArea        NVARCHAR(20)  = NULL,
     @MineOnly         BIT           = 1,
     @UserId           INT           = NULL,
-    @AllowedBranchIds NVARCHAR(MAX) = NULL
+    @AllowedBranchIds NVARCHAR(MAX) = NULL,
+    @OpenOnly         BIT           = 0
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -168,7 +179,14 @@ BEGIN
                never committed is the one a clerk comes back to; anything else
                is history. Returned rather than derived on the page, so the row
                action and the resume card cannot disagree about it. */
-            CONVERT(bit, CASE WHEN r.Status = 'previewed' THEN 1 ELSE 0 END) AS IsOpen
+            CONVERT(bit, CASE WHEN r.Status = 'previewed' THEN 1 ELSE 0 END) AS IsOpen,
+            /* Which working-list gesture the row offers. Status alone, on
+               purpose: whether anything has been processed against a run is
+               decided by usp_Recon_DiscardRuns and nowhere else, and it
+               refuses the rare run that says 'previewed' but has evidence
+               hanging off it. The row only has to know which button to show. */
+            CONVERT(bit, CASE WHEN r.Status IN ('previewed', 'failed') THEN 1 ELSE 0 END) AS IsClosable,
+            CONVERT(bit, CASE WHEN r.Status = 'closed' THEN 1 ELSE 0 END) AS IsClosed
         FROM agora.ReconRun r
         LEFT JOIN agora.Branch b ON b.BranchId = r.BranchId AND b.DeletedAt IS NULL
         LEFT JOIN agora.[User] u ON u.Id = r.CreatedBy
@@ -178,6 +196,7 @@ BEGIN
           /* @MineOnly with no @UserId is NO runs rather than every run: a
              filter that fails open is the one that leaks. */
           AND (@MineOnly = 0 OR (@UserId IS NOT NULL AND r.CreatedBy = @UserId))
+          AND (ISNULL(@OpenOnly, 0) = 0 OR r.Status IN ('previewing', 'previewed'))
           AND (@DateFrom IS NULL OR r.ToDate   >= @DateFrom)
           AND (@DateTo   IS NULL OR r.FromDate <= @DateTo)
     )
@@ -208,7 +227,8 @@ BEGIN
     SELECT
         Id, Note, BranchId, BranchName, ReconArea, FromDate, ToDate, Status, RunBy, CreatedAt,
         TotalRows, MatchedRows, MismatchRows, BankOnlyRows, DepositOnlyRows, OtherRows,
-        MatchedTotal, CommittedRows, CommittedTotal, PreviewMs, StampMode, ProcedureName, IsOpen
+        MatchedTotal, CommittedRows, CommittedTotal, PreviewMs, StampMode, ProcedureName, IsOpen,
+        IsClosable, IsClosed
     FROM #Rows
     ORDER BY
         /* Text and date sorts kept apart so each compares as itself — '10'

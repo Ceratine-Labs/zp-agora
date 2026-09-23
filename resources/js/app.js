@@ -18,6 +18,7 @@ import modal from './components/modal';
 import tableTools from './components/table-tools';
 import linkedSelect from './components/linked-select';
 import bulkSelection from './components/bulk-selection';
+import postLink from './components/post-link';
 import * as format from './format';
 
 megaMenu();
@@ -68,6 +69,9 @@ window.Agora = { notify, format, tip: tip() };
 // After the global exists — it asks through window.Agora.notify, so that the
 // dialog is the same one every other confirmation in the application uses.
 confirmForm();
+
+// Same reason: a row action that POSTs asks in the same dialog as a form does.
+postLink();
 
 // Same reason: "match all strong" on the recon Suggestions tab asks in the
 // same dialog before it posts each one. Nothing on any other page.

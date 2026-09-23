@@ -52,11 +52,30 @@ class ReconRunListTest extends TestCase
     {
         $this->actingAs($this->admin())->get('/app/recon/auto/ABSA/runs')
             ->assertOk()
-            ->assertSee('The previews you have made in this area');
+            ->assertSee('the previews you have made in this area');
 
         $this->actingAs($this->admin())->get('/app/recon/auto/ABSA/runs?scope=all')
             ->assertOk()
-            ->assertSee('Every preview made in this area, whoever made it');
+            ->assertSee('everyone\'s, in this area');
+    }
+
+    /**
+     * Open work by default, everything on request (Ryan, 23 Sep 2026) — and,
+     * like the other switch, the sub-heading says which way it is set. Each
+     * switch keeps the other's setting, so flipping one never resets the other.
+     */
+    public function test_the_open_work_switch_defaults_to_open_and_keeps_the_scope(): void
+    {
+        $this->actingAs($this->admin())->get('/app/recon/auto/ABSA/runs')
+            ->assertOk()
+            ->assertSee('Open work — the previews you have made in this area')
+            ->assertSee('Everything');
+
+        $this->actingAs($this->admin())->get('/app/recon/auto/ABSA/runs?scope=all&show=all')
+            ->assertOk()
+            ->assertSee('Every run — everyone\'s, in this area')
+            // The Open work link keeps scope=all.
+            ->assertSee(route('app.recon.runs', ['area' => 'ABSA', 'scope' => 'all']), false);
     }
 
     /**
@@ -71,7 +90,7 @@ class ReconRunListTest extends TestCase
         $this->actingAs($this->admin())->get('/app/recon')
             ->assertOk()
             ->assertSee('agora.usp_Recon_GridRuns')
-            ->assertSee('Every preview across the five areas');
+            ->assertSee('Open work across the five areas');
     }
 
     /** A run can be given a name on the way in, so it can be found by one. */

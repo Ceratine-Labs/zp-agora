@@ -131,8 +131,35 @@
         </div>
     @endisset
 
+    {{-- Which pending proposals another run has already committed since this
+         preview — agora.usp_Recon_RunFreshness, read on every open. Empty on
+         anything that is not an open preview. --}}
+    @php($claimed = collect($freshness['claimed'] ?? []))
+
     @if ($run->Status === 'previewed')
         @php($ready = $run->lines->where('WouldReconcile', true)->where('CommitState', 'pending')->count())
+
+        @if ($claimed->isNotEmpty())
+            @php($summary = $freshness['summary'])
+            @php($newest = $claimed->sortByDesc('ClaimedAt')->first())
+            {{-- Before the press, not after it. The commit re-checks every row
+                 and skips anything that moved, so nothing is ever stamped twice
+                 — but until now it said so only once the button had been
+                 pressed, and a clerk resuming an old preview found out that
+                 most of it was already done from the refusal list. --}}
+            <x-notice tone="warn" style="margin:12px 14px 0"
+                      :title="$claimed->count().' of '.(int) $summary->Pending.' '.Str::plural('proposal', (int) $summary->Pending).' here '.($claimed->count() === 1 ? 'has' : 'have').' been reconciled by another run since this preview'">
+                <p>Worth {{ \App\Support\Format::r($summary->ClaimedTotal) }}. Their ticks are off, so
+                   Reconcile now offers the {{ \App\Support\Format::n((int) $summary->Pending - $claimed->count()) }}
+                   that nobody has touched. The newest was run
+                   <a href="{{ route('app.recon.run', (int) $newest->ClaimedByRunId) }}">#{{ $newest->ClaimedByRunId }}</a>{{ $newest->ClaimedBy ? ', by '.$newest->ClaimedBy : '' }},
+                   {{ \Illuminate\Support\Carbon::parse($newest->ClaimedAt)->diffForHumans() }}.</p>
+                <p class="field-help">This reads Agora's own ledger: the same reference, committed by another
+                   Agora run in this area after this preview was made. A line stamped outside Agora since then is
+                   still caught when you press Reconcile — every row is re-checked, and anything that has moved is
+                   skipped. For a clean list, preview the period again.</p>
+            </x-notice>
+        @endif
 
         {{-- The press, above the rows it acts on. It used to sit in the footer
              under the table, which on a month of ABSA is four hundred rows
@@ -144,7 +171,9 @@
                     data-count-noun="batch" data-count-plural="batches"
                     @disabled($ready === 0)>
                 {{ $stampMode === 'live' ? 'Reconcile' : 'Record' }}
-                {{ $ready }} {{ Str::plural('batch', $ready) }}
+                {{-- What is ticked on arrival, which is what the count on the
+                     button tracks from here on. --}}
+                {{ $ready - $claimed->count() }} {{ Str::plural('batch', $ready - $claimed->count()) }}
             </button>
 
             <x-slot:note>
@@ -204,13 +233,22 @@
                 @if ($run->Status === 'previewed')
                     <td class="pick">
                         @if ($line->WouldReconcile && $line->CommitState === 'pending')
+                            {{-- Unticked, not removed, where another run has
+                                 committed the same reference since: a matching
+                                 key is a strong sign, not proof, and the commit
+                                 re-check has the final word. --}}
                             <input type="checkbox" name="lines[]" value="{{ $line->Id }}" data-check
-                                   aria-label="Reconcile {{ $line->KeyRef }}" checked>
+                                   aria-label="Reconcile {{ $line->KeyRef }}" @checked(! $claimed->has($line->Id))>
                         @endif
                     </td>
                 @endif
                 <td>
                     <x-chip :tone="$line->tone()">{{ $line->Outcome }}</x-chip>
+                    @if ($claimed->has($line->Id))
+                        @php($claim = $claimed->get($line->Id))
+                        <br><span class="drill-line-id">reconciled by run #{{ $claim->ClaimedByRunId }}
+                            (batch {{ $claim->ClaimedBatchNo }}) since this preview</span>
+                    @endif
                     @if ($line->CommitState === 'committed')
                         <br><span class="drill-line-id">batch {{ $line->ReconBatchNo }}</span>
                     @elseif ($line->CommitState === 'blocked')
@@ -304,6 +342,13 @@
             <p class="field-help">
                 Reversed {{ $run->ReversedAt?->diffForHumans() }} — {{ $run->ReversalReason }}.
                 The proposals are pending again and can be executed once whatever caused it is dealt with.
+            </p>
+
+        @elseif ($run->Status === 'closed')
+            <p class="field-help">
+                Marked complete{{ $run->UpdatedAt ? ' '.$run->UpdatedAt->diffForHumans() : '' }}. Nothing was
+                stamped from this run, and it stays here as the record of what the preview found. It is out of
+                the open work list and out of every clear-previews sweep. Reopen it to reconcile anything on it.
             </p>
         @endif
     </footer>

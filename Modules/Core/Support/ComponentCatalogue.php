@@ -603,6 +603,19 @@ class ComponentCatalogue
                 ],
             ],
             [
+                'name' => 'x-explainer',
+                'group' => 'Messages',
+                'summary' => 'A **group** of explanatory panels folded behind one line.',
+                'mockup' => 'note',
+                'notes' => '`<x-notice collapsible>` folds one panel and keeps its headline visible; that is right for a finding and wrong for a screen that opens with several paragraphs of standing explanation, which the regular reader scrolls past on every visit to reach the work. This folds the GROUP, and the summary line names what is inside, so the existence of what it hides is still on the screen \u{2014} one line instead of three panels. **Closed by default**, because standing explanation is not the answer to anything. Not for a refusal, a result, or anything about the run in hand: those go in their own `<x-notice>` above it, where they cannot be folded away unread. Built for the stock recon centre (Ryan, 22 Sep 2026), whose invariant and commit-warning panels were the whole of its first screen.',
+                'js' => 'disclosure.js',
+                'props' => [
+                    ['summary', 'string', "'How this screen works'", 'The line that stays visible'],
+                    ['open', 'bool', 'false', 'Which way it starts'],
+                    ['remember', '?string', 'null', 'Key for disclosure.js'],
+                ],
+            ],
+            [
                 'name' => 'x-tip',
                 'group' => 'Messages',
                 'summary' => 'The page\'s one floating tooltip.',

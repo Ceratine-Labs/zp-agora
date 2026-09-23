@@ -26,13 +26,31 @@ import { test } from './support/fixtures.js';
  * shape being tested, not a limitation of it.
  */
 test.describe('stock recon centre', () => {
-    test('the hub leads with the invariant and names its exclusions', async ({ signedIn: page }) => {
+    test('the standing explanation is folded away but says what it holds', async ({ signedIn: page }) => {
         await page.goto('/app/stock-recon');
 
         await expect(page.getByRole('heading', { name: 'Stock recon centre', level: 1 })).toBeVisible();
 
-        // The one sentence every figure on the screen follows from.
+        // Ryan, 22 Sep 2026: the invariant and the commit warning are true on
+        // every visit and are not about the run in hand, so they fold as a
+        // group and the work leads instead. Closed on arrival.
+        const explainer = page.locator('details.explainer');
+        await expect(explainer).toHaveJSProperty('open', false);
+        await expect(page.getByText(/Balancing moves variance between shifts/)).toBeHidden();
+
+        // Folded is not hidden: the summary has to say that a commit writes to
+        // PumpIT, or the fold has buried the one fact somebody needs before
+        // they press. This is the assertion that stops the summary being
+        // reworded into something decorative.
+        await expect(explainer.locator('summary')).toContainText(/commit writes to PumpIT|commit records/);
+
+        await explainer.locator('summary').click();
         await expect(page.getByText(/Balancing moves variance between shifts/)).toBeVisible();
+        await expect(page.getByText(/Committing amends the counts in PumpIT|recorded here, not written/)).toBeVisible();
+    });
+
+    test('the hub names its exclusions', async ({ signedIn: page }) => {
+        await page.goto('/app/stock-recon');
 
         // Virtual products are out, and the screen says so rather than
         // silently dropping them.

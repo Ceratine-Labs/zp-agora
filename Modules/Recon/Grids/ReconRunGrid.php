@@ -41,7 +41,11 @@ class ReconRunGrid extends GridDefinition
 
     public function blurb(): ?string
     {
-        return 'Every preview made in this area, newest first. Yours unless you ask for everyone\'s. '
+        return (self::wantsOpenOnly()
+                ? 'Open work only: previews not yet reconciled or marked complete. Committed, reversed, '
+                    .'closed and failed runs are under Everything. '
+                : 'Every run, newest first, whatever happened to it. ')
+            .'Yours unless you ask for everyone\'s. '
             .'The dates are the PERIOD a run covered, not when it was run — a run of 25 July to '
             .'5 August answers a search for either month.';
     }
@@ -85,7 +89,7 @@ class ReconRunGrid extends GridDefinition
             'Note' => new GridFilter(column: 'Note', type: 'text'),
             'BranchName' => new GridFilter(column: 'BranchName', type: 'text'),
             'Status' => new GridFilter(column: 'Status', type: 'set',
-                options: ['previewing', 'previewed', 'committed', 'reversed', 'failed']),
+                options: ['previewing', 'previewed', 'committed', 'reversed', 'closed', 'failed']),
             'RunBy' => new GridFilter(column: 'RunBy', type: 'text'),
         ];
     }
@@ -98,6 +102,7 @@ class ReconRunGrid extends GridDefinition
             extra: [
                 'ReconArea' => $this->area(),
                 'MineOnly' => (int) self::wantsOwnRunsOnly(),
+                'OpenOnly' => (int) self::wantsOpenOnly(),
                 'UserId' => request()->user()?->Id,
                 // The sites this person may see AT ALL, which is not the same
                 // question as the sites they have selected. @BranchIds is
@@ -131,15 +136,51 @@ class ReconRunGrid extends GridDefinition
     }
 
     /**
-     * @return array<int, array{label: string, url: string, primary?: bool}>
+     * Resume or open, and — for a person who may tidy runs — the one
+     * working-list gesture the row allows: Complete on a finished preview,
+     * Reopen on a run marked complete. History rows get neither.
+     *
+     * Both are POSTs, carried by `data-post` (resources/js/components/
+     * post-link.js); the href stays the run page, so with scripting off the
+     * button still takes the person to where the same action lives.
+     *
+     * @return array<int, array{label: string, url: string, primary?: bool, attributes?: array<string, string>}>
      */
     public function rowActions(object $row): array
     {
-        return [[
+        $actions = [[
             'label' => (bool) ($row->IsOpen ?? false) ? 'Resume' : 'Open',
             'url' => route('app.recon.run', ['run' => $row->Id]),
             'primary' => (bool) ($row->IsOpen ?? false),
         ]];
+
+        if (! (request()->user()?->can('recon.runs.close') ?? false)) {
+            return $actions;
+        }
+
+        if ((bool) ($row->IsClosable ?? false)) {
+            $actions[] = [
+                'label' => 'Complete',
+                'url' => route('app.recon.run', ['run' => $row->Id]),
+                'attributes' => [
+                    'data-post' => route('app.recon.close', ['run' => $row->Id]),
+                    'data-confirm' => 'Mark run #'.$row->Id.' complete?',
+                    'data-confirm-text' => 'It leaves the open work list and stays on record. Nothing in PumpIT '
+                        .'moves, and it can be reopened. A run that has stamped anything cannot be closed.',
+                    'data-confirm-action' => 'Mark complete',
+                ],
+            ];
+        } elseif ((bool) ($row->IsClosed ?? false)) {
+            $actions[] = [
+                'label' => 'Reopen',
+                'url' => route('app.recon.run', ['run' => $row->Id]),
+                'attributes' => [
+                    'data-post' => route('app.recon.reopen', ['run' => $row->Id]),
+                ],
+            ];
+        }
+
+        return $actions;
     }
 
     /**
@@ -155,6 +196,20 @@ class ReconRunGrid extends GridDefinition
     public static function wantsOwnRunsOnly(): bool
     {
         return request()->query('scope', 'mine') !== 'all';
+    }
+
+    /**
+     * Open work, or everything.
+     *
+     * Default OPEN (Ryan, 23 Sep 2026). A runs list that grows forever is the
+     * reason "clear old runs" was asked for: that morning the clerks' own
+     * lists held 1,136 open previews and 236 failed runs between them. Static
+     * for the same reason as the Mine / Everyone switch: the pane renders the
+     * control and has to agree with the grid about which way it is set.
+     */
+    public static function wantsOpenOnly(): bool
+    {
+        return request()->query('show', 'open') !== 'all';
     }
 
     /**

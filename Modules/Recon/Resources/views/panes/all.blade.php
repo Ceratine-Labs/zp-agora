@@ -8,6 +8,8 @@
 --}}
 <x-card title="Run every site"
         :sub="'A period and the readings. '.$sites->count().' trading '.Str::plural('site', $sites->count()).' will be previewed, one at a time.'">
+    @include('recon::partials.unconfigured-sites', ['unconfigured' => $unconfigured, 'area' => $area])
+
     <form method="POST" action="{{ route('app.recon.all.start', $area['key']) }}">
         @csrf
         <input type="hidden" name="area" value="{{ $area['key'] }}">

@@ -532,7 +532,40 @@ class ReconController extends Controller
                 $request,
                 $request->user()?->Id,
             ),
+            // Checked on every open, not once: a preview resumed a fortnight
+            // later is exactly the one somebody else has been working through.
+            'freshness' => $this->service->freshness($run),
         ]);
+    }
+
+    /**
+     * Mark a run complete: it leaves the working list and stays on record.
+     *
+     * Today a clerk who has looked at a preview and decided nothing needs
+     * stamping can only discard it, which destroys the record of the read.
+     * The procedure refuses a run with anything processed against it.
+     */
+    public function close(ReconRun $run): RedirectResponse
+    {
+        try {
+            $status = $this->service->close($run);
+        } catch (AgoraProcException $e) {
+            return back()->with('refusal', $e->getMessage());
+        }
+
+        return redirect()->route('app.recon.run', $run)->with('tidied', $status->Message);
+    }
+
+    /** Undo a close. Closing destroys nothing, so it has to be undoable. */
+    public function reopen(ReconRun $run): RedirectResponse
+    {
+        try {
+            $status = $this->service->reopen($run);
+        } catch (AgoraProcException $e) {
+            return back()->with('refusal', $e->getMessage());
+        }
+
+        return redirect()->route('app.recon.run', $run)->with('tidied', $status->Message);
     }
 
     /**
@@ -581,10 +614,20 @@ class ReconController extends Controller
 
         try {
             // An area filter only means anything on a sweep; discarding one
-            // run is already as narrow as it gets.
+            // run is already as narrow as it gets. So do the age limit and the
+            // "only mine": they come off the Runs tab's own Clear button, which
+            // sits under a list that shows the clerk her own runs by default.
             $area = $run ? null : ($request->string('area')->value() ?: null);
+            $olderThan = $run ? null : ($request->integer('older_than_days') ?: null);
+            $mine = ! $run && $request->boolean('mine');
 
-            $count = $this->service->discard((int) $branchId, $area, $run?->Id);
+            $count = $this->service->discard(
+                (int) $branchId,
+                $area,
+                $run?->Id,
+                $olderThan,
+                $mine ? (int) auth()->id() : null,
+            );
         } catch (AgoraProcException $e) {
             return back()->with('refusal', $e->getMessage());
         }

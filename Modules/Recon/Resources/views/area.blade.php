@@ -14,7 +14,8 @@
     @if (session('discarded') !== null)
         <x-notice tone="info" :title="session('discarded') === 0 ? 'Nothing to discard' : session('discarded').' '.Str::plural('preview', session('discarded')).' discarded'" style="margin-bottom:16px">
             <p>Previews only. Nothing in the customer's databases was touched, and any run that had been
-               executed was kept — a committed run is the only record of what it stamped.</p>
+               executed was kept — a committed run is the only record of what it stamped. Runs marked
+               complete were kept too: closing one is how you set it aside without losing it.</p>
         </x-notice>
     @endif
 

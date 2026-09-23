@@ -36,6 +36,12 @@ Route::middleware('auth')->prefix('recon')->name('recon.')->group(function () {
     Route::post('runs/{run}/execute', [ReconController::class, 'execute'])->middleware('can:recon.runs.execute')->name('execute');
     Route::post('runs/{run}/reverse', [ReconController::class, 'reverse'])->middleware('can:recon.runs.reverse')->name('reverse');
 
+    // Marking a run complete, and undoing that. Its own permission, because
+    // feature-rules §4 gives every action on a resource its own grant — and it
+    // is not execute: nothing in PumpIT moves either way.
+    Route::post('runs/{run}/close', [ReconController::class, 'close'])->middleware('can:recon.runs.close')->name('close');
+    Route::post('runs/{run}/reopen', [ReconController::class, 'reopen'])->middleware('can:recon.runs.close')->name('reopen');
+
     // Discarding previews. One run, or every uncommitted run in scope — the
     // procedure refuses a committed one either way.
     Route::delete('runs/{run}', [ReconController::class, 'discard'])->middleware('can:recon.runs.delete')->name('discard');

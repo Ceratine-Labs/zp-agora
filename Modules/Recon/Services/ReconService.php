@@ -250,16 +250,122 @@ class ReconService
      * procedure refuses with AGORA:RUN_COMMITTED, which reaches the caller as
      * an AgoraProcException with the code intact.
      */
-    public function discard(int $branchId, ?string $area = null, ?int $runId = null): int
-    {
+    public function discard(
+        int $branchId,
+        ?string $area = null,
+        ?int $runId = null,
+        ?int $olderThanDays = null,
+        ?int $createdBy = null,
+    ): int {
         $status = $this->procedures->write('usp_Recon_DiscardRuns', [
             'BranchId' => $branchId,
             'ReconArea' => $area,
             'RunId' => $runId,
             'UserId' => auth()->id(),
+            'Action' => 'discard',
+            'OlderThanDays' => $olderThanDays,
+            'CreatedBy' => $createdBy,
         ]);
 
         return (int) $status->Id;
+    }
+
+    /**
+     * The sites with at least one extraction rule for this area.
+     *
+     * The same test every preview makes before it reads a single bank line:
+     * all five fill their rule table from agora.vw_AutoReconCriteria for
+     * (branch, area) and refuse when it comes back empty. Asked once for the
+     * whole estate, so the every-site runner can leave out a site that could
+     * only ever refuse. Until 23 Sep 2026 it recorded a failed run for each
+     * one on every press instead: 236 of them on live, all NO_CRITERIA, all
+     * four sites that have no rules at all.
+     *
+     * The screen still names what it left out. A site with no rule and a site
+     * with nothing to reconcile are opposite answers, and hiding the first is
+     * the thing this module was built to stop doing.
+     *
+     * @return array<int, int>
+     */
+    public function branchesWithRules(string $area): array
+    {
+        return DB::connection(config('agora.connections.app'))
+            ->table(config('agora.schema').'.vw_AutoReconCriteria')
+            ->where('BankReconArea', $area)
+            ->distinct()
+            ->pluck('BranchId')
+            ->map(fn (mixed $id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * Mark a run complete: out of the working list, kept as a record.
+     *
+     * Through usp_Recon_DiscardRuns, deliberately. Whether anything has been
+     * processed against a run is decided there and nowhere else — Ryan's rule
+     * of 9 Sep covers closing exactly as it covers removing — so a run with
+     * evidence hanging off it is refused with AGORA:RUN_PROCESSED rather than
+     * judged a second time here.
+     */
+    public function close(ReconRun $run): object
+    {
+        return $this->procedures->write('usp_Recon_DiscardRuns', [
+            'BranchId' => $run->BranchId,
+            'ReconArea' => null,
+            'RunId' => $run->Id,
+            'UserId' => auth()->id(),
+            'Action' => 'close',
+        ]);
+    }
+
+    /** Undo a close. The procedure puts a refused preview back to 'failed'. */
+    public function reopen(ReconRun $run): object
+    {
+        return $this->procedures->write('usp_Recon_DiscardRuns', [
+            'BranchId' => $run->BranchId,
+            'ReconArea' => null,
+            'RunId' => $run->Id,
+            'UserId' => auth()->id(),
+            'Action' => 'reopen',
+        ]);
+    }
+
+    /**
+     * Which of this preview's pending proposals another Agora run has already
+     * committed since it was made.
+     *
+     * One set-based read of the ledger — see usp_Recon_RunFreshness for why it
+     * does not re-drill, and for what it cannot see. Null on anything that is
+     * not an open preview: a committed run's proposals are history, and a
+     * closed one offers nothing to stamp.
+     *
+     * @return array{summary: object, claimed: Collection<int, object>}|null
+     */
+    public function freshness(ReconRun $run): ?array
+    {
+        if ($run->Status !== 'previewed') {
+            return null;
+        }
+
+        $sets = $this->procedures->callSets('usp_Recon_RunFreshness', [
+            'RunId' => $run->Id,
+            'BranchId' => $run->BranchId,
+            // The run's CreatedAt is in the application's timezone and the
+            // batches it is compared with are on the database server's clock.
+            // The procedure reconciles the two; this says which one ours is.
+            'AppUtcOffsetMinutes' => now()->utcOffset(),
+        ]);
+
+        $summary = ($sets[0] ?? collect())->first();
+
+        if ($summary === null) {
+            return null;
+        }
+
+        return [
+            'summary' => $summary,
+            'claimed' => ($sets[1] ?? collect())->keyBy(fn (object $row) => (int) $row->RunLineId),
+        ];
     }
 
     /**

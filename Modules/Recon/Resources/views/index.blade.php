@@ -49,19 +49,33 @@
         than a second list, so the column widths a person sets on the tab are
         the widths they get here.
     --}}
-    <x-card title="Runs" sub="Every preview across the five areas, newest first" flush>
-        @if ($context->id() !== null)
-            <x-slot:actions>
+    @php($mine = \Modules\Recon\Grids\ReconRunGrid::wantsOwnRunsOnly())
+    @php($openOnly = \Modules\Recon\Grids\ReconRunGrid::wantsOpenOnly())
+    <x-card title="Runs"
+            :sub="($openOnly ? 'Open work' : 'Every run').' across the five areas, '.($mine ? 'yours' : 'everyone\'s').', newest first'"
+            flush>
+        <x-slot:actions>
+            <x-tabs label="Which runs"
+                    :active="$openOnly ? 'open' : 'all'"
+                    :items="[
+                        ['key' => 'open', 'label' => 'Open work', 'href' => route('app.recon.index', array_filter(['scope' => $mine ? null : 'all']))],
+                        ['key' => 'all', 'label' => 'Everything', 'href' => route('app.recon.index', array_filter(['scope' => $mine ? null : 'all', 'show' => 'all']))],
+                    ]" />
+            {{-- Scoped like the list beside it: this site, and only your own
+                 runs while the list shows only yours. It used to take
+                 everybody's. A sweep never takes a run marked complete. --}}
+            @if ($context->id() !== null)
                 <form method="POST" action="{{ route('app.recon.clear') }}"
-                      data-confirm="Discard every preview for this site?"
-                      data-confirm-text="Across all five areas. Nothing in PumpIT is affected — a preview is a record of a read. Any run that has been executed is kept."
+                      data-confirm="Discard {{ $mine ? 'your' : 'every' }} preview{{ $mine ? 's' : '' }} for this site?"
+                      data-confirm-text="Across all five areas. Nothing in PumpIT is affected — a preview is a record of a read. Any run that has been executed is kept, and so is any run marked complete."
                       data-confirm-action="Discard previews" data-confirm-danger>
                     @csrf
                     @method('DELETE')
+                    @if ($mine)<input type="hidden" name="mine" value="1">@endif
                     <button type="submit" class="btn-ghost">Clear previews</button>
                 </form>
-            </x-slot:actions>
-        @endif
+            @endif
+        </x-slot:actions>
 
         <x-data-grid :grid="$grid" :branches="$branches" />
     </x-card>

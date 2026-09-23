@@ -48,9 +48,12 @@ class ReconGroupController extends Controller
     {
         $this->refuseBranchWorkspace($context);
 
+        [$sites, $unconfigured] = $this->configured($this->sites($context), $area);
+
         return view('recon::area', $this->workbench($area, 'all', $context) + [
             'options' => $this->service->optionsFor($area),
-            'sites' => $this->sites($context),
+            'sites' => $sites,
+            'unconfigured' => $unconfigured,
             'groups' => ReconRunGroup::query()
                 ->where('ReconArea', $area)
                 ->orderByDesc('CreatedAt')
@@ -70,11 +73,14 @@ class ReconGroupController extends Controller
     {
         $this->refuseBranchWorkspace($context);
 
+        // Only the sites that can answer. See configured().
+        [$sites] = $this->configured($this->sites($context), $area);
+
         $group = $this->groups->start(
             $area,
             $request->from(),
             $request->to(),
-            $this->sites($context)->pluck('BranchId')->map(fn (mixed $id) => (int) $id)->all(),
+            $sites->pluck('BranchId')->map(fn (mixed $id) => (int) $id)->all(),
             $request->options(),
             $request->note(),
         );
@@ -90,13 +96,19 @@ class ReconGroupController extends Controller
         // Eager loaded: lazy loading is disabled outside production, and
         // runsByBranch() reaches for the relation.
         $model = $this->group($group)->load('runs');
-        $sites = $this->sites($context);
+        $runs = $model->runsByBranch();
+
+        // A group opened before sites without rules were left out still has a
+        // failed run for each of them, and those rows must keep rendering —
+        // so a site with a run in THIS group stays in, rules or not.
+        [$sites, $unconfigured] = $this->configured($this->sites($context), $model->ReconArea, $runs->keys()->all());
 
         return view('recon::group', [
             'group' => $model,
             'area' => $this->service->area($model->ReconArea),
             'sites' => $sites,
-            'runs' => $model->runsByBranch(),
+            'unconfigured' => $unconfigured,
+            'runs' => $runs,
             'outstanding' => $this->groups->outstanding($model, $sites->pluck('BranchId')
                 ->map(fn (mixed $id) => (int) $id)->all()),
             'stampMode' => config('recon.stamp_mode'),
@@ -121,7 +133,7 @@ class ReconGroupController extends Controller
         // from a script. It has to be a site this person may reconcile and a
         // site the group was opened over.
         abort_unless($context->maySee($branch), 403, 'You may not reconcile that branch.');
-        abort_unless($this->sites($context)->contains('BranchId', $branch), 404);
+        abort_unless($this->configured($this->sites($context), $model->ReconArea)[0]->contains('BranchId', $branch), 404);
 
         $run = $this->groups->runBranch($model, $branch);
 
@@ -208,6 +220,35 @@ class ReconGroupController extends Controller
         return $this->branches()
             ->filter(fn (Branch $branch) => $context->maySee((int) $branch->BranchId))
             ->values();
+    }
+
+    /**
+     * Split the sites into those with a rule for this area and those without.
+     *
+     * A site with no extraction rule can only refuse. Until 23 Sep 2026 every
+     * press recorded a failed run for each one — 236 on live, all NO_CRITERIA,
+     * all the same four sites — which filled the clerks' run lists without
+     * telling anybody anything new. Ryan approved leaving them out (Bank Recon
+     * Close-out, q2). The second half of the pair is what the screen names
+     * instead, because "no rule here" is still an answer worth seeing.
+     *
+     * `$keep` holds sites that stay in whatever their rules say: on an existing
+     * group, the sites that already have a run in it.
+     *
+     * @param  Collection<int, Branch>  $sites
+     * @param  array<int, int|string>  $keep
+     * @return array{0: Collection<int, Branch>, 1: Collection<int, Branch>}
+     */
+    protected function configured(Collection $sites, string $area, array $keep = []): array
+    {
+        $ruled = array_flip($this->service->branchesWithRules($area));
+        $keep = array_flip(array_map('intval', $keep));
+
+        [$in, $out] = $sites->partition(
+            fn (Branch $branch) => isset($ruled[(int) $branch->BranchId]) || isset($keep[(int) $branch->BranchId])
+        );
+
+        return [$in->values(), $out->values()];
     }
 
     /**

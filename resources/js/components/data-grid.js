@@ -84,7 +84,10 @@ class Grid {
 
         this.root.addEventListener('click', (event) => {
             const link = event.target.closest('a[href]');
-            if (!link || link.hasAttribute('data-extract') || link.closest('[data-drawer]')) return;
+            // A `data-post` action asks first and may be cancelled — the busy
+            // note would then sit there over a page that is going nowhere.
+            if (!link || link.hasAttribute('data-extract') || link.hasAttribute('data-post')
+                || link.closest('[data-drawer]')) return;
             start();
         });
 

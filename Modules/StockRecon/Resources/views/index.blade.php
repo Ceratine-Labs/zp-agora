@@ -17,45 +17,54 @@
         </x-slot:actions>
     </x-page-head>
 
-    {{-- The one sentence everything on this screen follows from. It is a
-         thesis rather than a warning, so it leads rather than folds. --}}
-    <x-notice tone="info" title="{{ __('stockrecon::stockrecon.invariant') }}" style="margin-bottom:16px">
-        <p>A shift's variance is <code>POS &minus; (Open + Issued &minus; Close)</code>, and one shift's
-           closing count <em>is</em> the next shift's opening. Raising a closing by <em>d</em> lifts that
-           shift's variance by <em>d</em> and drops the next one's by exactly <em>d</em>, so over the
-           window everything cancels except at the two ends. Balancing decides which shift carries the
-           loss; it cannot make the loss smaller.</p>
-        <p>That is why a window ending <strong>over</strong> is the finding rather than a rounding
-           problem: more was sold than the books ever received, and no set of closing counts changes it.
-           Those chains are reported, never balanced.</p>
-    </x-notice>
+    {{-- Standing explanation — the invariant the screen follows from, and what
+         a commit does. Both are true on every visit and neither is about the
+         run in hand, so they fold as a group and the summary line names what
+         is behind it. The panels below this one do not fold: a refusal, a
+         discard and an open run are all answers about THIS visit.
 
-    @if ($stampMode === 'journal')
-        <x-notice tone="warn" collapsible title="Amendments are recorded here, not written to PumpIT"
-                  style="margin-bottom:16px">
-            <p>A commit records every amendment in <code>agora.StockReconAmendment</code> — the shift, the
-               prior pair, the new pair — and nothing in PumpIT moves. The extract from a committed run is
-               then the worklist an admin applies by hand.</p>
-            <p>Nothing else is different. The arithmetic, the ticks, the confirmation and the reversal are
-               the same in both modes.</p>
+         The live-commit warning used to sit open on the argument that nobody
+         should have to open something to learn a problem exists. It still
+         should not: the summary says a commit writes to PumpIT, so the fact is
+         on the screen closed, and only the detail is behind the fold. --}}
+    <x-explainer remember="stockrecon-intro"
+                 summary="{{ $stampMode === 'journal'
+                    ? 'How balancing works, and what a commit records'
+                    : 'How balancing works, and what a commit writes to PumpIT' }}">
+        <x-notice tone="info" title="{{ __('stockrecon::stockrecon.invariant') }}">
+            <p>A shift's variance is <code>POS &minus; (Open + Issued &minus; Close)</code>, and one shift's
+               closing count <em>is</em> the next shift's opening. Raising a closing by <em>d</em> lifts that
+               shift's variance by <em>d</em> and drops the next one's by exactly <em>d</em>, so over the
+               window everything cancels except at the two ends. Balancing decides which shift carries the
+               loss; it cannot make the loss smaller.</p>
+            <p>That is why a window ending <strong>over</strong> is the finding rather than a rounding
+               problem: more was sold than the books ever received, and no set of closing counts changes it.
+               Those chains are reported, never balanced.</p>
         </x-notice>
-    @else
-        {{-- Live. The reader has to know this BEFORE they press, so it does not
-             fold — a collapsible warning about writing to the customer's live
-             ERP is a warning somebody has to open to learn exists. --}}
-        <x-notice tone="stop" title="Committing amends the counts in PumpIT" style="margin-bottom:16px">
-            <p>A commit writes <code>QtyOpen</code> and <code>QtyClose</code> back to
-               <code>STK_StockReconLine</code> in the customer's live database. It acts on the ticked rows
-               and no others, re-checks every one against the source first, and skips anything whose counts
-               have moved since the preview.</p>
-            <p><strong>It is reversible.</strong> Each shift's prior pair is recorded before anything moves,
-               so a reversal puts back precisely what was changed — not the original counts, so an earlier
-               hand amendment is not thrown away with it. The procedure this replaces can undo nothing.</p>
-            <p>Two things it will not touch: <code>QtyIssued</code>, because amending an issue changes the
-               window's total rather than redistributing it, and the <code>_Original</code> columns, which
-               are what make a re-preview propose the same amendment rather than one on top of the last.</p>
-        </x-notice>
-    @endif
+
+        @if ($stampMode === 'journal')
+            <x-notice tone="warn" title="Amendments are recorded here, not written to PumpIT">
+                <p>A commit records every amendment in <code>agora.StockReconAmendment</code> — the shift, the
+                   prior pair, the new pair — and nothing in PumpIT moves. The extract from a committed run is
+                   then the worklist an admin applies by hand.</p>
+                <p>Nothing else is different. The arithmetic, the ticks, the confirmation and the reversal are
+                   the same in both modes.</p>
+            </x-notice>
+        @else
+            <x-notice tone="stop" title="Committing amends the counts in PumpIT">
+                <p>A commit writes <code>QtyOpen</code> and <code>QtyClose</code> back to
+                   <code>STK_StockReconLine</code> in the customer's live database. It acts on the ticked rows
+                   and no others, re-checks every one against the source first, and skips anything whose counts
+                   have moved since the preview.</p>
+                <p><strong>It is reversible.</strong> Each shift's prior pair is recorded before anything moves,
+                   so a reversal puts back precisely what was changed — not the original counts, so an earlier
+                   hand amendment is not thrown away with it. The procedure this replaces can undo nothing.</p>
+                <p>Two things it will not touch: <code>QtyIssued</code>, because amending an issue changes the
+                   window's total rather than redistributing it, and the <code>_Original</code> columns, which
+                   are what make a re-preview propose the same amendment rather than one on top of the last.</p>
+            </x-notice>
+        @endif
+    </x-explainer>
 
     @if (session('refusal'))
         {{-- Open by default: a refusal is the answer, not context for one. --}}

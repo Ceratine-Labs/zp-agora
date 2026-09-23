@@ -242,7 +242,11 @@
                             {{-- `attributes` is how an action opts into
                                  behaviour the shell knows nothing about — a
                                  dialog, a confirmation. The href stays real, so
-                                 the action works with scripting off. --}}
+                                 the action works with scripting off. An action
+                                 that CHANGES something carries `data-post` and
+                                 is sent as a POST by post-link.js (the recon
+                                 runs grid's Complete / Reopen); its href should
+                                 be the page where the same action lives. --}}
                             <a class="{{ ($action['primary'] ?? false) ? 'btn-primary sm' : 'btn sm' }}"
                                href="{{ $action['url'] }}"
                                @foreach (($action['attributes'] ?? []) as $name => $value) {{ $name }}="{{ $value }}" @endforeach

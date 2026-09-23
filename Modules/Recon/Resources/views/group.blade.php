@@ -52,6 +52,12 @@
              'note' => \App\Support\Format::r($group->CommittedTotal)],
         ]" />
 
+        @include('recon::partials.unconfigured-sites', [
+            'unconfigured' => $unconfigured,
+            'area' => $area,
+            'noticeStyle' => 'margin:12px 14px 0',
+        ])
+
         @if ($outstanding !== [])
             {{-- The driver. One small POST per site, in order, so the table
                  fills in as it goes and a refusal is a row rather than a dead
