@@ -193,8 +193,22 @@ class ReconCriteriaTest extends TestCase
             $this->markTestSkipped('The stub holds no criteria row.');
         }
 
+        // A site and area with no rule of the customer's at process order 1,
+        // so the base is an ADDITION and each case reaches the check it is
+        // named for. Which pair that is depends on what the stub holds — since
+        // copy-fnb.php (23 Sep 2026) branch 18 carries real FNB rules, and the
+        // base hit RULE_NOT_NAMED before BAD_START — so it is looked up.
+        $legacy = collect($this->rowsOf('vw_LegacyReconCriteria'));
+        $area = collect(array_keys(config('recon.areas')))->first(fn (string $a) => ! $legacy->contains(
+            fn (object $rule) => (int) $rule->BranchId === 18 && $rule->BankReconArea === $a && (int) $rule->ProcessOrder === 1,
+        ));
+
+        if ($area === null) {
+            $this->markTestSkipped('Branch 18 has a rule at order 1 in every area.');
+        }
+
         $base = [
-            'BranchId' => 18, 'ReconArea' => 'FNB', 'ProcessOrder' => 1, 'Action' => 'save',
+            'BranchId' => 18, 'ReconArea' => $area, 'ProcessOrder' => 1, 'Action' => 'save',
             'BankStartPosition' => 28, 'BankEndPosition' => 5,
             'Reason' => self::REASON, 'UserId' => 1,
         ];

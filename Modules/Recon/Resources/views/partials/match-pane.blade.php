@@ -83,7 +83,10 @@
                      lists. --}}
                 <div class="field" data-match-reason hidden>
                     <label for="match-reason">Why are these being matched despite the difference?</label>
-                    <input type="text" id="match-reason" name="reason" maxlength="300"
+                    {{-- 200: agora.ReconRunLine.BlockReason, where a forced match's reason
+                         is kept. 300 let a longer one through to a truncation
+                         error in the procedure. --}}
+                    <input type="text" id="match-reason" name="reason" maxlength="200"
                            placeholder="A bank charge deducted at source, a short banking, a split deposit…">
                     <p class="field-help">Required the moment the two sides do not agree. It is the only
                        record of the decision, and the variance travels with the batch wherever it is

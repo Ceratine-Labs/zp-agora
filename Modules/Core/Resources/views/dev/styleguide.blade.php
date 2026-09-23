@@ -194,6 +194,34 @@
             </div>
         </x-core::gallery-entry>
 
+        <x-core::gallery-entry name="x-facts">
+            <div class="gal-variant">
+                <p class="eyebrow">The body of a detail screen — labelled facts, each with what it means</p>
+                <x-card title="What this line is">
+                    <x-facts>
+                        <x-fact label="Item number" value="10234">
+                            Unique within this site only. The same number is a different product at the other twenty-one.
+                        </x-fact>
+                        <x-fact label="POS system" value="PilotPOS">
+                            Which till system carries it. PumpIT calls this column Location; it is not a place.
+                        </x-fact>
+                        <x-fact label="Counting area" value="Forecourt shop">Monthly loss grace R150.00.</x-fact>
+                    </x-facts>
+                </x-card>
+            </div>
+        </x-core::gallery-entry>
+
+        <x-core::gallery-entry name="x-fact">
+            <div class="gal-variant">
+                <p class="eyebrow">One fact: a missing value is the house em dash, and a tone flags it</p>
+                <x-facts :columns="3">
+                    <x-fact label="Last counted" value="2026-09-21">Three counts in 90 days.</x-fact>
+                    <x-fact label="Cost price">No cost on the POS file — nothing to value it at.</x-fact>
+                    <x-fact label="Held by" value="Agora override" tone="warn">This row replaces the customer's own.</x-fact>
+                </x-facts>
+            </div>
+        </x-core::gallery-entry>
+
         <x-core::gallery-entry name="x-tabs">
             <div class="gal-variant">
                 <p class="eyebrow">Panel mode — remembered between visits, and walkable on the arrow keys</p>
@@ -676,6 +704,21 @@
                     Twenty-eight are timing: the bank posted them on the next working day. Three are amounts that
                     appear on neither side, and those are the ones worth a person.
                 </x-notice>
+            </div>
+        </x-core::gallery-entry>
+
+        <x-core::gallery-entry name="x-explainer">
+            <div class="gal-variant">
+                <p class="eyebrow">Closed, as it starts — one line that names what it holds</p>
+                <x-explainer summary="How balancing works, and what a commit writes to PumpIT">
+                    <x-notice tone="info" title="The invariant">
+                        <p>One shift's closing count is the next shift's opening, so balancing moves a loss between
+                           shifts; it cannot make the loss smaller.</p>
+                    </x-notice>
+                    <x-notice tone="warn" title="What a commit writes">
+                        <p>The two stamp columns on each line, and nothing else — each reversible from the run.</p>
+                    </x-notice>
+                </x-explainer>
             </div>
         </x-core::gallery-entry>
 
