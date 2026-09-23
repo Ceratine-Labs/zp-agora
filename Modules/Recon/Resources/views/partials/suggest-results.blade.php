@@ -15,6 +15,7 @@
     $suggestions = collect($suggestions ?? []);
     $strong = $suggestions->where('Confidence', 'strong');
     $possible = $suggestions->where('Confidence', 'possible');
+    $close = $suggestions->where('Confidence', 'close');
     $tiers = [
         'strong' => ['label' => 'Strong', 'tone' => 'good'],
         'possible' => ['label' => 'Possible', 'tone' => 'warn'],
@@ -83,6 +84,13 @@
                         Match all {{ \App\Support\Format::n($possible->count()) }} possible
                     </button>
                 @endif
+                {{-- Ryan, 23 Sep 2026: "yes to match all". Asks for one reason
+                     in its dialog; a row with its own reason keeps it. --}}
+                @if ($close->isNotEmpty())
+                    <button type="button" class="btn" data-suggest-run="close">
+                        Force all {{ \App\Support\Format::n($close->count()) }} close
+                    </button>
+                @endif
                 <span class="field-help" data-suggest-status role="status"></span>
 
                 <x-slot:note>
@@ -92,7 +100,7 @@
                         than stamped over, and each gets its own batch number and its own run, reversible from
                         that run. A column filter narrows what is matched. The possible press asks separately,
                         and each run it writes says the suggestion was a possible one and why. Close ones are
-                        matched one at a time, each with its own reason.
+                        forced matches: their press asks for one reason, and a row with its own keeps it.
                     @else
                         <strong>Journal mode.</strong> Matches are recorded here and nothing in PumpIT changes.
                     @endif
@@ -163,6 +171,7 @@
                                   data-loader="{{ $isClose ? 'Forcing the match…' : 'Matching…' }}"
                                   data-suggest-kind="{{ $s->Confidence }}"
                                   data-amount="{{ $s->BankTotal }}"
+                                  @if ($isClose) data-diff="{{ $diff }}" @endif
                                   @if (! $isStrong) data-caution="{{ $s->Caution }}" @endif
                                   data-confirm="{{ $isClose
                                       ? ($live ? 'Force this match in PumpIT?' : 'Record this forced match?')

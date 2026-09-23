@@ -25,9 +25,9 @@
     CLOSE is the third tier (23 Sep 2026): what the exact two left, a few rand
     off — sites 8, 23, 25 and 26 bank days that never tie to the cent. A close
     match is a forced match, so each row carries its own reason box and the
-    procedure refuses it without one. It has NO "match all" press: one reason
-    typed once for a month of variances is a different decision, and Ryan is
-    asked for it separately.
+    procedure refuses it without one. Its "Force all close" press (Ryan, the
+    same day: "yes to match all") asks for one reason in its dialog and posts
+    it with every close row on screen; a row with its own reason keeps it.
 --}}
 @if (session('suggestMatched'))
     <x-notice tone="info" title="Matched" style="margin-bottom:16px">

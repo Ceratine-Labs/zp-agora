@@ -273,20 +273,23 @@ class SuggestMatchesTest extends TestCase
     }
 
     /**
-     * Each close row carries its own reason box, and there is no press that
-     * forces them all — that one waits on Ryan.
+     * Each close row carries its own reason box, and "Force all close" (Ryan,
+     * 23 Sep 2026: "yes to match all") is its own press, carrying each row's
+     * difference so its dialog can say how big the decision is.
      */
-    public function test_close_suggestions_are_offered_one_at_a_time_with_a_reason(): void
+    public function test_close_suggestions_carry_a_reason_and_their_own_press(): void
     {
         $this->actingAs($this->admin())
             ->get('/app/recon/auto/FNB/suggest?branch_id='.self::BRANCH.'&from='.self::FROM.'&to='.self::TO)
             ->assertOk()
             ->assertSee('Close — needs a reason')
             ->assertSee('data-suggest-kind="close"', false)
+            ->assertSee('data-diff="-18.06"', false)
             ->assertSee('name="reason" required', false)
             ->assertSee('Force match')
             ->assertSee('−R18.06')
-            ->assertDontSee('data-suggest-run="close"', false);
+            ->assertSee('data-suggest-run="close"', false)
+            ->assertSee('Force all 1 close');
     }
 
     public function test_an_area_other_than_fnb_is_refused(): void

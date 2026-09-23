@@ -1,5 +1,6 @@
 /**
- * "Match all strong" and "Match all possible" on the recon Suggestions tab.
+ * "Match all strong", "Match all possible" and "Force all close" on the recon
+ * Suggestions tab.
  *
  * Each suggestion is already a form that posts one match — the same route,
  * procedure and ledger as a match made by hand. This presses one tier's forms
@@ -13,6 +14,16 @@
  * the till files deposits under a different merchant and batch numbering from
  * the bank's and every tie there is therefore possible. No two suggestions
  * share a row, so the two presses can never claim a row twice.
+ *
+ * FORCE ALL CLOSE (Ryan, 23 Sep 2026: "yes to match all"). A close suggestion
+ * is a few rand off, so each one is a FORCED match and usp_Recon_ManualMatch
+ * refuses it without a reason. The press asks for one reason in its dialog and
+ * posts it with every close suggestion on screen — except a row where the
+ * clerk has already typed a reason of its own, which keeps its own. The
+ * dialog counts the rows, the bank total, the net variance and the largest
+ * single difference, because "force forty matches with one sentence" should
+ * be decided with the size of it in front of you. Each is still its own
+ * batch and its own run, reversible on its own.
  *
  * SEQUENTIAL, NOT PARALLEL, for the reason recon-group.js gives: every match
  * runs a procedure that writes to the customer's live database, and one at a
@@ -33,10 +44,13 @@
  *   <div data-suggest-bulk data-suggest-live="1">
  *     <button data-suggest-run="strong">…</button>
  *     <button data-suggest-run="possible">…</button>
+ *     <button data-suggest-run="close">…</button>
  *     <span data-suggest-status></span>
  *   </div>
  *   <td data-suggest-state>
- *     <form data-suggest-kind="strong|possible" data-amount="…" data-caution="…">…</form>
+ *     <form data-suggest-kind="strong|possible|close" data-amount="…" data-diff="…" data-caution="…">
+ *       <input name="reason">   close only
+ *     </form>
  *   </td>
  */
 export default function reconSuggest(root = document) {
@@ -70,21 +84,42 @@ async function run(root, panel, button, buttons, status) {
     const total = forms.reduce((sum, form) => sum + Number(form.dataset.amount || 0), 0);
     const noun = `${forms.length} ${kind} ${forms.length === 1 ? 'suggestion' : 'suggestions'}`;
 
-    const ok = await window.Agora.notify.confirm(
-        `${live ? 'Match' : 'Record'} ${noun}${live ? ' in PumpIT' : ''}?`,
-        {
-            text: [
-                kind === 'possible' ? weaker(forms) : '',
-                `${money(total)} on each side. Each is matched on its own — its rows are re-read first, `
-                    + 'anything reconciled since this list was drawn is refused rather than stamped over, and '
-                    + 'each gets its own batch number and run, reversible from that run.',
-            ].filter(Boolean).join('\n\n'),
-            action: live ? `Match all ${kind}` : `Record all ${kind}`,
-            danger: live || kind === 'possible',
-        },
-    );
+    if (kind === 'close') {
+        const reason = await window.Agora.notify.ask(
+            `${live ? 'Force' : 'Record'} ${noun}${live ? ' in PumpIT' : ''}?`,
+            {
+                text: forced(forms, total),
+                action: live ? 'Force all close' : 'Record all close',
+                danger: true,
+                placeholder: 'Why these differences are accepted',
+                maxlength: 200,
+            },
+        );
 
-    if (!ok) return;
+        if (reason === null) return;
+
+        // A row the clerk already gave a reason of its own keeps it.
+        forms.forEach((form) => {
+            const own = form.querySelector('input[name="reason"]');
+            if (own && !own.value.trim()) own.value = reason;
+        });
+    } else {
+        const ok = await window.Agora.notify.confirm(
+            `${live ? 'Match' : 'Record'} ${noun}${live ? ' in PumpIT' : ''}?`,
+            {
+                text: [
+                    kind === 'possible' ? weaker(forms) : '',
+                    `${money(total)} on each side. Each is matched on its own — its rows are re-read first, `
+                        + 'anything reconciled since this list was drawn is refused rather than stamped over, and '
+                        + 'each gets its own batch number and run, reversible from that run.',
+                ].filter(Boolean).join('\n\n'),
+                action: live ? `Match all ${kind}` : `Record all ${kind}`,
+                danger: live || kind === 'possible',
+            },
+        );
+
+        if (!ok) return;
+    }
 
     // Both presses wait while one runs: they share the page and the status line.
     buttons.forEach((b) => { b.disabled = true; });
@@ -158,6 +193,26 @@ function weaker(forms) {
         .map(([reason, n]) => `${n} × ${reason}.`);
 
     return ['These are the weaker readings — the amounts tie to the cent, but:', ...lines].join('\n');
+}
+
+/**
+ * The size of a forced batch of close matches, before the reason is typed:
+ * how many, what the bank side comes to, the net variance, and the largest
+ * single difference — the one a reviewer will ask about first.
+ */
+function forced(forms, total) {
+    const diffs = forms.map((form) => Number(form.dataset.diff || 0));
+    const net = diffs.reduce((sum, d) => sum + d, 0);
+    const largest = diffs.reduce((max, d) => (Math.abs(d) > Math.abs(max) ? d : max), 0);
+    const own = forms.filter((form) => form.querySelector('input[name="reason"]')?.value.trim()).length;
+
+    return [
+        `${money(total)} on the bank side, each a few rand off its takings: ${money(Math.abs(net))} `
+            + `${net > 0 ? 'short of' : 'over'} the takings net, the largest single difference ${money(Math.abs(largest))}.`,
+        'Each is a FORCED match: the reason you type is recorded with every batch and shown wherever it is. '
+            + 'Each is matched on its own and can be reversed from its own run.'
+            + (own ? ` ${own} ${own === 1 ? 'row has' : 'rows have'} a reason of its own and ${own === 1 ? 'keeps it' : 'keep theirs'}.` : ''),
+    ].join('\n\n');
 }
 
 async function post(form) {

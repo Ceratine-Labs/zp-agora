@@ -77,6 +77,37 @@ export async function confirm(title, { text = '', action = 'Continue', danger = 
     return result.isConfirmed;
 }
 
+/**
+ * Ask for a reason before doing something that cannot be taken back.
+ *
+ * The confirmation with one required line in it — built for "Force all close"
+ * on the recon Suggestions tab (23 Sep 2026), where a month of forced matches
+ * is one decision and the reason is the only record of why. Resolves to the
+ * trimmed text, or null when the person backs out. An empty answer is refused
+ * in the dialog, not after it.
+ */
+export async function ask(title, {
+    text = '', action = 'Continue', danger = false, placeholder = '', maxlength = 200,
+} = {}) {
+    const s = await sweet();
+
+    const result = await s.fire(theme({
+        title,
+        text,
+        icon: danger ? 'warning' : 'question',
+        input: 'text',
+        inputPlaceholder: placeholder,
+        inputAttributes: { maxlength: String(maxlength), 'aria-label': placeholder || title },
+        inputValidator: (value) => (value && value.trim() ? null : 'A reason is required.'),
+        showCancelButton: true,
+        confirmButtonText: action,
+        cancelButtonText: 'Cancel',
+        reverseButtons: true,
+    }));
+
+    return result.isConfirmed ? String(result.value).trim() : null;
+}
+
 /** A short confirmation of something that already happened. */
 export async function toast(title, icon = 'success') {
     const s = await sweet();
@@ -93,4 +124,4 @@ export async function toast(title, icon = 'success') {
     }));
 }
 
-export default { alert, warn, error, confirm, toast };
+export default { alert, warn, error, confirm, ask, toast };
