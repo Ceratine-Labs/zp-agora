@@ -44,7 +44,9 @@ DRY=""
 for arg in "$@"; do
     case "$arg" in
         --no-migrate) MIGRATE=0 ;;
-        --dry-run)    DRY="--dry-run" ;;
+        # --itemize-changes because a bare --dry-run prints nothing at all:
+        # it would "show what would be shipped" by showing an empty screen.
+        --dry-run)    DRY="--dry-run --itemize-changes" ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
 done
@@ -61,6 +63,34 @@ rm -rf public/build public/hot
 npm run build >/dev/null
 [ -f public/build/manifest.json ] || { echo "no build manifest — the build failed silently" >&2; exit 1; }
 
+# Two kinds of rule below are not --exclude, because an exclude is wrong for
+# both.
+#
+#   P /public/build/assets/*   protects the PREVIOUS build's files from
+#       --delete. Every file in there is named by its content hash, and every
+#       one can be fetched late by a page that is already open: app-*.js
+#       imports sweetalert2, tom-select (and its CSS) and apexcharts only when
+#       a confirm, a select or a chart first needs one, and the CSS pulls its
+#       fonts on first use. Delete the old names and a clerk who loaded the
+#       page before the deploy gets a failed dynamic import on their next
+#       confirm dialog, until they reload. sweetalert2.all-*.js changes name on
+#       every deploy that touches app.js, because it imports app-*.js by hash.
+#       P only stops a delete, so the new build still ships in full, and
+#       manifest.json sits outside assets/, so it is replaced and the server
+#       only ever points at the new names. Used by hand for the 23 Sep 2026
+#       15:34 deploy. Nothing prunes the old names: they accumulate, roughly
+#       140 KB a deploy that changes JS and 440 KB one that also changes SCSS.
+#   H /tests/  H /playwright-report/   keep Playwright's saved sign-in
+#       (tests/e2e/.auth/user.json, a signed-in session cookie that .gitignore
+#       already treats as a credential) and its report off the box. The
+#       server runs --no-dev, so tests/ is dead weight there: PHPUnit is not
+#       installed, autoload-dev is not in the autoloader, and seed:master
+#       reads database/seeders and Modules/*, never tests/. H (hide) and not
+#       --exclude, because an exclude also shields the server's copy from
+#       --delete, and every deploy before this one already put user.json
+#       there. Hide stops it being sent AND lets --delete remove the copy that
+#       is already on the server, so the first deploy after this change
+#       deletes tests/ from the box. That is intended.
 echo "==> shipping to ${HOST}:${REMOTE}"
 rsync -az --no-owner --no-group --delete $DRY \
     --exclude '.git' \
@@ -80,6 +110,9 @@ rsync -az --no-owner --no-group --delete $DRY \
     --exclude 'storage/framework/sessions/*' \
     --exclude 'storage/framework/views/*' \
     --exclude 'bootstrap/cache/*' \
+    --filter 'P /public/build/assets/*' \
+    --filter 'H /tests/' \
+    --filter 'H /playwright-report/' \
     ./ "${HOST}:${REMOTE}/"
 
 if [ -n "$DRY" ]; then

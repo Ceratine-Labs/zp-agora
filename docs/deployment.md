@@ -61,7 +61,8 @@ rm -rf public/build public/hot
 npm run build
 
 # 2. Ship it. Every exclusion below is load-bearing, and so is --no-owner
-#    --no-group — see "the ownership window" below.
+#    --no-group — see "the ownership window" below — and so are the three
+#    --filter rules — see "old asset chunks" and "tests/ is hidden" below.
 rsync -az --no-owner --no-group --delete \
   --exclude '.git' --exclude 'node_modules' --exclude 'vendor' \
   --exclude '.env' --exclude '.env.*' --exclude 'public/hot' \
@@ -73,6 +74,8 @@ rsync -az --no-owner --no-group --delete \
   --exclude 'storage/framework/sessions/*' \
   --exclude 'storage/framework/views/*' \
   --exclude 'bootstrap/cache/*' \
+  --filter 'P /public/build/assets/*' \
+  --filter 'H /tests/' --filter 'H /playwright-report/' \
   ./ root@agora.ceratine.com:/var/www/agora/
 
 # 3. On the server.
@@ -162,6 +165,51 @@ gitignored, so they are in a working checkout but not in a clone, which is
 exactly how they get rsynced by accident. The excludes above are the guard; on
 the first deploy they were not there and both files had to be deleted off the
 box afterwards.
+
+---
+
+## Old asset chunks are kept on purpose — `P /public/build/assets/*`
+
+Step 1 wipes `public/build` and Vite writes every file under a new content hash,
+so without the protect rule `--delete` removes the previous build's files from
+the server. That breaks anybody who had a page open across the deploy. Their
+page is still running the OLD `app-*.js`, which imports sweetalert2, tom-select
+(and its CSS) and apexcharts lazily — only when a confirm, a select or a chart
+first needs one — by the OLD hashed names. Those are gone, so a clerk's next
+confirm dialog fails with a dynamic-import error until they reload. The CSS
+does the same with its fonts, which the browser fetches on first use.
+
+`sweetalert2.all-*.js` is the one that bites every time: it imports `app-*.js`
+by hash, so it gets a new name on every deploy that touches any JavaScript.
+The others only rename when their library or font file changes.
+
+`P` protects from deletion and nothing else, so the new build still ships in
+full. `manifest.json` sits outside `assets/`, so it is replaced as normal and
+the server only ever points new page loads at the new names. The rule was first
+used by hand for the 23 September 2026 15:34 deploy, and is in
+`scripts/deploy.sh` as of 24 September 2026.
+
+**Nothing prunes the old names.** Every deploy leaves its superseded chunks
+behind: about 140 KB when only JavaScript changed, about 440 KB when SCSS did
+too, and 900 KB more on the rare deploy that bumps apexcharts. Harmless for a
+long while, but it does grow without limit.
+
+## `tests/` is hidden, not excluded — `H /tests/`, `H /playwright-report/`
+
+`tests/e2e/.auth/user.json` is Playwright's saved sign-in, a session cookie
+`.gitignore` already treats as a credential, and until 24 September 2026 every
+deploy put it on the server. The server has no use for any of `tests/`: it runs
+`composer install --no-dev`, so PHPUnit is not installed and `autoload-dev` is
+not in the autoloader, and `seed:master` reads `database/seeders` and
+`Modules/*/Database/Seeders`, never `tests/`. `playwright-report/` is the same
+kind of thing and is not on disk today, but would ride the next deploy if it
+were.
+
+They are `H` (hide) rules rather than `--exclude` because an exclude also
+shields the SERVER's copy from `--delete` — the `user.json` earlier deploys left
+there would stay forever. Hide stops the files being sent and lets `--delete`
+remove the copy already on the box, so **the first deploy after this change
+deletes `/var/www/agora/tests` from the server.** That is intended.
 
 ---
 
