@@ -177,7 +177,7 @@ class StockReconController extends Controller
      * A real grid rather than the run's own table: thousands of rows, header
      * filters, an export and a footer total somebody takes to a branch meeting.
      * Nothing on it is ticked, because nothing on it is actionable HERE — an
-     * A-class row is a conversation with a branch, not a count to amend.
+     * U-class row is a conversation with a branch, not a count to amend.
      */
     public function exceptions(StockReconRun $run, Request $request): View
     {
@@ -392,6 +392,7 @@ class StockReconController extends Controller
             'stampMode' => $run->StampMode,
             'branch' => Branch::query()->where('BranchId', $run->BranchId)->first(),
             'classes' => $this->service->exceptionClasses(),
+            'audit' => $this->service->auditChecks(),
         ];
     }
 

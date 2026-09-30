@@ -1,0 +1,3112 @@
+BranchId,AreaNo,StockItemNo,POSCode,IssueMultiple,IsWeighed,Enforcement,SourceOfValue
+13,1,292,BTC315,1,1,Enforce,Unit the history shows this is issued in
+13,1,347,ENG112,50,0,Enforce,History: Issued pack
+13,1,348,ENG113,0,0,,Too little history
+13,1,291,BTC309,0,0,,History: no pack - issued in varying quantities
+13,1,346,ENG912,36,0,Enforce,History: Issued pack
+13,1,345,ENG911,36,0,Default only,"History: Pack in use, also broken open"
+13,1,55,ENG377,10,1,Enforce,Unit the history shows this is issued in
+13,1,349,ENG929,0,0,,History: no pack - issued in varying quantities
+13,1,69,ENG524,48,0,Default only,"History: Pack in use, also broken open"
+13,1,71,ENG953,0,0,,No history
+13,1,289,BTC108,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,1,342,ENG716,24,0,Default only,History: Issued pack
+13,1,335,ENG715,40,0,Default only,History: Issued pack
+13,1,382,ENG714,36,0,Enforce,History: Issued pack
+13,1,336,ENG705,36,0,Enforce,History: Issued pack
+13,1,340,ENG703,36,0,Enforce,History: Issued pack
+13,1,313,ENG712,36,0,Enforce,History: Issued pack
+13,1,337,ENG706,36,0,Enforce,History: Issued pack
+13,1,338,ENG707,36,0,Enforce,History: Issued pack
+13,1,334,ENG701,40,0,Enforce,History: Issued pack
+13,1,312,ENG709,36,0,Enforce,History: Issued pack
+13,1,341,ENG710,0,0,,No history
+13,1,339,ENG711,36,0,Enforce,History: Issued pack
+13,1,293,BTC321,25,0,,Too little history
+13,1,295,BTC414,25,0,Enforce,History: Issued pack
+13,1,296,BTC415,25,0,Enforce,History: Issued pack
+13,1,297,BTC416,25,0,Enforce,History: Issued pack
+13,1,294,BTC364,25,0,Enforce,History: Issued pack
+13,5,114,6009801801018,1,0,Enforce,Staff entry for this item at another site
+13,5,283,6009801801032,1,0,Enforce,Staff entry for this item at another site
+13,5,325,6009695581461,0,0,,No history
+13,5,93,6009695584912,48,0,Enforce,Staff entry for this item at another site
+13,5,94,6009695584936,48,0,Enforce,Staff entry for this item at another site
+13,5,95,60026392,30,0,Default only,"History: Pack in use, also broken open"
+13,5,96,6009695584516,48,0,Enforce,Staff entry for this item at another site
+13,5,324,6001016400116,0,0,,No history
+13,5,99,6001106120771,48,0,Enforce,Staff entry for this item at another site
+13,5,320,5052197039719,0,0,,Too little history
+13,5,103,60050205,72,0,Enforce,Staff entry for this item at another site
+13,5,323,6001076003531,0,0,,Too little history
+13,5,109,60099983,144,0,Enforce,Staff entry for this item at another site
+13,5,132,9770019177000,0,0,,Staff entry for this item at another site
+13,5,133,9771816097003,0,0,,No history
+13,5,134,9771682968001,0,0,,History: no pack - issued in varying quantities
+13,5,115,60015990,72,0,Enforce,Staff entry for this item at another site
+13,5,282,60011008,0,0,,Too little history
+13,5,90,6009823910163,1,0,Enforce,Staff entry for this item at another site
+13,5,116,6009695585223,48,0,Enforce,Staff entry for this item at another site
+13,5,108,60018014,12,0,Enforce,History: Issued pack
+13,5,321,6003787133026,0,0,,Too little history
+13,5,319,5011831092138,0,0,,No history
+13,5,285,5011831087462,0,0,,No history
+13,5,284,5011831092107,0,0,,No history
+13,5,121,6001106116545,25,0,Enforce,History: Issued pack
+13,5,286,8901111006450,0,0,,Too little history
+13,5,123,6007013000304,1,0,Enforce,Staff entry for this item at another site
+13,5,124,6007013000359,1,0,Enforce,Staff entry for this item at another site
+13,5,126,61600416,2,0,Enforce,History: Issued pack
+13,5,322,6001076002237,0,0,,No history
+13,5,128,6001296006015,0,0,,Too little history
+13,5,129,6009697612996,0,0,,History: no pack - issued in varying quantities
+13,8,370,G028,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+13,8,373,M003,1,1,Enforce,Pack read off the item name and confirmed by the history
+13,8,386,1019433,0.09,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,8,384,1019360,1,1,Enforce,Pack read off the item name and confirmed by the history
+13,8,372,1019372,0.09,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,8,371,C-GCC,3,1,Enforce,Unit the history shows this is issued in
+13,8,377,M005,1,1,Enforce,Unit the history shows this is issued in
+13,8,376,M008,1,1,Enforce,Pack read off the item name and confirmed by the history
+13,8,368,D-RIB,1.1,1,Enforce,Unit the history shows this is issued in
+13,8,375,G030,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+13,8,374,C-DCC,5.5,1,Enforce,Unit the history shows this is issued in
+13,8,365,C003,3,1,Enforce,Unit the history shows this is issued in
+13,8,366,V010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,8,367,VO17,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,8,369,V016,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,9,378,1004623,1,0,,Too little history
+13,9,379,P002,50,0,Enforce,History: Issued pack
+13,9,380,P003,50,0,Default only,"History: Pack in use, also broken open"
+13,9,22,P-RDPB,50,0,Enforce,History: Issued pack
+13,9,23,PTRD,50,0,Enforce,History: Issued pack
+13,9,24,D1.5LC,12,0,Enforce,History: Issued pack
+13,9,381,PTDB,50,0,Enforce,History: Issued pack
+13,10,131,6001324238098,6,0,Enforce,History: Issued pack
+13,10,328,80050278,1,0,,Too little history
+13,10,333,5060811385098,1,0,,No history
+13,10,332,5060811385104,1,0,,No history
+13,10,329,4000539363108,1,0,,Too little history
+13,10,330,4000539397325,1,0,,Too little history
+13,10,327,6001087376761,20,0,Enforce,History: Issued pack
+13,10,326,6001087376792,20,0,Enforce,History: Issued pack
+13,10,138,5060166698874,24,0,Enforce,Staff rule: energy drinks by the case of 24
+13,10,139,5060947540040,24,0,Enforce,Staff rule: energy drinks by the case of 24
+13,10,136,5060335632715,24,0,Enforce,Staff rule: energy drinks by the case of 24
+13,10,352,5061013962605,0,0,,History: no pack - issued in varying quantities
+13,10,145,9002490100070,24,0,Enforce,Staff entry for this item at another site
+13,10,146,9002490200220,24,0,Enforce,Staff rule: energy drinks by the case of 24
+13,10,143,9002490209599,24,0,Enforce,Staff entry for this item at another site
+13,10,144,9002490218638,24,0,Enforce,Staff entry for this item at another site
+13,10,147,6001710010253,0,0,,Staff entry for this item at another site
+13,10,148,6001710010192,0,0,,Staff entry for this item at another site
+13,10,331,6009621930165,0,0,,History: no pack - issued in varying quantities
+13,12,298,9968,1,0,Enforce,Staff entry
+13,12,299,997,1,0,Enforce,Staff entry
+13,13,154,6001351100726,1,0,Enforce,Staff entry for this item at another site
+13,13,155,6001351100740,1,0,Enforce,Staff entry for this item at another site
+13,13,157,6001351000521,20,0,Enforce,Staff entry for this item at another site
+13,13,170,6001351414120,20,0,Enforce,Staff entry for this item at another site
+13,13,152,6001351099891,20,0,Enforce,Staff entry for this item at another site
+13,13,160,6001351100283,20,0,Enforce,Staff entry for this item at another site
+13,13,163,6001351100061,20,0,Enforce,Staff entry for this item at another site
+13,13,176,6001351525307,20,0,Enforce,Staff entry for this item at another site
+13,13,158,6001351000606,20,0,Enforce,Staff entry for this item at another site
+13,13,151,6001351100238,20,0,Enforce,Staff entry for this item at another site
+13,13,175,6001351339300,20,0,Enforce,Staff entry for this item at another site
+13,13,166,6001351164520,20,0,Enforce,Staff entry for this item at another site
+13,13,168,6001351099969,20,0,Enforce,Staff entry for this item at another site
+13,13,169,6001351025906,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+13,13,150,6001351461100,20,0,Enforce,Staff entry for this item at another site
+13,13,172,6001351099792,20,0,Enforce,Staff entry for this item at another site
+13,13,174,6001351099846,20,0,Enforce,Staff entry for this item at another site
+13,13,173,6001351113955,20,0,Enforce,Staff entry for this item at another site
+13,13,265,6001351100269,20,0,Enforce,Staff entry for this item at another site
+13,13,156,6001351525000,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+13,13,350,6001351166234,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+13,13,351,6001351169679,0,0,,Too little history
+13,13,264,8001238080040,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+13,17,353,M1,16,0,Enforce,History: Common divisor of the packs issued
+13,17,30,SMBF,24,0,Enforce,History: Issued pack
+13,17,31,SBBB,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+13,17,356,B1,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+13,17,354,G4,72,0,Enforce,History: Issued pack
+13,17,36,54-1805-420,4,0,Enforce,History: Issued pack
+13,17,37,54-4468-206,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+13,17,38,54-4465-206,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+13,17,39,54-4466-206,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+13,17,357,V5,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,17,41,1012366,4.4,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,17,358,V7,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,17,43,STE77654,12,0,Enforce,History: Issued pack
+13,17,383,M2,12,0,Enforce,History: Issued pack
+13,17,360,M6,10,0,Enforce,History: Issued pack
+13,17,355,1019360S,0,0,,History: no pack - issued in varying quantities
+13,17,359,V8,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+13,18,48,30-3610-901,50,0,Enforce,History: Issued pack
+13,18,361,90-0605-108,6,0,Default only,History: Issued pack
+13,18,362,BEVC0017A,1,0,,Too little history
+13,18,363,BEVC0002,24,0,,History: no pack - issued in varying quantities
+13,18,53,30-4506-901,250,0,Default only,"History: Pack in use, also broken open"
+13,19,183,6001060686825,10,0,Enforce,Staff entry
+13,19,182,6001060685828,10,0,Enforce,Staff entry
+13,19,184,6001060665820,10,0,Enforce,Staff entry
+13,19,185,6001060944826,10,0,Enforce,Staff entry
+13,19,186,6001060684821,10,0,Enforce,Staff entry
+13,19,196,4032900125206,20,0,Enforce,Staff entry
+13,19,190,42139447,10,0,Enforce,Staff entry
+13,19,195,4033100057885,10,0,Enforce,Staff entry
+13,19,318,4032900168760,10,0,Enforce,Staff entry
+13,19,191,42139621,10,0,Enforce,Staff entry
+13,19,192,42139430,10,0,Enforce,Staff entry for this item at another site
+13,19,201,6009800476255,10,0,Enforce,Staff entry
+13,19,197,6009800476248,10,0,Enforce,Staff entry
+13,19,199,6009802927380,10,0,Enforce,Staff entry
+13,19,198,6009802927403,10,0,Enforce,Staff entry
+13,19,202,6001335065829,10,0,Enforce,Staff entry
+13,19,203,6001060603815,20,0,Enforce,Staff entry
+13,19,204,6001060177811,20,0,Enforce,Staff entry
+13,19,211,6001060215827,10,0,Enforce,Staff entry for this item at another site
+13,19,210,6001237212826,10,0,Enforce,Staff entry
+13,19,207,6001060969829,10,0,Enforce,Staff entry
+13,19,254,6001237004100,10,0,Enforce,Staff entry
+13,19,257,6001237004148,10,0,Enforce,Staff entry
+13,19,255,6001237004124,10,0,Enforce,Staff entry
+13,19,256,6001237004421,10,0,Enforce,Staff entry
+13,19,253,6001237004247,10,0,Enforce,Staff entry
+13,19,314,6001060381829,10,0,Enforce,Staff entry
+13,19,205,6001060967825,10,0,Enforce,Staff entry
+13,19,206,6001060968822,10,0,Enforce,Staff entry
+13,19,212,6001060496820,10,0,Enforce,Staff entry
+13,19,258,6001237004445,20,0,Enforce,Staff entry
+13,19,213,6001060358821,10,0,Enforce,Staff entry
+13,19,214,6001060361821,10,0,Enforce,Staff entry
+13,19,215,6001060359828,10,0,Enforce,Staff entry
+13,19,216,6001060360824,10,0,Enforce,Staff entry
+13,19,217,60069795,100,0,Enforce,Staff entry for this item at another site
+13,19,343,723,30,0,Enforce,Loose single cigarettes - always issued in 30s
+13,19,221,6009800476958,10,0,Enforce,Staff entry
+13,19,220,6009800476927,10,0,Enforce,Staff entry
+13,19,222,46014450,10,0,Enforce,Staff entry
+13,19,218,5410706821956,10,0,Enforce,Staff entry
+13,19,219,46014429,10,0,Enforce,Staff entry
+13,19,178,6001060954818,20,0,Enforce,Staff entry
+13,19,228,6001060563829,10,0,Enforce,Staff entry
+13,19,225,6001060565823,10,0,Enforce,Staff entry
+13,19,262,6001237004384,10,0,Enforce,Carton rule (20s pack)
+13,19,226,6001060884825,10,0,Enforce,Staff entry for this item at another site
+13,19,229,6001060886829,10,0,Enforce,Staff entry for this item at another site
+13,19,260,6001237001963,10,0,Enforce,Carton rule (20s pack)
+13,19,227,6001060880827,10,0,Enforce,Staff entry for this item at another site
+13,19,261,6001237001901,10,0,Enforce,Staff entry for this item at another site
+13,19,230,6001060314810,20,0,Enforce,Staff entry
+13,19,231,6001060313813,20,0,Enforce,Staff entry
+13,19,234,6001060160813,20,0,Enforce,Staff entry
+13,19,232,6001237015823,10,0,Enforce,Staff entry
+13,19,238,6001237010828,10,0,Enforce,Staff entry
+13,19,233,6001237012822,10,0,Enforce,Staff entry
+13,19,237,6001060100826,10,0,Enforce,Staff entry
+13,19,240,6001060333828,10,0,Enforce,Staff entry
+13,19,177,6001060953811,20,0,Enforce,Staff entry
+13,19,242,50974009,0,0,,Staff entry for this item at another site
+13,19,281,6001237002267,10,0,Enforce,Staff entry
+13,19,259,6001060590825,10,0,Enforce,Staff entry
+13,19,247,6001335054823,10,0,Enforce,Staff entry
+13,19,315,6001335051822,10,0,Enforce,Staff entry
+13,19,263,6001060317811,10,0,Enforce,Carton rule (20s pack)
+13,19,252,4032900123936,10,0,Enforce,Staff entry
+13,19,249,4033100086045,10,0,Enforce,Staff entry
+13,19,316,4032900168418,10,0,Enforce,Staff entry
+13,19,317,4032900168388,10,0,Enforce,Staff entry
+13,19,250,4033100018343,10,0,Enforce,Staff entry
+13,19,251,4033100018312,10,0,Enforce,Staff entry
+5,2,142,PROD3283,6,0,Enforce,History: Common divisor of the packs issued
+5,2,143,PROD3498,6,0,Enforce,History: Common divisor of the packs issued
+5,2,144,PROD3284,6,0,Enforce,History: Issued pack
+5,2,145,PROD3285,6,0,Enforce,History: Common divisor of the packs issued
+5,2,146,PROD3499,6,0,Enforce,History: Issued pack
+5,2,147,PROD3286,6,0,Enforce,History: Issued pack
+5,2,148,PROD3287,6,0,Enforce,History: Issued pack
+5,2,149,PROD3288,12,0,Default only,History: Issued pack
+5,2,150,PROD3515,6,0,Enforce,History: Issued pack
+5,2,151,PROD3289,6,0,Enforce,History: Issued pack
+5,2,152,PROD3290,6,0,Enforce,History: Issued pack
+5,2,153,PROD3292,6,0,Enforce,History: Issued pack
+5,2,154,PROD3293,6,0,Enforce,History: Issued pack
+5,2,155,PROD3294,6,0,Enforce,History: Issued pack
+5,2,156,PROD3361,29,0,,Too little history
+5,2,157,PROD3362,29,0,,Too little history
+5,2,158,PROD3517,6,0,Enforce,History: Issued pack
+5,2,159,PROD3363,30,0,Enforce,History: Issued pack
+5,2,160,PROD3308,6,0,Enforce,History: Issued pack
+5,2,161,PROD3309,6,0,Enforce,History: Issued pack
+5,2,162,PROD3310,6,0,Enforce,History: Common divisor of the packs issued
+5,2,163,PROD3311,6,0,Enforce,History: Issued pack
+5,2,164,PROD3312,6,0,Enforce,History: Issued pack
+5,2,165,PROD3313,6,0,Enforce,History: Issued pack
+5,2,166,PROD3508,6,0,,Too little history
+5,2,167,PROD3314,6,0,Enforce,History: Issued pack
+5,2,168,PROD3463,6,0,Enforce,History: Issued pack
+5,2,169,PROD3315,6,0,Enforce,History: Issued pack
+5,2,170,PROD3317,6,0,Enforce,History: Issued pack
+5,2,248,PROD3319,6,0,Enforce,History: Issued pack
+5,2,247,PROD3326,6,0,Enforce,History: Issued pack
+5,2,246,PROD3328,24,0,Enforce,Staff rule: energy drinks by the case of 24
+5,2,245,PROD3329,6,0,Enforce,History: Issued pack
+5,2,244,PROD3330,6,0,Enforce,History: Issued pack
+5,2,243,PROD3331,6,0,Enforce,History: Issued pack
+5,2,242,PROD3332,6,0,Enforce,History: Issued pack
+5,2,241,PROD3500,6,0,Enforce,History: Issued pack
+5,2,240,PROD3333,6,0,Enforce,History: Issued pack
+5,2,239,PROD3334,6,0,Enforce,History: Issued pack
+5,2,238,PROD3335,6,0,Enforce,History: Issued pack
+5,2,230,PROD3297,6,0,Enforce,History: Issued pack
+5,2,229,PROD3298,6,0,Enforce,History: Issued pack
+5,2,228,PROD3299,6,0,,Too little history
+5,2,227,PROD3300,6,0,Enforce,History: Issued pack
+5,2,226,PROD3301,12,0,Enforce,History: Issued pack
+5,2,225,PROD3302,6,0,Enforce,History: Issued pack
+5,2,224,PROD3505,6,0,Enforce,History: Issued pack
+5,2,223,PROD3303,6,0,Enforce,History: Common divisor of the packs issued
+5,2,222,PROD3304,6,0,Enforce,History: Issued pack
+5,2,221,PROD3305,6,0,,No history
+5,2,220,PROD3306,6,0,,Too little history
+5,2,217,PROD3345,29,0,,Too little history
+5,2,208,PROD3366,30,0,Enforce,History: Issued pack
+5,2,207,PROD3497,29,0,,Too little history
+5,2,206,PROD3369,29,0,Enforce,History: Issued pack
+5,2,205,PROD3370,29,0,Enforce,History: Issued pack
+5,2,179,PROD3355,29,0,,Too little history
+5,2,178,PROD3352,29,0,,No history
+5,2,177,PROD3356,29,0,,Too little history
+5,2,176,PROD3357,29,0,,Too little history
+5,2,175,PROD3353,29,0,Enforce,History: Issued pack
+5,2,174,PROD3354,29,0,,Too little history
+5,2,173,PROD3337,29,0,Enforce,History: Issued pack
+5,2,172,PROD3339,29,0,Enforce,History: Issued pack
+5,2,171,PROD3342,29,0,Enforce,History: Issued pack
+5,16,138,PROD3487,14,0,,Staff rule: baked and bought-in bread lines carry no multiple
+5,16,139,PROD3268,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+5,16,140,PROD3485,0,0,,Too little history
+5,16,141,PROD3486,0,0,,No history
+5,16,237,PROD3196,0.8,1,Enforce,Unit the history shows this is issued in
+5,16,236,PROD3197,30,0,Default only,"History: Pack in use, also broken open"
+5,16,235,PROD3198,10,0,Enforce,History: Issued pack
+5,16,234,PROD3199,0.8,1,Enforce,Unit the history shows this is issued in
+5,16,233,PROD3200,10,0,Default only,"History: Pack in use, also broken open"
+5,16,232,PROD3448,0,0,,History: no pack - issued in varying quantities
+5,16,231,PROD3201,10,0,Enforce,History: Issued pack
+5,16,219,PROD3172,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+5,16,137,PROD3165,120,0,Enforce,History: Issued pack
+5,16,218,PROD3173,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+5,16,216,PROD3190,0.8,1,Enforce,Unit the history shows this is issued in
+5,16,215,PROD3191,0,0,,No history
+5,16,214,PROD3192,0,0,,History: no pack - issued in varying quantities
+5,16,213,PROD3193,0,0,,No history
+5,16,212,PROD3459,0,0,,Too little history
+5,16,211,PROD3460,0,0,,Too little history
+5,16,210,PROD3194,0,0,,History: no pack - issued in varying quantities
+5,16,209,PROD3161,5,1,Enforce,Unit the history shows this is issued in
+5,16,204,PROD3439,5,0,Enforce,History: Common divisor of the packs issued
+5,16,203,PROD3177,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+5,16,202,PROD3179,0,0,,No history
+5,16,201,PROD3180,10,0,Default only,History: Issued pack
+5,16,200,PROD3181,10,0,Default only,History: Issued pack
+5,16,199,PROD3461,0,0,,Too little history
+5,16,198,PROD3182,0,0,,History: no pack - issued in varying quantities
+5,16,197,PROD3185,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+5,16,196,PROD3184,0,0,,History: no pack - issued in varying quantities
+5,16,195,PROD3462,0,0,,Too little history
+5,16,194,PROD3186,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+5,16,193,PROD3444,3,0,Default only,"History: Pack in use, also broken open"
+5,16,192,PROD3187,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+5,16,191,PROD3188,16,0,Enforce,History: Issued pack
+5,16,190,PROD3455,6,0,Enforce,History: Issued pack
+5,16,189,PROD3456,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+5,19,188,PROD3484,10,0,Enforce,Carton rule (20s pack)
+5,19,187,PROD3481,10,0,Enforce,Carton rule (20s pack)
+5,19,186,PROD3482,10,0,Enforce,Carton rule (20s pack)
+5,19,185,PROD3523,10,0,Enforce,Carton rule (20s pack)
+5,19,184,PROD3483,10,0,Enforce,Carton rule (20s pack)
+5,19,183,PROD3479,10,0,Enforce,Carton rule (20s pack)
+5,19,182,PROD3480,10,0,Enforce,Carton rule (20s pack)
+5,19,181,PROD3478,10,0,Enforce,Carton rule (20s pack)
+5,19,180,PROD3477,10,0,Enforce,Carton rule (20s pack)
+8,1,389,RMBAK3,1,1,Enforce,Staff entry for this item at another site
+8,1,388,RMBAK22,1,1,Enforce,Staff entry for this item at another site
+8,1,381,RMBAK13,12.5,1,Enforce,Staff entry for this item at another site
+8,1,400,RMBAK6,25,1,Enforce,Staff entry for this item at another site
+8,1,382,RMBAK14,12.5,1,Enforce,Staff entry for this item at another site
+8,1,391,RMBAK32,12.5,1,Enforce,Staff entry for this item at another site
+8,1,390,RMBAK31,25,1,Enforce,Staff entry for this item at another site
+8,1,399,RMBAK57,12.5,1,Enforce,Staff entry for this item at another site
+8,28,376,31028,0,0,,Staff entry for this item at another site
+8,28,428,31055,0,0,,Staff entry for this item at another site
+8,28,422,31025,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+8,5,131,6009801801032,1,0,Enforce,Staff entry for this item at another site
+8,5,132,6009801801018,1,0,Enforce,Staff entry for this item at another site
+8,5,134,6003001017712,6,0,Enforce,Staff entry
+8,5,135,6009695584912,48,0,Enforce,Staff entry for this item at another site
+8,5,136,6009695584936,48,0,Enforce,Staff entry for this item at another site
+8,5,138,6009695584516,48,0,Enforce,Staff entry for this item at another site
+8,5,30,5011831076855,1,0,Enforce,Staff entry
+8,5,34,5011831076862,1,0,Enforce,Staff entry
+8,5,35,5011831076893,1,0,Enforce,Staff entry
+8,5,36,6001106120771,48,0,Enforce,Staff entry
+8,5,37,6009823910163,1,0,Enforce,Staff entry for this item at another site
+8,5,168,4005800237515,1,0,Enforce,Staff entry
+8,5,43,60050205,72,0,Enforce,Staff entry for this item at another site
+8,5,44,60099983,144,0,Enforce,Staff entry for this item at another site
+8,5,49,6007013000755,1,0,Enforce,Staff entry for this item at another site
+8,5,48,6007013000502,1,0,Enforce,Staff entry for this item at another site
+8,5,50,6007013000564,1,0,Enforce,Staff entry for this item at another site
+8,5,51,6007013000014,6,0,Enforce,Staff entry
+8,5,52,60015990,72,0,Enforce,Staff entry for this item at another site
+8,5,53,6009695585223,48,0,Enforce,Staff entry for this item at another site
+8,5,54,6007013000304,1,0,Enforce,Staff entry for this item at another site
+8,5,55,6007013000359,1,0,Enforce,Staff entry for this item at another site
+8,5,58,6009697610398,36,0,Enforce,Staff entry for this item at another site
+8,10,174,6001253010185,0,0,,Staff entry for this item at another site
+8,10,175,6001253010178,0,0,,Staff entry for this item at another site
+8,10,373,31023,0,0,,Staff entry for this item at another site
+8,10,427,31054,0,0,,Staff entry for this item at another site
+8,10,374,31024,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+8,10,421,31013,0,0,,Staff entry for this item at another site
+8,10,370,31004,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+8,10,375,31027,0,0,,Staff entry for this item at another site
+8,10,367,31001,0,0,,Staff entry for this item at another site
+8,10,380,31053,0,0,,Staff entry for this item at another site
+8,10,368,31002,0,0,,Staff entry for this item at another site
+8,10,369,31003,0,0,,Staff entry for this item at another site
+8,10,176,6001205730321,0,0,,Staff entry for this item at another site
+8,10,177,6001205730475,0,0,,Staff entry for this item at another site
+8,10,377,31033,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+8,10,184,9002490100070,24,0,Enforce,Staff entry for this item at another site
+8,10,65,9002490209599,24,0,Enforce,Staff entry for this item at another site
+8,10,185,9002490218638,24,0,Enforce,Staff entry for this item at another site
+8,10,67,6001710010253,0,0,,Staff entry for this item at another site
+8,10,68,6001710010192,0,0,,Staff entry for this item at another site
+8,11,356,1204,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+8,11,353,1200,0,0,,History: no pack - issued in varying quantities
+8,11,357,1206,0,0,,History: no pack - issued in varying quantities
+8,11,358,1207,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+8,11,354,1201,0,0,,History: no pack - issued in varying quantities
+8,11,355,1202,0,0,,History: no pack - issued in varying quantities
+8,11,250,RMDEL13,10,1,Enforce,Unit the history shows this is issued in
+8,11,10,RMDEL14,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,11,11,RMDEL15,0,0,,No history
+8,11,12,RMDEL5,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,11,13,RMDEL16,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,11,14,RMDEL6,5,1,Enforce,Unit the history shows this is issued in
+8,11,245,RMDEL21,10,1,Enforce,Unit the history shows this is issued in
+8,11,16,RMDEL3,0,0,,No history
+8,11,17,RMDEL43,10,1,Enforce,Unit the history shows this is issued in
+8,11,244,RMDEL20,10,1,Enforce,Unit the history shows this is issued in
+8,11,19,RMDEL11,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+8,11,21,RMDEL1,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,11,240,RMDEL4,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,278,11042,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,341,21001,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,346,21007,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,345,21006,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,275,11032,0,0,,Staff entry for this item at another site
+8,29,272,11004,0,0,,Staff entry for this item at another site
+8,29,340,21000,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,342,21002,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,269,11015,0,0,,Staff entry for this item at another site
+8,29,344,21004,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,349,21010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,350,21011,0,0,,No history
+8,29,267,11002,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,288,11023,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,268,11019,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,292,11027,0,0,,No history
+8,29,281,11005,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,294,11025,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,29,296,11038,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+8,12,330,5000,1,0,Enforce,Staff entry
+8,12,3,3009,1,0,Enforce,Staff entry
+8,12,2,3007,1,0,Enforce,Staff entry
+8,12,4,3001,1,0,Enforce,Staff entry
+8,13,71,6002081600074,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+8,13,72,6002081601699,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+8,13,73,6002081601712,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+8,13,74,6002081600609,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+8,13,75,6002081600456,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+8,13,76,6002081600463,0,0,,History: no pack - issued in varying quantities
+8,13,77,6002081600555,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+8,13,78,6002081600326,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+8,13,79,6002081600081,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+8,13,80,8850131007735,0,0,,Too little history
+8,13,81,6002081600128,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+8,13,329,6002081600197,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+8,13,82,6002081600487,0,0,,History: no pack - issued in varying quantities
+8,13,251,6002081602160,6,0,Default only,"History: Pack in use, also broken open"
+8,19,190,6001060686825,10,0,Enforce,Staff entry
+8,19,85,6001060944826,10,0,Enforce,Staff entry
+8,19,195,6001060684821,10,0,Enforce,Staff entry
+8,19,203,42139621,10,0,Enforce,Staff entry
+8,19,207,40329055,10,0,Enforce,Staff entry for this item at another site
+8,19,205,42139447,10,0,Enforce,Staff entry
+8,19,87,4033100057885,10,0,Enforce,Staff entry
+8,19,266,4032900125206,20,0,Enforce,Staff entry
+8,19,208,42139126,10,0,Enforce,Staff entry
+8,19,88,6009802927403,10,0,Enforce,Staff entry
+8,19,210,6009800476255,10,0,Enforce,Staff entry
+8,19,89,6009802927380,10,0,Enforce,Staff entry
+8,19,212,6009802927397,10,0,Enforce,Staff entry
+8,19,91,6001060603815,20,0,Enforce,Staff entry
+8,19,213,6001060969829,10,0,Enforce,Staff entry
+8,19,90,6001060215827,10,0,Enforce,Staff entry
+8,19,95,6001060967825,10,0,Enforce,Staff entry
+8,19,214,6001060968822,10,0,Enforce,Staff entry
+8,19,94,6001060177811,20,0,Enforce,Staff entry
+8,19,96,6001060496820,10,0,Enforce,Staff entry
+8,19,93,6001237212826,10,0,Enforce,Staff entry
+8,19,100,6001237213823,10,0,Enforce,Staff entry for this item at another site
+8,19,92,6001335065829,10,0,Enforce,Staff entry
+8,19,97,6001060381829,10,0,Enforce,Staff entry
+8,19,98,6001060382826,10,0,Enforce,Staff entry
+8,19,215,6001060361821,10,0,Enforce,Staff entry
+8,19,216,6001060359828,10,0,Enforce,Staff entry
+8,19,218,6001060360824,10,0,Enforce,Staff entry
+8,19,101,60069795,100,0,Enforce,Staff entry for this item at another site
+8,19,220,39,30,0,Enforce,Loose single cigarettes - always issued in 30s
+8,19,102,6009800476958,10,0,Enforce,Staff entry
+8,19,103,6009800476927,10,0,Enforce,Staff entry
+8,19,221,56001709,10,0,Enforce,Staff entry
+8,19,104,46014450,10,0,Enforce,Staff entry for this item at another site
+8,19,226,6001060953811,20,0,Enforce,Staff entry
+8,19,227,6001060565823,10,0,Enforce,Staff entry
+8,19,109,6001060884825,10,0,Enforce,Staff entry
+8,19,224,6001060886829,10,0,Enforce,Staff entry
+8,19,111,6001060563829,10,0,Enforce,Staff entry
+8,19,264,6001060954818,20,0,Enforce,Staff entry
+8,19,124,50974009,0,0,,Staff entry for this item at another site
+8,19,114,6001237015823,10,0,Enforce,Staff entry
+8,19,230,6001060333828,10,0,Enforce,Staff entry
+8,19,121,6001060314810,20,0,Enforce,Staff entry
+8,19,122,6001060313813,20,0,Enforce,Staff entry
+8,19,123,6001060160813,20,0,Enforce,Staff entry
+8,19,115,6001237010828,10,0,Enforce,Staff entry for this item at another site
+8,19,117,6001237012822,10,0,Enforce,Staff entry for this item at another site
+8,19,118,6001060100826,10,0,Enforce,Staff entry
+8,19,434,40,30,0,Enforce,Loose single cigarettes - always issued in 30s
+8,19,125,6001335054823,10,0,Enforce,Staff entry
+8,19,126,6001335051822,10,0,Enforce,Staff entry
+8,19,128,4033100086045,10,0,Enforce,Staff entry
+17,1,182,6001833001077,0,0,,History: no pack - issued in varying quantities
+17,1,27,6001833000063,1,0,Enforce,Staff entry for this item at another site
+17,1,26,6001833000070,1,0,Enforce,Staff entry for this item at another site
+17,1,25,6001833000049,1,0,Enforce,Staff entry for this item at another site
+17,1,30,6001833000018,1,0,Enforce,Staff entry for this item at another site
+17,5,5,6009695584912,48,0,Enforce,Staff entry for this item at another site
+17,5,6,6009695584936,48,0,Enforce,Staff entry for this item at another site
+17,5,97,60026392,30,0,Default only,"History: Pack in use, also broken open"
+17,5,7,6009695584516,48,0,Enforce,Staff entry for this item at another site
+17,5,98,5011831076855,1,0,Enforce,Staff entry for this item at another site
+17,5,8,5011831084218,0,0,,No history
+17,5,99,5011831079818,0,0,,No history
+17,5,100,5011831076862,1,0,Enforce,Staff entry for this item at another site
+17,5,9,5011831076893,1,0,Enforce,Staff entry for this item at another site
+17,5,10,6001106120771,48,0,Enforce,Staff entry for this item at another site
+17,5,11,6002125006367,0,0,,Too little history
+17,5,205,5010232965096,0,0,,No history
+17,5,12,60050205,72,0,Enforce,Staff entry for this item at another site
+17,5,204,96041109,12,0,Enforce,Staff entry for this item at another site
+17,5,13,60099983,144,0,Enforce,Staff entry for this item at another site
+17,5,14,60069795,100,0,Enforce,Staff entry for this item at another site
+17,5,104,60091574,0,0,,Too little history
+17,5,15,6007013000502,1,0,Enforce,Staff entry for this item at another site
+17,5,16,6007013000564,1,0,Enforce,Staff entry for this item at another site
+17,5,17,6007013000014,6,0,Enforce,Staff entry
+17,5,18,60015990,72,0,Enforce,Staff entry for this item at another site
+17,5,19,6009695585223,48,0,Enforce,Staff entry for this item at another site
+17,5,103,60018014,12,0,Enforce,History: Issued pack
+17,5,110,50974009,0,0,,Staff entry for this item at another site
+17,5,111,6001106116545,25,0,Enforce,History: Issued pack
+17,5,20,6007013000359,1,0,Enforce,Staff entry for this item at another site
+17,5,113,6007013000304,1,0,Enforce,Staff entry for this item at another site
+17,5,203,6007013001059,0,0,,Too little history
+17,5,114,61600416,2,0,Enforce,History: Issued pack
+17,5,21,6009697612996,0,0,,History: no pack - issued in varying quantities
+17,10,121,9002490100070,24,0,Enforce,Staff entry for this item at another site
+17,10,180,5449000009067,0,0,,History: no pack - issued in varying quantities
+17,10,119,9002490209599,24,0,Enforce,Staff entry for this item at another site
+17,10,22,5449000664686,0,0,,History: no pack - issued in varying quantities
+17,10,120,9002490218638,24,0,Enforce,Staff entry for this item at another site
+17,10,208,5060896627472,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,10,214,5060517886127,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,10,115,5060335632715,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,10,210,5060751216551,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,10,215,5060335634399,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,10,212,5060517888299,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,10,23,5060166698874,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,10,211,5060751211693,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,10,213,5060337501804,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,10,209,5061013943543,24,0,Enforce,Staff rule: energy drinks by the case of 24
+17,12,2,9968,1,0,Enforce,Staff entry
+17,12,3,997,1,0,Enforce,Staff entry
+17,12,1,9869,1,0,Enforce,Staff entry
+17,13,125,6001351100740,1,0,Enforce,Staff entry for this item at another site
+17,13,31,6001351414120,20,0,Enforce,Staff entry for this item at another site
+17,13,32,6001351461100,20,0,Enforce,Staff entry for this item at another site
+17,13,33,6001351099891,20,0,Enforce,Staff entry for this item at another site
+17,13,124,6001351100238,20,0,Enforce,Staff entry for this item at another site
+17,13,34,6001351099969,20,0,Enforce,Staff entry for this item at another site
+17,13,35,6001351525307,20,0,Enforce,Staff entry for this item at another site
+17,13,36,6001351000521,20,0,Enforce,Staff entry for this item at another site
+17,13,37,6001351000606,20,0,Enforce,Staff entry for this item at another site
+17,13,126,6001351100184,20,0,Enforce,Staff entry for this item at another site
+17,13,40,6001351100061,20,0,Enforce,Staff entry for this item at another site
+17,13,38,6001351100283,20,0,Enforce,Staff entry for this item at another site
+17,13,41,6001351164520,20,0,Enforce,Staff entry for this item at another site
+17,13,43,6001351099792,20,0,Enforce,Staff entry for this item at another site
+17,13,42,6001351099846,20,0,Enforce,Staff entry for this item at another site
+17,13,44,6001351113955,20,0,Enforce,Staff entry for this item at another site
+17,19,134,6001060603815,20,0,Enforce,Staff entry
+17,19,45,6001060177811,20,0,Enforce,Staff entry
+17,19,46,6001060314810,20,0,Enforce,Staff entry
+17,19,47,6001060313813,20,0,Enforce,Staff entry
+17,19,48,6001060160813,20,0,Enforce,Staff entry
+17,19,216,6001060953811,20,0,Enforce,Staff entry
+17,19,206,6001060945823,10,0,Enforce,Staff entry
+17,19,51,6001060688829,10,0,Enforce,Staff entry
+17,19,222,6001060687822,10,0,Enforce,Staff entry
+17,19,52,42139430,10,0,Enforce,Staff entry
+17,19,55,6009800476255,10,0,Enforce,Staff entry
+17,19,56,6009800476248,10,0,Enforce,Staff entry
+17,19,132,6009802927403,10,0,Enforce,Staff entry
+17,19,57,6001060215827,10,0,Enforce,Staff entry
+17,19,58,6001060496820,10,0,Enforce,Staff entry
+17,19,59,6001335065829,10,0,Enforce,Staff entry
+17,19,60,6001060382826,10,0,Enforce,Staff entry
+17,19,138,6001237213823,10,0,Enforce,Staff entry
+17,19,61,6001060358821,10,0,Enforce,Staff entry
+17,19,139,6001060361821,10,0,Enforce,Staff entry
+17,19,62,6001060359828,10,0,Enforce,Staff entry
+17,19,63,6001060360824,10,0,Enforce,Staff entry
+17,19,64,6009800476927,10,0,Enforce,Staff entry
+17,19,65,6009800476958,10,0,Enforce,Staff entry
+17,19,142,46014429,10,0,Enforce,Staff entry
+17,19,66,46014436,10,0,Enforce,Staff entry
+17,19,143,46014450,10,0,Enforce,Staff entry
+17,19,67,6001237015823,10,0,Enforce,Staff entry
+17,19,68,6001237010828,10,0,Enforce,Staff entry
+17,19,69,6001237012822,10,0,Enforce,Staff entry
+17,19,70,6001060100826,10,0,Enforce,Staff entry
+17,19,144,6001060333828,10,0,Enforce,Staff entry
+17,19,73,6001060884825,10,0,Enforce,Staff entry
+17,19,74,6001060886829,10,0,Enforce,Staff entry
+17,19,75,6001060880827,10,0,Enforce,Staff entry
+17,19,129,6001060665820,10,0,Enforce,Staff entry
+17,19,220,6001060689826,10,0,Enforce,Staff entry
+17,19,77,6001060684821,10,0,Enforce,Staff entry
+17,19,78,4032900125206,20,0,Enforce,Staff entry
+17,19,79,42139447,10,0,Enforce,Staff entry for this item at another site
+17,19,131,42139621,10,0,Enforce,Staff entry
+17,19,80,4033100057885,10,0,Enforce,Staff entry
+17,19,81,6009802927380,10,0,Enforce,Staff entry
+17,19,133,6009802927397,10,0,Enforce,Staff entry
+17,19,136,6001060969829,10,0,Enforce,Staff entry
+17,19,82,6001060967825,10,0,Enforce,Staff entry
+17,19,207,7622100814726,10,0,Enforce,Staff entry
+17,19,94,56001709,10,0,Enforce,Staff entry
+17,19,189,2020,10,0,Enforce,Tobacco outer default (10)
+17,19,217,6001060954818,20,0,Enforce,Staff entry
+17,19,219,6001060563829,10,0,Enforce,Staff entry
+17,19,218,6001060565823,10,0,Enforce,Staff entry
+17,19,87,6001237012839,30,0,Enforce,Loose single cigarettes - always issued in 30s
+17,19,148,6001237003509,10,0,Enforce,Staff entry
+17,19,146,6001060163821,10,0,Enforce,Staff entry
+17,19,188,300,10,0,Enforce,Tobacco outer default (10)
+17,19,186,6009660560644,10,0,Enforce,Carton rule (20s pack)
+17,19,184,6009660560859,10,0,Enforce,Carton rule (20s pack)
+17,19,187,6009660560675,10,0,Enforce,Carton rule (20s pack)
+17,19,185,6009660560705,10,0,Enforce,Carton rule (20s pack)
+17,19,54,6009660561542,10,0,Enforce,Staff entry
+17,19,183,6009660562457,10,0,Enforce,Carton rule (20s pack)
+17,19,194,6001237051500,5,0,Enforce,Tobacco outer default (10)
+17,19,197,6001237051586,5,0,Enforce,Tobacco outer default (10)
+17,19,199,6001237001048,5,0,Enforce,Tobacco outer default (10)
+17,19,90,4033100086045,10,0,Enforce,Staff entry
+17,19,93,4032900123936,10,0,Enforce,Staff entry
+17,19,92,4033100018343,10,0,Enforce,Staff entry
+17,19,91,4033100018312,10,0,Enforce,Staff entry
+18,1,511,RMBAK3,1,1,Enforce,Staff entry for this item at another site
+18,1,549,RMBAK22,1,1,Enforce,Staff entry for this item at another site
+18,1,510,RMBAK2,1,1,Enforce,Staff entry for this item at another site
+18,1,531,RMBAK13,12.5,1,Enforce,Staff entry for this item at another site
+18,1,509,RMBAK14,12.5,1,Enforce,Staff entry for this item at another site
+18,1,505,RMBAK36,12.5,1,Enforce,Staff entry for this item at another site
+18,1,516,RMBAK45,12.5,1,Enforce,Staff entry for this item at another site
+18,1,524,RMBAK32,12.5,1,Enforce,Staff entry for this item at another site
+18,1,538,RMBAK31,25,1,Enforce,Staff entry for this item at another site
+18,1,528,RMBAK55,12.5,1,Enforce,Staff entry for this item at another site
+18,1,514,RMBAK57,12.5,1,Enforce,Staff entry for this item at another site
+18,28,580,31035,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+18,28,548,31016,0,0,,Staff entry for this item at another site
+18,28,578,31030,0,0,,Staff entry for this item at another site
+18,28,577,31029,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+18,28,576,31025,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+18,5,27,6009801801032,1,0,Enforce,Staff entry for this item at another site
+18,5,209,6009801801018,1,0,Enforce,Staff entry for this item at another site
+18,5,28,6003001017712,6,0,Enforce,Staff entry for this item at another site
+18,5,30,6009695584912,48,0,Enforce,Staff entry for this item at another site
+18,5,211,6009695584936,48,0,Enforce,Staff entry for this item at another site
+18,5,31,60026392,30,0,Default only,"History: Pack in use, also broken open"
+18,5,32,6009695584516,48,0,Enforce,Staff entry for this item at another site
+18,5,34,5011831076855,1,0,Enforce,Staff entry for this item at another site
+18,5,35,5011831076862,1,0,Enforce,Staff entry for this item at another site
+18,5,36,5011831076893,1,0,Enforce,Staff entry for this item at another site
+18,5,37,6001546011127,0,0,,Staff entry for this item at another site
+18,5,38,6001106119560,12,0,Enforce,Staff entry for this item at another site
+18,5,39,6001106120771,48,0,Enforce,Staff entry for this item at another site
+18,5,41,6009823910163,1,0,Enforce,Staff entry for this item at another site
+18,5,219,6002125004448,1,0,Enforce,Staff entry for this item at another site
+18,5,218,6002125006381,1,0,Enforce,Staff entry for this item at another site
+18,5,220,6002125006602,1,0,Enforce,Staff entry for this item at another site
+18,5,242,4005800237515,1,0,Enforce,Staff entry for this item at another site
+18,5,42,60050205,72,0,Enforce,Staff entry for this item at another site
+18,5,621,60018014,12,0,Enforce,History: Issued pack
+18,5,45,60099983,144,0,Enforce,Staff entry for this item at another site
+18,5,320,9770019177000,0,0,,Staff entry for this item at another site
+18,5,233,6007013000755,1,0,Enforce,Staff entry for this item at another site
+18,5,48,6007013000502,1,0,Enforce,Staff entry for this item at another site
+18,5,49,6007013000564,1,0,Enforce,Staff entry for this item at another site
+18,5,235,6007013000083,1,0,Enforce,Staff entry for this item at another site
+18,5,234,6007013000014,6,0,Enforce,Staff entry
+18,5,50,60015990,72,0,Enforce,Staff entry for this item at another site
+18,5,239,6009695585223,48,0,Enforce,Staff entry for this item at another site
+18,5,54,6001106116545,25,0,Enforce,History: Issued pack
+18,5,55,6007013000359,1,0,Enforce,Staff entry for this item at another site
+18,5,57,6009697610398,36,0,Enforce,Staff entry for this item at another site
+18,7,63,51031,0,0,,No history
+18,26,563,51013,10,1,Enforce,Unit the history shows this is issued in
+18,26,564,51014,13.61,1,Enforce,Unit the history shows this is issued in
+18,26,565,51015,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,566,51016,10,1,Enforce,Unit the history shows this is issued in
+18,26,614,51080,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,557,51007,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,558,51008,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,559,51009,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,560,51010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,562,51012,15,1,Enforce,Unit the history shows this is issued in
+18,26,561,51011,10,1,Enforce,Unit the history shows this is issued in
+18,26,567,51029,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,613,51082,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,64,51035,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,67,51021,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,68,51018,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,69,51020,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,340,51022,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,616,51081,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,615,51084,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,26,568,51038,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,35,343,51053,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,35,336,51040,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,35,66,51017,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,35,248,51024,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,35,73,51028,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,8,485,G028,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+18,8,478,M003,1,1,Enforce,Pack read off the item name and confirmed by the history
+18,8,477,C-GCC,3,1,Enforce,Unit the history shows this is issued in
+18,8,481,M005,1,1,Enforce,Unit the history shows this is issued in
+18,8,480,M008,1,1,Enforce,Pack read off the item name and confirmed by the history
+18,8,484,D-RIB,1.1,1,Enforce,Unit the history shows this is issued in
+18,8,486,G030,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+18,8,479,C-DCC,5.5,1,Enforce,Unit the history shows this is issued in
+18,8,482,C003,3,1,Enforce,Unit the history shows this is issued in
+18,8,483,V010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,8,487,V016,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,9,488,P002,50,0,Enforce,History: Issued pack
+18,9,489,P003,50,0,Default only,"History: Pack in use, also broken open"
+18,9,194,P-RDPB,50,0,Enforce,History: Issued pack
+18,9,361,PTRD,50,0,Enforce,History: Issued pack
+18,9,306,D1.5LC,12,0,Enforce,History: Issued pack
+18,9,490,PTDB,50,0,Enforce,History: Issued pack
+18,10,315,6001253010185,0,0,,Staff entry for this item at another site
+18,10,316,6001253010178,0,0,,Staff entry for this item at another site
+18,10,518,31023,0,0,,Staff entry for this item at another site
+18,10,515,31028,0,0,,Staff entry for this item at another site
+18,10,523,31005,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+18,10,525,31004,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+18,10,513,31027,0,0,,Staff entry for this item at another site
+18,10,507,31031,24,0,Enforce,Stated: white and brown bread are baked in 40s and 24s; 24 set as the multiple
+18,10,503,31007,24,0,Enforce,Stated: white and brown bread are baked in 40s and 24s; 24 set as the multiple
+18,10,530,31001,0,0,,Staff entry for this item at another site
+18,10,521,31053,0,0,,Staff entry for this item at another site
+18,10,508,31002,0,0,,Staff entry for this item at another site
+18,10,532,31003,0,0,,Staff entry for this item at another site
+18,10,317,6001205730321,0,0,,Staff entry for this item at another site
+18,10,318,6001205730475,0,0,,Staff entry for this item at another site
+18,10,526,31033,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+18,10,322,9002490100070,24,0,Enforce,Staff entry for this item at another site
+18,10,319,9002490209599,24,0,Enforce,Staff entry for this item at another site
+18,10,323,9002490218638,24,0,Enforce,Staff entry for this item at another site
+18,10,324,6001710010253,0,0,,Staff entry for this item at another site
+18,10,325,6001710010192,0,0,,Staff entry for this item at another site
+18,11,497,1204,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+18,11,493,1200,0,0,,History: no pack - issued in varying quantities
+18,11,494,1206,0,0,,History: no pack - issued in varying quantities
+18,11,495,1207,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+18,11,496,1201,0,0,,History: no pack - issued in varying quantities
+18,11,492,1202,0,0,,History: no pack - issued in varying quantities
+18,11,6,RMDEL13,10,1,Enforce,Unit the history shows this is issued in
+18,11,347,RMDEL31,16,0,Enforce,History: Common divisor of the packs issued
+18,11,8,RMDEL12,0,0,,History: no pack - issued in varying quantities
+18,11,9,RMDEL14,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,11,10,RMDEL15,0,0,,No history
+18,11,11,RMDEL5,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,11,349,RMDEL16,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,11,12,RMDEL6,5,1,Enforce,Unit the history shows this is issued in
+18,11,14,RMDEL21,10,1,Enforce,Unit the history shows this is issued in
+18,11,16,RMDEL43,10,1,Enforce,Unit the history shows this is issued in
+18,11,353,RMDEL20,10,1,Enforce,Unit the history shows this is issued in
+18,11,17,RMDEL11,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+18,11,354,RMDEL1,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,11,357,RMDEL4,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,401,11042,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,455,21001,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,394,11045,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,460,21007,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,459,21006,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,395,11004,0,0,,Staff entry for this item at another site
+18,29,454,21000,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,456,21002,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,392,11015,0,0,,Staff entry for this item at another site
+18,29,595,21022,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+18,29,458,21004,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,463,21010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,464,21011,0,0,,No history
+18,29,390,11002,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,412,11023,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,391,11019,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,416,11027,0,0,,No history
+18,29,404,11005,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,418,11025,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,29,420,11038,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,12,3,4003,1,0,Enforce,Staff entry
+18,12,452,5000,1,0,Enforce,Staff entry
+18,12,2,4002,1,0,Enforce,Staff entry
+18,12,297,3009,1,0,Enforce,Staff entry
+18,12,4,3007,1,0,Enforce,Staff entry
+18,12,298,3001,1,0,Enforce,Staff entry
+18,12,5,3006,1,0,Enforce,Staff entry
+18,12,299,3004,1,0,Enforce,Staff entry
+18,12,300,3008,1,0,Enforce,Staff entry
+18,13,612,6001351176752,20,0,Enforce,Staff entry for this item at another site
+18,13,617,6001351100122,0,0,,Too little history
+18,13,95,6001351414120,20,0,Enforce,Staff entry for this item at another site
+18,13,96,6001351000521,20,0,Enforce,Staff entry for this item at another site
+18,13,98,6001351525307,20,0,Enforce,Staff entry for this item at another site
+18,13,99,6001351100061,20,0,Enforce,Staff entry for this item at another site
+18,13,102,6001351099969,20,0,Enforce,Staff entry for this item at another site
+18,13,103,6001351000606,20,0,Enforce,Staff entry for this item at another site
+18,13,105,6001351099792,20,0,Enforce,Staff entry for this item at another site
+18,13,106,6001351113955,20,0,Enforce,Staff entry for this item at another site
+18,13,94,6001351100740,1,0,Enforce,Staff entry for this item at another site
+18,13,114,6001351100283,20,0,Enforce,Staff entry for this item at another site
+18,13,115,6001351100238,20,0,Enforce,Staff entry for this item at another site
+18,13,117,6001351164520,20,0,Enforce,Staff entry for this item at another site
+18,13,104,6001351461100,20,0,Enforce,Staff entry for this item at another site
+18,13,100,6001351099846,20,0,Enforce,Staff entry for this item at another site
+18,13,118,6001351099891,20,0,Enforce,Staff entry for this item at another site
+18,13,620,6001351176851,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+18,13,619,6001351176837,20,0,Enforce,Staff entry for this item at another site
+18,17,467,M1,16,0,Enforce,History: Common divisor of the packs issued
+18,17,469,30-3826-416,80,0,,History: no pack - issued in varying quantities
+18,17,470,B1,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+18,17,468,G4,72,0,Enforce,History: Issued pack
+18,17,203,54-1805-420,4,0,Enforce,History: Issued pack
+18,17,472,1012366,4.4,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,17,471,V7,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+18,17,309,STE77654,12,0,Enforce,History: Issued pack
+18,17,491,M2,12,0,Enforce,History: Issued pack
+18,18,618,BEV105,3,0,Default only,"History: Pack in use, also broken open"
+18,18,475,BEVC0002,24,0,,History: no pack - issued in varying quantities
+18,18,473,SS5,72,0,Default only,"History: Pack in use, also broken open"
+18,18,207,1012772,25,0,Default only,"History: Pack in use, also broken open"
+18,18,208,1012773,25,0,,No history
+18,19,253,6001060686825,10,0,Enforce,Staff entry
+18,19,125,6001060684821,10,0,Enforce,Staff entry
+18,19,264,42139447,10,0,Enforce,Staff entry
+18,19,131,4033100057885,10,0,Enforce,Staff entry
+18,19,132,42139126,10,0,Enforce,Staff entry for this item at another site
+18,19,136,6009802927403,10,0,Enforce,Staff entry for this item at another site
+18,19,138,6001060603815,20,0,Enforce,Staff entry
+18,19,140,6001060969829,10,0,Enforce,Staff entry
+18,19,137,6001060215827,10,0,Enforce,Staff entry
+18,19,141,6001060967825,10,0,Enforce,Staff entry
+18,19,139,6001060177811,20,0,Enforce,Staff entry
+18,19,142,6001060496820,10,0,Enforce,Staff entry
+18,19,270,6001335065829,10,0,Enforce,Staff entry
+18,19,143,6001060381829,10,0,Enforce,Staff entry
+18,19,274,6001060361821,10,0,Enforce,Staff entry
+18,19,146,6001060359828,10,0,Enforce,Staff entry
+18,19,276,6001060360824,10,0,Enforce,Staff entry
+18,19,147,60069795,100,0,Enforce,Staff entry for this item at another site
+18,19,148,39,30,0,Enforce,Loose single cigarettes - always issued in 30s
+18,19,149,6009800476958,10,0,Enforce,Staff entry
+18,19,150,6009800476927,10,0,Enforce,Staff entry
+18,19,153,56001709,10,0,Enforce,Staff entry
+18,19,151,46014450,10,0,Enforce,Staff entry for this item at another site
+18,19,280,6001060953811,20,0,Enforce,Staff entry
+18,19,281,6001060565823,10,0,Enforce,Staff entry
+18,19,157,6001060884825,10,0,Enforce,Staff entry
+18,19,160,6001060886829,10,0,Enforce,Staff entry
+18,19,161,6001060563829,10,0,Enforce,Staff entry
+18,19,376,6001060954818,20,0,Enforce,Staff entry
+18,19,177,50974009,0,0,,Staff entry for this item at another site
+18,19,166,6001237015823,10,0,Enforce,Staff entry for this item at another site
+18,19,175,6001060314810,20,0,Enforce,Staff entry
+18,19,176,6001060313813,20,0,Enforce,Staff entry
+18,19,164,6001060160813,20,0,Enforce,Staff entry
+18,19,172,6001237010828,10,0,Enforce,Staff entry for this item at another site
+18,19,174,6001237012822,10,0,Enforce,Staff entry for this item at another site
+18,19,173,6001060100826,10,0,Enforce,Staff entry for this item at another site
+18,19,501,40,30,0,Enforce,Loose single cigarettes - always issued in 30s
+18,19,289,6001335051822,10,0,Enforce,Staff entry
+18,19,293,4033100086045,10,0,Enforce,Staff entry
+23,1,4,RFG424,24,0,Default only,"History: Pack in use, also broken open"
+23,1,7,RFG423,0,0,,History: no pack - issued in varying quantities
+23,1,305,ENG911,36,0,Default only,"History: Pack in use, also broken open"
+23,1,308,ENG754,0,0,,Too little history
+23,1,319,ENG325,0,0,,No history
+23,1,229,ENG567,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+23,1,310,ENG496,2,0,Enforce,History: Common divisor of the packs issued
+23,1,315,SSF138,6,0,Enforce,History: Issued pack
+23,1,306,ENG524,48,0,Default only,"History: Pack in use, also broken open"
+23,1,297,ENG335,0,0,,History: no pack - issued in varying quantities
+23,1,296,ENG334,0,0,,History: no pack - issued in varying quantities
+23,1,303,ENG585,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+23,1,12,RFG413,36,0,Default only,"History: Pack in use, also broken open"
+23,1,8,RFG411,36,0,Default only,"History: Pack in use, also broken open"
+23,1,301,ENG949,4,0,Enforce,History: Issued pack
+23,1,327,ENG714,36,0,Enforce,History: Issued pack
+23,1,15,RFG404,0,0,,History: no pack - issued in varying quantities
+23,1,328,RFG414,36,0,Enforce,History: Issued pack
+23,1,18,RFG417,36,0,Default only,"History: Pack in use, also broken open"
+23,3,329,35BAM113,0,0,,Too little history
+23,3,19,35BAM175,0,0,,No history
+23,3,20,35BAM026,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+23,3,21,35BAM027,54,0,Enforce,History: Issued pack
+23,3,22,35BAM013,5,0,Default only,"History: Pack in use, also broken open"
+23,3,275,35BAM153,0,0,,Too little history
+23,3,23,35BAM001,15,0,Enforce,History: Issued pack
+23,3,24,35BAM024,120,0,Enforce,History: Issued pack
+23,3,276,35BAM084,10,0,Enforce,History: Issued pack
+23,3,25,35BAM003,10,0,Enforce,History: Issued pack
+23,3,274,35BAM163,0,0,,No history
+23,3,26,35BAM170,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+23,3,27,35BAM012,0,0,,No history
+23,3,28,35BAM016,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+23,3,29,35BAM031,0,0,,Too little history
+23,3,30,35BAM011,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+23,3,31,35BAM041,10,0,Enforce,History: Issued pack
+23,4,34,35BAM085,0,0,,No history
+23,5,185,6009695584912,48,0,Enforce,Staff entry for this item at another site
+23,5,35,6009695584936,48,0,Enforce,Staff entry for this item at another site
+23,5,36,60026392,30,0,Default only,"History: Pack in use, also broken open"
+23,5,37,6009695584493,0,0,,No history
+23,5,38,6009695584516,48,0,Enforce,Staff entry for this item at another site
+23,5,39,5011831076893,1,0,Enforce,Staff entry for this item at another site
+23,5,186,5011831076855,1,0,Enforce,Staff entry for this item at another site
+23,5,189,5011831076862,1,0,Enforce,Staff entry for this item at another site
+23,5,41,6001106120771,48,0,Enforce,Staff entry for this item at another site
+23,5,42,60050205,72,0,Enforce,Staff entry for this item at another site
+23,5,43,60018014,12,0,Enforce,History: Issued pack
+23,5,316,6001076003593,0,0,,Too little history
+23,5,45,60099983,144,0,Enforce,Staff entry for this item at another site
+23,5,320,8714599200001,0,0,,No history
+23,5,321,8714599200247,0,0,,No history
+23,5,324,8714599201992,0,0,,No history
+23,5,323,8714599201909,0,0,,No history
+23,5,332,60091611,0,0,,Too little history
+23,5,330,60091604,0,0,,Too little history
+23,5,331,60091581,0,0,,Too little history
+23,5,194,60091574,0,0,,Too little history
+23,5,46,6007013000502,1,0,Enforce,Staff entry for this item at another site
+23,5,47,6007013000014,6,0,Enforce,Staff entry
+23,5,48,6007013000564,1,0,Enforce,Staff entry for this item at another site
+23,5,49,6009801801018,1,0,Enforce,Staff entry for this item at another site
+23,5,51,60015990,72,0,Enforce,Staff entry for this item at another site
+23,5,52,6009695585223,48,0,Enforce,Staff entry for this item at another site
+23,5,53,700083154378,52,0,Enforce,History: Issued pack
+23,5,200,6001106116545,25,0,Enforce,History: Issued pack
+23,5,202,6007013000304,1,0,Enforce,Staff entry for this item at another site
+23,5,203,6007013000359,1,0,Enforce,Staff entry for this item at another site
+23,5,58,61600416,2,0,Enforce,History: Issued pack
+23,5,59,6009697612996,0,0,,History: no pack - issued in varying quantities
+23,10,259,5449000009067,0,0,,History: no pack - issued in varying quantities
+23,10,258,5449000664686,0,0,,History: no pack - issued in varying quantities
+23,10,247,6001324238098,6,0,Enforce,History: Issued pack
+23,10,249,5060166698874,24,0,Enforce,Staff rule: energy drinks by the case of 24
+23,10,248,5060335632715,24,0,Enforce,Staff rule: energy drinks by the case of 24
+23,10,255,9002490100070,24,0,Enforce,Staff entry for this item at another site
+23,10,253,9002490209599,24,0,Enforce,Staff entry for this item at another site
+23,10,254,9002490218638,24,0,Enforce,Staff entry for this item at another site
+23,10,256,9002490200220,24,0,Enforce,Staff rule: energy drinks by the case of 24
+23,10,246,6001710010253,0,0,,Staff entry for this item at another site
+23,10,257,6001710010192,0,0,,Staff entry for this item at another site
+23,12,1,9968,1,0,Enforce,Staff entry
+23,12,2,997,1,0,Enforce,Staff entry
+23,12,233,9869,1,0,Enforce,Staff entry
+23,13,365,6001351176776,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+23,13,60,6001351099891,20,0,Enforce,Staff entry for this item at another site
+23,13,61,6001351100283,20,0,Enforce,Staff entry for this item at another site
+23,13,205,6001351099969,20,0,Enforce,Staff entry for this item at another site
+23,13,317,6001351175663,2,0,Default only,History: Issued pack
+23,13,63,6001351525307,20,0,Enforce,Staff entry for this item at another site
+23,13,209,6001351100184,20,0,Enforce,Staff entry for this item at another site
+23,13,64,6001351100313,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+23,13,66,6001351100061,20,0,Enforce,Staff entry for this item at another site
+23,13,65,6001351100092,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+23,13,68,6001351000521,20,0,Enforce,Staff entry for this item at another site
+23,13,69,6001351000606,20,0,Enforce,Staff entry for this item at another site
+23,13,70,6001351461100,20,0,Enforce,Staff entry for this item at another site
+23,13,71,6001351414120,20,0,Enforce,Staff entry for this item at another site
+23,13,73,6001351099846,20,0,Enforce,Staff entry for this item at another site
+23,13,208,6001351100726,1,0,Enforce,Staff entry for this item at another site
+23,13,326,6001351175656,2,0,Default only,"History: Pack in use, also broken open"
+23,13,366,6001351176851,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+23,13,363,6001351169679,0,0,,Too little history
+23,13,364,6001351176752,20,0,Enforce,Staff entry for this item at another site
+23,13,207,6001351100238,20,0,Enforce,Staff entry for this item at another site
+23,19,77,6001060686825,10,0,Enforce,Staff entry
+23,19,78,6001060685828,10,0,Enforce,Staff entry
+23,19,211,6001060665820,10,0,Enforce,Staff entry
+23,19,212,6001060944826,10,0,Enforce,Staff entry
+23,19,79,6001060684821,10,0,Enforce,Staff entry
+23,19,81,3086120600020,10,0,Enforce,Tobacco outer default (10)
+23,19,82,3086120600051,10,0,Enforce,Tobacco outer default (10)
+23,19,84,4032900125206,20,0,Enforce,Staff entry
+23,19,85,42139126,10,0,Enforce,Staff entry for this item at another site
+23,19,87,4033100057885,10,0,Enforce,Staff entry
+23,19,88,8035335,10,0,Enforce,Staff entry
+23,19,367,8035238,10,0,Enforce,Staff entry
+23,19,86,42139430,10,0,Enforce,Staff entry
+23,19,214,42139621,10,0,Enforce,Staff entry
+23,19,272,6001697000872,10,0,Enforce,Staff entry
+23,19,92,6009800476255,10,0,Enforce,Staff entry
+23,19,93,6009800476248,10,0,Enforce,Staff entry
+23,19,95,6009802927397,10,0,Enforce,Staff entry
+23,19,96,6009802927403,10,0,Enforce,Staff entry
+23,19,94,6009802927380,10,0,Enforce,Staff entry for this item at another site
+23,19,215,6001060603815,20,0,Enforce,Staff entry
+23,19,97,6001335065829,10,0,Enforce,Staff entry
+23,19,98,6001060177811,20,0,Enforce,Staff entry
+23,19,217,6001060215827,10,0,Enforce,Staff entry for this item at another site
+23,19,100,6001060969829,10,0,Enforce,Staff entry
+23,19,99,6001060967825,10,0,Enforce,Staff entry
+23,19,101,6001237212826,10,0,Enforce,Staff entry
+23,19,102,6001237004100,10,0,Enforce,Staff entry for this item at another site
+23,19,103,6001060496820,10,0,Enforce,Staff entry for this item at another site
+23,19,104,6001060968822,10,0,Enforce,Staff entry
+23,19,105,6001060381829,10,0,Enforce,Staff entry for this item at another site
+23,19,106,6001060382826,10,0,Enforce,Staff entry for this item at another site
+23,19,107,6001237004148,10,0,Enforce,Staff entry for this item at another site
+23,19,234,6001237004124,10,0,Enforce,Staff entry for this item at another site
+23,19,108,6001237213823,10,0,Enforce,Staff entry
+23,19,289,6009804139132,10,0,Enforce,Tobacco outer default (10)
+23,19,291,6009804139170,10,0,Enforce,Tobacco outer default (10)
+23,19,292,6009804139118,10,0,Enforce,Tobacco outer default (10)
+23,19,293,6009804139187,10,0,Enforce,Tobacco outer default (10)
+23,19,121,4600051003973,10,0,Enforce,Staff entry
+23,19,122,4600051003959,10,0,Enforce,Staff entry
+23,19,123,6001060358821,10,0,Enforce,Staff entry for this item at another site
+23,19,124,6001060361821,10,0,Enforce,Staff entry for this item at another site
+23,19,125,6001060359828,10,0,Enforce,Staff entry
+23,19,126,6001060360824,10,0,Enforce,Staff entry for this item at another site
+23,19,127,27,10,0,Enforce,Tobacco outer default (10)
+23,19,128,6009800476958,10,0,Enforce,Staff entry for this item at another site
+23,19,129,6009800476927,10,0,Enforce,Staff entry
+23,19,220,7622100814726,10,0,Enforce,Staff entry
+23,19,130,46014436,10,0,Enforce,Staff entry
+23,19,131,46014429,10,0,Enforce,Staff entry
+23,19,132,46014450,10,0,Enforce,Staff entry
+23,19,354,6007673000027,10,0,Enforce,Tobacco outer default (10)
+23,19,244,6001060954818,20,0,Enforce,Staff entry
+23,19,268,6001060953811,20,0,Enforce,Staff entry
+23,19,221,6001060884825,10,0,Enforce,Staff entry
+23,19,137,6001060880827,10,0,Enforce,Staff entry
+23,19,245,6001060563829,10,0,Enforce,Staff entry
+23,19,135,6001060565823,10,0,Enforce,Staff entry
+23,19,138,6001060886829,10,0,Enforce,Staff entry for this item at another site
+23,19,141,6001060100826,10,0,Enforce,Staff entry
+23,19,142,6001060314810,20,0,Enforce,Staff entry
+23,19,144,6001060160813,20,0,Enforce,Staff entry
+23,19,222,6001237010828,10,0,Enforce,Staff entry
+23,19,145,6001237012839,30,0,Enforce,Loose single cigarettes - always issued in 30s
+23,19,146,6001237015823,10,0,Enforce,Staff entry for this item at another site
+23,19,147,6001060313813,20,0,Enforce,Staff entry
+23,19,148,6001237012822,10,0,Enforce,Staff entry for this item at another site
+23,19,151,50973620,10,0,Enforce,Tobacco outer default (10)
+23,19,154,6001237002281,10,0,Enforce,Staff entry
+23,19,226,6001335054823,10,0,Enforce,Staff entry
+23,19,271,6001335051822,10,0,Enforce,Staff entry
+23,19,225,6001060163821,10,0,Enforce,Staff entry
+23,19,152,6001060591822,10,0,Enforce,Staff entry
+23,19,270,6001060590825,10,0,Enforce,Staff entry for this item at another site
+23,19,350,6001697000292,10,0,Enforce,Tobacco outer default (10)
+23,19,351,6001697000322,10,0,Enforce,Tobacco outer default (10)
+23,19,352,6001697001671,10,0,Enforce,Tobacco outer default (10)
+23,19,353,6001697001732,10,0,Enforce,Tobacco outer default (10)
+23,19,294,6001237003561,10,0,Enforce,Tobacco outer default (10)
+23,19,295,6001237003646,10,0,Enforce,Tobacco outer default (10)
+23,19,341,6001237053740,10,0,Enforce,Staff entry
+23,19,345,6001237055249,10,0,Enforce,Staff entry
+23,19,349,6001237055621,10,0,Enforce,Tobacco outer default (10)
+23,19,346,6001237055263,10,0,Enforce,Staff entry
+23,19,347,6001237055287,10,0,Enforce,Staff entry
+23,19,348,6001237055584,10,0,Enforce,Tobacco outer default (10)
+23,19,157,6001335303822,10,0,Enforce,Staff entry
+23,19,236,6001237002021,10,0,Enforce,Tobacco outer default (10)
+23,19,278,6001237003424,10,0,Enforce,Tobacco outer default (10)
+23,19,277,6001237003387,10,0,Enforce,Tobacco outer default (10)
+23,19,174,6001237050923,10,0,Enforce,Tobacco outer default (10)
+23,19,176,6001237050985,10,0,Enforce,Tobacco outer default (10)
+23,19,279,6001237051043,10,0,Enforce,Tobacco outer default (10)
+23,19,237,6001237051241,10,0,Enforce,Tobacco outer default (10)
+23,19,238,6001237051166,10,0,Enforce,Tobacco outer default (10)
+23,19,240,6001237051586,5,0,Enforce,Tobacco outer default (10)
+23,19,241,6001237001345,5,0,Enforce,Tobacco outer default (10)
+23,19,178,6001237001260,10,0,Enforce,Tobacco outer default (10)
+23,19,339,6001237051609,5,0,Enforce,Tobacco outer default (10)
+23,19,343,6001237054327,10,0,Enforce,Tobacco outer default (10)
+23,19,342,6001237054242,10,0,Enforce,Tobacco outer default (10)
+23,19,282,6001237052026,10,0,Enforce,Tobacco outer default (10)
+23,19,344,6001237054761,10,0,Enforce,Tobacco outer default (10)
+23,19,338,6001237000966,10,0,Enforce,Tobacco outer default (10)
+23,19,340,6001237051623,5,0,Enforce,Tobacco outer default (10)
+23,19,280,6001237001000,5,0,Enforce,Tobacco outer default (10)
+23,19,284,6001237050602,5,0,Enforce,Tobacco outer default (10)
+23,19,179,4033100086045,10,0,Enforce,Staff entry
+23,19,180,4033100018343,10,0,Enforce,Staff entry
+23,19,181,4033100018312,10,0,Enforce,Staff entry
+23,19,242,41689560010,10,0,Enforce,Tobacco outer default (10)
+23,19,285,7311250042775,5,0,Enforce,Tobacco outer default (10)
+23,19,286,7311250042768,5,0,Enforce,Tobacco outer default (10)
+23,19,357,7311250042713,5,0,Enforce,Tobacco outer default (10)
+23,19,356,7311250042706,5,0,Enforce,Tobacco outer default (10)
+23,19,358,7311250042751,5,0,Enforce,Tobacco outer default (10)
+23,19,287,7311250042744,5,0,Enforce,Tobacco outer default (10)
+23,19,288,7622100557029,5,0,Enforce,Tobacco outer default (10)
+23,19,359,7311250047633,5,0,Enforce,Tobacco outer default (10)
+23,19,355,7311250033230,5,0,Enforce,Tobacco outer default (10)
+23,19,337,5704420042095,5,0,Enforce,Tobacco outer default (10)
+23,19,333,5704420029980,5,0,Enforce,Tobacco outer default (10)
+23,19,336,5704420042088,5,0,Enforce,Tobacco outer default (10)
+23,19,334,5704420033253,5,0,Enforce,Tobacco outer default (10)
+23,19,360,7311250047640,5,0,Enforce,Tobacco outer default (10)
+23,19,362,7311250047664,5,0,Enforce,Tobacco outer default (10)
+23,19,361,7311250047657,5,0,Enforce,Tobacco outer default (10)
+23,19,335,5704420033260,5,0,Enforce,Tobacco outer default (10)
+21,1,7,ENG524,48,0,Default only,"History: Pack in use, also broken open"
+21,1,8,ENG598,0,0,,History: no pack - issued in varying quantities
+21,1,10,RFG424,24,0,Default only,"History: Pack in use, also broken open"
+21,1,151,RFG423,0,0,,History: no pack - issued in varying quantities
+21,1,11,RFG411,36,0,Default only,"History: Pack in use, also broken open"
+21,1,12,RFG425,24,0,Enforce,History: Issued pack
+21,1,13,RFG413,36,0,Default only,"History: Pack in use, also broken open"
+21,1,14,RFG404,0,0,,History: no pack - issued in varying quantities
+21,1,15,RFG417,36,0,Default only,"History: Pack in use, also broken open"
+21,5,17,6009695584912,48,0,Enforce,Staff entry for this item at another site
+21,5,78,6009695584516,48,0,Enforce,Staff entry for this item at another site
+21,5,84,6001106120771,48,0,Enforce,Staff entry for this item at another site
+21,5,170,3732887382524,10,0,Enforce,History: Issued pack
+21,5,88,60050205,72,0,Enforce,Staff entry for this item at another site
+21,5,100,600011003,6,0,Default only,"History: Pack in use, also broken open"
+21,5,89,96041109,12,0,Enforce,Staff entry for this item at another site
+21,5,18,60099983,144,0,Enforce,Staff entry for this item at another site
+21,5,96,60015990,72,0,Enforce,Staff entry for this item at another site
+21,5,97,6009695585223,48,0,Enforce,Staff entry for this item at another site
+21,5,22,6007013000359,1,0,Enforce,Staff entry for this item at another site
+21,5,105,61600416,2,0,Enforce,History: Issued pack
+21,5,24,6009697612996,0,0,,History: no pack - issued in varying quantities
+21,5,101,6009697610398,36,0,Enforce,Staff entry for this item at another site
+21,5,166,30040588,50,0,Enforce,History: Issued pack
+21,12,1,6001351105523,1,0,Enforce,Staff entry
+21,12,2,6001351108227,1,0,Enforce,Staff entry
+21,13,25,6001351100726,1,0,Enforce,Staff entry for this item at another site
+21,13,26,6001351100740,1,0,Enforce,Staff entry for this item at another site
+21,13,27,6001351525307,20,0,Enforce,Staff entry for this item at another site
+21,13,29,6001351000521,20,0,Enforce,Staff entry for this item at another site
+21,13,30,6001351000606,20,0,Enforce,Staff entry for this item at another site
+21,13,31,6001351100184,20,0,Enforce,Staff entry for this item at another site
+21,13,32,6001351100283,20,0,Enforce,Staff entry for this item at another site
+21,13,33,6001351100238,20,0,Enforce,Staff entry for this item at another site
+21,13,34,6001351100061,20,0,Enforce,Staff entry for this item at another site
+21,13,35,6001351339300,20,0,Enforce,Staff entry for this item at another site
+21,13,169,6001351176851,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+21,13,36,6001351164520,20,0,Enforce,Staff entry for this item at another site
+21,13,37,6001351099891,20,0,Enforce,Staff entry for this item at another site
+21,13,38,6001351099969,20,0,Enforce,Staff entry for this item at another site
+21,13,109,6001351025906,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+21,13,106,6001351414120,20,0,Enforce,Staff entry for this item at another site
+21,13,107,6001351461100,20,0,Enforce,Staff entry for this item at another site
+21,13,40,6001351099846,20,0,Enforce,Staff entry for this item at another site
+21,13,168,6001351176752,20,0,Enforce,Staff entry for this item at another site
+21,19,111,6001060685828,10,0,Enforce,Staff entry
+21,19,112,6001060686825,10,0,Enforce,Staff entry
+21,19,43,6001060665820,10,0,Enforce,Staff entry
+21,19,113,6001060944826,10,0,Enforce,Staff entry
+21,19,114,6001060684821,10,0,Enforce,Staff entry for this item at another site
+21,19,118,4033100057885,10,0,Enforce,Staff entry for this item at another site
+21,19,119,4032900125206,20,0,Enforce,Staff entry
+21,19,44,6001060177811,20,0,Enforce,Staff entry
+21,19,126,6001060215827,10,0,Enforce,Staff entry for this item at another site
+21,19,45,6001060496820,10,0,Enforce,Staff entry for this item at another site
+21,19,46,6001335065829,10,0,Enforce,Staff entry
+21,19,47,6001060603815,20,0,Enforce,Staff entry
+21,19,48,6001060969829,10,0,Enforce,Staff entry
+21,19,50,6001060967825,10,0,Enforce,Staff entry for this item at another site
+21,19,51,6001060968822,10,0,Enforce,Staff entry for this item at another site
+21,19,53,6001060359828,10,0,Enforce,Staff entry
+21,19,129,6001060361821,10,0,Enforce,Staff entry
+21,19,54,60069795,100,0,Enforce,Staff entry for this item at another site
+21,19,55,6009800476958,10,0,Enforce,Staff entry for this item at another site
+21,19,56,6009800476927,10,0,Enforce,Staff entry
+21,19,57,46014450,10,0,Enforce,Staff entry
+21,19,58,5410706821956,10,0,Enforce,Staff entry
+21,19,131,46014429,10,0,Enforce,Staff entry
+21,19,110,6001060953811,20,0,Enforce,Staff entry
+21,19,164,6001060563829,10,0,Enforce,Staff entry
+21,19,62,6001060884825,10,0,Enforce,Staff entry for this item at another site
+21,19,133,6001060886829,10,0,Enforce,Staff entry for this item at another site
+21,19,137,6001060160813,20,0,Enforce,Staff entry
+21,19,63,6001060100826,10,0,Enforce,Staff entry
+21,19,64,6001237010828,10,0,Enforce,Staff entry
+21,19,65,6001237012839,30,0,Enforce,Loose single cigarettes - always issued in 30s
+21,19,138,6001060314810,20,0,Enforce,Staff entry
+21,19,135,6001237015823,10,0,Enforce,Staff entry
+21,19,66,6001060313813,20,0,Enforce,Staff entry for this item at another site
+21,19,136,6001237012822,10,0,Enforce,Staff entry
+21,19,139,6001060333828,10,0,Enforce,Staff entry
+21,19,67,6001060562815,20,0,Enforce,Staff entry
+21,19,134,6001060566820,10,0,Enforce,Staff entry
+21,19,144,6001237002281,10,0,Enforce,Staff entry
+21,19,142,6001060591822,10,0,Enforce,Staff entry
+21,19,147,4033100018343,10,0,Enforce,Staff entry for this item at another site
+21,19,150,4033100018312,10,0,Enforce,Staff entry for this item at another site
+9,30,514,RMBAK3,1,1,Enforce,Staff entry
+9,30,511,RMBAK22,1,1,Enforce,Staff entry
+9,30,509,RMBAK2,1,1,Enforce,Staff entry
+9,30,523,RMBAK5,1,1,Enforce,Staff entry
+9,30,529,RMBAK9,1,0,Enforce,Staff entry
+9,30,505,RMBAK13,12.5,1,Enforce,Staff entry
+9,30,527,RMBAK6,25,1,Enforce,Staff entry
+9,30,506,RMBAK14,12.5,1,Enforce,Staff entry
+9,30,482,RMBAK36,12.5,1,Enforce,Staff entry
+9,30,521,RMBAK45,12.5,1,Enforce,Staff entry
+9,30,516,RMBAK32,12.5,1,Enforce,Staff entry
+9,30,515,RMBAK31,25,1,Enforce,Staff entry
+9,30,524,RMBAK55,12.5,1,Enforce,Staff entry
+9,30,526,RMBAK57,12.5,1,Enforce,Staff entry
+9,31,158,6009801801032,1,0,Enforce,Staff entry
+9,31,159,6009801801018,1,0,Enforce,Staff entry
+9,31,160,6003001017712,6,0,Enforce,Staff entry
+9,31,161,6003001017910,6,0,Enforce,Staff entry
+9,31,163,6009695584912,48,0,Enforce,Staff entry
+9,31,164,6009695584936,48,0,Enforce,Staff entry
+9,31,166,60026392,30,0,Default only,"History: Pack in use, also broken open"
+9,31,170,6009695584516,48,0,Enforce,Staff entry
+9,31,171,5011831076855,1,0,Enforce,Staff entry
+9,31,173,5011831076862,1,0,Enforce,Staff entry
+9,31,174,5011831076893,1,0,Enforce,Staff entry
+9,31,175,6001546011127,0,0,,Staff entry
+9,31,176,6001106119560,12,0,Enforce,Staff entry
+9,31,177,6001106120771,48,0,Enforce,Staff entry
+9,31,181,6009823910163,1,0,Enforce,Staff entry
+9,31,182,6002125004448,1,0,Enforce,Staff entry
+9,31,183,6002125006381,1,0,Enforce,Staff entry
+9,31,184,6002125006602,1,0,Enforce,Staff entry
+9,31,186,6001335303822,10,0,Enforce,Staff entry
+9,31,189,4005800237515,1,0,Enforce,Staff entry
+9,31,190,60050205,72,0,Enforce,Staff entry
+9,31,191,96041109,12,0,Enforce,Staff entry
+9,31,192,60099983,144,0,Enforce,Staff entry
+9,31,197,9770019177000,0,0,,Staff entry
+9,31,201,6009695581034,6,0,Enforce,Staff entry
+9,31,203,6009695581058,6,0,Enforce,Staff entry
+9,31,205,60069795,100,0,Enforce,Staff entry
+9,31,206,6007013000755,1,0,Enforce,Staff entry
+9,31,207,6007013000533,1,0,Enforce,Staff entry
+9,31,208,6007013000502,1,0,Enforce,Staff entry
+9,31,209,6007013000564,1,0,Enforce,Staff entry
+9,31,210,6007013000083,1,0,Enforce,Staff entry
+9,31,211,6007013000014,6,0,Enforce,Staff entry
+9,31,215,60015990,72,0,Enforce,Staff entry
+9,31,219,6009695585223,48,0,Enforce,Staff entry
+9,31,220,50974009,0,0,,Staff entry
+9,31,225,6001106116545,25,0,Enforce,History: Issued pack
+9,31,226,6007013000304,1,0,Enforce,Staff entry
+9,31,227,6007013000359,1,0,Enforce,Staff entry
+9,31,232,6009697610398,36,0,Enforce,Staff entry
+9,10,260,6001253010185,0,0,,Staff entry
+9,10,261,6001253010178,0,0,,Staff entry
+9,10,495,31023,0,0,,Staff entry
+9,10,491,31016,0,0,,Staff entry
+9,10,494,31022,0,0,,Staff entry
+9,10,498,31028,0,0,,Staff entry
+9,10,578,31030,0,0,,Staff entry
+9,10,593,31054,0,0,,Staff entry
+9,10,594,31055,0,0,,Staff entry
+9,10,496,31024,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+9,10,572,31013,0,0,,Staff entry
+9,10,490,31005,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+9,10,489,31004,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+9,10,497,31027,0,0,,Staff entry
+9,10,484,31031,24,0,Enforce,Stated: white and brown bread are baked in 40s and 24s; 24 set as the multiple
+9,10,480,31007,24,0,Enforce,Stated: white and brown bread are baked in 40s and 24s; 24 set as the multiple
+9,10,486,31001,0,0,,Staff entry
+9,10,504,31053,0,0,,Staff entry
+9,10,485,31000,0,0,,Staff entry
+9,10,492,31017,0,0,,Staff entry
+9,10,487,31002,0,0,,Staff entry
+9,10,488,31003,0,0,,Staff entry
+9,10,262,6001205730321,0,0,,Staff entry
+9,10,263,6001205730475,0,0,,Staff entry
+9,10,499,31033,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+9,10,264,6001076027025,1,0,Enforce,Staff entry
+9,10,265,5060466519077,24,0,Enforce,Staff entry
+9,10,582,31036,0,0,,Staff entry
+9,10,266,9002490100070,24,0,Enforce,Staff entry
+9,10,267,9002490209599,24,0,Enforce,Staff entry
+9,10,268,9002490218638,24,0,Enforce,Staff entry
+9,10,269,6001710010253,0,0,,Staff entry
+9,10,270,6001710010192,0,0,,Staff entry
+9,11,416,11012,0,0,,Staff entry
+9,11,546,11063,0,0,,Staff entry
+9,11,542,11058,0,0,,Staff entry
+9,11,534,11028,0,0,,Staff entry
+9,11,633,12040,0,1,,Staff entry
+9,11,539,11052,0,0,,Staff entry
+9,11,569,21025,0,0,,Staff entry
+9,11,421,11031,0,0,,Staff entry
+9,11,390,11032,0,0,,Staff entry
+9,11,391,11004,0,0,,Staff entry
+9,11,422,11055,0,0,,Staff entry
+9,11,636,12039,0,1,,Staff entry
+9,11,634,12042,0,1,,Staff entry
+9,11,637,12041,0,1,,Staff entry
+9,11,401,11015,0,0,,Staff entry
+9,11,635,12043,0,1,,Staff entry
+9,11,652,6001833000063,1,0,Enforce,Staff entry
+9,11,651,6001833000070,1,0,Enforce,Staff entry
+9,11,653,6001833000018,1,0,Enforce,Staff entry
+9,11,650,6001833000049,1,0,Enforce,Staff entry
+9,11,467,11036,0,0,,Staff entry
+9,11,468,11053,0,0,,Staff entry
+9,11,608,21028,0,0,,Staff entry
+9,11,469,11037,0,0,,Staff entry
+9,11,419,11049,0,0,,Staff entry
+9,12,271,4003,1,0,Enforce,Staff entry
+9,12,273,5000,1,0,Enforce,Staff entry
+9,12,274,4002,1,0,Enforce,Staff entry
+9,12,275,3009,1,0,Enforce,Staff entry
+9,12,276,3007,1,0,Enforce,Staff entry
+9,12,277,3002,1,0,Enforce,Staff entry
+9,12,278,3006,1,0,Enforce,Staff entry
+9,12,279,3004,1,0,Enforce,Staff entry
+9,13,1,6001351414120,20,0,Enforce,Staff entry
+9,13,2,6001351000521,20,0,Enforce,Staff entry
+9,13,16,6001351525307,20,0,Enforce,Staff entry
+9,13,11,6001351099969,20,0,Enforce,Staff entry
+9,13,6,6001351000606,20,0,Enforce,Staff entry
+9,13,3,6001351461100,20,0,Enforce,Staff entry
+9,13,21,6001351099792,20,0,Enforce,Staff entry
+9,13,19,6001351100184,20,0,Enforce,Staff entry
+9,13,9,6001351100061,20,0,Enforce,Staff entry
+9,13,5,6001351099891,20,0,Enforce,Staff entry
+9,13,610,6001351100269,20,0,Enforce,Staff entry
+9,13,4,6001351100740,1,0,Enforce,Staff entry
+9,13,18,6001351100726,1,0,Enforce,Staff entry
+9,13,14,6001351339300,20,0,Enforce,Staff entry
+9,13,8,6001351100283,20,0,Enforce,Staff entry
+9,13,17,6001351100238,20,0,Enforce,Staff entry
+9,13,22,6001351164520,20,0,Enforce,Staff entry
+9,13,10,6001351099990,1,0,Enforce,Staff entry
+9,13,12,6001351099846,20,0,Enforce,Staff entry
+9,13,609,6001351176752,20,0,Enforce,Staff entry
+9,13,15,6001351113955,20,0,Enforce,Staff entry
+9,13,638,6001351176837,20,0,Enforce,Staff entry
+9,19,641,6001335068820,10,0,Enforce,Staff entry
+9,19,639,6001060383823,10,0,Enforce,Staff entry
+9,19,642,6001237004506,10,0,Enforce,Staff entry
+9,19,640,6001060939822,10,0,Enforce,Staff entry
+9,19,643,6001060755828,10,0,Enforce,Staff entry
+9,32,631,4032900125206,20,0,Enforce,Staff entry
+9,32,292,6001697311213,1,0,Enforce,Staff entry
+9,32,299,42139621,10,0,Enforce,Staff entry
+9,32,306,4033100057885,10,0,Enforce,Staff entry
+9,32,313,6009802927403,10,0,Enforce,Staff entry
+9,32,314,6001060603815,20,0,Enforce,Staff entry
+9,32,319,6001060177811,20,0,Enforce,Staff entry
+9,32,316,6001060215827,10,0,Enforce,Staff entry
+9,32,320,6001060496820,10,0,Enforce,Staff entry
+9,32,317,6001060967825,10,0,Enforce,Staff entry
+9,32,318,6001060968822,10,0,Enforce,Staff entry
+9,32,315,6001060969829,10,0,Enforce,Staff entry
+9,32,324,6001237212826,10,0,Enforce,Staff entry
+9,32,325,6001237213823,10,0,Enforce,Staff entry
+9,32,321,6001335065829,10,0,Enforce,Staff entry
+9,32,644,6001237004148,10,0,Enforce,Staff entry
+9,32,649,6937080574906,1,0,Enforce,Staff entry
+9,32,332,39,30,0,Enforce,Loose single cigarettes - always issued in 30s
+9,32,333,6009800476958,10,0,Enforce,Staff entry
+9,32,334,6009800476927,10,0,Enforce,Staff entry
+9,32,338,56001709,10,0,Enforce,Staff entry
+9,32,344,6001060953811,20,0,Enforce,Staff entry
+9,32,345,6001060565823,10,0,Enforce,Staff entry
+9,32,346,6001060884825,10,0,Enforce,Staff entry
+9,32,347,6001060886829,10,0,Enforce,Staff entry
+9,32,632,6001060954818,20,0,Enforce,Staff entry
+9,32,348,6001060563829,10,0,Enforce,Staff entry
+9,32,349,6001060880827,10,0,Enforce,Staff entry
+9,32,362,6001060314810,20,0,Enforce,Staff entry
+9,32,352,6001237015823,10,0,Enforce,Staff entry
+9,32,363,6001060313813,20,0,Enforce,Staff entry
+9,32,365,6001237010828,10,0,Enforce,Staff entry
+9,32,366,6001237012822,10,0,Enforce,Staff entry
+9,32,364,6001060160813,20,0,Enforce,Staff entry
+9,32,367,6001060100826,10,0,Enforce,Staff entry
+9,32,645,40,30,0,Enforce,Loose single cigarettes - always issued in 30s
+9,32,647,6001237000980,1,0,Enforce,Staff entry
+9,32,646,6001237001888,1,0,Enforce,Staff entry
+9,32,648,6001237054785,1,0,Enforce,Staff entry
+9,25,378,9999,0,0,,Staff entry
+15,6,37,7312040017430,12,0,Enforce,Staff entry
+15,6,407,6009694727549,6,0,Enforce,Staff entry
+15,6,39,5000387003019,12,0,Enforce,Staff entry
+15,6,408,1802,25,0,Enforce,Staff entry
+15,6,405,5000289938655,12,0,Enforce,Staff entry
+15,6,42,5010103800303,12,0,Enforce,Staff entry
+15,6,43,5000267024011,12,0,Enforce,Staff entry
+15,6,44,5000267014005,12,0,Enforce,Staff entry
+15,6,45,6001496010539,12,0,Enforce,Staff entry
+15,6,46,6001496010577,12,0,Enforce,Staff entry
+15,6,47,6001495001040,12,0,Enforce,Staff entry
+15,6,48,6001495001064,12,0,Enforce,Staff entry
+15,6,49,6001495001088,12,0,Enforce,Staff entry
+15,6,50,6001466000140,12,0,Enforce,Staff entry
+15,6,52,6001452635004,12,0,Enforce,Staff entry
+15,6,54,6001398127007,12,0,Enforce,Staff entry
+15,6,404,5410316961080,12,0,Enforce,Staff entry
+15,6,55,6001452152006,12,0,Enforce,Staff entry
+15,33,399,107,0,0,,Staff entry
+15,33,401,102,0,0,,Staff entry
+15,33,400,108,0,0,,Staff entry
+15,33,406,118,0,0,,Staff entry
+15,33,397,112,0,0,,Staff entry
+15,33,403,120,0,0,,Staff entry
+15,33,398,113,0,0,,Staff entry
+15,33,402,122,0,0,,Staff entry
+15,20,299,4033100057885,10,0,Enforce,Staff entry
+15,20,305,6001060603815,20,0,Enforce,Staff entry
+15,20,303,6001060967825,10,0,Enforce,Staff entry
+15,20,302,6001060968822,10,0,Enforce,Staff entry
+15,20,301,6001060177811,20,0,Enforce,Staff entry
+15,20,306,6009800476958,10,0,Enforce,Staff entry
+15,20,307,6001237015823,10,0,Enforce,Staff entry
+15,20,300,6001060313813,20,0,Enforce,Staff entry
+15,20,298,6001237010828,10,0,Enforce,Staff entry
+3,1,466,RMBAK3,1,1,Enforce,Staff entry for this item at another site
+3,1,451,RMBAK22,1,1,Enforce,Staff entry for this item at another site
+3,1,449,RMBAK2,1,1,Enforce,Staff entry for this item at another site
+3,1,445,RMBAK13,12.5,1,Enforce,Staff entry for this item at another site
+3,1,479,RMBAK6,25,1,Enforce,Staff entry for this item at another site
+3,1,446,RMBAK14,12.5,1,Enforce,Staff entry for this item at another site
+3,1,423,RMBAK36,12.5,1,Enforce,Staff entry for this item at another site
+3,1,473,RMBAK45,12.5,1,Enforce,Staff entry for this item at another site
+3,1,468,RMBAK32,12.5,1,Enforce,Staff entry for this item at another site
+3,1,467,RMBAK31,25,1,Enforce,Staff entry for this item at another site
+3,1,478,RMBAK57,12.5,1,Enforce,Staff entry for this item at another site
+3,28,431,31016,0,0,,Staff entry for this item at another site
+3,28,522,31054,0,0,,Staff entry for this item at another site
+3,28,523,31055,0,0,,Staff entry for this item at another site
+3,5,65,6009801801032,1,0,Enforce,Staff entry for this item at another site
+3,5,66,6009801801018,1,0,Enforce,Staff entry for this item at another site
+3,5,69,6009695584912,48,0,Enforce,Staff entry for this item at another site
+3,5,70,6009695584936,48,0,Enforce,Staff entry for this item at another site
+3,5,75,6009695584516,48,0,Enforce,Staff entry for this item at another site
+3,5,77,5011831076855,1,0,Enforce,Staff entry for this item at another site
+3,5,80,5011831076862,1,0,Enforce,Staff entry for this item at another site
+3,5,81,5011831076893,1,0,Enforce,Staff entry for this item at another site
+3,5,82,6001546011127,0,0,,Staff entry for this item at another site
+3,5,83,6001106119560,12,0,Enforce,Staff entry for this item at another site
+3,5,87,6009823910163,1,0,Enforce,Staff entry for this item at another site
+3,5,89,6002125004448,1,0,Enforce,Staff entry for this item at another site
+3,5,90,6002125006381,1,0,Enforce,Staff entry for this item at another site
+3,5,91,6002125006602,1,0,Enforce,Staff entry for this item at another site
+3,5,96,4005800237515,1,0,Enforce,Staff entry for this item at another site
+3,5,97,60050205,72,0,Enforce,Staff entry for this item at another site
+3,5,100,60099983,144,0,Enforce,Staff entry for this item at another site
+3,5,114,6009695581034,6,0,Enforce,Staff entry for this item at another site
+3,5,117,6009695581058,6,0,Enforce,Staff entry for this item at another site
+3,5,119,6007013000755,1,0,Enforce,Staff entry for this item at another site
+3,5,121,6007013000502,1,0,Enforce,Staff entry for this item at another site
+3,5,125,6007013000014,6,0,Enforce,Staff entry
+3,5,129,60015990,72,0,Enforce,Staff entry for this item at another site
+3,5,137,6009695585223,48,0,Enforce,Staff entry for this item at another site
+3,5,145,6007013000267,6,0,,Too little history
+3,5,147,6007013000359,1,0,Enforce,Staff entry for this item at another site
+25,5,187,6001539375113,0,0,,Too little history
+3,26,462,51029,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,452,51013,10,1,Enforce,Unit the history shows this is issued in
+3,26,453,51014,13.61,1,Enforce,Unit the history shows this is issued in
+3,26,454,51015,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,455,51016,10,1,Enforce,Unit the history shows this is issued in
+3,26,528,51080,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,457,51007,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,458,51008,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,459,51009,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,460,51010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,461,51012,15,1,Enforce,Unit the history shows this is issued in
+3,26,456,51011,10,1,Enforce,Unit the history shows this is issued in
+3,26,527,51082,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,161,51035,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,171,51021,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,172,51018,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,173,51020,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,174,51022,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,530,51081,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,26,529,51084,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,35,167,51017,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,35,162,51053,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,35,164,51040,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,35,168,51024,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,35,179,51028,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,8,185,C-GCC,3,1,Enforce,Unit the history shows this is issued in
+3,8,187,M009,1,1,Enforce,Unit the history shows this is issued in
+3,8,188,C-DCC,5.5,1,Enforce,Unit the history shows this is issued in
+3,8,189,M003,1,1,Enforce,Pack read off the item name and confirmed by the history
+3,8,190,G030,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+3,8,191,C002,2.5,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,8,192,M008,1,1,Enforce,Pack read off the item name and confirmed by the history
+3,8,193,M005,1,1,Enforce,Unit the history shows this is issued in
+3,8,194,C003,3,1,Enforce,Unit the history shows this is issued in
+3,8,195,V010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,8,196,D-RIB,1.1,1,Enforce,Unit the history shows this is issued in
+3,9,202,P002,50,0,Enforce,History: Issued pack
+3,9,203,P-RDPB,50,0,Enforce,History: Issued pack
+3,9,204,P003,50,0,Default only,"History: Pack in use, also broken open"
+3,9,205,PTDB,50,0,Enforce,History: Issued pack
+3,9,206,PTRD,50,0,Enforce,History: Issued pack
+25,5,180,6001539375120,0,0,,Too little history
+3,9,208,D1.5LC,12,0,Enforce,History: Issued pack
+25,5,48,9771816097003,1,0,,No history
+3,10,212,42070047,30,0,Enforce,History: Issued pack
+25,5,164,559,0,0,,Too little history
+26,5,123,5011831076879,6,0,,No history
+3,10,215,7622210626134,12,0,Enforce,History: Issued pack
+3,10,216,60025265,18,0,Enforce,History: Issued pack
+3,10,217,60025272,18,0,Enforce,History: Issued pack
+3,7,160,51031,15,0,,No history
+3,9,207,DPRED,0,0,,Too little history
+26,9,59,1004623,1,0,,Too little history
+3,10,211,42101925,30,0,,Too little history
+3,10,213,42102120,30,0,,Too little history
+3,10,214,50173167,30,0,,Too little history
+3,10,224,42299783,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+3,10,225,50173204,30,0,Enforce,History: Issued pack
+3,10,218,60026125,18,0,,Too little history
+3,10,227,8714789829623,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+3,10,228,60024824,25,0,Enforce,History: Issued pack
+3,10,219,60025258,18,0,,Too little history
+3,10,230,6001085120946,12,0,Enforce,History: Issued pack
+3,10,220,60025296,18,0,,No history
+3,10,221,42299875,6,0,,Too little history
+3,10,222,42332749,6,0,,Too little history
+3,11,394,1204,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+3,11,391,1200,0,0,,History: no pack - issued in varying quantities
+3,11,395,1206,0,0,,History: no pack - issued in varying quantities
+3,11,396,1207,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+3,11,392,1201,0,0,,History: no pack - issued in varying quantities
+3,11,393,1202,0,0,,History: no pack - issued in varying quantities
+3,11,28,RMDEL13,10,1,Enforce,Unit the history shows this is issued in
+3,11,32,RMDEL31,16,0,Enforce,History: Common divisor of the packs issued
+3,11,33,RMDEL28,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,11,35,RMDEL12,0,0,,History: no pack - issued in varying quantities
+3,11,36,RMDEL14,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,10,223,42299851,6,0,,Too little history
+3,11,38,RMDEL5,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,11,39,RMDEL16,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,11,40,RMDEL6,5,1,Enforce,Unit the history shows this is issued in
+3,11,43,RMDEL21,10,1,Enforce,Unit the history shows this is issued in
+3,11,46,RMDEL43,10,1,Enforce,Unit the history shows this is issued in
+3,11,48,RMDEL20,10,1,Enforce,Unit the history shows this is issued in
+3,11,49,RMDEL11,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+3,11,51,RMDEL1,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,11,53,RMDEL4,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,11,55,RMDEL18,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,359,11042,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,360,21001,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,361,11045,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,362,21007,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,365,21006,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,369,11004,0,0,,Staff entry for this item at another site
+3,29,370,21000,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,372,21002,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,376,11015,0,0,,Staff entry for this item at another site
+3,29,380,21004,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,381,21010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,10,226,50173822,30,0,,Too little history
+3,29,383,11002,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,384,11023,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,385,11019,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,10,229,60019035,12,0,,Too little history
+3,29,386,11005,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,387,11025,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,29,389,11038,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+3,12,234,5000,1,0,Enforce,Staff entry
+3,12,235,3009,1,0,Enforce,Staff entry
+3,12,236,3007,1,0,Enforce,Staff entry
+3,12,237,3002,1,0,Enforce,Staff entry
+3,12,238,3006,1,0,Enforce,Staff entry
+3,13,1,6001351414120,20,0,Enforce,Staff entry for this item at another site
+3,13,2,6001351000521,20,0,Enforce,Staff entry for this item at another site
+3,13,19,6001351100283,20,0,Enforce,Staff entry for this item at another site
+3,13,4,6001351525000,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+3,13,5,6001351100061,20,0,Enforce,Staff entry for this item at another site
+3,13,6,6001351339300,20,0,Enforce,Staff entry for this item at another site
+3,13,7,6001351099846,20,0,Enforce,Staff entry for this item at another site
+3,13,18,6001351099891,20,0,Enforce,Staff entry for this item at another site
+3,13,8,6001351099969,20,0,Enforce,Staff entry for this item at another site
+3,13,9,6001351000606,20,0,Enforce,Staff entry for this item at another site
+3,13,10,6001351461100,20,0,Enforce,Staff entry for this item at another site
+3,13,11,6001351099792,20,0,Enforce,Staff entry for this item at another site
+3,13,12,6001351525307,20,0,Enforce,Staff entry for this item at another site
+3,13,21,6001351100184,20,0,Enforce,Staff entry for this item at another site
+3,13,23,6001351164520,20,0,Enforce,Staff entry for this item at another site
+3,13,15,6001351100238,20,0,Enforce,Staff entry for this item at another site
+3,13,526,6001351176752,20,0,Enforce,Staff entry for this item at another site
+3,13,24,6001351113955,20,0,Enforce,Staff entry for this item at another site
+3,13,25,6001351100740,1,0,Enforce,Staff entry for this item at another site
+3,19,245,6001060684821,10,0,Enforce,Staff entry
+3,19,258,42139621,10,0,Enforce,Staff entry
+3,19,262,42139447,10,0,Enforce,Staff entry
+3,19,263,8035335,10,0,Enforce,Staff entry for this item at another site
+3,19,265,4033100057885,10,0,Enforce,Staff entry
+3,19,266,4032900125206,20,0,Enforce,Staff entry
+3,19,273,6009802927403,10,0,Enforce,Staff entry for this item at another site
+3,19,271,6009802927380,10,0,Enforce,Staff entry
+3,19,272,6009802927397,10,0,Enforce,Staff entry
+3,19,275,6001060603815,20,0,Enforce,Staff entry
+3,19,276,6001060969829,10,0,Enforce,Staff entry
+3,19,277,6001060215827,10,0,Enforce,Staff entry
+3,19,278,6001060967825,10,0,Enforce,Staff entry
+3,19,280,6001060177811,20,0,Enforce,Staff entry
+3,19,281,6001060496820,10,0,Enforce,Staff entry
+3,19,287,6001237213823,10,0,Enforce,Staff entry for this item at another site
+3,19,282,6001335065829,10,0,Enforce,Staff entry
+3,19,284,6001060381829,10,0,Enforce,Staff entry
+3,19,285,6001060382826,10,0,Enforce,Staff entry
+3,19,286,6001237212826,10,0,Enforce,Staff entry
+3,19,93,6001335303822,10,0,Enforce,Staff entry
+3,19,290,6001060359828,10,0,Enforce,Staff entry
+3,19,291,6001060360824,10,0,Enforce,Staff entry
+3,19,293,60069795,100,0,Enforce,Staff entry for this item at another site
+3,19,295,39,30,0,Enforce,Loose single cigarettes - always issued in 30s
+3,19,296,6009800476958,10,0,Enforce,Staff entry
+3,19,297,6009800476927,10,0,Enforce,Staff entry
+3,19,301,56001709,10,0,Enforce,Staff entry
+3,19,298,46014450,10,0,Enforce,Staff entry for this item at another site
+3,19,308,6001060953811,20,0,Enforce,Staff entry
+3,19,309,6001060565823,10,0,Enforce,Staff entry
+3,19,310,6001060884825,10,0,Enforce,Staff entry
+3,19,311,6001060886829,10,0,Enforce,Staff entry
+3,19,312,6001060563829,10,0,Enforce,Staff entry
+3,19,316,6001060954818,20,0,Enforce,Staff entry
+3,19,317,6001237015823,10,0,Enforce,Staff entry for this item at another site
+3,19,327,6001060314810,20,0,Enforce,Staff entry
+3,19,328,6001060313813,20,0,Enforce,Staff entry
+3,19,329,6001060160813,20,0,Enforce,Staff entry
+3,19,330,6001237010828,10,0,Enforce,Staff entry for this item at another site
+3,19,331,6001237012822,10,0,Enforce,Staff entry for this item at another site
+3,19,332,6001060100826,10,0,Enforce,Staff entry for this item at another site
+3,19,417,40,30,0,Enforce,Loose single cigarettes - always issued in 30s
+3,19,333,6001335054823,10,0,Enforce,Staff entry
+3,19,335,6001335051822,10,0,Enforce,Staff entry
+3,25,346,9999,0,0,,Staff entry for this item at another site
+25,1,5,ENG567,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+25,1,6,ENG575,6,0,Default only,"History: Pack in use, also broken open"
+25,1,171,ENG524,48,0,Default only,"History: Pack in use, also broken open"
+25,1,181,ENG305,10,0,Default only,History: Issued pack
+25,1,10,ENG525,0,0,,History: no pack - issued in varying quantities
+25,1,11,ENG551,5,0,Enforce,History: Issued pack
+25,1,12,ENG527,0,0,,History: no pack - issued in varying quantities
+25,1,13,ENG564,0,0,,History: no pack - issued in varying quantities
+25,1,14,RFG424,24,0,Default only,"History: Pack in use, also broken open"
+25,1,15,RFG423,0,0,,History: no pack - issued in varying quantities
+25,1,16,RFG411,36,0,Default only,"History: Pack in use, also broken open"
+25,1,17,RFG409,0,0,,History: no pack - issued in varying quantities
+25,1,18,RFG412,0,0,,History: no pack - issued in varying quantities
+25,1,19,RFG413,36,0,Default only,"History: Pack in use, also broken open"
+25,1,20,RFG404,0,0,,History: no pack - issued in varying quantities
+25,1,21,RFG415,4,0,Default only,"History: Pack in use, also broken open"
+25,1,22,RFG417,36,0,Default only,"History: Pack in use, also broken open"
+25,1,182,ENG383,10,0,Default only,History: Issued pack
+3,10,231,60018960,12,0,,Too little history
+3,10,232,60018939,12,0,,Too little history
+25,5,24,6009695584912,48,0,Enforce,Staff entry for this item at another site
+25,5,25,6009695584936,48,0,Enforce,Staff entry for this item at another site
+25,5,188,8904306404369,10,0,Enforce,History: Issued pack
+25,5,26,6009695584516,48,0,Enforce,Staff entry for this item at another site
+25,5,27,6001106120771,48,0,Enforce,Staff entry for this item at another site
+25,5,28,60050205,72,0,Enforce,Staff entry for this item at another site
+25,5,29,60099983,144,0,Enforce,Staff entry for this item at another site
+25,5,47,9770019177000,0,0,,Staff entry for this item at another site
+3,10,233,60014429,12,0,,Too little history
+25,5,49,9771682968001,0,0,,History: no pack - issued in varying quantities
+25,5,144,6007013000502,1,0,Enforce,Staff entry for this item at another site
+25,5,30,6007013000014,6,0,Enforce,Staff entry
+25,5,31,6007013000564,1,0,Enforce,Staff entry for this item at another site
+25,5,33,60015990,72,0,Enforce,Staff entry for this item at another site
+25,5,34,6009695585223,48,0,Enforce,Staff entry for this item at another site
+25,5,35,6009823910163,1,0,Enforce,Staff entry for this item at another site
+25,10,179,6009621930172,0,0,,No history
+25,5,36,790,0,0,,History: no pack - issued in varying quantities
+25,5,38,50974009,0,0,,Staff entry for this item at another site
+25,5,39,6007013000304,1,0,Enforce,Staff entry for this item at another site
+25,5,40,6007013000359,1,0,Enforce,Staff entry for this item at another site
+25,5,148,61600416,2,0,Enforce,History: Issued pack
+25,5,149,6009697612996,0,0,,History: no pack - issued in varying quantities
+25,10,41,6009642560228,0,0,,History: no pack - issued in varying quantities
+25,10,51,795,0,0,,History: no pack - issued in varying quantities
+3,11,37,RMDEL15,10,0,,No history
+25,12,2,9869,1,0,Enforce,Staff entry
+25,12,3,9968,1,0,Enforce,Staff entry
+25,12,4,997,1,0,Enforce,Staff entry
+25,12,1,1010,1,0,Enforce,Staff entry
+25,13,52,6001351100740,1,0,Enforce,Staff entry for this item at another site
+25,13,53,6001351099891,20,0,Enforce,Staff entry for this item at another site
+25,13,54,6001351339300,20,0,Enforce,Staff entry for this item at another site
+25,13,55,6001351100726,1,0,Enforce,Staff entry for this item at another site
+25,13,56,6001351525307,20,0,Enforce,Staff entry for this item at another site
+25,13,58,6001351100283,20,0,Enforce,Staff entry for this item at another site
+25,13,59,6001351100238,20,0,Enforce,Staff entry for this item at another site
+25,13,60,6001351100061,20,0,Enforce,Staff entry for this item at another site
+25,13,185,6001351176851,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+25,13,61,6001351164520,20,0,Enforce,Staff entry for this item at another site
+25,13,62,6001351099969,20,0,Enforce,Staff entry for this item at another site
+25,13,63,6001351025906,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+25,13,64,6001351000521,20,0,Enforce,Staff entry for this item at another site
+25,13,65,6001351000606,20,0,Enforce,Staff entry for this item at another site
+25,13,66,6001351414120,20,0,Enforce,Staff entry for this item at another site
+25,13,67,6001351461100,20,0,Enforce,Staff entry for this item at another site
+25,13,184,6001351176752,20,0,Enforce,Staff entry for this item at another site
+25,13,186,6001351176837,20,0,Enforce,Staff entry for this item at another site
+25,19,74,6001060685828,10,0,Enforce,Staff entry
+25,19,75,6001060665820,10,0,Enforce,Staff entry
+25,19,76,6001060944826,10,0,Enforce,Staff entry
+25,19,77,6001060686825,10,0,Enforce,Staff entry
+25,19,78,6001060684821,10,0,Enforce,Staff entry
+25,19,79,42139447,10,0,Enforce,Staff entry for this item at another site
+25,19,81,42139430,10,0,Enforce,Staff entry
+25,19,82,4033100057885,10,0,Enforce,Staff entry
+25,19,83,4032900125206,20,0,Enforce,Staff entry
+25,19,85,6009800476255,10,0,Enforce,Staff entry for this item at another site
+25,19,86,6009800476248,10,0,Enforce,Staff entry
+25,19,87,6009802927403,10,0,Enforce,Staff entry
+25,19,88,6009802927380,10,0,Enforce,Staff entry
+25,19,90,6001060603815,20,0,Enforce,Staff entry
+25,19,91,6001060177811,20,0,Enforce,Staff entry
+25,19,94,6001060969829,10,0,Enforce,Staff entry
+25,19,173,6001237004421,10,0,Enforce,Staff entry
+25,19,92,6001060967825,10,0,Enforce,Staff entry
+25,19,93,6001060968822,10,0,Enforce,Staff entry
+25,19,95,6001237214820,10,0,Enforce,Staff entry
+25,19,96,6001060496820,10,0,Enforce,Staff entry
+25,19,177,6001237004445,20,0,Enforce,Staff entry
+25,19,178,6001237004148,10,0,Enforce,Staff entry
+25,19,99,6001237212826,10,0,Enforce,Staff entry
+25,19,100,6001060358821,10,0,Enforce,Staff entry
+25,19,101,6001060361821,10,0,Enforce,Staff entry
+25,19,102,6001060359828,10,0,Enforce,Staff entry
+25,19,103,6001060360824,10,0,Enforce,Staff entry
+25,19,104,60069795,100,0,Enforce,Staff entry for this item at another site
+25,19,106,6009800476958,10,0,Enforce,Staff entry
+25,19,107,6009800476927,10,0,Enforce,Staff entry
+25,19,108,46014450,10,0,Enforce,Staff entry
+25,19,110,6001060953811,20,0,Enforce,Staff entry
+25,19,166,6001060954818,20,0,Enforce,Staff entry
+25,19,112,6001060880827,10,0,Enforce,Staff entry
+25,19,165,6001060563829,10,0,Enforce,Staff entry
+25,19,113,6001060565823,10,0,Enforce,Staff entry
+25,19,115,6001060884825,10,0,Enforce,Staff entry for this item at another site
+25,19,116,6001060886829,10,0,Enforce,Staff entry for this item at another site
+25,19,117,6001060160813,20,0,Enforce,Staff entry
+25,19,118,6001060100826,10,0,Enforce,Staff entry
+25,19,119,6001237012839,30,0,Enforce,Loose single cigarettes - always issued in 30s
+25,19,120,6001060314810,20,0,Enforce,Staff entry
+25,19,121,6001237015823,10,0,Enforce,Staff entry
+25,19,122,6001237010828,10,0,Enforce,Staff entry for this item at another site
+25,19,123,6001060313813,20,0,Enforce,Staff entry
+25,19,124,6001237012822,10,0,Enforce,Staff entry
+25,19,125,6001060333828,10,0,Enforce,Staff entry
+26,13,105,6007053024247,16,0,,Too little history
+25,19,127,4033100018343,10,0,Enforce,Staff entry for this item at another site
+25,19,128,4033100018312,10,0,Enforce,Staff entry for this item at another site
+25,19,129,4033100086045,10,0,Enforce,Staff entry
+25,19,130,4032900123936,10,0,Enforce,Staff entry for this item at another site
+24,1,414,RMBAK3,1,1,Enforce,Staff entry for this item at another site
+24,1,411,RMBAK22,1,1,Enforce,Staff entry for this item at another site
+24,1,405,RMBAK13,12.5,1,Enforce,Staff entry for this item at another site
+24,1,427,RMBAK6,25,1,Enforce,Staff entry for this item at another site
+24,1,406,RMBAK14,12.5,1,Enforce,Staff entry for this item at another site
+24,1,371,RMBAK36,12.5,1,Enforce,Staff entry for this item at another site
+24,1,416,RMBAK32,12.5,1,Enforce,Staff entry for this item at another site
+24,1,415,RMBAK31,25,1,Enforce,Staff entry for this item at another site
+24,1,426,RMBAK57,12.5,1,Enforce,Staff entry for this item at another site
+24,5,61,6009801801032,1,0,Enforce,Staff entry for this item at another site
+24,5,62,6009801801018,1,0,Enforce,Staff entry for this item at another site
+24,5,63,6003001017712,6,0,Enforce,Staff entry for this item at another site
+24,5,64,6003001017910,6,0,Enforce,Staff entry for this item at another site
+24,5,65,6009695584912,48,0,Enforce,Staff entry for this item at another site
+24,5,66,6009695584936,48,0,Enforce,Staff entry for this item at another site
+24,5,67,60026392,30,0,Default only,"History: Pack in use, also broken open"
+24,5,70,6009695584516,48,0,Enforce,Staff entry for this item at another site
+24,5,71,5011831076855,1,0,Enforce,Staff entry for this item at another site
+24,5,73,5011831076862,1,0,Enforce,Staff entry for this item at another site
+24,5,74,5011831076893,1,0,Enforce,Staff entry for this item at another site
+24,5,75,6001546011127,0,0,,Staff entry for this item at another site
+24,5,77,6001106120771,48,0,Enforce,Staff entry for this item at another site
+24,5,80,6009823910163,1,0,Enforce,Staff entry for this item at another site
+24,5,81,6002125004448,1,0,Enforce,Staff entry for this item at another site
+24,5,82,6002125006381,1,0,Enforce,Staff entry for this item at another site
+24,5,83,6002125006602,1,0,Enforce,Staff entry for this item at another site
+24,5,89,4005800237515,1,0,Enforce,Staff entry for this item at another site
+24,5,90,60050205,72,0,Enforce,Staff entry for this item at another site
+24,5,91,96041109,12,0,Enforce,Staff entry for this item at another site
+24,5,92,60099983,144,0,Enforce,Staff entry for this item at another site
+24,5,97,9770019177000,0,0,,Staff entry for this item at another site
+24,5,101,6009695581034,6,0,Enforce,Staff entry for this item at another site
+24,5,103,6009695581058,6,0,Enforce,Staff entry for this item at another site
+24,5,104,6007013000755,1,0,Enforce,Staff entry for this item at another site
+24,5,106,6007013000502,1,0,Enforce,Staff entry for this item at another site
+24,5,107,6007013000564,1,0,Enforce,Staff entry for this item at another site
+24,5,109,6007013000014,6,0,Enforce,Staff entry
+24,5,112,60015990,72,0,Enforce,Staff entry for this item at another site
+24,5,117,6009695585223,48,0,Enforce,Staff entry for this item at another site
+24,5,118,50974009,0,0,,Staff entry for this item at another site
+24,5,121,6001106116545,25,0,Enforce,History: Issued pack
+24,5,122,6007013000267,0,0,,Too little history
+24,5,123,6007013000304,1,0,Enforce,Staff entry for this item at another site
+24,5,124,6007013000359,1,0,Enforce,Staff entry for this item at another site
+24,7,138,51031,0,0,,No history
+24,26,379,51013,10,1,Enforce,Unit the history shows this is issued in
+24,26,380,51014,13.61,1,Enforce,Unit the history shows this is issued in
+24,26,381,51015,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,382,51016,10,1,Enforce,Unit the history shows this is issued in
+24,26,497,51080,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,374,51007,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,375,51008,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,376,51009,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,377,51010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,378,51012,15,1,Enforce,Unit the history shows this is issued in
+24,26,373,51011,10,1,Enforce,Unit the history shows this is issued in
+24,26,384,51029,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,496,51082,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,139,51035,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,149,51021,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,150,51018,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,151,51020,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,152,51022,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,499,51081,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,26,498,51084,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,35,140,51053,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,35,142,51040,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,35,145,51017,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,35,146,51024,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,35,157,51028,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,8,163,C-GCC,3,1,Enforce,Unit the history shows this is issued in
+24,8,164,M009,1,1,Enforce,Unit the history shows this is issued in
+24,8,165,C-DCC,5.5,1,Enforce,Unit the history shows this is issued in
+24,8,166,M003,1,1,Enforce,Pack read off the item name and confirmed by the history
+24,8,167,G030,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+24,8,168,M008,1,1,Enforce,Pack read off the item name and confirmed by the history
+24,8,169,M005,1,1,Enforce,Unit the history shows this is issued in
+24,8,170,C003,3,1,Enforce,Unit the history shows this is issued in
+24,8,171,V010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+24,8,173,D-RIB,1.1,1,Enforce,Unit the history shows this is issued in
+24,9,176,D1.5LF,12,0,,Too little history
+24,9,177,D1.5LS,12,0,,No history
+24,9,178,P002,50,0,Enforce,History: Issued pack
+24,9,179,P-RDPB,50,0,Enforce,History: Issued pack
+24,9,180,P003,50,0,Default only,"History: Pack in use, also broken open"
+24,9,181,PTDB,50,0,Enforce,History: Issued pack
+24,9,182,PTRD,50,0,Enforce,History: Issued pack
+24,9,183,DPRED,0,0,,Too little history
+24,9,184,D1.5LC,12,0,Enforce,History: Issued pack
+24,34,354,11012,0,0,,Staff entry for this item at another site
+24,34,446,11063,0,0,,Staff entry for this item at another site
+24,34,473,11058,0,0,,Staff entry for this item at another site
+24,34,463,12000,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,489,12032,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,479,12022,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,488,12031,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,478,12021,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,468,12013,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,477,12020,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,487,12030,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,476,12019,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,486,12029,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,481,12024,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,491,12034,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,480,12023,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,490,12033,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,482,12025,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,483,12026,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,493,12036,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,492,12035,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,469,12016,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,474,12009,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,464,12005,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,465,12006,0,1,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,467,12011,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,466,12010,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,475,12012,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,494,12037,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,484,12027,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,495,12038,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,485,12028,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,472,11028,0,0,,Staff entry for this item at another site
+24,34,441,11052,0,0,,Staff entry for this item at another site
+24,34,471,21025,0,0,,Staff entry for this item at another site
+24,34,434,11031,0,0,,Staff entry for this item at another site
+24,34,333,11032,0,0,,Staff entry for this item at another site
+24,34,334,11004,0,0,,Staff entry for this item at another site
+24,34,443,11055,0,0,,Staff entry for this item at another site
+24,34,340,11015,0,0,,Staff entry for this item at another site
+24,34,362,1204,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+24,34,359,1200,0,0,,History: no pack - issued in varying quantities
+24,34,363,1206,0,0,,History: no pack - issued in varying quantities
+24,34,364,1207,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+24,34,360,1201,0,0,,History: no pack - issued in varying quantities
+24,34,361,1202,0,0,,History: no pack - issued in varying quantities
+24,34,435,11036,0,0,,Staff entry for this item at another site
+24,34,442,11053,0,0,,Staff entry for this item at another site
+24,34,470,21028,0,0,,Staff entry for this item at another site
+24,34,436,11037,0,0,,Staff entry for this item at another site
+24,34,358,11049,0,0,,Staff entry for this item at another site
+24,10,187,6001253010185,0,0,,Staff entry for this item at another site
+24,10,188,6001253010178,0,0,,Staff entry for this item at another site
+24,10,189,6001205730321,0,0,,Staff entry for this item at another site
+24,10,190,6001205730475,0,0,,Staff entry for this item at another site
+24,10,192,6001076027025,1,0,Enforce,Staff entry for this item at another site
+24,10,195,9002490100070,24,0,Enforce,Staff entry for this item at another site
+24,10,196,9002490218638,24,0,Enforce,Staff entry for this item at another site
+24,10,197,6001710010253,0,0,,Staff entry for this item at another site
+24,10,198,6001710010192,0,0,,Staff entry for this item at another site
+24,12,200,4003,1,0,Enforce,Staff entry
+24,12,202,5000,1,0,Enforce,Staff entry
+24,12,203,4002,1,0,Enforce,Staff entry
+24,12,204,3009,1,0,Enforce,Staff entry
+24,12,205,3007,1,0,Enforce,Staff entry
+24,12,206,3001,1,0,Enforce,Staff entry
+24,12,207,3008,1,0,Enforce,Staff entry
+24,13,2,6001351000521,20,0,Enforce,Staff entry for this item at another site
+24,13,11,6001351099846,20,0,Enforce,Staff entry for this item at another site
+24,13,7,6001351099969,20,0,Enforce,Staff entry for this item at another site
+24,13,13,6001351100740,1,0,Enforce,Staff entry for this item at another site
+24,13,1,6001351414120,20,0,Enforce,Staff entry for this item at another site
+24,13,9,6001351461100,20,0,Enforce,Staff entry for this item at another site
+24,13,14,6001351099891,20,0,Enforce,Staff entry for this item at another site
+24,13,8,6001351000606,20,0,Enforce,Staff entry for this item at another site
+24,13,3,6001351525307,20,0,Enforce,Staff entry for this item at another site
+24,13,6,6001351339300,20,0,Enforce,Staff entry for this item at another site
+24,13,16,6001351100283,20,0,Enforce,Staff entry for this item at another site
+24,13,17,6001351100238,20,0,Enforce,Staff entry for this item at another site
+24,13,462,6001351176752,20,0,Enforce,Staff entry for this item at another site
+24,13,19,6001351164520,20,0,Enforce,Staff entry for this item at another site
+24,13,10,6001351099792,20,0,Enforce,Staff entry for this item at another site
+24,13,12,6001351113955,20,0,Enforce,Staff entry for this item at another site
+24,19,209,6001060686825,10,0,Enforce,Staff entry
+24,19,214,6001060684821,10,0,Enforce,Staff entry
+24,19,212,6001060688829,10,0,Enforce,Staff entry
+24,19,220,6001697311213,1,0,Enforce,Staff entry for this item at another site
+24,19,227,42139621,10,0,Enforce,Staff entry
+24,19,233,40329055,10,0,Enforce,Staff entry for this item at another site
+24,19,231,42139447,10,0,Enforce,Staff entry
+24,19,232,8035335,10,0,Enforce,Staff entry for this item at another site
+24,19,235,4033100057885,10,0,Enforce,Staff entry
+24,19,229,42139126,10,0,Enforce,Staff entry for this item at another site
+24,19,242,6009802927403,10,0,Enforce,Staff entry for this item at another site
+24,19,238,6009800476255,10,0,Enforce,Staff entry
+24,19,240,6009802927380,10,0,Enforce,Staff entry
+24,19,241,6009802927397,10,0,Enforce,Staff entry
+24,19,243,6001060603815,20,0,Enforce,Staff entry
+24,19,244,6001060969829,10,0,Enforce,Staff entry
+24,19,245,6001060215827,10,0,Enforce,Staff entry
+24,19,246,6001060967825,10,0,Enforce,Staff entry
+24,19,247,6001060968822,10,0,Enforce,Staff entry
+24,19,248,6001060177811,20,0,Enforce,Staff entry
+24,19,249,6001060496820,10,0,Enforce,Staff entry
+24,19,250,6001335065829,10,0,Enforce,Staff entry
+24,19,252,6001060381829,10,0,Enforce,Staff entry
+24,19,253,6001060382826,10,0,Enforce,Staff entry
+24,19,254,6001237212826,10,0,Enforce,Staff entry
+24,19,259,6001060358821,10,0,Enforce,Staff entry
+24,19,261,6001060359828,10,0,Enforce,Staff entry
+24,19,262,6001060360824,10,0,Enforce,Staff entry
+24,19,263,60069795,100,0,Enforce,Staff entry for this item at another site
+24,19,265,39,30,0,Enforce,Loose single cigarettes - always issued in 30s
+24,19,266,6009800476958,10,0,Enforce,Staff entry
+24,19,267,6009800476927,10,0,Enforce,Staff entry
+24,19,271,56001709,10,0,Enforce,Staff entry
+24,19,268,46014450,10,0,Enforce,Staff entry for this item at another site
+24,19,277,6001060953811,20,0,Enforce,Staff entry
+24,19,278,6001060565823,10,0,Enforce,Staff entry
+24,19,279,6001060884825,10,0,Enforce,Staff entry
+24,19,280,6001060886829,10,0,Enforce,Staff entry
+24,19,281,6001060563829,10,0,Enforce,Staff entry
+24,19,282,6001060880827,10,0,Enforce,Staff entry
+24,19,285,6001060954818,20,0,Enforce,Staff entry
+24,19,286,6001237015823,10,0,Enforce,Staff entry for this item at another site
+24,19,297,6001060314810,20,0,Enforce,Staff entry
+24,19,298,6001060313813,20,0,Enforce,Staff entry
+24,19,299,6001060160813,20,0,Enforce,Staff entry
+24,19,300,6001237010828,10,0,Enforce,Staff entry for this item at another site
+24,19,301,6001237012822,10,0,Enforce,Staff entry for this item at another site
+24,19,302,6001060100826,10,0,Enforce,Staff entry for this item at another site
+24,19,366,40,30,0,Enforce,Loose single cigarettes - always issued in 30s
+24,19,303,6001335054823,10,0,Enforce,Staff entry
+24,19,305,6001335051822,10,0,Enforce,Staff entry
+24,19,307,4033100086045,10,0,Enforce,Staff entry
+24,25,312,9999,0,0,,Staff entry for this item at another site
+6,1,3,ENG377,10,1,Enforce,Unit the history shows this is issued in
+6,1,6,ENG524,48,0,Default only,"History: Pack in use, also broken open"
+6,1,230,ENG953,0,0,,No history
+6,1,220,ENG715,40,0,Default only,History: Issued pack
+6,1,361,ENG703,36,0,Enforce,History: Issued pack
+6,1,352,ENG709,36,0,Enforce,History: Issued pack
+6,1,7,RFG424,24,0,Default only,"History: Pack in use, also broken open"
+6,1,299,RFG428,0,0,,No history
+6,1,300,RFG429,0,0,,No history
+6,1,8,RFG411,36,0,Default only,"History: Pack in use, also broken open"
+6,1,298,RFG430,0,0,,No history
+6,1,9,RFG420,0,0,,Too little history
+6,1,351,RFG419,36,0,Default only,"History: Pack in use, also broken open"
+6,1,10,RFG412,0,0,,History: no pack - issued in varying quantities
+6,1,12,RFG413,36,0,Default only,"History: Pack in use, also broken open"
+6,1,13,RFG404,0,0,,History: no pack - issued in varying quantities
+6,1,353,RFG416,0,0,,Too little history
+6,1,14,RFG417,36,0,Default only,"History: Pack in use, also broken open"
+6,1,283,7114,0,0,,No history
+6,1,315,9728,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+6,5,16,6009823910163,1,0,Enforce,Staff entry for this item at another site
+6,5,17,5011831076855,1,0,Enforce,Staff entry for this item at another site
+6,5,18,6009695584912,48,0,Enforce,Staff entry for this item at another site
+6,5,19,6009695584936,48,0,Enforce,Staff entry for this item at another site
+6,5,20,60026392,30,0,Default only,"History: Pack in use, also broken open"
+6,5,172,6009695584516,48,0,Enforce,Staff entry for this item at another site
+6,5,358,9771016818002,0,0,,History: no pack - issued in varying quantities
+6,5,21,6001106120771,48,0,Enforce,Staff entry for this item at another site
+6,5,177,5010232953925,0,0,,No history
+6,5,22,60050205,72,0,Enforce,Staff entry for this item at another site
+6,5,297,3732822587977,0,0,,Too little history
+6,5,296,3732887382524,10,0,Enforce,History: Issued pack
+6,5,295,2158189818584,10,0,Enforce,History: Issued pack
+6,5,347,6001076003531,0,0,,Too little history
+6,5,24,60099983,144,0,Enforce,Staff entry for this item at another site
+6,5,195,9771816097003,0,0,,No history
+6,5,194,9770019177000,0,0,,Staff entry for this item at another site
+6,5,357,9771022176004,0,0,,History: no pack - issued in varying quantities
+6,5,196,9771682968001,0,0,,History: no pack - issued in varying quantities
+6,5,359,9772222989005,0,0,,History: no pack - issued in varying quantities
+6,5,345,60091611,0,0,,Too little history
+6,5,346,60091604,0,0,,Too little history
+6,5,348,60091581,0,0,,Too little history
+6,5,180,60091574,0,0,,Too little history
+6,5,354,6007013000755,1,0,Enforce,Staff entry for this item at another site
+6,5,183,6007013000014,6,0,Enforce,Staff entry
+6,5,182,6007013000564,1,0,Enforce,Staff entry for this item at another site
+6,5,184,6009801801018,1,0,Enforce,Staff entry for this item at another site
+6,5,25,60015990,72,0,Enforce,Staff entry for this item at another site
+6,5,360,9771016821002,0,0,,History: no pack - issued in varying quantities
+6,5,185,6009695580143,0,0,,Too little history
+6,5,26,6009695585223,48,0,Enforce,Staff entry for this item at another site
+6,5,344,6009695586145,0,0,,No history
+6,5,178,60018014,12,0,Enforce,History: Issued pack
+6,5,28,5011831076862,1,0,Enforce,Staff entry for this item at another site
+6,5,188,6001106116545,25,0,Enforce,History: Issued pack
+6,5,190,6007013000304,1,0,Enforce,Staff entry for this item at another site
+6,5,29,6007013000359,1,0,Enforce,Staff entry for this item at another site
+6,5,192,61600416,2,0,Enforce,History: Issued pack
+6,5,30,5011831076893,1,0,Enforce,Staff entry for this item at another site
+6,5,282,6001296006015,0,0,,Too little history
+6,5,193,6009697612996,0,0,,History: no pack - issued in varying quantities
+6,8,32,M002,1,1,Enforce,Unit the history shows this is issued in
+6,8,33,C-GCC,3,1,Enforce,Unit the history shows this is issued in
+6,8,35,C-DCC,5.5,1,Enforce,Unit the history shows this is issued in
+6,8,36,M003,1,1,Enforce,Pack read off the item name and confirmed by the history
+6,8,350,1019372,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,8,366,1019433,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,8,37,M008,1,1,Enforce,Pack read off the item name and confirmed by the history
+6,8,38,M005,1,1,Enforce,Unit the history shows this is issued in
+6,8,39,C003,3,1,Enforce,Unit the history shows this is issued in
+6,8,40,V010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,8,41,M007,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,8,42,D-RIB,1.1,1,Enforce,Unit the history shows this is issued in
+6,8,341,1016215,6,0,Enforce,History: Common divisor of the packs issued
+6,9,280,DP3476,12,0,Enforce,History: Issued pack
+6,9,281,DP3482,0,0,,No history
+6,9,356,DCZB,0,0,,History: no pack - issued in varying quantities
+6,9,248,D9085,6,0,Enforce,History: Issued pack
+6,9,239,DA002,0,0,,Too little history
+6,9,355,DR-BUDD,2,0,Enforce,History: Common divisor of the packs issued
+6,9,247,D2028,6,0,Enforce,History: Issued pack
+6,9,44,DBOX,50,0,Enforce,History: Issued pack
+6,9,243,D0008,0,0,,No history
+6,9,246,D0007,0,0,,No history
+6,9,240,DA001,0,0,,Too little history
+6,9,45,P002,50,0,Enforce,History: Issued pack
+6,9,46,P-RDPB,50,0,Enforce,History: Issued pack
+6,9,47,P003,50,0,Default only,"History: Pack in use, also broken open"
+6,9,301,D11,6,0,Enforce,History: Issued pack
+6,9,48,PTRD,50,0,Enforce,History: Issued pack
+6,9,49,PTDB,50,0,Enforce,History: Issued pack
+6,10,364,6001253010185,0,0,,Staff entry for this item at another site
+6,10,365,6001205730321,0,0,,Staff entry for this item at another site
+6,10,50,6001324238098,6,0,Enforce,History: Issued pack
+6,10,52,5060335632715,24,0,Enforce,Staff rule: energy drinks by the case of 24
+6,10,54,5060166698874,24,0,Enforce,Staff rule: energy drinks by the case of 24
+6,10,55,5060947540040,24,0,Enforce,Staff rule: energy drinks by the case of 24
+6,10,56,5060639128013,24,0,Enforce,Staff rule: energy drinks by the case of 24
+6,10,340,5061013962605,0,0,,History: no pack - issued in varying quantities
+6,10,59,9002490209599,24,0,Enforce,Staff entry for this item at another site
+6,10,60,9002490218638,24,0,Enforce,Staff entry for this item at another site
+6,10,61,9002490100070,24,0,Enforce,Staff entry for this item at another site
+6,10,62,9002490200220,24,0,Enforce,Staff rule: energy drinks by the case of 24
+6,10,197,6001710010253,0,0,,Staff entry for this item at another site
+6,10,198,6001710010192,0,0,,Staff entry for this item at another site
+6,12,2,997,1,0,Enforce,Staff entry
+6,12,1,9968,1,0,Enforce,Staff entry
+6,13,202,6001351100740,1,0,Enforce,Staff entry for this item at another site
+6,13,84,6001351525307,20,0,Enforce,Staff entry for this item at another site
+6,13,201,6001351099891,20,0,Enforce,Staff entry for this item at another site
+6,13,65,6001351100726,1,0,Enforce,Staff entry for this item at another site
+6,13,67,6001351000521,20,0,Enforce,Staff entry for this item at another site
+6,13,68,6001351000606,20,0,Enforce,Staff entry for this item at another site
+6,13,69,6001351100283,20,0,Enforce,Staff entry for this item at another site
+6,13,70,6001351100313,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+6,13,71,6001351100092,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+6,13,72,6001351100061,20,0,Enforce,Staff entry for this item at another site
+6,13,74,6001351164520,20,0,Enforce,Staff entry for this item at another site
+6,13,77,6001351099969,20,0,Enforce,Staff entry for this item at another site
+6,13,204,6001351099846,20,0,Enforce,Staff entry for this item at another site
+6,13,78,6001351025906,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+6,13,79,6001351414120,20,0,Enforce,Staff entry for this item at another site
+6,13,199,6001351461100,20,0,Enforce,Staff entry for this item at another site
+6,13,81,6001351099792,20,0,Enforce,Staff entry for this item at another site
+6,13,82,6001351113955,20,0,Enforce,Staff entry for this item at another site
+6,13,83,6001351339300,20,0,Enforce,Staff entry for this item at another site
+6,13,200,6001351100238,20,0,Enforce,Staff entry for this item at another site
+6,19,207,6001060685828,10,0,Enforce,Staff entry
+6,19,208,6001060686825,10,0,Enforce,Staff entry
+6,19,209,6001060665820,10,0,Enforce,Staff entry
+6,19,88,6001060944826,10,0,Enforce,Staff entry
+6,19,210,6001060684821,10,0,Enforce,Staff entry
+6,19,212,4032900125206,20,0,Enforce,Staff entry
+6,19,211,42139447,10,0,Enforce,Staff entry for this item at another site
+6,19,306,40329055,10,0,Enforce,Staff entry
+6,19,92,42139621,10,0,Enforce,Staff entry
+6,19,93,42139430,10,0,Enforce,Staff entry
+6,19,94,8035238,10,0,Enforce,Staff entry
+6,19,96,4033100057885,10,0,Enforce,Staff entry for this item at another site
+6,19,362,4032900168760,10,0,Enforce,Staff entry
+6,19,97,6009800476248,10,0,Enforce,Staff entry
+6,19,98,6009802927403,10,0,Enforce,Staff entry
+6,19,100,6009802927397,10,0,Enforce,Staff entry
+6,19,99,6009802927380,10,0,Enforce,Staff entry
+6,19,101,6009800476255,10,0,Enforce,Staff entry for this item at another site
+6,19,104,6001060177811,20,0,Enforce,Staff entry
+6,19,107,6001060969829,10,0,Enforce,Staff entry
+6,19,310,6001237004247,10,0,Enforce,Staff entry
+6,19,105,6001060967825,10,0,Enforce,Staff entry
+6,19,106,6001060968822,10,0,Enforce,Staff entry
+6,19,102,6001335065829,10,0,Enforce,Staff entry
+6,19,103,6001060603815,20,0,Enforce,Staff entry
+6,19,313,6001237004445,20,0,Enforce,Staff entry
+6,19,302,6001237004100,10,0,Enforce,Staff entry
+6,19,312,6001237004148,10,0,Enforce,Staff entry
+6,19,309,6001237004124,10,0,Enforce,Staff entry
+6,19,108,6001237213823,10,0,Enforce,Staff entry
+6,19,109,6001060215827,10,0,Enforce,Staff entry for this item at another site
+6,19,214,6001237212826,10,0,Enforce,Staff entry
+6,19,110,6001060496820,10,0,Enforce,Staff entry for this item at another site
+6,19,111,6001060358821,10,0,Enforce,Staff entry
+6,19,112,6001060361821,10,0,Enforce,Staff entry
+6,19,113,6001060359828,10,0,Enforce,Staff entry
+6,19,114,6001060360824,10,0,Enforce,Staff entry
+6,19,115,60069795,100,0,Enforce,Staff entry for this item at another site
+6,19,311,7622100814726,10,0,Enforce,Staff entry
+6,19,215,5410706821956,10,0,Enforce,Staff entry
+6,19,116,46014429,10,0,Enforce,Staff entry
+6,19,117,6009800476927,10,0,Enforce,Staff entry
+6,19,118,6009800476958,10,0,Enforce,Staff entry
+6,19,119,46014450,10,0,Enforce,Staff entry
+6,19,120,46014436,10,0,Enforce,Staff entry
+6,19,121,6007673000034,10,0,Enforce,Tobacco outer default (10)
+6,19,122,6001060884825,10,0,Enforce,Staff entry
+6,19,123,6001060880827,10,0,Enforce,Staff entry
+6,19,126,6001060563829,10,0,Enforce,Staff entry
+6,19,125,6001060565823,10,0,Enforce,Staff entry
+6,19,205,6001060953811,20,0,Enforce,Staff entry
+6,19,124,6001060886829,10,0,Enforce,Staff entry for this item at another site
+6,19,206,6001060954818,20,0,Enforce,Staff entry
+6,19,303,6001237004407,10,0,Enforce,Carton rule (20s pack)
+6,19,304,6001237001963,10,0,Enforce,Carton rule (20s pack)
+6,19,127,6001060314810,20,0,Enforce,Staff entry
+6,19,128,6001060313813,20,0,Enforce,Staff entry
+6,19,129,6001237015823,10,0,Enforce,Staff entry
+6,19,130,6001237012822,10,0,Enforce,Staff entry
+6,19,314,6001060763823,10,0,Enforce,Staff entry
+6,19,305,6001060927829,10,0,Enforce,Staff entry
+6,19,216,6001060160813,20,0,Enforce,Staff entry
+6,19,133,6001060100826,10,0,Enforce,Staff entry
+6,19,134,6001237010828,10,0,Enforce,Staff entry
+6,19,135,6001237012839,30,0,Enforce,Loose single cigarettes - always issued in 30s
+6,19,136,6001060333828,10,0,Enforce,Staff entry
+6,19,137,50974009,0,0,,Staff entry for this item at another site
+6,19,140,6001237003509,10,0,Enforce,Staff entry
+6,19,141,6001237002281,10,0,Enforce,Staff entry
+6,19,142,6001335054823,10,0,Enforce,Staff entry
+6,19,342,6001335051822,10,0,Enforce,Staff entry
+6,19,139,6001060591822,10,0,Enforce,Staff entry
+6,19,143,6001335303822,10,0,Enforce,Staff entry for this item at another site
+6,19,219,4032900123936,10,0,Enforce,Staff entry
+6,19,218,4033100086045,10,0,Enforce,Staff entry
+6,19,144,4033100018343,10,0,Enforce,Staff entry
+6,19,308,4032900168418,10,0,Enforce,Staff entry
+6,19,307,4032900168388,10,0,Enforce,Staff entry
+6,19,145,4033100018312,10,0,Enforce,Staff entry
+6,21,259,8BEVR011,6,0,Enforce,History: Issued pack
+6,21,258,8BEVR012,6,0,Enforce,History: Issued pack
+6,21,288,8BEVL984,0,0,,No history
+6,21,284,8BEVL982,0,0,,Too little history
+6,21,285,8BEVL980,0,0,,Too little history
+6,21,287,8BEVL981,0,0,,Too little history
+6,21,286,8BEVL983,0,0,,Too little history
+6,21,290,8BEVL987,0,0,,Too little history
+6,21,292,8BEVL989,0,0,,Too little history
+6,21,289,8BEVL988,0,0,,No history
+6,21,255,8BEVR360,6,0,Enforce,History: Issued pack
+6,21,146,8TOYS060,10,0,Default only,"History: Pack in use, also broken open"
+6,21,257,8BEVR016,6,0,Enforce,History: Issued pack
+6,21,256,8BEVR015,6,0,Enforce,History: Issued pack
+6,21,294,8BEVL165,24,0,Enforce,Staff rule: energy drinks by the case of 24
+6,21,291,8BEVL990,0,0,,Too little history
+6,21,293,8BEVL985,0,0,,No history
+6,22,329,8FRUT380,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,22,264,8MEATP050,40,0,Enforce,History: Issued pack
+6,22,265,8MEATP055,60,0,Enforce,History: Issued pack
+6,22,147,8MEATP120,0,0,,History: no pack - issued in varying quantities
+6,22,148,8MEATP080,10,0,Enforce,History: Issued pack
+6,22,363,8BRED070,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+6,22,150,8BRED050,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+6,22,151,8BRED010,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+6,22,328,8FRUT360,0.5,1,Enforce,Unit the history shows this is issued in
+6,22,152,8DAIR050,72,0,Enforce,History: Issued pack
+6,22,153,8MEATP140,20,0,Enforce,History: Issued pack
+6,22,154,8CHICP100,0,0,,No history
+6,22,155,8CHICP011,12,0,Enforce,History: Issued pack
+6,22,156,8CHICP120,8,0,Default only,History: Issued pack
+6,22,157,8CHICP140,6,0,Enforce,History: Common divisor of the packs issued
+6,22,334,8COND300,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+6,22,158,8CHIP010,15,1,Enforce,Unit the history shows this is issued in
+6,22,323,8DRYG070,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,22,159,8DAIR040,30,0,Enforce,History: Issued pack
+6,22,160,8MEATP030,0,0,,Too little history
+6,22,261,8FROZ095,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,22,330,8MEATP090,2,0,Enforce,History: Common divisor of the packs issued
+6,22,324,8FRUT120,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,22,325,8FRUT175,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,22,263,8MEATP230,12,0,Enforce,History: Issued pack
+6,22,163,8MEATP011,96,0,Enforce,History: Issued pack
+6,22,260,8FROZ110,0,0,,Too little history
+6,22,335,8COND220,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+6,22,262,8MEATP320,12,0,Enforce,History: Issued pack
+6,22,164,8MEATP100,3,1,Enforce,Unit the history shows this is issued in
+6,22,333,8COND340,1,1,Enforce,History overrides the 5 litre rule - the line plainly runs on another unit
+6,22,327,8FRUT310,0.5,1,Enforce,Unit the history shows this is issued in
+6,22,165,8MEATP060,5,0,Enforce,History: Issued pack
+6,22,326,8FRUT190,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,23,166,8DRYG580,0,0,,History: no pack - issued in varying quantities
+6,23,167,8BAKE003,50,0,Enforce,History: Issued pack
+6,23,252,8DAIR052,2,1,Enforce,Unit the history shows this is issued in
+6,23,339,8BEVD020,2,0,Enforce,History: Issued pack
+6,23,254,8DAIR020,1,1,Enforce,Unit the history shows this is issued in
+6,23,251,8ICEC010,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+6,23,249,8BEVR060,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,23,250,8BEVR056,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,23,278,8BEVR059,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,23,279,8BEVR055,5,1,Enforce,Unit the history shows this is issued in
+6,23,331,8COND770,0,0,,Too little history
+6,23,336,8BRED107,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+6,23,277,8BRED105,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+6,23,338,8BEVR020,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+6,23,337,8BEVR025,0,0,,No history
+6,23,332,8COND700,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+6,23,168,8BEVD030,0,0,,Too little history
+6,23,169,8BEVD040,80,0,Enforce,History: Issued pack
+6,23,253,8DRYG420,10,0,Enforce,History: Issued pack
+19,1,411,RMBAK3,1,1,Enforce,Staff entry for this item at another site
+19,1,408,RMBAK22,1,1,Enforce,Staff entry for this item at another site
+19,1,406,RMBAK2,1,1,Enforce,Staff entry for this item at another site
+19,1,420,RMBAK5,1,1,Enforce,Staff entry for this item at another site
+19,1,427,RMBAK9,1,0,Enforce,Staff entry for this item at another site
+19,1,402,RMBAK13,12.5,1,Enforce,Staff entry for this item at another site
+19,1,425,RMBAK6,25,1,Enforce,Staff entry for this item at another site
+19,1,403,RMBAK14,12.5,1,Enforce,Staff entry for this item at another site
+19,1,381,RMBAK36,12.5,1,Enforce,Staff entry for this item at another site
+19,1,418,RMBAK45,12.5,1,Enforce,Staff entry for this item at another site
+19,1,413,RMBAK32,12.5,1,Enforce,Staff entry for this item at another site
+19,1,412,RMBAK31,25,1,Enforce,Staff entry for this item at another site
+19,1,422,RMBAK55,12.5,1,Enforce,Staff entry for this item at another site
+19,1,424,RMBAK57,12.5,1,Enforce,Staff entry for this item at another site
+19,28,446,31035,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+19,28,388,31016,0,0,,Staff entry for this item at another site
+19,28,445,31008,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+19,5,148,6009801801032,1,0,Enforce,Staff entry for this item at another site
+19,5,32,6009801801018,1,0,Enforce,Staff entry for this item at another site
+19,5,154,6001001010801,0,0,,Too little history
+19,5,150,6003001017712,6,0,Enforce,Staff entry for this item at another site
+19,5,149,6003001017910,6,0,Enforce,Staff entry for this item at another site
+19,5,33,6009695584912,48,0,Enforce,Staff entry for this item at another site
+19,5,34,6009695584936,48,0,Enforce,Staff entry for this item at another site
+19,5,151,60026392,30,0,Default only,"History: Pack in use, also broken open"
+19,5,152,6009695584516,48,0,Enforce,Staff entry for this item at another site
+19,5,156,5011831076855,1,0,Enforce,Staff entry for this item at another site
+19,5,158,5011831076862,1,0,Enforce,Staff entry for this item at another site
+19,5,159,5011831076893,1,0,Enforce,Staff entry for this item at another site
+19,5,193,6001546011127,0,0,,Staff entry for this item at another site
+19,5,197,6001106119560,12,0,Enforce,Staff entry for this item at another site
+19,5,160,6001106120771,48,0,Enforce,Staff entry for this item at another site
+19,5,35,6009823910163,1,0,Enforce,Staff entry for this item at another site
+19,5,164,6002125004448,1,0,Enforce,Staff entry for this item at another site
+19,5,163,6002125006381,1,0,Enforce,Staff entry for this item at another site
+19,5,165,6002125006602,1,0,Enforce,Staff entry for this item at another site
+19,5,196,4005800237515,1,0,Enforce,Staff entry for this item at another site
+19,5,36,60050205,72,0,Enforce,Staff entry for this item at another site
+19,5,191,96041109,12,0,Enforce,Staff entry for this item at another site
+19,5,38,60099983,144,0,Enforce,Staff entry for this item at another site
+19,5,206,9770019177000,0,0,,Staff entry for this item at another site
+19,5,175,6009695581058,6,0,Enforce,Staff entry for this item at another site
+19,5,183,60069795,100,0,Enforce,Staff entry for this item at another site
+19,5,180,6007013000755,1,0,Enforce,Staff entry for this item at another site
+19,5,179,6007013000533,1,0,Enforce,Staff entry for this item at another site
+19,5,178,6007013000502,1,0,Enforce,Staff entry for this item at another site
+19,5,181,6007013000564,1,0,Enforce,Staff entry for this item at another site
+19,5,182,6007013000083,1,0,Enforce,Staff entry for this item at another site
+19,5,40,6007013000014,6,0,Enforce,Staff entry
+19,5,41,60015990,72,0,Enforce,Staff entry for this item at another site
+19,5,187,6009695585223,48,0,Enforce,Staff entry for this item at another site
+19,5,173,50974009,0,0,,Staff entry for this item at another site
+19,5,195,6001106116545,25,0,Enforce,History: Issued pack
+19,5,292,6007013000267,0,0,,Too little history
+19,5,43,6007013000304,1,0,Enforce,Staff entry for this item at another site
+19,5,44,6007013000359,1,0,Enforce,Staff entry for this item at another site
+19,5,202,6009697610398,36,0,Enforce,Staff entry for this item at another site
+19,8,129,C-GCC,3,1,Enforce,Unit the history shows this is issued in
+19,8,132,M009,1,1,Enforce,Unit the history shows this is issued in
+19,8,133,C-DCC,5.5,1,Enforce,Unit the history shows this is issued in
+19,8,260,M003,1,1,Enforce,Pack read off the item name and confirmed by the history
+19,8,451,1019360,1,1,Enforce,Pack read off the item name and confirmed by the history
+19,8,134,G030,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+19,8,135,C002,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,8,136,M008,1,1,Enforce,Pack read off the item name and confirmed by the history
+19,8,137,M005,1,1,Enforce,Unit the history shows this is issued in
+19,8,138,C003,3,1,Enforce,Unit the history shows this is issued in
+19,8,140,D-RIB,1.1,1,Enforce,Unit the history shows this is issued in
+19,8,452,1018100,1,1,Enforce,Pack read off the item name
+19,9,447,1011579,24,0,Default only,"History: Pack in use, also broken open"
+19,9,143,P002,50,0,Enforce,History: Issued pack
+19,9,144,P-RDPB,50,0,Enforce,History: Issued pack
+19,9,145,P003,50,0,Default only,"History: Pack in use, also broken open"
+19,9,146,PTDB,50,0,Enforce,History: Issued pack
+19,9,147,PTRD,50,0,Enforce,History: Issued pack
+19,9,449,DPRED,0,0,,Too little history
+19,9,263,D1.5LC,12,0,Enforce,History: Issued pack
+19,9,448,SF001,0,0,,History: no pack - issued in varying quantities
+19,10,45,6001253010185,0,0,,Staff entry for this item at another site
+19,10,46,6001253010178,0,0,,Staff entry for this item at another site
+19,10,47,6001205730321,0,0,,Staff entry for this item at another site
+19,10,48,6001205730475,0,0,,Staff entry for this item at another site
+19,10,49,6001051001507,0,0,,No history
+19,10,51,6001051001415,0,0,,Too little history
+19,10,53,6001076027025,1,0,Enforce,Staff entry for this item at another site
+19,10,210,5060466519077,24,0,Enforce,Staff entry for this item at another site
+19,10,211,9002490100070,24,0,Enforce,Staff entry for this item at another site
+19,10,205,9002490209599,24,0,Enforce,Staff entry for this item at another site
+19,10,212,9002490218638,24,0,Enforce,Staff entry for this item at another site
+19,10,54,6001710010253,0,0,,Staff entry for this item at another site
+19,10,55,6001710010192,0,0,,Staff entry for this item at another site
+19,11,373,1204,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+19,11,370,1200,0,0,,History: no pack - issued in varying quantities
+19,11,374,1206,0,0,,History: no pack - issued in varying quantities
+19,11,375,1207,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+19,11,371,1201,0,0,,History: no pack - issued in varying quantities
+19,11,372,1202,0,0,,History: no pack - issued in varying quantities
+19,11,456,RMG11,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,11,455,RMG13,4,1,Enforce,Unit the history shows this is issued in
+19,11,10,RMDEL13,10,1,Enforce,Unit the history shows this is issued in
+19,11,12,RMDEL31,16,0,Enforce,History: Common divisor of the packs issued
+19,11,13,RMDEL12,0,0,,History: no pack - issued in varying quantities
+19,11,16,RMDEL5,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,11,17,RMDEL16,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,11,18,RMDEL6,5,1,Enforce,Unit the history shows this is issued in
+19,11,19,RMDEL21,10,1,Enforce,Unit the history shows this is issued in
+19,11,275,RMDEL43,10,1,Enforce,Unit the history shows this is issued in
+19,11,21,RMDEL20,10,1,Enforce,Unit the history shows this is issued in
+19,11,22,RMDEL11,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+19,11,25,RMDEL1,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,304,11042,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,297,11045,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,363,21007,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,362,21006,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,298,11004,0,0,,Staff entry for this item at another site
+19,29,359,21002,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,361,21004,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,293,11002,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,315,11023,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,294,11019,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,307,11005,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,29,323,11038,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+19,12,355,5000,1,0,Enforce,Staff entry
+19,12,4,3009,1,0,Enforce,Staff entry
+19,12,3,3007,1,0,Enforce,Staff entry
+19,12,5,3001,1,0,Enforce,Staff entry
+19,13,59,6001351414120,20,0,Enforce,Staff entry for this item at another site
+19,13,60,6001351000521,20,0,Enforce,Staff entry for this item at another site
+19,13,70,6001351099891,20,0,Enforce,Staff entry for this item at another site
+19,13,71,6001351100283,20,0,Enforce,Staff entry for this item at another site
+19,13,61,6001351525307,20,0,Enforce,Staff entry for this item at another site
+19,13,11,6001351525000,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+19,13,257,6001351100238,20,0,Enforce,Staff entry for this item at another site
+19,13,62,6001351100061,20,0,Enforce,Staff entry for this item at another site
+19,13,63,6001351339300,20,0,Enforce,Staff entry for this item at another site
+19,13,64,6001351099969,20,0,Enforce,Staff entry for this item at another site
+19,13,65,6001351000606,20,0,Enforce,Staff entry for this item at another site
+19,13,66,6001351461100,20,0,Enforce,Staff entry for this item at another site
+19,13,68,6001351099846,20,0,Enforce,Staff entry for this item at another site
+19,13,57,6001351100184,20,0,Enforce,Staff entry for this item at another site
+19,13,72,6001351164520,20,0,Enforce,Staff entry for this item at another site
+19,13,50,8001238080040,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+19,13,454,6001351176851,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+19,13,453,6001351176752,20,0,Enforce,Staff entry for this item at another site
+19,13,58,6001351100726,1,0,Enforce,Staff entry for this item at another site
+19,13,267,6009691358807,24,0,Enforce,Staff rule: energy drinks by the case of 24
+19,19,77,42139621,10,0,Enforce,Staff entry
+19,19,229,8035335,10,0,Enforce,Staff entry for this item at another site
+19,19,81,4033100057885,10,0,Enforce,Staff entry
+19,19,85,6009802927403,10,0,Enforce,Staff entry for this item at another site
+19,19,233,6001060603815,20,0,Enforce,Staff entry
+19,19,90,6001060969829,10,0,Enforce,Staff entry
+19,19,86,6001060215827,10,0,Enforce,Staff entry
+19,19,91,6001060967825,10,0,Enforce,Staff entry
+19,19,92,6001060968822,10,0,Enforce,Staff entry
+19,19,88,6001060177811,20,0,Enforce,Staff entry
+19,19,89,6001060496820,10,0,Enforce,Staff entry
+19,19,87,6001335065829,10,0,Enforce,Staff entry
+19,19,94,6001060381829,10,0,Enforce,Staff entry
+19,19,459,6001237051425,10,0,Enforce,Tobacco outer default (10)
+19,19,100,6001060361821,10,0,Enforce,Staff entry
+19,19,101,6001060360824,10,0,Enforce,Staff entry
+19,19,102,39,30,0,Enforce,Loose single cigarettes - always issued in 30s
+19,19,103,6009800476958,10,0,Enforce,Staff entry
+19,19,104,6009800476927,10,0,Enforce,Staff entry
+19,19,107,56001709,10,0,Enforce,Staff entry
+19,19,114,6001060953811,20,0,Enforce,Staff entry
+19,19,115,6001060565823,10,0,Enforce,Staff entry
+19,19,239,6001060884825,10,0,Enforce,Staff entry
+19,19,240,6001060886829,10,0,Enforce,Staff entry
+19,19,111,6001060563829,10,0,Enforce,Staff entry
+19,19,109,6001060954818,20,0,Enforce,Staff entry
+19,19,118,6001237015823,10,0,Enforce,Staff entry for this item at another site
+19,19,120,6001060314810,20,0,Enforce,Staff entry
+19,19,121,6001060313813,20,0,Enforce,Staff entry
+19,19,245,6001060160813,20,0,Enforce,Staff entry
+19,19,119,6001237010828,10,0,Enforce,Staff entry for this item at another site
+19,19,122,6001237012822,10,0,Enforce,Staff entry for this item at another site
+19,19,243,6001060100826,10,0,Enforce,Staff entry for this item at another site
+19,19,376,40,30,0,Enforce,Loose single cigarettes - always issued in 30s
+19,19,252,6001335054823,10,0,Enforce,Staff entry
+19,19,124,6001335051822,10,0,Enforce,Staff entry
+19,19,461,6001237054327,5,0,Enforce,Tobacco outer default (10)
+19,19,460,6001237054785,10,0,Enforce,Staff entry for this item at another site
+19,19,462,7311250042768,5,0,Enforce,Tobacco outer default (10)
+19,19,463,7311250042706,5,0,Enforce,Tobacco outer default (10)
+30,3,59,35BAM113,0,0,,Too little history
+30,3,55,35BAM026,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+30,3,56,35BAM027,54,0,Enforce,History: Issued pack
+30,3,52,35BAM013,5,0,Default only,"History: Pack in use, also broken open"
+30,3,49,35BAM001,15,0,Enforce,History: Issued pack
+30,3,54,35BAM024,120,0,Enforce,History: Issued pack
+30,3,58,35BAM084,10,0,Enforce,History: Issued pack
+30,3,50,35BAM003,10,0,Enforce,History: Issued pack
+30,3,53,35BAM016,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+30,3,60,35BAM170,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+30,3,51,35BAM011,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+30,3,57,35BAM041,10,0,Enforce,History: Issued pack
+30,4,61,35BAM085,0,0,,No history
+30,5,87,6009695584912,48,0,Enforce,Staff entry for this item at another site
+30,5,86,6009695584516,48,0,Enforce,Staff entry for this item at another site
+30,5,83,6007013000304,1,0,Enforce,Staff entry for this item at another site
+30,5,76,5011831076893,1,0,Enforce,Staff entry for this item at another site
+30,5,82,6007013000014,6,0,Enforce,Staff entry
+30,5,85,6007013000755,1,0,Enforce,Staff entry for this item at another site
+30,5,75,5011831076862,1,0,Enforce,Staff entry for this item at another site
+30,5,84,6007013000359,1,0,Enforce,Staff entry for this item at another site
+30,5,77,6001106120771,48,0,Enforce,Staff entry for this item at another site
+30,5,81,60050205,72,0,Enforce,Staff entry for this item at another site
+30,5,80,60018014,12,0,Enforce,History: Issued pack
+30,5,88,60099983,144,0,Enforce,Staff entry for this item at another site
+30,5,79,60015990,72,0,Enforce,Staff entry for this item at another site
+30,5,89,61600416,2,0,Enforce,History: Issued pack
+30,5,78,6001296006015,0,0,,Too little history
+30,10,67,6001253010185,0,0,,Staff entry for this item at another site
+30,10,66,6001205730321,0,0,,Staff entry for this item at another site
+30,10,68,6001324238098,6,0,Enforce,History: Issued pack
+30,10,65,5060947540040,24,0,Enforce,Staff rule: energy drinks by the case of 24
+30,10,63,5060335632715,24,0,Enforce,Staff rule: energy drinks by the case of 24
+30,10,62,5060166698874,24,0,Enforce,Staff rule: energy drinks by the case of 24
+30,10,64,5061013962605,0,0,,History: no pack - issued in varying quantities
+30,10,71,9002490100070,24,0,Enforce,Staff entry for this item at another site
+30,10,72,9002490200220,24,0,Enforce,Staff rule: energy drinks by the case of 24
+30,10,73,9002490209599,24,0,Enforce,Staff entry for this item at another site
+30,10,74,9002490218638,24,0,Enforce,Staff entry for this item at another site
+30,10,70,6001710010253,0,0,,Staff entry for this item at another site
+30,10,69,6001710010192,0,0,,Staff entry for this item at another site
+30,13,99,6001351100726,1,0,Enforce,Staff entry for this item at another site
+30,13,105,6001351525307,20,0,Enforce,Staff entry for this item at another site
+30,13,90,6001351000521,20,0,Enforce,Staff entry for this item at another site
+30,13,91,6001351000606,20,0,Enforce,Staff entry for this item at another site
+30,13,98,6001351100238,20,0,Enforce,Staff entry for this item at another site
+30,13,97,6001351100061,20,0,Enforce,Staff entry for this item at another site
+30,13,100,6001351100740,1,0,Enforce,Staff entry for this item at another site
+30,13,102,6001351164520,20,0,Enforce,Staff entry for this item at another site
+30,13,95,6001351099891,20,0,Enforce,Staff entry for this item at another site
+30,13,96,6001351099969,20,0,Enforce,Staff entry for this item at another site
+30,13,92,6001351025906,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+30,13,103,6001351414120,20,0,Enforce,Staff entry for this item at another site
+30,13,104,6001351461100,20,0,Enforce,Staff entry for this item at another site
+30,13,93,6001351099792,20,0,Enforce,Staff entry for this item at another site
+30,13,94,6001351099846,20,0,Enforce,Staff entry for this item at another site
+30,13,101,6001351113955,20,0,Enforce,Staff entry for this item at another site
+30,19,26,6001060685828,10,0,Enforce,Staff entry
+30,19,27,6001060686825,10,0,Enforce,Staff entry
+30,19,24,6001060665820,10,0,Enforce,Staff entry
+30,19,31,6001060944826,10,0,Enforce,Staff entry
+30,19,25,6001060684821,10,0,Enforce,Staff entry
+30,19,4,4032900168760,10,0,Enforce,Staff entry
+30,19,9,42139430,10,0,Enforce,Staff entry for this item at another site
+30,19,1,4032900125206,20,0,Enforce,Staff entry
+30,19,8,4033100057885,10,0,Enforce,Staff entry for this item at another site
+30,19,5,40329055,10,0,Enforce,Staff entry for this item at another site
+30,19,3,8035238,10,0,Enforce,Staff entry for this item at another site
+30,19,10,42139447,10,0,Enforce,Staff entry for this item at another site
+30,19,43,6009800476255,10,0,Enforce,Staff entry for this item at another site
+30,19,42,6009800476248,10,0,Enforce,Staff entry for this item at another site
+30,19,48,6009802927403,10,0,Enforce,Staff entry for this item at another site
+30,19,46,6009802927380,10,0,Enforce,Staff entry for this item at another site
+30,19,47,6009802927397,10,0,Enforce,Staff entry for this item at another site
+30,19,41,6001335065829,10,0,Enforce,Staff entry for this item at another site
+30,19,18,6001060215827,10,0,Enforce,Staff entry for this item at another site
+30,19,21,6001060496820,10,0,Enforce,Staff entry for this item at another site
+30,19,17,6001060177811,20,0,Enforce,Staff entry
+30,19,37,6001237004148,10,0,Enforce,Staff entry
+30,19,34,6001060967825,10,0,Enforce,Staff entry for this item at another site
+30,19,36,6001060969829,10,0,Enforce,Staff entry for this item at another site
+30,19,35,6001060968822,10,0,Enforce,Staff entry for this item at another site
+30,19,45,6009800476958,10,0,Enforce,Staff entry for this item at another site
+30,19,44,6009800476927,10,0,Enforce,Staff entry for this item at another site
+30,19,13,46014450,10,0,Enforce,Staff entry for this item at another site
+30,19,12,46014436,10,0,Enforce,Staff entry
+30,19,14,5410706821956,10,0,Enforce,Staff entry for this item at another site
+30,19,11,46014429,10,0,Enforce,Staff entry
+30,19,33,6001060954818,20,0,Enforce,Staff entry
+30,19,32,6001060953811,20,0,Enforce,Staff entry
+30,19,29,6001060884825,10,0,Enforce,Staff entry
+30,19,22,6001060563829,10,0,Enforce,Staff entry
+30,19,23,6001060565823,10,0,Enforce,Staff entry
+30,19,30,6001060886829,10,0,Enforce,Staff entry for this item at another site
+30,19,28,6001060880827,10,0,Enforce,Staff entry
+30,19,40,6001237015823,10,0,Enforce,Staff entry for this item at another site
+30,19,38,6001237010828,10,0,Enforce,Staff entry for this item at another site
+30,19,16,6001060160813,20,0,Enforce,Staff entry
+30,19,15,6001060100826,10,0,Enforce,Staff entry for this item at another site
+30,19,39,6001237012822,10,0,Enforce,Staff entry for this item at another site
+30,19,19,6001060313813,20,0,Enforce,Staff entry
+30,19,20,6001060314810,20,0,Enforce,Staff entry
+30,19,2,4032900168388,10,0,Enforce,Staff entry
+30,19,7,4033100018343,10,0,Enforce,Staff entry for this item at another site
+30,19,6,4033100018312,10,0,Enforce,Staff entry for this item at another site
+7,1,5,ENG567,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+7,1,227,SSF166,6,0,Default only,"History: Pack in use, also broken open"
+7,1,226,SSF141,0,0,,No history
+7,1,217,ENG404,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+7,1,6,SSF010,6,0,Default only,"History: Pack in use, also broken open"
+7,1,219,ENG599,54,0,Enforce,History: Issued pack
+7,1,218,ENG489,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+7,1,211,9720,0,0,,No history
+7,1,223,SSF016,0,0,,History: no pack - issued in varying quantities
+7,1,220,ENG632,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+7,1,228,SSF054,3,1,Enforce,Unit the history shows this is issued in
+7,1,224,SSF027,0.5,1,Enforce,Unit the history shows this is issued in
+7,1,12,SSF068,0,0,,History: no pack - issued in varying quantities
+7,1,214,ENG315,10,0,Enforce,Stated: buns and hot cross buns are made in tens
+7,1,215,ENG317,0,0,,History: no pack - issued in varying quantities
+7,1,225,SSF087,6,0,Default only,"History: Pack in use, also broken open"
+7,1,221,ENG739,0,0,,Too little history
+7,1,222,ENG702,36,0,Enforce,History: Issued pack
+7,1,210,9136,0,0,,History: no pack - issued in varying quantities
+7,1,14,ENG716,24,0,Default only,History: Issued pack
+7,1,15,ENG715,40,0,Default only,History: Issued pack
+7,1,16,ENG705,36,0,Enforce,History: Issued pack
+7,1,17,ENG703,36,0,Enforce,History: Issued pack
+7,1,213,ENG101,36,0,Enforce,History: Issued pack
+7,1,18,ENG706,36,0,Enforce,History: Issued pack
+7,1,212,ENG100,36,0,Enforce,History: Issued pack
+7,1,19,ENG707,36,0,Enforce,History: Issued pack
+7,1,20,ENG701,40,0,Enforce,History: Issued pack
+7,1,21,ENG709,36,0,Enforce,History: Issued pack
+7,1,22,ENG711,36,0,Enforce,History: Issued pack
+7,1,216,ENG386,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+7,5,146,6009801801018,1,0,Enforce,Staff entry for this item at another site
+7,5,229,6009801801032,1,0,Enforce,Staff entry for this item at another site
+7,5,109,6009695584936,48,0,Enforce,Staff entry for this item at another site
+7,5,108,6009695584912,48,0,Enforce,Staff entry for this item at another site
+7,5,110,6009695584516,48,0,Enforce,Staff entry for this item at another site
+7,5,122,6007013000014,6,0,Enforce,Staff entry
+7,5,111,5011831076855,1,0,Enforce,Staff entry for this item at another site
+7,5,112,5011831079818,0,0,,No history
+7,5,113,5011831076862,1,0,Enforce,Staff entry for this item at another site
+7,5,114,5011831076893,1,0,Enforce,Staff entry for this item at another site
+7,5,115,6001106120771,48,0,Enforce,Staff entry for this item at another site
+7,5,116,5010232953994,0,0,,Too little history
+7,5,117,5010232953925,0,0,,No history
+7,5,142,60050205,72,0,Enforce,Staff entry for this item at another site
+7,5,143,96041109,12,0,Enforce,Staff entry for this item at another site
+7,5,120,60099983,144,0,Enforce,Staff entry for this item at another site
+7,5,261,2158189818584,10,0,Enforce,History: Issued pack
+7,5,262,3732887382524,10,0,Enforce,History: Issued pack
+7,5,121,60091574,0,0,,Too little history
+7,5,123,6007013000564,1,0,Enforce,Staff entry for this item at another site
+7,5,124,60015990,72,0,Enforce,Staff entry for this item at another site
+7,5,126,6009695580143,0,0,,Too little history
+7,5,260,60018014,12,0,Enforce,History: Issued pack
+7,5,147,6009823910163,1,0,Enforce,Staff entry for this item at another site
+7,5,125,6009695585223,48,0,Enforce,Staff entry for this item at another site
+7,5,129,6001106116545,25,0,Enforce,History: Issued pack
+7,5,204,1442,0,0,,History: no pack - issued in varying quantities
+7,5,132,6007013000304,1,0,Enforce,Staff entry for this item at another site
+7,5,133,6007013000359,1,0,Enforce,Staff entry for this item at another site
+7,5,134,61600416,2,0,Enforce,History: Issued pack
+7,10,232,6009518602533,0,0,,No history
+7,10,231,6001253010185,0,0,,Staff entry for this item at another site
+7,10,230,6001253010178,0,0,,Staff entry for this item at another site
+7,10,233,6009518602526,0,0,,No history
+7,10,184,5449000009067,0,0,,History: no pack - issued in varying quantities
+7,10,185,5449000664686,0,0,,History: no pack - issued in varying quantities
+7,10,176,6001651014976,0,0,,No history
+7,10,178,6009811550166,0,0,,Too little history
+7,10,179,6009811550456,0,0,,No history
+7,10,181,6009811550661,0,0,,No history
+7,10,182,6009811550678,0,0,,No history
+7,10,180,6009811550616,0,0,,No history
+7,10,177,6001651031089,0,0,,No history
+7,10,175,6001651010237,0,0,,No history
+7,10,171,9770019177000,0,0,,Staff entry for this item at another site
+7,10,172,9771816097003,0,0,,No history
+7,10,173,9771682968001,0,0,,History: no pack - issued in varying quantities
+7,10,164,5060166698874,24,0,Enforce,Staff rule: energy drinks by the case of 24
+7,10,183,5061013962605,0,0,,History: no pack - issued in varying quantities
+7,10,170,6009900025506,0,0,,No history
+7,10,190,9002490256159,24,0,Enforce,Staff rule: energy drinks by the case of 24
+7,10,167,9002490100070,24,0,Enforce,Staff entry for this item at another site
+7,10,168,9002490200220,24,0,Enforce,Staff rule: energy drinks by the case of 24
+7,10,191,9002490263744,24,0,Enforce,Staff rule: energy drinks by the case of 24
+7,10,165,9002490209599,24,0,Enforce,Staff entry for this item at another site
+7,10,189,9002490227357,24,0,Enforce,Staff rule: energy drinks by the case of 24
+7,10,166,9002490218638,24,0,Enforce,Staff entry for this item at another site
+7,10,186,6001710010253,0,0,,Staff entry for this item at another site
+7,10,187,6001710010192,0,0,,Staff entry for this item at another site
+7,12,4,9969,1,0,Enforce,Staff entry
+7,12,3,9968,1,0,Enforce,Staff entry
+7,12,174,997,1,0,Enforce,Staff entry
+7,13,37,6001351414120,20,0,Enforce,Staff entry for this item at another site
+7,13,35,6001351000521,20,0,Enforce,Staff entry for this item at another site
+7,13,27,6001351525307,20,0,Enforce,Staff entry for this item at another site
+7,13,31,6001351100061,20,0,Enforce,Staff entry for this item at another site
+7,13,25,6001351339300,20,0,Enforce,Staff entry for this item at another site
+7,13,33,6001351099969,20,0,Enforce,Staff entry for this item at another site
+7,13,36,6001351000606,20,0,Enforce,Staff entry for this item at another site
+7,13,34,6001351025906,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+7,13,38,6001351461100,20,0,Enforce,Staff entry for this item at another site
+7,13,39,6001351099792,20,0,Enforce,Staff entry for this item at another site
+7,13,40,6001351099846,20,0,Enforce,Staff entry for this item at another site
+7,13,32,6001351164520,20,0,Enforce,Staff entry for this item at another site
+7,13,26,6001351100726,1,0,Enforce,Staff entry for this item at another site
+7,13,24,6001351099891,20,0,Enforce,Staff entry for this item at another site
+7,13,29,6001351100283,20,0,Enforce,Staff entry for this item at another site
+7,13,30,6001351100238,20,0,Enforce,Staff entry for this item at another site
+7,13,42,6001296003588,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+7,13,41,6001351113955,20,0,Enforce,Staff entry for this item at another site
+7,17,235,SMBF,24,0,Enforce,History: Issued pack
+7,17,236,M1,16,0,Enforce,History: Common divisor of the packs issued
+7,17,250,54-4468-206,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+7,17,241,B1,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+7,17,238,G4,72,0,Enforce,History: Issued pack
+7,17,237,SBBB,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+7,17,242,54-1805-420,4,0,Enforce,History: Issued pack
+7,17,248,54-4465-206,5,1,Enforce,Unit the history shows this is issued in
+7,17,243,1012366,4.4,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+7,17,249,54-4466-206,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+7,17,244,V7,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+7,17,245,STE77654,12,0,Enforce,History: Issued pack
+7,17,239,M2,12,0,Enforce,History: Issued pack
+7,17,247,M6,10,0,Enforce,History: Issued pack
+7,17,263,1019360S,80,0,,History: no pack - issued in varying quantities
+7,18,253,BEV117,6,0,,No history
+7,18,256,BEVC0004,6,0,,No history
+7,18,251,90-0605-108,6,0,Default only,History: Issued pack
+7,18,259,D7,6,0,,Too little history
+7,18,258,RB001,24,0,Enforce,Staff rule: energy drinks by the case of 24
+7,18,254,BEVC0017,1,0,,No history
+7,18,255,BEVC0002,24,0,,History: no pack - issued in varying quantities
+7,18,252,30-3610-901,50,0,Enforce,History: Issued pack
+7,18,257,30-4506-901,250,0,Default only,"History: Pack in use, also broken open"
+7,19,45,6001060685828,10,0,Enforce,Staff entry
+7,19,47,6001060944826,10,0,Enforce,Staff entry
+7,19,234,6001060689826,10,0,Enforce,Staff entry
+7,19,49,6001060684821,10,0,Enforce,Staff entry
+7,19,198,6001060666827,10,0,Enforce,Staff entry
+7,19,54,4032900125206,20,0,Enforce,Staff entry
+7,19,50,42139447,10,0,Enforce,Staff entry
+7,19,52,42139430,10,0,Enforce,Staff entry
+7,19,53,4033100057885,10,0,Enforce,Staff entry
+7,19,201,8035238,10,0,Enforce,Staff entry
+7,19,51,42139621,10,0,Enforce,Staff entry
+7,19,193,8035335,10,0,Enforce,Staff entry
+7,19,196,6001697000872,10,0,Enforce,Staff entry
+7,19,56,6009800476255,10,0,Enforce,Staff entry
+7,19,57,6009800476248,10,0,Enforce,Staff entry
+7,19,58,6009802927403,10,0,Enforce,Staff entry
+7,19,55,6009802927397,10,0,Enforce,Staff entry
+7,19,59,6009802927380,10,0,Enforce,Staff entry
+7,19,61,6001060603815,20,0,Enforce,Staff entry
+7,19,62,6001060177811,20,0,Enforce,Staff entry
+7,19,67,6001060496820,10,0,Enforce,Staff entry for this item at another site
+7,19,65,6001060969829,10,0,Enforce,Staff entry
+7,19,199,6001237004148,10,0,Enforce,Staff entry
+7,19,60,6001335065829,10,0,Enforce,Staff entry
+7,19,63,6001060967825,10,0,Enforce,Staff entry
+7,19,64,6001060968822,10,0,Enforce,Staff entry
+7,19,70,6001237212826,10,0,Enforce,Staff entry
+7,19,68,6001060215827,10,0,Enforce,Staff entry
+7,19,71,6001060358821,10,0,Enforce,Staff entry
+7,19,74,6001060360824,10,0,Enforce,Staff entry
+7,19,73,6001060359828,10,0,Enforce,Staff entry
+7,19,72,6001060361821,10,0,Enforce,Staff entry
+7,19,77,6009800476958,10,0,Enforce,Staff entry for this item at another site
+7,19,78,6009800476927,10,0,Enforce,Staff entry
+7,19,200,7622100814726,10,0,Enforce,Staff entry
+7,19,76,5410706821956,10,0,Enforce,Staff entry
+7,19,75,60069795,100,0,Enforce,Staff entry for this item at another site
+7,19,207,6001060953811,20,0,Enforce,Staff entry
+7,19,206,6001060954818,20,0,Enforce,Staff entry
+7,19,83,6001060880827,10,0,Enforce,Staff entry
+7,19,86,6001060884825,10,0,Enforce,Staff entry
+7,19,209,6001060563829,10,0,Enforce,Staff entry
+7,19,208,6001060565823,10,0,Enforce,Staff entry
+7,19,195,6001237001901,10,0,Enforce,Staff entry
+7,19,94,6001060313813,20,0,Enforce,Staff entry
+7,19,91,6001060314810,20,0,Enforce,Staff entry
+7,19,92,6001237015823,10,0,Enforce,Staff entry
+7,19,89,6001060100826,10,0,Enforce,Staff entry
+7,19,95,6001237012822,10,0,Enforce,Staff entry
+7,19,90,6001237012839,30,0,Enforce,Loose single cigarettes - always issued in 30s
+7,19,88,6001060160813,20,0,Enforce,Staff entry
+7,19,93,6001237010828,10,0,Enforce,Staff entry
+7,19,192,6001237004186,10,0,Enforce,Staff entry
+7,19,150,50974009,0,0,,Staff entry for this item at another site
+7,19,155,6001237003509,10,0,Enforce,Staff entry
+7,19,205,6001335051822,10,0,Enforce,Staff entry
+7,19,100,4033100086045,10,0,Enforce,Staff entry
+7,19,99,4033100018312,10,0,Enforce,Staff entry
+7,19,98,4033100018343,10,0,Enforce,Staff entry
+7,19,101,4032900123936,10,0,Enforce,Staff entry
+7,19,87,6001060886829,10,0,Enforce,Staff entry for this item at another site
+26,1,207,2000036000003,2,0,Default only,"History: Pack in use, also broken open"
+26,1,208,2000037000002,2,0,Default only,"History: Pack in use, also broken open"
+26,1,213,2000320000009,0,0,,History: no pack - issued in varying quantities
+26,1,210,2000040000006,2,0,Default only,"History: Pack in use, also broken open"
+26,1,211,2000042000004,2,0,Default only,"History: Pack in use, also broken open"
+26,1,212,2000044000002,2,0,Default only,"History: Pack in use, also broken open"
+26,5,121,5011831076855,1,0,Enforce,Staff entry for this item at another site
+26,13,104,6007053024193,16,0,,Too little history
+26,5,122,5011831076862,1,0,Enforce,Staff entry for this item at another site
+26,5,124,5011831076893,1,0,Enforce,Staff entry for this item at another site
+26,5,138,6009697610398,36,0,Enforce,Staff entry for this item at another site
+26,5,117,60050205,72,0,Enforce,Staff entry for this item at another site
+26,5,118,60099983,144,0,Enforce,Staff entry for this item at another site
+26,5,120,2420000001735,25,0,Enforce,History: Issued pack
+26,5,116,60015990,72,0,Enforce,Staff entry for this item at another site
+26,5,129,6007013000014,6,0,Enforce,Staff entry
+26,5,133,6007013000564,1,0,Enforce,Staff entry for this item at another site
+26,5,130,6007013000304,1,0,Enforce,Staff entry for this item at another site
+26,5,131,6007013000359,1,0,Enforce,Staff entry for this item at another site
+26,5,119,61600416,2,0,Enforce,History: Issued pack
+26,8,83,G028,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+26,8,86,M003,1,1,Enforce,Pack read off the item name and confirmed by the history
+26,8,214,1019433,0.09,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+26,8,97,1019360,1,1,Enforce,Pack read off the item name and confirmed by the history
+26,8,98,1019372,0.09,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+26,8,84,C-GCC,3,1,Enforce,Unit the history shows this is issued in
+26,8,90,M005,1,1,Enforce,Unit the history shows this is issued in
+26,8,89,M008,1,1,Enforce,Pack read off the item name and confirmed by the history
+26,8,81,D-RIB,1.1,1,Enforce,Unit the history shows this is issued in
+26,8,88,G030,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+26,8,87,C-DCC,5.5,1,Enforce,Unit the history shows this is issued in
+26,8,78,C003,3,1,Enforce,Unit the history shows this is issued in
+26,8,79,V010,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+26,8,80,VO17,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+26,8,82,V016,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+26,9,75,SF001,6,0,,History: no pack - issued in varying quantities
+26,9,62,DCAP01,6,0,Default only,History: Issued pack
+26,18,65,BEV119,6,0,,Too little history
+26,9,72,P002,50,0,Enforce,History: Issued pack
+26,9,74,P003,50,0,Default only,"History: Pack in use, also broken open"
+26,9,76,D11A,6,0,Default only,History: Issued pack
+26,9,22,P-RDPB,50,0,Enforce,History: Issued pack
+26,9,23,PTRD,50,0,Enforce,History: Issued pack
+26,9,24,D1.5LC,12,0,Enforce,History: Issued pack
+26,9,73,PTDB,50,0,Enforce,History: Issued pack
+26,10,108,5060166698812,4,0,Enforce,History: Issued pack
+26,10,109,5060166698874,24,0,Enforce,Staff rule: energy drinks by the case of 24
+26,10,114,9002490227357,24,0,Enforce,Staff rule: energy drinks by the case of 24
+26,10,110,9002490100070,24,0,Enforce,Staff entry for this item at another site
+26,10,112,9002490209599,24,0,Enforce,Staff entry for this item at another site
+26,10,111,9002490200220,24,0,Enforce,Staff rule: energy drinks by the case of 24
+26,10,115,9002490241773,24,0,Enforce,Staff rule: energy drinks by the case of 24
+26,13,102,6007053024285,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+26,18,96,BEVC0017A,1,0,,Too little history
+25,19,126,6001754000029,10,0,Enforce,Tobacco outer default (10)
+26,17,66,M1,16,0,Enforce,History: Common divisor of the packs issued
+26,17,29,SMBF,24,0,Enforce,History: Issued pack
+26,17,30,SBBB,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+26,17,69,B1,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+26,17,67,G4,72,0,Enforce,History: Issued pack
+26,17,35,54-1805-420,4,0,Enforce,History: Issued pack
+26,17,53,54-4468-206,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+26,17,51,54-4465-206,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+26,17,52,54-4466-206,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+26,17,91,V5,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+26,17,37,1012366,4.4,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+26,17,70,V7,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+26,17,39,STE77654,12,0,Enforce,History: Issued pack
+26,17,92,M2,12,0,Enforce,History: Issued pack
+26,17,71,M6,10,0,Enforce,History: Issued pack
+26,17,215,1019360S,80,0,,History: no pack - issued in varying quantities
+26,17,93,V8,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+26,18,44,30-3610-901,50,0,Enforce,History: Issued pack
+26,19,180,6001237001420,5,0,Enforce,Tobacco outer default (10)
+26,18,94,90-0605-108,6,0,Default only,History: Issued pack
+26,18,63,RB001,24,0,Enforce,Staff rule: energy drinks by the case of 24
+26,19,177,6001237001161,5,0,Enforce,Tobacco outer default (10)
+26,18,95,BEVC0002,0,0,,History: no pack - issued in varying quantities
+26,18,49,30-4506-901,250,0,Default only,"History: Pack in use, also broken open"
+26,19,190,6001335065829,10,0,Enforce,Staff entry
+26,19,167,6001060603815,20,0,Enforce,Staff entry
+26,19,166,6001060496820,10,0,Enforce,Staff entry
+26,19,159,6001060177811,20,0,Enforce,Staff entry
+26,19,174,6001060969829,10,0,Enforce,Staff entry
+26,19,172,6001060967825,10,0,Enforce,Staff entry
+26,19,173,6001060968822,10,0,Enforce,Staff entry
+26,19,160,6001060215827,10,0,Enforce,Staff entry
+26,19,189,6001237212826,10,0,Enforce,Staff entry
+26,19,163,6001060358821,10,0,Enforce,Staff entry
+26,19,164,6001060359828,10,0,Enforce,Staff entry
+26,19,165,6001060360824,10,0,Enforce,Staff entry
+26,19,169,6001060880827,10,0,Enforce,Staff entry
+26,19,171,6001060886829,10,0,Enforce,Staff entry
+26,19,185,6001237010828,10,0,Enforce,Staff entry
+26,19,186,6001237012822,10,0,Enforce,Staff entry
+26,19,158,6001060160813,20,0,Enforce,Staff entry
+26,19,157,6001060100826,10,0,Enforce,Staff entry
+26,19,162,6001060314810,20,0,Enforce,Staff entry
+26,19,188,6001237015823,10,0,Enforce,Staff entry
+26,19,161,6001060313813,20,0,Enforce,Staff entry
+26,19,187,6001237012839,30,0,Enforce,Carton rule (30s pack)
+26,19,184,6001237002281,10,0,Enforce,Staff entry
+26,19,191,6001335303822,10,0,Enforce,Staff entry
+26,19,176,6001237001048,5,0,Enforce,Tobacco outer default (10)
+26,19,175,6001237000980,5,0,Enforce,Staff entry for this item at another site
+26,19,179,6001237001321,5,0,Enforce,Tobacco outer default (10)
+26,19,181,6001237001888,5,0,Enforce,Staff entry for this item at another site
+26,19,178,6001237051302,5,0,Enforce,Tobacco outer default (10)
+26,19,140,1151,10,0,Enforce,Tobacco outer default (10)
+3,29,382,21011,2,0,,No history
+26,19,151,4032900125206,20,0,Enforce,Staff entry
+26,19,154,4033100057885,10,0,Enforce,Staff entry
+26,19,145,42139621,10,0,Enforce,Staff entry
+26,19,142,8035335,10,0,Enforce,Staff entry
+26,19,143,42139430,10,0,Enforce,Staff entry
+26,19,144,42139447,10,0,Enforce,Staff entry
+26,19,155,4033100086045,10,0,Enforce,Staff entry
+26,19,153,4033100018343,10,0,Enforce,Staff entry
+26,19,152,4033100018312,10,0,Enforce,Staff entry
+26,19,150,4032900123936,10,0,Enforce,Staff entry
+26,19,148,60069795,100,0,Enforce,Staff entry for this item at another site
+26,19,193,6009800476248,10,0,Enforce,Staff entry
+26,19,199,6009802927403,10,0,Enforce,Staff entry
+26,19,197,6009802927380,10,0,Enforce,Staff entry
+26,19,198,6009802927397,10,0,Enforce,Staff entry
+26,19,192,6001697000902,10,0,Enforce,Staff entry
+26,19,202,7622100814566,10,0,Enforce,Staff entry
+26,19,206,7702005516977,10,0,Enforce,Staff entry
+26,19,204,7702005511095,10,0,Enforce,Staff entry
+26,19,205,7702005511125,10,0,Enforce,Staff entry
+26,19,196,6009800476958,10,0,Enforce,Staff entry
+26,19,147,46014450,10,0,Enforce,Staff entry
+26,19,146,46014436,10,0,Enforce,Staff entry
+26,19,195,6009800476927,10,0,Enforce,Staff entry
+26,19,156,5410706821956,10,0,Enforce,Staff entry
+3,29,499,11027,2,0,,No history
+22,1,343,RMBAK3,1,1,Enforce,Staff entry for this item at another site
+22,1,337,RMBAK13,12.5,1,Enforce,Staff entry for this item at another site
+22,1,353,RMBAK6,25,1,Enforce,Staff entry for this item at another site
+22,1,338,RMBAK14,12.5,1,Enforce,Staff entry for this item at another site
+22,1,345,RMBAK32,12.5,1,Enforce,Staff entry for this item at another site
+22,1,344,RMBAK31,25,1,Enforce,Staff entry for this item at another site
+22,1,352,RMBAK57,12.5,1,Enforce,Staff entry for this item at another site
+22,5,129,6009801801032,1,0,Enforce,Staff entry for this item at another site
+22,5,130,6009801801018,1,0,Enforce,Staff entry for this item at another site
+22,5,132,6003001017712,6,0,Enforce,Staff entry for this item at another site
+22,5,28,6009695584912,48,0,Enforce,Staff entry for this item at another site
+22,5,29,6009695584936,48,0,Enforce,Staff entry for this item at another site
+22,5,30,60026392,30,0,Default only,"History: Pack in use, also broken open"
+22,5,31,6009695584516,48,0,Enforce,Staff entry for this item at another site
+22,5,32,5011831076862,1,0,Enforce,Staff entry for this item at another site
+22,5,33,5011831076893,1,0,Enforce,Staff entry for this item at another site
+22,5,35,6001106120771,48,0,Enforce,Staff entry for this item at another site
+22,5,36,6009823910163,1,0,Enforce,Staff entry for this item at another site
+22,5,140,6002125004448,1,0,Enforce,Staff entry for this item at another site
+22,5,37,6002125006381,1,0,Enforce,Staff entry for this item at another site
+22,5,38,6002125006602,1,0,Enforce,Staff entry for this item at another site
+22,5,40,60050205,72,0,Enforce,Staff entry for this item at another site
+22,5,41,60099983,144,0,Enforce,Staff entry for this item at another site
+22,5,179,9770019177000,0,0,,Staff entry for this item at another site
+22,5,155,6007013000755,1,0,Enforce,Staff entry for this item at another site
+22,5,154,6007013000533,1,0,Enforce,Staff entry for this item at another site
+22,5,42,6007013000502,1,0,Enforce,Staff entry for this item at another site
+22,5,43,6007013000564,1,0,Enforce,Staff entry for this item at another site
+22,5,156,6007013000083,1,0,Enforce,Staff entry for this item at another site
+22,5,44,6007013000014,6,0,Enforce,Staff entry
+22,5,45,60015990,72,0,Enforce,Staff entry for this item at another site
+22,5,161,6009695585223,48,0,Enforce,Staff entry for this item at another site
+22,5,149,50974009,0,0,,Staff entry for this item at another site
+22,5,46,6007013000304,1,0,Enforce,Staff entry for this item at another site
+22,5,47,6007013000359,1,0,Enforce,Staff entry for this item at another site
+22,34,372,11012,0,0,,Staff entry for this item at another site
+22,34,361,11063,0,0,,Staff entry for this item at another site
+22,34,373,11058,0,0,,Staff entry for this item at another site
+22,34,374,12000,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,397,12032,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,387,12022,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,396,12031,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,386,12021,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,381,12013,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,385,12020,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,395,12030,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,384,12019,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,394,12029,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,389,12024,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,399,12034,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,388,12023,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,398,12033,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,390,12025,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,391,12026,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,401,12036,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,400,12035,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,382,12016,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,377,12009,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,375,12005,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,376,12006,0,1,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,379,12011,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,378,12010,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,380,12012,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,402,12037,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,392,12027,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,403,12038,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,393,12028,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,267,11028,0,0,,Staff entry for this item at another site
+22,34,260,11052,0,0,,Staff entry for this item at another site
+22,34,370,21025,0,0,,Staff entry for this item at another site
+22,34,276,11031,0,0,,Staff entry for this item at another site
+22,34,262,11032,0,0,,Staff entry for this item at another site
+22,34,259,11004,0,0,,Staff entry for this item at another site
+22,34,257,11055,0,0,,Staff entry for this item at another site
+22,34,256,11015,0,0,,Staff entry for this item at another site
+22,34,324,1204,0,0,,Staff rule: hot foods and made-up meals carry no multiple
+22,34,321,1200,0,0,,History: no pack - issued in varying quantities
+22,34,325,1206,0,0,,History: no pack - issued in varying quantities
+22,34,326,1207,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+22,34,322,1201,0,0,,History: no pack - issued in varying quantities
+22,34,323,1202,0,0,,History: no pack - issued in varying quantities
+22,34,299,11036,0,0,,Staff entry for this item at another site
+22,34,297,11053,0,0,,Staff entry for this item at another site
+22,34,383,21028,0,0,,Staff entry for this item at another site
+22,34,298,11037,0,0,,Staff entry for this item at another site
+22,34,296,11049,0,0,,Staff entry for this item at another site
+22,10,49,6001253010185,0,0,,Staff entry for this item at another site
+22,10,50,6001253010178,0,0,,Staff entry for this item at another site
+22,10,331,31023,0,0,,Staff entry for this item at another site
+22,10,333,31028,0,0,,Staff entry for this item at another site
+22,10,332,31027,0,0,,Staff entry for this item at another site
+22,10,327,31001,0,0,,Staff entry for this item at another site
+22,10,336,31053,0,0,,Staff entry for this item at another site
+22,10,328,31002,0,0,,Staff entry for this item at another site
+22,10,329,31003,0,0,,Staff entry for this item at another site
+22,10,51,6001205730321,0,0,,Staff entry for this item at another site
+22,10,52,6001205730475,0,0,,Staff entry for this item at another site
+22,10,53,96041109,12,0,Enforce,Staff entry for this item at another site
+22,10,58,9002490100070,24,0,Enforce,Staff entry for this item at another site
+22,10,178,9002490209599,24,0,Enforce,Staff entry for this item at another site
+22,10,59,9002490218638,24,0,Enforce,Staff entry for this item at another site
+22,10,60,6001710010253,0,0,,Staff entry for this item at another site
+22,10,61,6001710010192,0,0,,Staff entry for this item at another site
+22,12,3,4003,1,0,Enforce,Staff entry
+22,12,306,5000,1,0,Enforce,Staff entry
+22,12,2,4002,1,0,Enforce,Staff entry
+22,12,5,3009,1,0,Enforce,Staff entry
+22,12,4,3007,1,0,Enforce,Staff entry
+22,12,6,3002,1,0,Enforce,Staff entry
+22,13,64,6007053022250,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+22,13,65,6007053024438,0,0,,Too little history
+22,13,66,6007053022267,0,0,,No history
+22,13,67,6007053024261,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+22,13,68,6007053000180,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+22,13,69,6007053000197,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+22,13,70,6007053024285,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+22,13,72,6007053024346,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+22,13,71,6007053024339,16,0,Enforce,History: Issued pack
+22,13,73,6007053022229,0,0,,No history
+22,13,74,6007053024230,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+22,13,75,6007053020133,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+22,13,76,6007053024452,0,0,,No history
+22,13,78,6007053024582,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+22,13,81,6007053024612,0,0,,Too little history
+22,13,82,6007053024421,1,0,Enforce,Staff rule: lubes of 1 litre and larger go singly
+22,13,83,6007053024551,20,0,Enforce,Staff rule: lubes in 500ml and smaller go by the case of 20
+22,19,188,6001060686825,10,0,Enforce,Staff entry
+22,19,190,6001060944826,10,0,Enforce,Staff entry
+22,19,194,6001060684821,10,0,Enforce,Staff entry
+22,19,186,6001697311213,1,0,Enforce,Staff entry for this item at another site
+22,19,88,42139621,10,0,Enforce,Staff entry
+22,19,203,40329055,10,0,Enforce,Staff entry for this item at another site
+22,19,200,42139447,10,0,Enforce,Staff entry
+22,19,89,4033100057885,10,0,Enforce,Staff entry
+22,19,204,42139126,10,0,Enforce,Staff entry for this item at another site
+22,19,91,6009802927403,10,0,Enforce,Staff entry for this item at another site
+22,19,206,6009800476255,10,0,Enforce,Staff entry
+22,19,92,6009802927380,10,0,Enforce,Staff entry
+22,19,93,6009802927397,10,0,Enforce,Staff entry
+22,19,95,6001060603815,20,0,Enforce,Staff entry
+22,19,207,6001060969829,10,0,Enforce,Staff entry
+22,19,94,6001060215827,10,0,Enforce,Staff entry
+22,19,209,6001060967825,10,0,Enforce,Staff entry
+22,19,208,6001060968822,10,0,Enforce,Staff entry
+22,19,98,6001060177811,20,0,Enforce,Staff entry
+22,19,99,6001060496820,10,0,Enforce,Staff entry
+22,19,212,6001237213823,10,0,Enforce,Staff entry for this item at another site
+22,19,96,6001335065829,10,0,Enforce,Staff entry
+22,19,211,6001060381829,10,0,Enforce,Staff entry
+22,19,210,6001060382826,10,0,Enforce,Staff entry
+22,19,97,6001237212826,10,0,Enforce,Staff entry
+22,19,213,6001060361821,10,0,Enforce,Staff entry
+22,19,100,6001060359828,10,0,Enforce,Staff entry
+22,19,215,6001060360824,10,0,Enforce,Staff entry
+22,19,101,60069795,100,0,Enforce,Staff entry for this item at another site
+22,19,102,39,30,0,Enforce,Loose single cigarettes - always issued in 30s
+22,19,217,6009800476958,10,0,Enforce,Staff entry
+22,19,218,46014450,10,0,Enforce,Staff entry for this item at another site
+22,19,226,6001060953811,20,0,Enforce,Staff entry
+22,19,107,6001060565823,10,0,Enforce,Staff entry
+22,19,223,6001060884825,10,0,Enforce,Staff entry
+22,19,224,6001060886829,10,0,Enforce,Staff entry
+22,19,112,6001060563829,10,0,Enforce,Staff entry
+22,19,113,6001237015823,10,0,Enforce,Staff entry for this item at another site
+22,19,116,6001237012839,30,0,Enforce,Carton rule (30s pack)
+22,19,119,6001060314810,20,0,Enforce,Staff entry
+22,19,120,6001060313813,20,0,Enforce,Staff entry
+22,19,121,6001060160813,20,0,Enforce,Staff entry
+22,19,115,6001237010828,10,0,Enforce,Staff entry for this item at another site
+22,19,117,6001237012822,10,0,Enforce,Staff entry for this item at another site
+22,19,118,6001060100826,10,0,Enforce,Staff entry for this item at another site
+22,19,320,40,30,0,Enforce,Loose single cigarettes - always issued in 30s
+22,19,124,6001335054823,10,0,Enforce,Staff entry
+22,19,125,6001335051822,10,0,Enforce,Staff entry
+22,19,126,4033100086045,10,0,Enforce,Staff entry
+31,21,21,8BEVR011,6,0,Enforce,History: Issued pack
+31,21,22,8BEVR012,6,0,Enforce,History: Issued pack
+31,21,25,8BEVR360,6,0,Enforce,History: Issued pack
+31,21,26,8TOYS060,10,0,Default only,"History: Pack in use, also broken open"
+31,21,24,8BEVR016,6,0,Enforce,History: Issued pack
+31,21,23,8BEVR015,6,0,Enforce,History: Issued pack
+31,21,20,8BEVL165,24,0,Enforce,Staff rule: energy drinks by the case of 24
+31,22,48,8FRUT380,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,22,51,8MEATP050,40,0,Enforce,History: Issued pack
+31,22,52,8MEATP055,60,0,Enforce,History: Issued pack
+31,22,57,8MEATP120,0,0,,History: no pack - issued in varying quantities
+31,22,54,8MEATP080,10,0,Enforce,History: Issued pack
+31,22,29,8BRED070,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+31,22,28,8BRED050,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+31,22,27,8BRED010,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+31,22,47,8FRUT360,0.5,1,Enforce,Unit the history shows this is issued in
+31,22,39,8DAIR050,72,0,Enforce,History: Issued pack
+31,22,58,8MEATP140,20,0,Enforce,History: Issued pack
+31,22,31,8CHICP100,0,0,,No history
+31,22,30,8CHICP011,12,0,Enforce,History: Issued pack
+31,22,32,8CHICP120,8,0,Default only,History: Issued pack
+31,22,33,8CHICP140,6,0,Enforce,History: Common divisor of the packs issued
+31,22,36,8COND300,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+31,22,34,8CHIP010,15,1,Enforce,Unit the history shows this is issued in
+31,22,40,8DRYG070,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,22,38,8DAIR040,30,0,Enforce,History: Issued pack
+31,22,50,8MEATP030,0,0,,Too little history
+31,22,41,8FROZ095,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,22,55,8MEATP090,2,0,Enforce,History: Common divisor of the packs issued
+31,22,43,8FRUT120,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,22,44,8FRUT175,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,22,59,8MEATP230,12,0,Enforce,History: Issued pack
+31,22,49,8MEATP011,96,0,Enforce,History: Issued pack
+31,22,42,8FROZ110,0,0,,Too little history
+31,22,35,8COND220,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+31,22,60,8MEATP320,12,0,Enforce,History: Issued pack
+31,22,56,8MEATP100,3,1,Enforce,Unit the history shows this is issued in
+31,22,37,8COND340,1,1,Enforce,Unit the history shows this is issued in
+31,22,46,8FRUT310,0.5,1,Enforce,Unit the history shows this is issued in
+31,22,53,8MEATP060,5,0,Enforce,History: Issued pack
+31,22,45,8FRUT190,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,23,18,8DRYG580,0,0,,History: no pack - issued in varying quantities
+31,23,1,8BAKE003,50,0,Enforce,History: Issued pack
+31,23,16,8DAIR052,2,1,Enforce,Unit the history shows this is issued in
+31,23,2,8BEVD020,2,0,Enforce,History: Issued pack
+31,23,15,8DAIR020,1,1,Enforce,Unit the history shows this is issued in
+31,23,10,8BEVR060,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,23,8,8BEVR056,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,23,9,8BEVR059,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,23,7,8BEVR055,5,1,Enforce,Unit the history shows this is issued in
+31,23,14,8COND770,0,0,,Too little history
+31,23,12,8BRED107,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+31,23,11,8BRED105,0,0,,Staff rule: baked and bought-in bread lines carry no multiple
+31,23,5,8BEVR020,0,1,,"Weighed with no fixed unit - any quantity, decimals allowed"
+31,23,6,8BEVR025,0,0,,No history
+31,23,13,8COND700,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+31,23,19,8ICEC010,5,1,Enforce,"Stated: sauces, ice cream and soft serve are issued in 5 litres"
+31,23,3,8BEVD030,0,0,,Too little history
+31,23,4,8BEVD040,80,0,Enforce,History: Issued pack
+31,23,17,8DRYG420,10,0,Enforce,History: Issued pack

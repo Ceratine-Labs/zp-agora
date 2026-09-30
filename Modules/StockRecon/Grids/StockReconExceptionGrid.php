@@ -24,8 +24,8 @@ use App\Grid\Sources\ProcedureSource;
  * customer's estate, so running one to get this report costs two seconds.
  *
  * DEFAULT ORDER IS WORST CLASS FIRST, THEN BIGGEST MONEY. That is the order
- * somebody actually works the list in, and it puts the A-class rows — stock
- * that entered the store with no paperwork — above every counting habit.
+ * somebody actually works the list in, and it puts a vanished opening, a
+ * missing issue sheet and stock with no paperwork above every counting habit.
  */
 class StockReconExceptionGrid extends GridDefinition
 {
@@ -41,25 +41,28 @@ class StockReconExceptionGrid extends GridDefinition
 
     public function blurb(): ?string
     {
-        return 'Every line the balancing reported instead of amending. A-class rows are stock that '
-            .'entered the store without an issue being captured and no amendment can remove them; '
-            .'B is a data fault; C is a count that was never taken; D is the residual short that '
-            .'survives balancing and is the only class that can carry a charge — and "On shift" is '
-            .'who was signed on to the area, so a D1 can name a person rather than a shift number. '
-            .'Where two people were on, both are named and neither can be held to it alone.';
+        return 'Every line the counts or the hand balancing put in question. The codes are the client\'s '
+            .'where the client\'s weekly pack defines the test: S10a/S10b an opening that was not the previous '
+            .'closing, S1 an over of a whole pack, E1 no till sales linked. U rows are stock that entered the '
+            .'store without an issue; F is a data fault; N a count that was never taken; L the residual short '
+            .'that survives balancing and the only class that can carry a charge — "On shift" names who was '
+            .'signed on, and where two were, neither can be held to it alone. Audit is what the hand balancing '
+            .'already in PumpIT did that the client\'s rules do not allow.';
     }
 
     public function columns(): array
     {
         return [
             new GridColumn(key: 'ExceptionCode', label: 'Class', sort: 'ExceptionCode', format: 'chip'),
+            new GridColumn(key: 'AuditCode', label: 'Audit', sort: 'AuditCode', format: 'chip',
+                title: 'The client\'s check on the hand balancing already in PumpIT: S7, S8, S11, S12, S13, S4'),
             new GridColumn(key: 'Outcome', label: 'What it is', sort: 'Outcome', wide: true),
             new GridColumn(key: 'AreaName', label: 'Area', sort: 'AreaName'),
             new GridColumn(key: 'ItemDescription', label: 'Item', sort: 'ItemDescription', wide: true, link: true),
             new GridColumn(key: 'POSCode', label: 'POS code', sort: 'POSCode', mono: true),
             /*
              * Who was on the shift. The reason it is here rather than only in
-             * the drill is D1 — a persistent short is the one class that can
+             * the drill is L1 — a persistent short is the one class that can
              * carry a charge, and a charge against "shift 1" is not a charge
              * against anybody. `EmployeeCount` rides alongside, hidden, so a
              * shared shift is filterable: two people on a shift means the
@@ -102,6 +105,8 @@ class StockReconExceptionGrid extends GridDefinition
         return [
             'ExceptionCode' => new GridFilter(column: 'ExceptionCode', type: 'set',
                 options: array_keys((array) config('stockrecon.exceptions'))),
+            'AuditCode' => new GridFilter(column: 'AuditCode', type: 'set',
+                options: array_keys((array) config('stockrecon.audit'))),
             'AreaName' => new GridFilter(column: 'AreaName', type: 'text'),
             'ItemDescription' => new GridFilter(column: 'ItemDescription', type: 'text'),
             'POSCode' => new GridFilter(column: 'POSCode', type: 'text'),

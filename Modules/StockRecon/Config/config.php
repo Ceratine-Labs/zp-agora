@@ -28,6 +28,13 @@
 | Source: docs/reference/ZRP_Shift_Variance_Balancing method note (Ryan, 8 Sep
 | 2026) and dbo.sp_UpdateAUTOStockReconBalancing, the procedure this replaces.
 |
+| And, since 30 Sep 2026, the client's own rules: ZRP's Weekly Stock Recon pack
+| (23 Sep 2026, docs/reference/zrp-weekly-stock-recon-pack). An opening that is
+| not the previous closing is REPAIRED (the opening amended, the closing
+| standing) rather than blocking the chain; a whole-pack over and a chain with
+| no till sales against it are reported, not balanced; unfinished recon days
+| are held back. docs/stock-recon.md → "The client's rules" has the mapping.
+|
 */
 
 return [
@@ -165,6 +172,21 @@ return [
             'max' => 30,
         ],
 
+        /*
+        | Rule 10 of the client's pack: a site is analysed only up to its last
+        | complete recon day — every shift in on 95% of its lines, closings in,
+        | POS posted. Later days are held back and counted on the run, because
+        | balancing them would pin "the latest count" on one nobody has taken.
+        */
+        'HoldBackIncomplete' => [
+            'label' => 'Hold back days the recon has not finished',
+            'help' => 'On, a day with a shift missing, closings not captured or POS not posted — and every '
+                .'day after it — is left out of the run and counted on it, as the client\'s weekly pack does. '
+                .'Turn it off only to look at an unfinished week on purpose.',
+            'default' => 1,
+            'type' => 'bool',
+        ],
+
         'UseOriginalCounts' => [
             'label' => 'Recompute from the original counts',
             'help' => 'On, the preview reads QtyOpen_Original and QtyClose_Original, which is what makes '
@@ -182,55 +204,135 @@ return [
     | grid's tick-list filter cannot drift into three different vocabularies.
     | The `test` is the same predicate the procedure applies, written out, so a
     | reader can check the classification against the arithmetic without
-    | opening SSMS.
+    | opening SSMS. Every test reads the REPAIRED opening (rule 3).
     |
-    | A = the stock arrived without paperwork. Never balanced, always reported:
-    |     these are worth more than the balancing is.
-    | B = the data is wrong. Withheld rather than printed as a performance figure.
-    | C = the count was not taken. A supervision finding, not an arithmetic one.
-    | D = the balanced answer, and the only class that can carry a charge.
+    | THE CODES ARE THE CLIENT'S WHERE THE CLIENT DEFINES THE TEST. The weekly
+    | pack (ZRP, 23 Sep 2026) names its shift tests S1–S13 and its data faults
+    | E1–E3; where Agora applies the same test it uses the same code, so a line
+    | reads the same in Agora and in the master book on Monday. Where the test is
+    | ours it takes a letter the pack does not use — U unrecorded issue, F data
+    | fault, N not counted, L loss — because the pack's A–D mean storeroom
+    | scenarios, and our old A1 ("a missing issue sheet") would have read as the
+    | pack's A1 ("confirmed loss, charge the staff"). v1__14e relabelled the
+    | recorded runs; the tests behind U, F, N and L did not change.
+    |
+    | Blocks: a chain with this class is reported, never balanced.
     */
     'exceptions' => [
-        'A1' => ['tone' => 'crit', 'label' => 'Unrecorded issue — proven',
+        'S10a' => ['tone' => 'crit', 'label' => 'Opening below the previous closing',
+            'test' => 'Open < Close of the shift before',
+            'blocks' => false,
+            'blurb' => 'Stock vanished between two shifts and nobody carries it — the pack calls it the known '
+                .'manipulation route. Rule 3: the OPENING is amended to the previous closing, which stands, '
+                .'and the incoming shift carries the difference. Balancing does that repair; the line stays '
+                .'on this report because somebody has to explain it.'],
+        'E1' => ['tone' => 'crit', 'label' => 'No till sales linked',
+            'test' => 'T < −max(3, pack) over 2+ days and Σ POS ≤ 10% of |T|',
+            'blocks' => true,
+            'blurb' => 'The stock is falling and the till shows next to nothing against it: the selling PLU '
+                .'or recipe is not reducing this item, so every count looks short. A system fault, not a '
+                .'loss — nobody is charged, and it is not balanced. Link the PLU and re-run.'],
+        'S1' => ['tone' => 'crit', 'label' => 'Over of a whole pack — issue not written up',
+            'test' => 'over within 10% of k × issue multiple, k ≥ 1, not weighed',
+            'blocks' => true,
+            'blurb' => 'A whole pack reached the counter without an issue sheet (rule 5). Capture the issue '
+                .'on the shift it happened; balancing it away would hide the paperwork failure.'],
+        'U1' => ['tone' => 'crit', 'label' => 'Unrecorded issue — proven',
             'test' => 'POS > Open + Issued',
-            'blurb' => 'The till sold more in one shift than the opening count plus every recorded issue '
-                .'could supply. The stock was there; the paperwork was not. This needs no interpretation.'],
-        'A2' => ['tone' => 'crit', 'label' => 'Closing exceeds what was on hand',
+            'blocks' => true,
+            'blurb' => 'The till sold more in one shift than the opening plus every recorded issue could '
+                .'supply. The stock was there; the paperwork was not.'],
+        'U2' => ['tone' => 'crit', 'label' => 'Closing exceeds what was on hand',
             'test' => 'Close > Open + Issued',
+            'blocks' => true,
             'blurb' => 'The shift closed holding more than it opened with plus everything issued to it. '
                 .'The surplus arrived without a document.'],
-        'A3' => ['tone' => 'serious', 'label' => 'Selling with no issues captured at all',
-            'test' => 'Σ Issued = 0 and Σ POS > 0 and T > 0',
+        'U3' => ['tone' => 'serious', 'label' => 'Selling with no issues captured at all',
+            'test' => 'Σ Issued = 0 and Σ POS > 0 and a segment ends over',
+            'blocks' => true,
             'blurb' => 'Sales all through the window and not one issue recorded. Usually a recipe or a '
                 .'transfer route that was never set up, rather than a one-off omission.'],
-        'A4' => ['tone' => 'serious', 'label' => 'Net over for the window',
-            'test' => 'T > 0',
-            'blurb' => 'The general case. Nothing individually impossible, but the window as a whole '
-                .'received less than it sold. No set of closing counts can change T, so chasing it with '
-                .'amendments only spreads a data fault across innocent shifts.'],
-        'B1' => ['tone' => 'warn', 'label' => 'Data fault',
+        'U4' => ['tone' => 'serious', 'label' => 'Net over for the window',
+            'test' => 'a segment\'s total T > 0',
+            'blocks' => true,
+            'blurb' => 'The window (or the stretch between two repaired openings) received less than it '
+                .'sold. No set of closing counts changes that, so chasing it with amendments only spreads '
+                .'a data fault across innocent shifts.'],
+        'S10b' => ['tone' => 'serious', 'label' => 'Opening above the previous closing',
+            'test' => 'Open > Close of the shift before',
+            'blocks' => false,
+            'blurb' => 'Stock appeared between shifts, which can hide an over or offset a short. Repaired '
+                .'like S10a: the opening is amended to the previous closing.'],
+        'F1' => ['tone' => 'warn', 'label' => 'Data fault',
             'test' => 'a count below zero, or a correction larger than the caps allow',
+            'blocks' => true,
             'blurb' => 'Either a negative count, or an amendment so large it cannot be a miscount. Both '
                 .'are withheld rather than printed.'],
-        'B2' => ['tone' => 'warn', 'label' => 'Issue went nowhere',
+        'F2' => ['tone' => 'warn', 'label' => 'Issue went nowhere',
             'test' => 'Open = Close and Issued > 0 and POS = 0',
+            'blocks' => true,
             'blurb' => 'Stock was issued, nothing was sold, and the count did not move. Either the issue '
-                .'was never delivered or the count was never taken. It LOOKS dormant and is not, so it is '
-                .'never folded away.'],
-        'C1' => ['tone' => 'warn', 'label' => 'No physical count taken',
+                .'was never delivered or the count was never taken.'],
+        'F3' => ['tone' => 'warn', 'label' => 'Audit conflict — issue changed at balancing',
+            'test' => 'writing the chain would trip S7, S8, S11, S12 or S13 on a shift that trips none today',
+            'blocks' => true,
+            'blurb' => 'An issue (or POS) quantity was changed at balancing and a count moved to match. Agora '
+                .'writes counts, never issues, and with that edit in place no set of counts passes every one '
+                .'of the client\'s checks — so the chain is left for a person rather than given a new flag.'],
+        'S3' => ['tone' => 'warn', 'label' => 'Short of a whole pack',
+            'test' => 'short after balancing within 10% of k × issue multiple',
+            'blocks' => false,
+            'blurb' => 'A pack issued on paper but not handed over, or a whole pack missing. Check the issue '
+                .'book before treating it as a loss.'],
+        'S5' => ['tone' => 'neutral', 'label' => 'Issue not in whole packs',
+            'test' => 'Issued is not a multiple of the issue multiple',
+            'blocks' => false,
+            'blurb' => 'The issue was captured in a quantity the pack does not come in — a keying or unit '
+                .'problem on the issue sheet.'],
+        'N1' => ['tone' => 'warn', 'label' => 'No physical count taken',
             'test' => 'Close = Open and Issued = 0 and POS > 0, on more than half the active shifts',
-            'blurb' => 'The closing was carried forward instead of counted. This is the single biggest '
-                .'source of the over/short sawtooth, and it is a supervision issue: balancing corrects the '
-                .'number, only the branch corrects the habit.'],
-        'C2' => ['tone' => 'neutral', 'label' => 'Mostly dormant',
+            'blocks' => false,
+            'blurb' => 'The closing was carried forward instead of counted — the biggest source of the '
+                .'over/short sawtooth, and a supervision issue: balancing corrects the number, only the '
+                .'branch corrects the habit.'],
+        'N2' => ['tone' => 'neutral', 'label' => 'Mostly dormant',
             'test' => 'dormant on more than half of six or more shifts',
-            'blurb' => 'More than half the chain never traded. The item barely moves on this shift '
-                .'pattern, or it is counted on a shift that does not sell it. Two live shifts in twelve is '
-                .'almost no evidence.'],
-        'D1' => ['tone' => 'serious', 'label' => 'Persistent short — accountable',
+            'blocks' => false,
+            'blurb' => 'More than half the chain never traded. Two live shifts in twelve is almost no '
+                .'evidence.'],
+        'L1' => ['tone' => 'serious', 'label' => 'Persistent short — accountable',
             'test' => 'short on more than half of six or more ACTIVE shifts',
-            'blurb' => 'After balancing, still short on most of its real shifts. Consistent shorts are not '
-                .'a counting problem and should not be treated as one. This is the output that carries a '
-                .'charge.'],
+            'blocks' => false,
+            'blurb' => 'After balancing, still short on most of its real shifts. The pack\'s rule stands: a '
+                .'consistent short is not a "wrong count" until a recount proves it. This is the class '
+                .'that carries a charge.'],
+    ],
+
+    /*
+    | The hand-balancing audit — what somebody already did to a shift in PumpIT,
+    | measured against the client's rules. The pack's own codes and wording.
+    | A line carries at most one, the first that applies in this order. Agora's
+    | own commits never produce any of them; a commit on a clear chain puts the
+    | amendment behind S7, S8, S11 and S12 back.
+    */
+    'audit' => [
+        'S13' => ['tone' => 'crit', 'label' => 'Opening/closing mismatch still open',
+            'blurb' => 'The recon was balanced with the mismatch still in it. Fix the opening; re-run.'],
+        'S12' => ['tone' => 'crit', 'label' => 'Mismatch fixed the wrong way',
+            'blurb' => 'Balancing changed the previous CLOSING to meet the opening — it rewrites what the '
+                .'staff counted. Restore the closing; amend the opening instead.'],
+        'S7' => ['tone' => 'crit', 'label' => 'Over turned into a short by balancing',
+            'blurb' => 'An over may be brought to nil against a neighbouring short, never made a short.'],
+        'S8' => ['tone' => 'crit', 'label' => 'Short increased by balancing',
+            'blurb' => 'A short may shrink by absorbing a neighbouring over, never grow.'],
+        'S11' => ['tone' => 'serious', 'label' => 'Latest closing count amended',
+            'blurb' => 'Balancing works backwards from the latest count, which stands.'],
+        'S4' => ['tone' => 'warn', 'label' => 'Issue mis-keyed',
+            'blurb' => 'A fat-finger issue (e.g. 123456) that was later corrected. Confirm the correction.'],
+        'S4a' => ['tone' => 'warn', 'label' => 'Issue added at balancing',
+            'blurb' => 'The over was an issue not written up on the shift. It balances now, but the issue '
+                .'sheet was not completed at the time — a paperwork failure against the issuer.'],
+        'S4b' => ['tone' => 'neutral', 'label' => 'Issue reduced at balancing',
+            'blurb' => 'An issue was over-captured or captured twice. Confirm with the issue book.'],
     ],
 ];

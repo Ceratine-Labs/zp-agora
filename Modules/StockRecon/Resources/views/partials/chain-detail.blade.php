@@ -12,8 +12,9 @@
     rebuilding them in JavaScript is how the two drift apart.
 --}}
 @php($blocks = collect([
-    $item?->BlockSoldMore, $item?->BlockCloseExceeds, $item?->BlockNetOver, $item?->BlockChainBroken,
-    $item?->BlockIssueNowhere, $item?->BlockBigAmendment, $item?->BlockPctAmendment,
+    $item?->BlockPackOver, $item?->BlockNoPosLink,
+    $item?->BlockSoldMore, $item?->BlockCloseExceeds, $item?->BlockNetOver,
+    $item?->BlockIssueNowhere, $item?->BlockAuditConflict, $item?->BlockBigAmendment, $item?->BlockPctAmendment,
     $item?->BlockNegativeClose, $item?->BlockShortChain, $item?->BlockDormantMoved,
 ])->filter()->values())
 
@@ -52,12 +53,20 @@
             <ul>
                 @foreach ($blocks as $why)<li>{{ $why }}</li>@endforeach
             </ul>
-            @if ($item?->BlockChainBroken)
-                <p><strong>A broken chain is the one worth chasing.</strong> The whole method rests on a
-                   shift's opening being the previous shift's closing. Where that is not true in the
-                   source, moving a quantity along the chain is moving it along a path that does not
-                   exist — so the chain is left exactly as counted and the break is reported instead.</p>
+            @if ($item?->BlockNoPosLink)
+                <p><strong>This is not a loss.</strong> The counts fall and the till shows next to nothing
+                   against the item, so the selling PLU or recipe is not reducing it. Link it and re-run;
+                   nobody is charged for a short the system made.</p>
             @endif
+        </x-notice>
+    @endif
+
+    @if ((int) ($item?->RepairedOpenings ?? 0) > 0)
+        <x-notice tone="warn" :title="$item->RepairedOpenings.' '.Str::plural('opening', (int) $item->RepairedOpenings).' not equal to the previous closing'">
+            <p>The client's rule: the <strong>opening</strong> is amended to the previous closing, and the
+               closing stands. The shift that opened wrong carries the difference, and the closing before it
+               is not moved by the balancing either. An opening <em>below</em> the previous closing is stock
+               that vanished between shifts — it is on the exceptions report as S10a whatever happens here.</p>
         </x-notice>
     @endif
 
@@ -114,7 +123,15 @@
                         <span class="muted">—</span>
                     @endif
                 </td>
-                <td class="num grp">{{ \App\Support\Format::n($shift->QtyOpen, 3) }}</td>
+                <td class="num grp">
+                    {{ \App\Support\Format::n($shift->QtyOpen, 3) }}
+                    @if (abs((float) $shift->ChainBreak) > 0.0005)
+                        <x-chip :tone="(float) $shift->ChainBreak < 0 ? 'crit' : 'warn'" :dot="false"
+                                :title="'Previous closing '.\App\Support\Format::n($shift->PrevClose, 3)">
+                            {{ (float) $shift->ChainBreak < 0 ? 'S10a' : 'S10b' }}
+                        </x-chip>
+                    @endif
+                </td>
                 <td class="num">{{ (float) $shift->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($shift->QtyIssued, 3) }}</td>
                 <td class="num">{{ \App\Support\Format::n($shift->QtyClose, 3) }}</td>
                 <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($shift->QtyPOS, 3) }}</td>
@@ -137,6 +154,12 @@
                     {{ $shift->Outcome }}
                     @if ($shift->IsDormant)<x-chip tone="neutral" :dot="false">dormant</x-chip>@endif
                     @if ($shift->AmendmentState === 'active')<x-chip tone="good" :dot="false">amended</x-chip>@endif
+                    @if ($shift->AuditCode)
+                        <x-chip tone="crit" :dot="false"
+                                :title="config('stockrecon.audit.'.$shift->AuditCode.'.label').' — PumpIT holds '.\App\Support\Format::n($shift->QtyOpenNow, 3).' / '.\App\Support\Format::n($shift->QtyCloseNow, 3)">
+                            {{ $shift->AuditCode }}
+                        </x-chip>
+                    @endif
                 </td>
             </tr>
         @endforeach
@@ -148,8 +171,10 @@
         and a screen that showed one name would be deciding that on your behalf.
     </p>
     <p class="field-help">
-        Only the closing count is amended. The opening follows automatically, because it <em>is</em> the
-        previous closing — which is why a shift whose closing is pinned can still have its opening moved,
-        and why both are written when this run is committed.
+        Balancing amends the closing count; the opening follows, because it <em>is</em> the previous
+        closing. Where the counted opening was not the previous closing, the opening is repaired and the
+        closing before it stands. Both are written when this run is committed, and a chip beside the
+        outcome marks what the hand balancing already in PumpIT did that the rules do not allow — the
+        commit puts that back.
     </p>
 </div>

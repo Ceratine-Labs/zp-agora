@@ -56,6 +56,17 @@ use Illuminate\Support\Carbon;
  * @property string|null $EmployeeNames
  * @property int $EmployeeCount
  * @property string|null $UOMCode
+ * @property string|null $PrevClose
+ * @property string $ChainBreak
+ * @property string|null $QtyOpenNow
+ * @property string|null $QtyCloseNow
+ * @property string|null $QtyIssuedOrig
+ * @property string|null $IssueMultiple
+ * @property bool $FlagPackOver
+ * @property bool $FlagNoPosLink
+ * @property bool $RestoresHand
+ * @property bool $FlagAuditConflict
+ * @property string|null $AuditCode
  * @property-read StockReconRun $run
  */
 class StockReconRunLine extends BaseModel
@@ -108,6 +119,10 @@ class StockReconRunLine extends BaseModel
         'FlagShortChain' => 'boolean',
         'FlagDormantMoved' => 'boolean',
         'FlagChainBroken' => 'boolean',
+        'FlagPackOver' => 'boolean',
+        'FlagNoPosLink' => 'boolean',
+        'RestoresHand' => 'boolean',
+        'FlagAuditConflict' => 'boolean',
         'ChainBlocked' => 'boolean',
         'WouldAmend' => 'boolean',
         'Selected' => 'boolean',
@@ -130,7 +145,12 @@ class StockReconRunLine extends BaseModel
     {
         return match (true) {
             $this->IsDormant => 'dormant',
-            $this->ExceptionCode !== null && str_starts_with($this->ExceptionCode, 'A') => 'unrecorded',
+            // The classes that say stock arrived with no paperwork — see
+            // config('stockrecon.exceptions').
+            in_array($this->ExceptionCode, ['U1', 'U2', 'U3', 'U4', 'S1'], true) => 'unrecorded',
+            // A blocked chain put back to the staff counts: the hand amendment
+            // is reversed, the chain is still not balanced.
+            $this->RestoresHand && $this->WouldAmend => 'restored',
             $this->ChainBlocked => 'blocked',
             $this->WouldAmend && (float) $this->QtyVarNew < -0.005 => 'short',
             $this->WouldAmend => 'balanced',
@@ -176,6 +196,7 @@ class StockReconRunLine extends BaseModel
             'short' => 'warn',
             'unrecorded' => 'crit',
             'blocked' => 'serious',
+            'restored' => 'warn',
             default => 'neutral',
         };
     }
@@ -191,6 +212,19 @@ class StockReconRunLine extends BaseModel
     public function moves(): bool
     {
         return $this->WouldAmend;
+    }
+
+    /**
+     * Can the commit write this row — the one definition the tick box, the
+     * single-row button, StockReconService::select() and usp_StockRecon_Commit
+     * all apply. A blocked chain is written only where it is being put back to
+     * the staff counts because a hand amendment broke the client's rules.
+     */
+    public function isWritable(): bool
+    {
+        return $this->WouldAmend
+            && $this->CommitState === 'pending'
+            && (! $this->ChainBlocked || $this->RestoresHand);
     }
 
     public function isCommitted(): bool

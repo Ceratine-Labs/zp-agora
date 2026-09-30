@@ -21,7 +21,13 @@
  * nothing to the customer's estate, so running one to get the exception report
  * costs nothing but the two seconds it takes.
  *
- * THE DENOMINATORS EXCLUDE DORMANT SHIFTS. C1, C2 and D1 all count against
+ * TWO CODES PER LINE. ExceptionCode is what the COUNTS say (config
+ * 'stockrecon.exceptions'); AuditCode is what the HAND balancing already in
+ * PumpIT did to the shift, measured against the client's rules (config
+ * 'stockrecon.audit' — the pack's S7, S8, S11, S12, S13, S4, S4a, S4b). A line
+ * is on this report if either is set, and each has its own tick-list filter.
+ *
+ * THE DENOMINATORS EXCLUDE DORMANT SHIFTS. N1, N2 and L1 all count against
  * ACTIVE shifts, never raw line count. A chain where nine of twelve shifts
  * never traded is not "short a quarter of the time" — it is short on one of
  * three real shifts, and the rate that goes to a branch has to say so.
@@ -85,9 +91,17 @@ BEGIN
             @fPos     NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'POSCode'),
             @fPosOp   NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'POSCode'),
             @fEmp     NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'EmployeeNames'),
-            @fEmpOp   NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'EmployeeNames');
+            @fEmpOp   NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'EmployeeNames'),
+            /* The date and value header filters the grid has always offered.
+               They were declared on the grid and never read here, so a
+               filter typed into either did nothing at all (inbox, 23 Sep). */
+            @fDate    DATE          = (SELECT TOP 1 TRY_CONVERT(date, [Value])          FROM @Filter WHERE [Column] = 'TransactionDate'),
+            @fDateOp  NVARCHAR(20)  = (SELECT TOP 1 [Op]                                FROM @Filter WHERE [Column] = 'TransactionDate'),
+            @fVal     DECIMAL(18,2) = (SELECT TOP 1 TRY_CONVERT(decimal(18,2), [Value]) FROM @Filter WHERE [Column] = 'ExceptionValue'),
+            @fValOp   NVARCHAR(20)  = (SELECT TOP 1 [Op]                                FROM @Filter WHERE [Column] = 'ExceptionValue');
 
-    DECLARE @fCodeAny bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'ExceptionCode') THEN 1 ELSE 0 END;
+    DECLARE @fCodeAny  bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'ExceptionCode') THEN 1 ELSE 0 END,
+            @fAuditAny bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'AuditCode')     THEN 1 ELSE 0 END;
 
     ;WITH base AS (
         SELECT
@@ -104,7 +118,7 @@ BEGIN
             ISNULL(rl.ItemDescription, ISNULL(m.StockItemDescription, rl.StockItemNo)) AS ItemDescription,
             ISNULL(rl.POSCode, m.POSCode)             AS POSCode,
             ISNULL(rl.StockLocation, m.StockLocation) AS StockLocation,
-            /* Who was on. The point of it is D1 — a persistent short is the
+            /* Who was on. The point of it is L1 — a persistent short is the
                one class that can carry a charge, and until now it could only
                name a shift number.
 
@@ -122,6 +136,16 @@ BEGIN
             rl.TransactionDate,
             rl.ShiftNo,
             rl.ExceptionCode,
+            rl.AuditCode,
+            /* The rank of the class, so the default order is worst first
+               whatever letters the codes happen to use. Same order as config
+               'stockrecon.exceptions'. */
+            CASE rl.ExceptionCode
+                WHEN 'S10a' THEN 1  WHEN 'E1' THEN 2   WHEN 'S1' THEN 3   WHEN 'U1' THEN 4
+                WHEN 'U2'   THEN 5  WHEN 'U3' THEN 6   WHEN 'U4' THEN 7   WHEN 'S10b' THEN 8
+                WHEN 'F1'   THEN 9  WHEN 'F2' THEN 10  WHEN 'F3' THEN 11  WHEN 'S3' THEN 12
+                WHEN 'S5'   THEN 13 WHEN 'N1' THEN 14  WHEN 'N2' THEN 15  WHEN 'L1' THEN 16
+                ELSE 99 END                                                   AS ClassRank,
             rl.Outcome,
             rl.IsDormant,
             rl.ActiveLen,
@@ -129,16 +153,23 @@ BEGIN
             rl.ChainNetVar,
             rl.SellPrice,
             /* What the exception is WORTH, which is the column this report is
-               ranked by. On an A-class line it is the shortfall the paperwork
-               never covered; on a D1 it is the residual short that survives
-               balancing. Both at the price the shift was selling at. */
-            CONVERT(decimal(18,2), CASE
-                WHEN rl.ExceptionCode IN ('A1','A2') THEN
-                    CASE WHEN rl.QtyPOS - (rl.QtyOpen + rl.QtyIssued) > 0
-                         THEN (rl.QtyPOS - (rl.QtyOpen + rl.QtyIssued)) * ISNULL(rl.SellPrice, 0)
-                         ELSE (rl.QtyClose - (rl.QtyOpen + rl.QtyIssued)) * ISNULL(rl.SellPrice, 0) END
-                WHEN rl.ExceptionCode IN ('A3','A4') THEN rl.ChainNetVar * ISNULL(rl.SellPrice, 0)
-                WHEN rl.QtyVarNew < 0                THEN -rl.QtyVarNew * ISNULL(rl.SellPrice, 0)
+               ranked by, at the price the shift was selling at. The opening
+               the shift SHOULD have had is the counted one less the break. */
+            CONVERT(decimal(18,2), ISNULL(rl.SellPrice, 0) * CASE
+                WHEN rl.ExceptionCode IN ('S10a', 'S10b') THEN ABS(rl.ChainBreak)
+                WHEN rl.ExceptionCode = 'E1'  THEN ABS(rl.ChainNetVar)
+                WHEN rl.ExceptionCode = 'S1'  THEN rl.QtyVar + rl.ChainBreak
+                WHEN rl.ExceptionCode = 'U1'  THEN rl.QtyPOS   - (rl.QtyOpen - rl.ChainBreak + rl.QtyIssued)
+                WHEN rl.ExceptionCode = 'U2'  THEN rl.QtyClose - (rl.QtyOpen - rl.ChainBreak + rl.QtyIssued)
+                WHEN rl.ExceptionCode IN ('U3', 'U4') AND rl.ChainNetVar > 0 THEN rl.ChainNetVar
+                WHEN rl.ExceptionCode IS NOT NULL AND rl.QtyVarNew < 0 THEN -rl.QtyVarNew
+                /* A line here only for its audit code: what the hand
+                   balancing moved. */
+                WHEN rl.AuditCode IN ('S7', 'S8')
+                    THEN ABS(rl.QtyPOS - (ISNULL(rl.QtyOpenNow, rl.QtyOpen) + rl.QtyIssued - ISNULL(rl.QtyCloseNow, rl.QtyClose)))
+                WHEN rl.AuditCode = 'S11'           THEN ABS(ISNULL(rl.QtyCloseNow, rl.QtyClose) - rl.QtyClose)
+                WHEN rl.AuditCode IN ('S12', 'S13') THEN ABS(rl.ChainBreak)
+                WHEN rl.AuditCode IN ('S4a', 'S4b') THEN ABS(rl.QtyIssued - ISNULL(rl.QtyIssuedOrig, rl.QtyIssued))
                 ELSE 0 END)                                                   AS ExceptionValue
         FROM agora.StockReconRunLine rl
         LEFT JOIN agora.vw_StockArea   a ON a.BranchId = rl.BranchId AND a.AreaNo = rl.AreaNo
@@ -154,7 +185,7 @@ BEGIN
               AND se.TransactionDate = rl.TransactionDate
               AND se.ShiftNo         = rl.ShiftNo
               AND se.AreaNo          = rl.AreaNo
-        WHERE rl.ExceptionCode IS NOT NULL
+        WHERE (rl.ExceptionCode IS NOT NULL OR rl.AuditCode IS NOT NULL)
           AND (@RunId IS NULL OR rl.RunId = @RunId)
           AND (@AllBranches = 1 OR rl.BranchId IN (SELECT BranchId FROM @Branch))
           AND (@DateFrom IS NULL OR rl.TransactionDate >= @DateFrom)
@@ -176,18 +207,34 @@ BEGIN
                                    ELSE                      CASE WHEN base.POSCode         LIKE '%'+@fPos +'%' THEN 1 ELSE 0 END END) = 1)
       AND (@fEmp  IS NULL OR (CASE WHEN @fEmpOp  = 'eq' THEN CASE WHEN base.EmployeeNames   =        @fEmp       THEN 1 ELSE 0 END
                                    ELSE                      CASE WHEN base.EmployeeNames   LIKE '%'+@fEmp +'%' THEN 1 ELSE 0 END END) = 1)
-      AND (@fCodeAny = 0 OR base.ExceptionCode IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'ExceptionCode'));
+      AND (@fCodeAny  = 0 OR base.ExceptionCode IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'ExceptionCode'))
+      AND (@fAuditAny = 0 OR base.AuditCode     IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'AuditCode'))
+      AND (@fDate IS NULL OR 1 = CASE ISNULL(@fDateOp, 'eq')
+                WHEN 'ne'  THEN CASE WHEN base.TransactionDate <> @fDate THEN 1 ELSE 0 END
+                WHEN 'gt'  THEN CASE WHEN base.TransactionDate >  @fDate THEN 1 ELSE 0 END
+                WHEN 'gte' THEN CASE WHEN base.TransactionDate >= @fDate THEN 1 ELSE 0 END
+                WHEN 'lt'  THEN CASE WHEN base.TransactionDate <  @fDate THEN 1 ELSE 0 END
+                WHEN 'lte' THEN CASE WHEN base.TransactionDate <= @fDate THEN 1 ELSE 0 END
+                ELSE            CASE WHEN base.TransactionDate =  @fDate THEN 1 ELSE 0 END END)
+      AND (@fVal IS NULL OR 1 = CASE ISNULL(@fValOp, 'eq')
+                WHEN 'ne'  THEN CASE WHEN base.ExceptionValue <> @fVal THEN 1 ELSE 0 END
+                WHEN 'gt'  THEN CASE WHEN base.ExceptionValue >  @fVal THEN 1 ELSE 0 END
+                WHEN 'gte' THEN CASE WHEN base.ExceptionValue >= @fVal THEN 1 ELSE 0 END
+                WHEN 'lt'  THEN CASE WHEN base.ExceptionValue <  @fVal THEN 1 ELSE 0 END
+                WHEN 'lte' THEN CASE WHEN base.ExceptionValue <= @fVal THEN 1 ELSE 0 END
+                ELSE            CASE WHEN base.ExceptionValue =  @fVal THEN 1 ELSE 0 END END);
 
     SELECT
         Id, RunId, BranchId, AreaNo, AreaName, StockItemNo, ItemDescription, POSCode, StockLocation,
         EmployeeNames, EmployeeCount,
-        TransactionDate, ShiftNo, ExceptionCode, Outcome, IsDormant, ActiveLen,
+        TransactionDate, ShiftNo, ExceptionCode, AuditCode, Outcome, IsDormant, ActiveLen,
         QtyOpen, QtyIssued, QtyClose, QtyPOS, QtyVar, ChainNetVar, SellPrice, ExceptionValue
     FROM #Rows
     ORDER BY
         CASE WHEN @SortAsc = 1 THEN
             CASE @SortColumn
                 WHEN 'ExceptionCode'   THEN ExceptionCode
+                WHEN 'AuditCode'       THEN AuditCode
                 WHEN 'AreaName'        THEN AreaName
                 WHEN 'ItemDescription' THEN ItemDescription
                 WHEN 'POSCode'         THEN POSCode
@@ -198,6 +245,7 @@ BEGIN
         CASE WHEN @SortAsc = 0 THEN
             CASE @SortColumn
                 WHEN 'ExceptionCode'   THEN ExceptionCode
+                WHEN 'AuditCode'       THEN AuditCode
                 WHEN 'AreaName'        THEN AreaName
                 WHEN 'ItemDescription' THEN ItemDescription
                 WHEN 'POSCode'         THEN POSCode
@@ -212,8 +260,9 @@ BEGIN
         CASE WHEN @SortAsc = 1 AND @SortColumn = 'ExceptionValue'  THEN ExceptionValue END ASC,
         CASE WHEN @SortAsc = 0 AND @SortColumn = 'ExceptionValue'  THEN ExceptionValue END DESC,
         /* The default: worst class first, and inside a class the biggest money
-           first — which is the order somebody works the list in. */
-        ExceptionCode ASC, ExceptionValue DESC, AreaName, ItemDescription, TransactionDate, ShiftNo
+           first — which is the order somebody works the list in. Audit-only
+           lines follow the classed ones. */
+        ClassRank ASC, AuditCode ASC, ExceptionValue DESC, AreaName, ItemDescription, TransactionDate, ShiftNo
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 
     SELECT COUNT_BIG(*) AS TotalRows FROM #Rows;

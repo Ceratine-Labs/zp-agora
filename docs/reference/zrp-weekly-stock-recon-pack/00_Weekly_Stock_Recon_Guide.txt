@@ -1,0 +1,209 @@
+Weekly Stock Recon Process
+Set-up and operating guide - convenience sites and Baobab Inn
+For
+ | Sabrina Tieghi, Group Operations Executive - Convenience
+ | From
+ | Andries Geyser, CEO
+ | Date
+ | 23 September 2026
+ | First live week
+ | Week of 21-27 September 2026, run on Tuesday 29 September (the 14-20 September book is the baseline)
+ | 1. Purpose
+This pack lets you run the weekly stock recon investigation yourself, in your own Claude. You upload the week's PumpIT reports and get back the same master book that head office produced for 1-21 September. It gives a diagnosed reason for every recon line, the shift-level evidence, the standing controls, a live site scorecard and the control actions.
+Everything is built from PumpIT reports. The weekly Google Sheet (PumpIt Stock Recon Problem Items) is no longer used: its line list, balancing screen and last stock take dates are rebuilt from the same PumpIT data, so nothing is drawn out, pasted into a sheet and imported again.
+Ownership is as follows:
+Operations (you and your Business Manager) owns the outcome: the Monday presentation, the actions, discipline and training.
+Ruan is the investigator. He pulls the reports, runs the evidence and chases the sites under your direction. He supports the Monday meeting with evidence; he does not present in your place.
+Site managers explain every line and close it with a finding, within 48 hours.
+Finance tests storeroom overs against supplier statements, and no stock take over or reversal is posted without a reason.
+2. What is in the pack
+File
+ | What it is
+ | Where it goes
+ | 00_Weekly_Stock_Recon_Guide.docx
+ | This guide
+ | Keep; share with your BM and Ruan
+ | zrp-stock-recon-weekly.zip
+ | The Claude skill: the analysis engine, the rules and the scenario matrix
+ | Claude: Customize > Skills (upload the zip as it is - do not unzip)
+ | Project_Instructions.txt
+ | Standing instructions for the project
+ | Paste into the project's instructions
+ | Required_Reports.md
+ | The 12 PumpIT reports to export each week, and the date range
+ | Project knowledge, and for Ruan
+ | summary_14Sep-20Sep2026.json
+ | Baseline figures for 14-20 September
+ | Project knowledge (week-on-week comparison)
+ | ZRP_Stock_Recon_Master_Book_14Sep-20Sep2026.xlsx
+ | The baseline book, produced by this skill
+ | Reference: what a finished book looks like
+ | 3. One-time set-up (about 15 minutes)
+3.1 Enable code execution and skills
+The skill runs code, so code execution must be on. On ZRP's Team or Enterprise plan an organisation owner enables it under Organization settings > Plugins & skills: "Code execution and file creation", and "Skills". On an individual plan it is under Settings > Capabilities. If the Skills page is missing, ask IT to enable these two settings.
+3.2 Upload the skill
+In Claude, open Customize > Skills.
+Click "+", then "+ Create skill", then "Upload a skill".
+Select zrp-stock-recon-weekly.zip. Do not unzip it first.
+Make sure the skill is switched on.
+3.3 Create the project
+Open Projects and create a new project named "Stock Recon - Convenience".
+Open the project's instructions and paste in the full text of Project_Instructions.txt.
+Add Required_Reports.md and summary_14Sep-20Sep2026.json to the project knowledge.
+Each week, add that week's summary file to the project knowledge. Claude then compares each week with the one before.
+4. The weekly timetable
+Day
+ | What happens
+ | Who
+ | Monday
+ | Every recon item counted (QSR items daily). Stock takes posted the same day.
+Monday stock recon meeting: you present last week's book - outcomes, open lines, discipline and training.
+ | Sites / stock controllers
+You, with your BM; Ruan supports
+ | Tuesday, by 10:00
+ | Balancing completed for every site for the full week.
+ | Site managers
+ | Tuesday, by 12:00
+ | The 12 PumpIT reports exported (section 5).
+ | Ruan
+ | Tuesday afternoon
+ | Upload to the project and run. Check the data notes first. Send the book and the brief to the BMs and site managers.
+ | You (Ruan may prepare)
+ | Wednesday - Thursday
+ | Sites work the yellow columns. Anything not answered within 24 hours is escalated the same day.
+ | Site managers; Ruan chases; BM escalates
+ | Friday
+ | Review the scorecard and the open lines; prepare the Monday presentation.
+ | You, your BM and Ruan
+ | 5. The PumpIT reports
+All 12 reports are run from PumpIT, including the Aura and Pilot reports. No Google Sheet is used.
+When: Tuesday, after balancing is complete for every site for the whole week and Monday's stock takes are posted.
+Date range: from the Monday three weeks before the week under review, to the Monday after it (the count day). For the week of 21-27 September, export 31 August to 28 September. Report 3 is the exception: run it for the week under review only.
+File names: do not rename the exports. Claude finds each report by its name.
+#
+ | PumpIT report
+ | System
+ | Used for
+ | 1
+ | Stock Recon Detail - Amended & Original QTY
+ | All sites
+ | Every shift line, staff count and balanced; also the weekly line list and the balancing screen
+ | 2
+ | 1. Winbranch Stock Take Detail
+ | WinBranch
+ | Whole-site stock takes
+ | 3
+ | Stock Recon Items with last stock take date - Winbranch sites
+ | WinBranch
+ | Proves items counted with no variance; the only count date for Engen Manguzi
+ | 4
+ | 1. Omni Supplier Transactions Detail - CONV Shops
+ | WinBranch
+ | GRVs, invoices, credits
+ | 5
+ | DET Sales Profit Rpt - Category GP Loss Growth
+ | WinBranch
+ | Unit cost
+ | 6
+ | ALL SITES STOCK SOH COVER GP - Master (run on the day)
+ | WinBranch
+ | Last stock take date per item
+ | 7
+ | Conveneice - Raw Material Consumption
+ | WinBranch
+ | Recipe consumption against recon POS
+ | 8
+ | 1. Aura stk 01 stock take register allsites
+ | Aura (QSR)
+ | QSR counts
+ | 9
+ | Aura 09 supplier grv DETAILED purchases allsites
+ | Aura (QSR)
+ | QSR GRVs (potatoes and buns)
+ | 10
+ | Stock take VAR per product per day DETAIL
+ | Pilot (Baobab Inn)
+ | Daily counts off the prep sheet
+ | 11
+ | Purchases per day per supplier per product
+ | Pilot (Baobab Inn)
+ | Purchases
+ | 12
+ | Consumption per product per day ACT against THEO
+ | Pilot (Baobab Inn)
+ | Recipe (theoretical) consumption against recon POS
+ | 
+The issue multiples (pack size per recon item) are built into the skill. Head office sends an updated file when they change; attach it with the week's reports.
+6. Running the week
+Open the Stock Recon - Convenience project and start a new chat.
+Attach all the report files in one message.
+Type: "Run the weekly stock recon for the week of 21 to 27 September. Give me the master book and the brief for the Business Managers."
+Claude checks that every report is there, runs the analysis (1-3 minutes) and returns the book, a summary file and the brief.
+Read the data notes first. Any site-day held back as incomplete, or any site with no recon lines in the week, is a data problem to fix before the findings are sent.
+Download the summary file and add it to the project knowledge (section 3.3).
+Send the book and the brief to your Business Managers and site managers, with the due dates.
+7. Working the book
+Read the Findings tab first. The Site Scorecard updates as lines are closed. Site managers work the yellow columns on the registers:
+Tab
+ | Who works it
+ | What closes a line
+ | Item Register
+ | Site manager / stock controller
+ | A finding backed by evidence: the GRV, the count or the shift.
+ | Opening vs Closing
+ | Site manager
+ | The OPENING amended to the previous closing in PumpIT, with the reason. A closing changed to match is never accepted.
+ | Balancing Breaches
+ | Site manager
+ | The breach reversed and explained.
+ | Issue Sheet Failures
+ | Site manager
+ | The issue sheet produced, or the staff member accountable.
+ | Potatoes & Buns
+ | Site manager / key holder
+ | Every delivery issued in full on the day; the shortfall accounted for.
+ | Count Compliance / Count Recency
+ | Stock controller
+ | Items counted on Monday; items not counted for over 30 days counted now.
+ | Recipe vs Recon
+ | IT / master data
+ | The link or recipe fixed. This is not a loss.
+ | Control Actions
+ | You and your BM
+ | The action done, with the date.
+ | 
+Status: every line starts Open. Close a line only with a written finding: what actually happened, not an opinion. "GRV 16334 captured 90 instead of 100" is a finding; "counting error" is not. Anything not answered in 24 hours is set to "Escalated to Ops Exec" that day.
+8. The rules
+Recon variance = POS - (opening + issued - closing). Negative is short.
+Storeroom = site stock take - recon. A negative storeroom is a loss outside the recon (issue not written up, or the key holder). A positive storeroom is not a loss: it is an invoice, GRV or credit problem.
+The opening must equal the previous closing. Where it does not, amend the OPENING; never change a closing to match.
+In balancing, an over may reduce a short, but an over may never become a short, a short may never grow, and the latest closing count stands.
+An over within 10% of a whole pack is an uncaptured issue.
+Steers potatoes and buns are issued in full on the day of delivery: issue = GRV.
+Recipes already include yield. A shortfall is never peel or trim.
+The same item short at three or more sites points to a recipe, pack or link fault, not theft.
+Each site is analysed only up to its last complete recon day.
+No cause is stated without evidence. A consistent short is not a "wrong count" until a recount proves it.
+9. The Monday meeting
+You and your Business Manager present. Use the book's Site Scorecard and Control Actions tabs. Cover:
+For each site: lines to investigate, closed, still open, and the value at risk. Every site below 100% closed explains why.
+The outstanding-items register: every line still open from earlier weeks, with its owner and new date.
+Openings below the previous closing, and balancing breaches: explained, reversed, and who was accountable.
+Outcomes: staff charged, key holders held accountable, invoices and GRVs corrected, and the training given.
+Control actions: done, late, and what is needed from IT or Finance.
+10. When something goes wrong
+What you see
+ | What to do
+ | Claude says a report is missing
+ | Export it and attach it in the same chat. Check that the file name has not been changed.
+ | A site is held back for more than one day
+ | Balancing or the POS posting is incomplete. The site manager completes it; re-export the Stock Recon Detail and re-run.
+ | A site has no lines for the week
+ | The Stock Recon Detail was exported before the site balanced, or with the wrong date range. Re-export and re-run.
+ | Not-counted lines look too high
+ | Check that report 3 (last stock take date) was uploaded and run for the week under review. Report 2 leaves out counts with no variance.
+ | Claude states a cause without evidence
+ | Challenge it: ask for the GRV, the count or the shift that proves it. If there is none, the next step is a question to the site.
+ | The skill does not appear
+ | Code execution or skills is not enabled for your account (section 3.1).
+ | 

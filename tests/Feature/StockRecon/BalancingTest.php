@@ -199,29 +199,245 @@ class BalancingTest extends TestCase
     }
 
     /**
-     * A chain the source has already broken — an opening that is not the
-     * previous closing — is reported, never balanced. Redistributing along a
-     * path that does not exist is meaningless, and it is what made the method
-     * note's own dormant guard fire on real data.
+     * The client's rule 3 (ZRP weekly pack, 23 Sep 2026): the opening must
+     * equal the previous closing, and where it does not the OPENING is
+     * amended — the closing stands. Until then a break blocked the chain.
+     *
+     * Opening ABOVE the previous closing is S10b. The row is repaired to the
+     * closing before it, that closing is not moved by the balancing (the pack
+     * would flag it S12 if it were), and the chain still balances.
      */
-    public function test_a_broken_chain_is_reported_rather_than_balanced(): void
+    public function test_a_broken_chain_is_repaired_by_amending_the_opening(): void
     {
-        $this->db()->table('PumpIT.dbo.STK_StockReconLine')
-            ->where('SSBranchId', self::BRANCH)
-            ->where('StockItemNo', self::ITEM)
-            ->where('TransactionDate', '2026-07-19')
-            ->where('ShiftNo', 1)
-            // The opening no longer equals the 18th's closing.
-            ->update(['QtyOpen_Original' => 999, 'QtyOpen' => 999]);
+        $this->setCounts('2026-07-19', 1, ['QtyOpen_Original' => 999, 'QtyOpen' => 999]);
+
+        $run = $this->preview();
+        $lines = $run->lines->where('StockItemNo', self::ITEM)->keyBy(fn ($l) => $l->TransactionDate->toDateString().'/'.$l->ShiftNo);
+
+        $broken = $lines['2026-07-19/1'];
+        $before = $lines['2026-07-18/3'];
+
+        $this->assertTrue($broken->FlagChainBroken, 'The break was not noticed.');
+        $this->assertSame('S10b', $broken->ExceptionCode, 'An opening above the previous closing is the pack\'s S10b.');
+        $this->assertEqualsWithDelta(949.0, (float) $broken->ChainBreak, 0.005);
+        $this->assertFalse($broken->ChainBlocked, 'A break is repaired now, not blocked.');
+        $this->assertEqualsWithDelta(50.0, (float) $broken->QtyOpenNew, 0.005, 'The opening is amended to the previous closing.');
+        $this->assertTrue($broken->WouldAmend, 'The repair is written.');
+        $this->assertStringStartsWith('Opening repaired', $broken->Outcome);
+
+        $this->assertEqualsWithDelta((float) $before->QtyClose, (float) $before->QtyCloseNew, 0.005,
+            'The closing before a repaired opening stands — moving it is what the pack calls S12.');
+
+        // The invariant still holds, on the repaired total: every over goes to
+        // zero and the residual short is exactly the chain total.
+        $this->assertTrue($lines->every(fn ($l) => (float) $l->QtyVarNew <= 0.005));
+        $this->assertEqualsWithDelta(-5.0, $lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.001);
+        $this->assertEqualsWithDelta(-5.0, (float) $broken->ChainNetVar, 0.001,
+            'T is the repaired total: the break is not a loss or a gain, it is a capture error.');
+        $this->assertEqualsWithDelta(-5.0 - 949.0, $lines->sum(fn ($l) => (float) $l->QtyVar), 0.001,
+            'The counted variance still shows what the staff actually wrote down.');
+        $this->assertSame(1, (int) $run->fresh()->RepairedOpenings);
+    }
+
+    /**
+     * Opening BELOW the previous closing: stock vanished between two shifts,
+     * the pack's S10a and "the known manipulation route". The incoming shift
+     * carries it — the repair makes that shift shorter, and it is reported
+     * whatever the balancing then does.
+     */
+    public function test_an_opening_below_the_previous_closing_is_s10a_and_the_incoming_shift_carries_it(): void
+    {
+        $this->setCounts('2026-07-19', 1, ['QtyOpen_Original' => 40, 'QtyOpen' => 40]);
+
+        $run = $this->preview();
+        $line = $run->lines->where('StockItemNo', self::ITEM)
+            ->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-19' && $l->ShiftNo === 1);
+
+        $this->assertSame('S10a', $line->ExceptionCode);
+        $this->assertEqualsWithDelta(-10.0, (float) $line->ChainBreak, 0.005);
+        $this->assertEqualsWithDelta(50.0, (float) $line->QtyOpenNew, 0.005);
+        $this->assertEqualsWithDelta(0.0, (float) $line->QtyVar, 0.005, 'As counted, the shift looked balanced.');
+        $this->assertEqualsWithDelta(-5.0, (float) $line->ChainNetVar, 0.001,
+            'Repaired, the ten units that vanished are back in the chain total.');
+    }
+
+    /**
+     * The client's rule 5: an over within 10% of a whole issue multiple is an
+     * issue not written up. It is captured, never balanced away — so the chain
+     * is reported and the shift carries S1.
+     *
+     * The multiple comes from agora.StockIssueMultiple — head office's
+     * workbook — because PumpIT's own column is empty on the pack's sites.
+     */
+    public function test_an_over_of_a_whole_pack_is_reported_not_balanced(): void
+    {
+        $this->db()->table(config('agora.schema').'.StockIssueMultiple')->insert([
+            'BranchId' => self::BRANCH, 'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM,
+            'IssueMultiple' => 10, 'IsWeighed' => 0, 'Workbook' => 'TEST-multiples',
+        ]);
 
         $run = $this->preview();
         $lines = $run->lines->where('StockItemNo', self::ITEM);
 
-        $this->assertTrue($lines->contains(fn ($l) => $l->FlagChainBroken), 'The break was not noticed.');
-        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked), 'A chain is blocked WHOLE, never half balanced.');
-        $this->assertTrue($lines->every(fn ($l) => ! $l->WouldAmend), 'A blocked chain carries no proposal at all.');
-        $this->assertTrue($lines->every(fn ($l) => abs((float) $l->QtyVarNew - (float) $l->QtyVar) < 0.005),
-            'A blocked chain\'s "after" figures are its counted figures — anything else describes a world the press cannot produce.');
+        // 17 Jul shift 3 is over by exactly 10: one pack.
+        $pack = $lines->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-17' && $l->ShiftNo === 3);
+
+        $this->assertTrue($pack->FlagPackOver);
+        $this->assertSame('S1', $pack->ExceptionCode);
+        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked), 'A missing issue sheet blocks the chain whole.');
+        $this->assertTrue($lines->every(fn ($l) => ! $l->WouldAmend));
+    }
+
+    /**
+     * The pack's E1: the stock falls and the till shows next to nothing
+     * against it, so the selling PLU or recipe is not reducing this item.
+     * A false short — nobody is charged, and it is not balanced.
+     */
+    public function test_a_chain_with_no_till_sales_linked_is_e1_and_not_balanced(): void
+    {
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)->where('StockItemNo', self::ITEM)
+            ->update(['QtyComputer' => 0, 'QtyComputer_Original' => 0]);
+
+        $run = $this->preview();
+        $lines = $run->lines->where('StockItemNo', self::ITEM);
+
+        $this->assertTrue($lines->every(fn ($l) => $l->FlagNoPosLink));
+        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked));
+        $this->assertTrue($lines->every(fn ($l) => $l->ExceptionCode === 'E1'),
+            'E1 outranks the persistent-short class that would otherwise charge somebody.');
+    }
+
+    /**
+     * The client's rule 10: a site is analysed only up to its last complete
+     * recon day. Shift 3 is missing on the 21st, so the 21st is held back —
+     * not balanced, not written, counted on the run.
+     */
+    public function test_a_day_the_recon_has_not_finished_is_held_back(): void
+    {
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)->where('TransactionDate', '2026-07-21')->where('ShiftNo', 3)
+            ->delete();
+
+        $run = $this->preview()->fresh();
+
+        $this->assertSame('2026-07-20', $run->CompleteTo?->toDateString());
+        $this->assertSame(3, $run->HeldBackRows, 'Shifts 1 and 2 of the item and shift 1 of the dormant item.');
+        $this->assertTrue($run->lines->every(fn ($l) => $l->TransactionDate->toDateString() <= '2026-07-20'));
+    }
+
+    /**
+     * Somebody balanced by hand in PumpIT and turned an over into a short —
+     * the pack's S7. The run says so, proposes the balanced answer for that
+     * shift, and a live commit puts it back, leaving the chain in the source
+     * intact: every opening equal to the closing before it.
+     */
+    public function test_a_hand_amendment_the_rules_forbid_is_flagged_and_put_back(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live']);
+
+        // 17 Jul shift 3 counted +10 over; by hand its closing went to 45,
+        // which makes it 5 short.
+        $this->setCounts('2026-07-17', 3, ['QtyClose' => 45]);
+
+        $run = $this->preview();
+        $line = $run->lines->where('StockItemNo', self::ITEM)
+            ->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-17' && $l->ShiftNo === 3);
+
+        $this->assertSame('S7', $line->AuditCode, 'An over turned into a short by balancing is the pack\'s S7.');
+        $this->assertTrue($line->WouldAmend, 'The hand figure differs from the answer, so the row is proposed.');
+        $this->assertGreaterThan(0, (int) $run->fresh()->AuditRows);
+
+        $this->service->commit($run);
+
+        $chain = $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)->where('StockItemNo', self::ITEM)
+            ->orderBy('TransactionDate')->orderBy('ShiftNo')->get(['QtyOpen', 'QtyClose'])->values();
+
+        for ($i = 1; $i < $chain->count(); $i++) {
+            $this->assertEqualsWithDelta((float) $chain[$i - 1]->QtyClose, (float) $chain[$i]->QtyOpen, 0.005,
+                "After the commit the opening of row {$i} must equal the closing before it.");
+        }
+
+        $source = $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)->where('StockItemNo', self::ITEM)
+            ->where('TransactionDate', '2026-07-17')->where('ShiftNo', 3)->first();
+
+        $this->assertEqualsWithDelta((float) $line->QtyCloseNew, (float) $source->QtyClose, 0.005,
+            'The hand closing is replaced by the balanced one.');
+    }
+
+    /**
+     * The same breach on a chain Agora will NOT balance. It used to stay in
+     * PumpIT, because a blocked chain carried no proposal at all — on real data
+     * that was most chains. Now the chain is put back to the staff counts with
+     * every opening repaired (the pack's own staff basis), and is still not
+     * balanced: the whole-pack over that blocks it stands, and is reported.
+     */
+    public function test_a_forbidden_hand_amendment_on_a_blocked_chain_goes_back_to_the_count(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live']);
+
+        // Blocked: 17 Jul shift 3 is over by exactly one pack of 10 (S1).
+        $this->db()->table(config('agora.schema').'.StockIssueMultiple')->insert([
+            'BranchId' => self::BRANCH, 'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM,
+            'IssueMultiple' => 10, 'IsWeighed' => 0, 'Workbook' => 'TEST-multiples',
+        ]);
+
+        // And somebody balanced it away by hand, past nil into a short (S7).
+        $this->setCounts('2026-07-17', 3, ['QtyClose' => 45]);
+        $this->setCounts('2026-07-18', 1, ['QtyOpen' => 45]);
+
+        $run = $this->preview();
+        $lines = $run->lines->where('StockItemNo', self::ITEM);
+        $line = $lines->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-17' && $l->ShiftNo === 3);
+
+        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked), 'The pack over still blocks the chain.');
+        $this->assertSame('S7', $line->AuditCode);
+        $this->assertTrue($line->RestoresHand && $line->isWritable());
+        $this->assertEqualsWithDelta(60.0, (float) $line->QtyCloseNew, 0.005, 'Back to what the staff counted.');
+        $this->assertStringStartsWith('Hand amendment reversed', $line->Outcome);
+        $this->assertTrue($lines->every(fn ($l) => abs((float) $l->AmendClose) < 0.005), 'Reversed, not balanced.');
+
+        $this->service->commit($run);
+
+        $chain = $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)->where('StockItemNo', self::ITEM)
+            ->orderBy('TransactionDate')->orderBy('ShiftNo')->get()->values();
+
+        foreach ($chain as $i => $row) {
+            $this->assertEqualsWithDelta((float) $row->QtyClose_Original, (float) $row->QtyClose, 0.005,
+                "Row {$i}: every closing is the staff count again.");
+
+            if ($i > 0) {
+                $this->assertEqualsWithDelta((float) $chain[$i - 1]->QtyClose, (float) $row->QtyOpen, 0.005,
+                    "Row {$i}: every opening meets the closing before it.");
+            }
+        }
+    }
+
+    /**
+     * Agora never hands the client a new audit flag.
+     *
+     * At balancing somebody captured an issue of 10 on the last shift and
+     * raised its closing by the same to match, which the pack accepts as it
+     * stands (S4a, and S11 for the latest count). Agora writes counts, never
+     * issues: putting the latest count back would turn the shift's staff over
+     * into a short on the amended issue — S7, a flag that is not there today.
+     * So the chain is withdrawn, F3, and nothing is written.
+     */
+    public function test_a_chain_whose_write_would_trip_the_clients_audit_is_held_back(): void
+    {
+        $this->setCounts('2026-07-21', 3, ['QtyIssued' => 10, 'QtyClose' => 60]);
+
+        $run = $this->preview();
+        $lines = $run->lines->where('StockItemNo', self::ITEM);
+        $last = $lines->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-21' && $l->ShiftNo === 3);
+
+        $this->assertTrue($last->FlagAuditConflict);
+        $this->assertSame('F3', $last->ExceptionCode);
+        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked && ! $l->WouldAmend),
+            'The whole chain is held back — nothing on it is written.');
     }
 
     /** A window that ends over cannot be balanced by any amendment, so it is reported. */
@@ -241,8 +457,8 @@ class BalancingTest extends TestCase
 
         $this->assertTrue($lines->contains(fn ($l) => $l->FlagNetOver));
         $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked));
-        $this->assertTrue($lines->contains(fn ($l) => in_array($l->ExceptionCode, ['A1', 'A2', 'A3', 'A4'], true)),
-            'A net over is an unrecorded issue and belongs in the A classes.');
+        $this->assertTrue($lines->contains(fn ($l) => in_array($l->ExceptionCode, ['U1', 'U2', 'U3', 'U4'], true)),
+            'A net over is an unrecorded issue and belongs in the U classes.');
     }
 
     /** The counts are read from the _Original columns, so a re-run never compounds. */
@@ -330,12 +546,12 @@ class BalancingTest extends TestCase
     {
         $line = new StockReconRunLine;
         $line->FlagShortChain = true;
-        $line->ChainNetVar = -5.0;
+        $line->ChainNetVar = '-5.000';
 
         $this->assertFalse($line->isEmptyChain(),
             'One active shift with a short nobody can balance is the accountable case, not noise.');
 
-        $line->ChainNetVar = 0.0;
+        $line->ChainNetVar = '0.000';
         $this->assertTrue($line->isEmptyChain());
     }
 
@@ -444,6 +660,12 @@ class BalancingTest extends TestCase
      */
     public function test_a_second_run_will_not_stack_an_amendment_on_the_same_shift(): void
     {
+        // Journal, so PumpIT still differs from the answer and the second run
+        // proposes the same rows again. In live mode it would propose nothing:
+        // a row is proposed only where the answer differs from what PumpIT
+        // holds, which is asserted in the live idempotency test below.
+        config(['stockrecon.stamp_mode' => 'journal']);
+
         $first = $this->preview();
         $this->service->commit($first);
 
@@ -567,6 +789,8 @@ class BalancingTest extends TestCase
 
         $this->assertEqualsWithDelta($proposed, (float) $second->UnitsAmended, 0.001,
             'Reading the _Original columns is what makes this true; writing them would break it.');
+        $this->assertSame(0, (int) $second->AmendedRows,
+            'PumpIT already holds the answer, so there is nothing left to write.');
     }
 
     /**
@@ -863,6 +1087,17 @@ class BalancingTest extends TestCase
         )->load('lines');
     }
 
+    /** @param  array<string, float|int>  $counts */
+    private function setCounts(string $date, int $shift, array $counts): void
+    {
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::ITEM)
+            ->where('TransactionDate', $date)
+            ->where('ShiftNo', $shift)
+            ->update($counts);
+    }
+
     /** The four counts in the source, so a journal commit can be proved inert. */
     private function countsInSource(): string
     {
@@ -990,7 +1225,7 @@ class BalancingTest extends TestCase
 
         $schema = config('agora.schema');
 
-        foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun'] as $table) {
+        foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun', 'StockIssueMultiple'] as $table) {
             $db->table("{$schema}.{$table}")->where('BranchId', self::BRANCH)->delete();
         }
     }

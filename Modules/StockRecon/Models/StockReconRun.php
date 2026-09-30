@@ -38,6 +38,10 @@ use Illuminate\Support\Carbon;
  * @property string $NetOverUnits
  * @property string $NetOverValue
  * @property string $ShortValueAfter
+ * @property Carbon|null $CompleteTo
+ * @property int $HeldBackRows
+ * @property int $RepairedOpenings
+ * @property int $AuditRows
  * @property int|null $PreviewMs
  * @property Carbon|null $CommittedAt
  * @property int|null $CommittedBy
@@ -82,6 +86,10 @@ class StockReconRun extends BaseModel
         'ShortRowsAfter' => 'integer',
         'CommittedRows' => 'integer',
         'PreviewMs' => 'integer',
+        'HeldBackRows' => 'integer',
+        'RepairedOpenings' => 'integer',
+        'AuditRows' => 'integer',
+        'CompleteTo' => 'date',
         'FromDate' => 'date',
         'ToDate' => 'date',
         'CommittedAt' => 'datetime',

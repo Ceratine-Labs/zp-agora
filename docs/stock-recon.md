@@ -83,18 +83,91 @@ opening and closing stay equal **to each other**, not that they stay at their
 original values — the opening *is* the previous closing, so pinning it would
 break the chain.
 
-### `FlagChainBroken` — ours, and not in the method note
+### `FlagChainBroken` — a repair since 30 Sep 2026, no longer a block
 
 The method rests on `Open(i) = Close(i−1)`. On branch 18's August, **880 of
-14,483 lines break that in the SOURCE**: the opening simply is not the previous
-closing. Redistributing a quantity along a path that does not exist is
-meaningless, and it is also what made the note's own dormant guard fire 144
-times on the first real run.
+14,483 lines break that in the SOURCE**. Until 30 Sep 2026 a break blocked the
+whole chain. The client's rule 3 settles it the other way: the **opening** is
+amended to the previous closing and the closing stands, so every test and the
+balancing now read the repaired opening, the closing before a repair is pinned,
+and the break is reported (S10a / S10b). The dormant guard that fired on broken
+chains reads the repaired opening too, so it still holds.
 
-Measured 8 September 2026, and the number that settles it: **of the 64 chains
-where the dormant guard fired, zero had an intact chain.** Blocking a broken
-chain takes the guard to zero and the invariant then holds to the fourth
-decimal.
+---
+
+## The client's rules (ZRP weekly pack, 23 Sep 2026)
+
+On 23 Sep 2026 ZRP's CEO issued the *Weekly Stock Recon Process* pack to the
+Group Operations Executive: a guide, the rules, a scenario matrix and a Python
+engine she runs in her own Claude every Tuesday against twelve PumpIT reports.
+Its master book audits the balancing in PumpIT — including Agora's — so the
+module follows its rules exactly. The pack itself, engine included, is in
+[`docs/reference/zrp-weekly-stock-recon-pack/`](reference/zrp-weekly-stock-recon-pack/README.md).
+Where each rule lands:
+
+| Pack rule | In Agora |
+|---|---|
+| 1. Variance = POS − (opening + issued − closing) | Unchanged. |
+| 3. Opening must equal the previous closing; amend the **opening**, never the closing | A break is **repaired**, not blocked: `QtyOpenNew` = the previous closing (the shift before the window for the first row). The closing before a repaired opening is **pinned** — the chain is balanced in segments split at each repair — because the pack flags any moved previous closing at a break as S12. Reported as **S10a** (opening below: stock vanished) or **S10b** (above). |
+| 4. Over → nil, never a short; a short never grows; the latest closing stands | Unchanged — it is what the reverse running maximum already did. The last active shift of each segment is pinned. |
+| 5. An over within 10% of a whole issue multiple is an issue not written up | **S1**, blocks the chain: captured, never balanced away. Multiples come from `agora.StockIssueMultiple` (head office's workbook, seeded by `IssueMultipleSeeder`), falling back to `vw_StockItem.IssueMultiple` — PumpIT's column is ≥ 2 on 1 of 2,433 items at the pack's sites. |
+| 10. Analyse a site only up to its last complete recon day | Stage 0 of the preview. A day is complete when every shift the site normally runs carries ≥ 95% of its normal lines with ≥ half its normal share of closings, and POS is posted on ≥ half the normal share. The first incomplete day and everything after it is **held back** (`CompleteTo`, `HeldBackRows`). Option `HoldBackIncomplete`, default on. |
+| E1. Stock falling with no till sales linked is a system fault | **E1**, blocks the chain: T < −max(3, pack) over 2+ days with Σ POS ≤ 10% of \|T\|. Nobody is charged. |
+| S7, S8, S11, S12, S13, S4/S4a/S4b — the audit of hand balancing | `AuditCode` on every line: what the balancing **already in PumpIT** did against the rules, measured the pack's way (original counts, opening repaired to the original previous closing, fat-finger issues neutralised). |
+| 12. Virtual lines are not stock | Already excluded by `AreaGroup = 'Virtual Items'`; on the pack's sites that is exactly the "Lotto/Electricity/Airtime" area it names. |
+
+**A commit reverses the hand amendments the client's rules forbid** — Ryan's
+answer, 30 Sep 2026: "Yes, as built", and "follow the client's request". Three
+parts:
+
+* **A row is proposed where its answer differs from what PumpIT holds now**, not
+  from the original counts, so on a balanceable chain every hand figure is
+  replaced by the balanced one and the chain in PumpIT is left intact. The
+  commit re-checks the live pair as well as the counted one.
+* **A blocked chain that carries S7, S8, S11, S12 or S13 is put back to the staff
+  counts** (`RestoresHand`, outcome "Hand amendment reversed"): every closing as
+  counted, every opening repaired to the previous closing — the pack's own staff
+  basis. It is **not** balanced; the reason it is blocked still stands. Before
+  this, a blocked chain carried no proposal and the breach stayed in PumpIT —
+  190 of 255 chains on Bethlehem.
+* **Agora never hands the client a new flag** (`FlagAuditConflict`, class **F3**).
+  Every chain about to be written is audited as it would stand afterwards, check
+  by check; if any shift would trip a check it does not trip today, the chain is
+  withdrawn. On real data every such chain had an **issue** changed at balancing
+  with a count moved to match. Agora writes counts, never issues (`QtyIssued` is
+  not a named write), and with that edit in place no set of counts passes every
+  check — so it is left for the site, and reported.
+
+Measured, Engen Bethlehem 1–29 Sep on the local copy, preview → commit →
+preview: forbidden hand amendments 141 → 53 (S12 86 → 22, S13 11 → 2, S11
+15 → 6, S7 27 → 22, S8 2 → 1); 819 shifts written; **0** new S7/S8 created; 0
+breaks left on any chain the commit wrote (breaks in the copy 80 → 43, all 43
+on chains it did not touch). All 53 left are on 22 F3 chains, every one with an
+issue edited at balancing. Two tolerances: counts are compared at 0.0005 (a
+weighed item's 8.355 against 8.350 is a break), variances at 0.005.
+
+**The codes are the pack's where the pack defines the test** (S1, S3, S5, S10a,
+S10b, E1; S4–S13 on the audit). Ours moved to letters the pack does not use —
+U unrecorded issue, F data fault, N not counted, L loss — because the pack's
+A–D are storeroom scenarios with other meanings: its A1 is "confirmed loss,
+charge the staff", ours was "a missing issue sheet". `v1__14e` relabelled the
+recorded runs.
+
+**Not in Agora yet**, and why: the pack's storeroom side (whole-site stock take
+vs recon — A1–D4, RV, NC, E2, E3), potatoes and buns issued on receipt, count
+compliance and recency, recipe vs recon, the scorecard and control actions. All
+of it needs sources the module does not read — WinBranch stock takes
+(`DBF_INVHISTF_STOCKTAKE`), the Aura stk 01 register, Pilot counts, Omni and
+Aura GRVs, raw material consumption. Filed in the PM inbox.
+
+**Measured on real data**, 30 Sep 2026: Engen Bethlehem (branch 23), 1–21 Sep,
+8,520 shift lines in 3.5 s. Openings below the previous closing 44 / R-7,335 —
+the same as a direct count on PumpIT, and the pack's baseline says 46 / R-7,398
+(the data has moved since 23 Sep). S4a 136 against the pack's 144 (a line
+carries one audit code, so S12/S7 take some). 65 of 255 chains balanceable; of
+the 190 reported, 90 have too few active shifts, 57 closed holding more than
+they received (U2), 16 are whole-pack overs (S1), 16 sold more than they held
+(U1), and 5 are blocked only because a segment ends over.
 
 ---
 
@@ -112,6 +185,7 @@ decimal.
 | `agora.StockReconRun` | One press of Preview: window, caps, procedure, and the before/after shape. |
 | `agora.StockReconRunLine` | One shift of one item: counted, balanced, every flag, the tick. |
 | `agora.StockReconAmendment` | What a commit did, with the PRIOR counts. This is what makes a reversal exact. |
+| `agora.StockIssueMultiple` | Head office's pack size per (branch, area, item). Rule 5 reads it. |
 
 **The preview WRITES, unlike every other preview in Agora.** A branch-month is
 fifteen thousand shift lines, which as a chunked multi-row INSERT from PHP is
@@ -216,22 +290,36 @@ by how much, on whose authority, or what they were before.
 ## The exception classes
 
 Ranked most serious first, which is also the order the report comes in. A line
-that satisfies several tests is reported under the first it trips, so an
-unrecorded issue is never filed as a counting habit.
+that satisfies several tests is reported under the first it trips. Every test
+reads the **repaired** opening. `config('stockrecon.exceptions')` carries the
+same list with the wording the screen uses.
 
-| | | |
-|---|---|---|
-| **A1** | Unrecorded issue, proven | `POS > Open + Issued` |
-| **A2** | Closing exceeds what was on hand | `Close > Open + Issued` |
-| **A3** | Selling with no issues captured at all | `Σ Issued = 0 and Σ POS > 0 and T > 0` |
-| **A4** | Net over for the window | `T > 0` |
-| **B1** | Data fault | a count below zero, or a correction larger than the caps allow |
-| **B2** | Issue went nowhere | `Open = Close and Issued > 0 and POS = 0` |
-| **C1** | No physical count taken | `Close = Open and Issued = 0 and POS > 0`, on more than half the active shifts |
-| **C2** | Mostly dormant | dormant on more than half of six or more shifts |
-| **D1** | Persistent short — accountable | short on more than half of six or more ACTIVE shifts |
+| | | | |
+|---|---|---|---|
+| **S10a** | Opening below the previous closing | `Open < Close(i−1)` | repaired |
+| **E1** | No till sales linked | `T < −max(3, pack)`, 2+ days, `Σ POS ≤ 10% of \|T\|` | blocks |
+| **S1** | Over of a whole pack | over within 10% of k × multiple | blocks |
+| **U1** | Unrecorded issue, proven | `POS > Open + Issued` | blocks |
+| **U2** | Closing exceeds what was on hand | `Close > Open + Issued` | blocks |
+| **U3** | Selling with no issues captured at all | `Σ Issued = 0 and Σ POS > 0` and a segment over | blocks |
+| **U4** | Net over | a segment's `T > 0` | blocks |
+| **S10b** | Opening above the previous closing | `Open > Close(i−1)` | repaired |
+| **F1** | Data fault | a count below zero, or a correction larger than the caps allow | blocks |
+| **F2** | Issue went nowhere | `Open = Close and Issued > 0 and POS = 0` | blocks |
+| **F3** | Audit conflict — issue changed at balancing | writing the chain would trip S7/S8/S11/S12/S13 on a shift that trips none of them today | blocks |
+| **S3** | Short of a whole pack | short after balancing within 10% of k × multiple | — |
+| **S5** | Issue not in whole packs | `Issued mod multiple ≠ 0` | — |
+| **N1** | No physical count taken | `Close = Open and Issued = 0 and POS > 0`, on more than half the active shifts | — |
+| **N2** | Mostly dormant | dormant on more than half of six or more shifts | — |
+| **L1** | Persistent short — accountable | short on more than half of six or more ACTIVE shifts | — |
 
-**Dormant shifts are out of every denominator.** C1, C2 and D1 count against
+And, separately, the **audit** of what the hand balancing already in PumpIT did
+(`AuditCode`, `config('stockrecon.audit')`): S13 mismatch still open, S12
+mismatch fixed by moving the previous closing, S7 over turned into a short, S8
+short increased, S11 latest closing amended (only when the window reaches the
+data's end), S4 issue mis-keyed, S4a issue added at balancing, S4b issue reduced.
+
+**Dormant shifts are out of every denominator.** N1, N2 and L1 count against
 ACTIVE shifts, never raw line count. A chain where nine of twelve shifts never
 traded is not "short a quarter of the time" — it is short on one of three real
 shifts, and the rate that goes to a branch has to say so.
@@ -246,7 +334,7 @@ reconciled as stock, on the same reasoning that keeps fuel out of the pack.
 
 ## Running it
 
-1. **Exception report first, on a full month.** Clear the A-class items. The
+1. **Exception report first, on a full month.** Clear the S10a, E1, S1 and U items. The
    unrecorded issues are worth more than the balancing is.
 2. **Preview one area**, caps tight — try `MaxAmendmentPct = 0.50`. Read the
    Outcome column and compare a few chains against what the admin would do.
@@ -261,9 +349,9 @@ reconciled as stock, on the same reasoning that keeps fuel out of the pack.
   be an artefact of where the window starts. Run at least a full stock cycle
   before treating `T > 0` as a finding.
 * **A blocked chain is blocked whole**, so a chain is never half balanced around
-  a fault — and a blocked chain carries **no proposal at all**: its "after"
-  figures are its counted figures, because anything else describes a world the
-  press cannot produce.
+  a fault — and a blocked chain carries **no proposal at all**, not even its
+  opening repairs: its "after" figures are its counted figures, because anything
+  else describes a world the press cannot produce.
 * **Balancing and capturing an issue are different acts.** Amending a closing
   redistributes variance; amending an issue or a POS quantity changes T. The
   second is often correct, but recording it as balancing makes the
@@ -275,7 +363,7 @@ reconciled as stock, on the same reasoning that keeps fuel out of the pack.
   method places the residual where the counts put it and moves counts as little
   as possible, which is the most defensible rule available — but the invariant
   means that if the total is R500, somebody carries R500. Before a balanced
-  figure is used to charge anybody, the C1 list should be clear for that item: a
+  figure is used to charge anybody, the N1 list should be clear for that item: a
   shift that never counted cannot support a charge on the shift next to it.
 * ~~**The cashier is not in the recon line.**~~ **It is** — corrected
   9 September 2026. `dbo.STK_StockReconEmployees` is keyed on
@@ -285,7 +373,7 @@ reconciled as stock, on the same reasoning that keeps fuel out of the pack.
   preview resolves it once and stores it on the line, so the proposals table,
   the chain drill, the exception report and the extract all name the person.
 
-  **D1 can now name somebody, and that raises the bar rather than lowering it.**
+  **L1 can now name somebody, and that raises the bar rather than lowering it.**
   90 of those 1,138 shifts had more than one person signed on, up to three. A
   short on a shared shift cannot be attributed to either of them, so the count
   travels beside the names and every screen says so. Collapsing the list to one

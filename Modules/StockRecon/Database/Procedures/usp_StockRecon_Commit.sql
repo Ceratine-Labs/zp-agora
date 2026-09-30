@@ -32,9 +32,16 @@
  * all.
  *
  * IT RE-CHECKS EVERY ROW FIRST. A preview is a photograph; between the press
- * and the read somebody may have counted again. Any row whose source counts no
- * longer match what the preview saw is SKIPPED and says so, rather than being
- * overwritten with an amendment derived from figures that have gone.
+ * and the read somebody may have counted again, or balanced by hand. Any row
+ * whose counts — the pair the preview worked from, or the pair PumpIT held —
+ * no longer match what the preview saw is SKIPPED and says so, rather than
+ * being overwritten with an amendment derived from figures that have gone.
+ *
+ * WHAT IT WRITES follows the client's rules (docs/stock-recon.md): openings
+ * repaired to the previous closing, closings before a repair and the latest
+ * closing left standing, and — because a row is proposed wherever its answer
+ * differs from PumpIT — a hand amendment the rules do not produce put back.
+ * Every write keeps the row's PRIOR pair, so a reversal restores it exactly.
  *
  * @UseOriginalCounts must be the value the PREVIEW ran with, because it decides
  * which pair of columns the re-check compares against. It is replayed from the
@@ -93,6 +100,7 @@ BEGIN
     SELECT
         rl.Id, rl.[LineNo], rl.AreaNo, rl.StockItemNo, rl.TransactionDate, rl.ShiftNo,
         rl.QtyOpen, rl.QtyClose, rl.QtyOpenNew, rl.QtyCloseNew,
+        rl.QtyOpenNow, rl.QtyCloseNow,
         CONVERT(nvarchar(200), NULL) AS SkipReason
     INTO #cand
     FROM agora.StockReconRunLine rl
@@ -100,7 +108,10 @@ BEGIN
       AND rl.RunId       = @RunId
       AND rl.Selected    = 1
       AND rl.WouldAmend  = 1
-      AND rl.ChainBlocked = 0
+      /* A blocked chain is written only to REVERSE a hand amendment the
+         client's rules forbid, back to the staff counts — never balanced
+         (usp_StockRecon_PreviewBalancing, stage 7d). */
+      AND (rl.ChainBlocked = 0 OR rl.RestoresHand = 1)
       AND rl.CommitState = 'pending';
 
     IF NOT EXISTS (SELECT 1 FROM #cand)
@@ -130,6 +141,24 @@ BEGIN
                         THEN l.QtyOpen_Original  ELSE l.QtyOpen  END, 0)) - c.QtyOpen)  > @eps
             OR ABS(CONVERT(decimal(18,4), ISNULL(CASE WHEN @UseOriginalCounts = 1
                         THEN l.QtyClose_Original ELSE l.QtyClose END, 0)) - c.QtyClose) > @eps));
+
+    /* AND THE LIVE PAIR. Since v1__14pf a row is proposed because its answer
+       differs from what PumpIT holds NOW, which is what lets a commit put back
+       a hand amendment the rules do not produce. So a hand edit made between
+       the preview and the press is a different starting point, and the row
+       is re-previewed rather than written over it. A run made before v1__14pf
+       recorded no live pair and is checked as it always was. */
+    UPDATE c SET SkipReason = 'The counts on this shift were edited in PumpIT since the preview.'
+    FROM #cand c
+    WHERE c.SkipReason IS NULL
+      AND c.QtyOpenNow IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM agora.vw_StockReconLine l
+        WHERE l.BranchId = @BranchId
+          AND CONVERT(date, l.TransactionDate) = c.TransactionDate
+          AND l.ShiftNo = c.ShiftNo AND l.AreaNo = c.AreaNo AND l.StockItemNo = c.StockItemNo
+          AND (ABS(CONVERT(decimal(18,4), ISNULL(l.QtyOpen,  0)) - c.QtyOpenNow)  > @eps
+            OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyClose, 0)) - c.QtyCloseNow) > @eps));
 
     /* This shift already carries an amendment nobody has reversed. Two live
        amendments on one row means two "prior" values and no way to know which

@@ -1,0 +1,259 @@
+{
+ "week": "14-20 September 2026",
+ "period": "1-21 September 2026",
+ "prepared": "23 September 2026",
+ "book": "ZRP_Stock_Recon_Master_Book_14Sep-20Sep2026.xlsx",
+ "cutoff": {
+  "Baobab Convenience Centre": "21 Sep",
+  "Baobab Inn": "21 Sep",
+  "Captains Convenience Centre": "21 Sep",
+  "Engen Bethlehem One Plus": "21 Sep",
+  "Engen Manguzi": "21 Sep",
+  "Ngwenya Service Station": "21 Sep",
+  "Nyala One Stop": "20 Sep",
+  "Theku Plaza (Cygnisol)": "21 Sep",
+  "Total Hluhluwe": "20 Sep"
+ },
+ "held_back": [
+  {
+   "site": "Ngwenya Service Station",
+   "first": "22 Sep",
+   "last": "22 Sep"
+  },
+  {
+   "site": "Nyala One Stop",
+   "first": "21 Sep",
+   "last": "21 Sep"
+  },
+  {
+   "site": "Total Hluhluwe",
+   "first": "21 Sep",
+   "last": "21 Sep"
+  }
+ ],
+ "week_lines": 1492,
+ "week_to_explain": 877,
+ "buckets": {
+  "Balanced": {
+   "lines": 615,
+   "value_selling": 184.0
+  },
+  "Capture error": {
+   "lines": 1,
+   "value_selling": 9114.0
+  },
+  "Loss at recon point": {
+   "lines": 23,
+   "value_selling": 1942.0
+  },
+  "Not counted": {
+   "lines": 398,
+   "value_selling": 10662.0
+  },
+  "Paperwork - recon not confirmed": {
+   "lines": 78,
+   "value_selling": 44530.0
+  },
+  "Reversal vs last week": {
+   "lines": 36,
+   "value_selling": 3706.0
+  },
+  "Storeroom loss": {
+   "lines": 169,
+   "value_selling": 49064.0
+  },
+  "Storeroom over / invoices": {
+   "lines": 148,
+   "value_selling": 37450.0
+  },
+  "System fault": {
+   "lines": 5,
+   "value_selling": 1679.0
+  },
+  "Virtual line": {
+   "lines": 19,
+   "value_selling": 190.0
+  }
+ },
+ "storeroom_loss_by_site": {
+  "Nyala": 12034.0,
+  "Baobab Inn": 11734.0,
+  "Baobab CC": 11693.0,
+  "Total Hluhluwe": 5618.0,
+  "Theku Plaza": 5268.0,
+  "Engen Bethlehem": 1332.0,
+  "Ngwenya": 871.0,
+  "Engen Manguzi": 468.0,
+  "Captains": 46.0
+ },
+ "not_counted": {
+  "Baobab CC": "16 of 221",
+  "Baobab Inn": "5 of 112",
+  "Captains": "88 of 138",
+  "Engen Bethlehem": "18 of 203",
+  "Engen Manguzi": "13 of 87",
+  "Ngwenya": "1 of 121",
+  "Nyala": "110 of 277",
+  "Theku Plaza": "58 of 197",
+  "Total Hluhluwe": "89 of 136"
+ },
+ "period_site_count_cost": -45611.0,
+ "period_recon_balanced_cost": 5341.0,
+ "openings_below_previous_closing": {
+  "shifts": 610,
+  "value": -70442.0,
+  "repair": {
+   "Both changed": {
+    "n": 112,
+    "value": -9859.0
+   },
+   "Correct - opening amended": {
+    "n": 80,
+    "value": -6389.0
+   },
+   "Still open after balancing": {
+    "n": 25,
+    "value": -12579.0
+   },
+   "WRONG - previous closing changed": {
+    "n": 393,
+    "value": -41616.0
+   }
+  },
+  "by_site": {
+   "Nyala": {
+    "n": 172,
+    "value": -37303.0
+   },
+   "Total Hluhluwe": {
+    "n": 239,
+    "value": -12423.0
+   },
+   "Engen Bethlehem": {
+    "n": 46,
+    "value": -7398.0
+   },
+   "Ngwenya": {
+    "n": 62,
+    "value": -5855.0
+   },
+   "Theku Plaza": {
+    "n": 23,
+    "value": -3180.0
+   },
+   "Captains": {
+    "n": 50,
+    "value": -2980.0
+   },
+   "Baobab CC": {
+    "n": 10,
+    "value": -872.0
+   },
+   "Engen Manguzi": {
+    "n": 4,
+    "value": -268.0
+   },
+   "Baobab Inn": {
+    "n": 4,
+    "value": -163.0
+   }
+  }
+ },
+ "balancing": {
+  "over_to_short": {
+   "n": 172,
+   "value": -10689.0
+  },
+  "short_increased": {
+   "n": 38,
+   "value": -18310.0
+  },
+  "latest_closing_changed": 124,
+  "by_site": {
+   "Nyala": {
+    "n": 133,
+    "value": -25118.0
+   },
+   "Engen Bethlehem": {
+    "n": 23,
+    "value": -1722.0
+   },
+   "Baobab Inn": {
+    "n": 21,
+    "value": -708.0
+   },
+   "Baobab CC": {
+    "n": 1,
+    "value": -540.0
+   },
+   "Theku Plaza": {
+    "n": 19,
+    "value": -478.0
+   },
+   "Engen Manguzi": {
+    "n": 6,
+    "value": -173.0
+   },
+   "Total Hluhluwe": {
+    "n": 3,
+    "value": -140.0
+   },
+   "Ngwenya": {
+    "n": 4,
+    "value": -120.0
+   }
+  }
+ },
+ "issues_added_at_balancing": {
+  "n": 449,
+  "value": 92142.0,
+  "by_site": {
+   "Theku Plaza": 203,
+   "Engen Bethlehem": 144,
+   "Baobab CC": 3,
+   "Nyala": 29,
+   "Total Hluhluwe": 14,
+   "Ngwenya": 46,
+   "Engen Manguzi": 9,
+   "Captains": 1
+  }
+ },
+ "potatoes": [
+  {
+   "site": "Baobab CC",
+   "compliance": "0 of 6 deliveries",
+   "received": 600.0,
+   "issued": 317.0,
+   "site_count": -256.0
+  },
+  {
+   "site": "Theku Plaza",
+   "compliance": "0 of 6 deliveries",
+   "received": 596.0,
+   "issued": 332.0,
+   "site_count": -204.0
+  },
+  {
+   "site": "Total Hluhluwe",
+   "compliance": "0 of 5 deliveries",
+   "received": 480.0,
+   "issued": 326.0,
+   "site_count": -135.0
+  }
+ ],
+ "recipe": {
+  "items": 298,
+  "item_days": 6146,
+  "match": 5881,
+  "items_disagree": 38
+ },
+ "stale_counts_over_16_days": {
+  "Baobab CC": 1,
+  "Captains": 5,
+  "Engen Bethlehem": 4,
+  "Ngwenya": 4,
+  "Nyala": 5,
+  "Theku Plaza": 3
+ },
+ "control_actions": 41
+}

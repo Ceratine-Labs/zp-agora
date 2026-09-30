@@ -85,11 +85,19 @@ BEGIN
         /* WHY it is blocked, named rather than left for the reader to work out
            from ten bits. First one wins, most serious first — the same order
            the exception classes are ranked in. */
+        MAX(CASE WHEN rl.FlagPackOver           = 1 THEN 'A shift is over by a whole pack: an issue not written up' END) AS BlockPackOver,
+        MAX(CASE WHEN rl.FlagNoPosLink          = 1 THEN 'Stock falls with no till sales against it: a PLU or recipe link fault' END) AS BlockNoPosLink,
         MAX(CASE WHEN rl.FlagSoldMoreThanOnHand = 1 THEN 'A shift sold more than it could hold'        END) AS BlockSoldMore,
         MAX(CASE WHEN rl.FlagCloseExceedsOnHand = 1 THEN 'A shift closed holding more than it received' END) AS BlockCloseExceeds,
         MAX(CASE WHEN rl.FlagNetOver            = 1 THEN 'The window as a whole is over'                END) AS BlockNetOver,
-        MAX(CASE WHEN rl.FlagChainBroken        = 1 THEN 'An opening is not the previous closing'       END) AS BlockChainBroken,
+        /* NOT a block since v1__14pf — the client's rule 3 repairs a break by
+           amending the opening. Kept, under its old name, so the panel can say
+           how many openings the balancing repairs. */
+        SUM(CONVERT(int, rl.FlagChainBroken))                AS RepairedOpenings,
+        SUM(CASE WHEN rl.AuditCode IS NOT NULL THEN 1 ELSE 0 END) AS AuditShifts,
+        MAX(rl.IssueMultiple)                               AS IssueMultiple,
         MAX(CASE WHEN rl.FlagIssueWentNowhere   = 1 THEN 'An issue went nowhere'                        END) AS BlockIssueNowhere,
+        MAX(CASE WHEN rl.FlagAuditConflict      = 1 THEN 'Writing it would trip the client''s audit: an issue was changed at balancing' END) AS BlockAuditConflict,
         MAX(CASE WHEN rl.FlagBigAmendment       = 1 THEN 'A correction exceeds the unit cap'            END) AS BlockBigAmendment,
         MAX(CASE WHEN rl.FlagPctAmendment       = 1 THEN 'A correction exceeds the share cap'           END) AS BlockPctAmendment,
         MAX(CASE WHEN rl.FlagNegativeClose      = 1 THEN 'Balancing would drive a closing below zero'   END) AS BlockNegativeClose,
@@ -134,7 +142,16 @@ BEGIN
         CONVERT(decimal(18,2), rl.QtyVarNew * ISNULL(rl.SellPrice, 0)) AS VarValueNew,
         rl.SellPrice,
         rl.ExceptionCode,
+        rl.AuditCode,
         rl.Outcome,
+        /* The rule-3 repair on this row: the closing it had to meet, and by
+           how much the counted opening missed it. */
+        rl.PrevClose,
+        rl.ChainBreak,
+        /* What PumpIT held when the run was made, so a hand amendment the
+           commit puts back is visible beside the count it goes back to. */
+        rl.QtyOpenNow,
+        rl.QtyCloseNow,
         /* THE BUG RYAN SAW, 9 September 2026: the header above resolves the
            item by joining the master, and these rows resolved nothing — so a
            run made before v1__14a named the product at the top and showed an

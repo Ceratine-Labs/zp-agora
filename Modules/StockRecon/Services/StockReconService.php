@@ -59,6 +59,17 @@ class StockReconService
     }
 
     /**
+     * The client's audit of hand balancing already in PumpIT (S7, S8, S11,
+     * S12, S13, S4 …), in the order a line is given one.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function auditChecks(): array
+    {
+        return config('stockrecon.audit');
+    }
+
+    /**
      * The counting areas, for the picker.
      *
      * EVERY SITE'S AREAS AT ONCE, tagged with the branch they belong to, and
@@ -313,8 +324,10 @@ class StockReconService
         return $lines()
             // Only a row the commit could actually honour may be ticked. A tick
             // on anything else would be a promise the commit has to break.
+            // A blocked chain qualifies only where it is being put back to the
+            // staff counts (StockReconRunLine::isWritable()).
             ->where('WouldAmend', true)
-            ->where('ChainBlocked', false)
+            ->where(fn ($q) => $q->where('ChainBlocked', false)->orWhere('RestoresHand', true))
             ->where('CommitState', 'pending')
             ->whereIn('Id', $lineIds)
             ->update(['Selected' => true]);
@@ -342,7 +355,7 @@ class StockReconService
             ->where('BranchId', $run->BranchId)
             ->where('RunId', $run->Id)
             ->where('WouldAmend', true)
-            ->where('ChainBlocked', false)
+            ->where(fn ($q) => $q->where('ChainBlocked', false)->orWhere('RestoresHand', true))
             ->where('CommitState', 'pending')
             ->update(['Selected' => true]);
     }

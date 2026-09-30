@@ -28,7 +28,7 @@
 @php
     $tones = [
         'balanced' => 'is-matched', 'short' => 'is-warn', 'blocked' => 'is-serious',
-        'unrecorded' => 'is-crit', 'dormant' => '', 'clean' => '',
+        'restored' => 'is-warn', 'unrecorded' => 'is-crit', 'dormant' => '', 'clean' => '',
     ];
 
     /*
@@ -44,6 +44,7 @@
         'balanced' => 'Balanced',
         'short' => 'Short',
         'blocked' => 'Blocked',
+        'restored' => 'Hand amendment reversed',
         'unrecorded' => 'Unrecorded issue',
         'dormant' => 'Dormant',
         'clean' => 'No change',
@@ -85,7 +86,23 @@
          'note' => \App\Support\Format::r($run->ShortValueAfter).' after — the floor, not a target', 'tone' => 'neutral'],
         ['label' => 'Dormant shifts', 'value' => \App\Support\Format::n($run->DormantRows),
          'note' => 'never charged, and they move as a block'],
+        ['label' => 'Openings repaired', 'value' => \App\Support\Format::n($run->RepairedOpenings),
+         'note' => 'set to the previous closing, which stands', 'tone' => $run->RepairedOpenings > 0 ? 'warn' : 'neutral'],
+        ['label' => 'Hand balancing breaches', 'value' => \App\Support\Format::n($run->AuditRows),
+         'note' => 'already in PumpIT — see Exceptions', 'tone' => $run->AuditRows > 0 ? 'serious' : 'neutral'],
     ]" />
+
+    @if ($run->HeldBackRows > 0)
+        {{-- Rule 10 of the client's pack. A data problem, not a finding, and
+             the pack says to report it first. --}}
+        <x-notice tone="stop" style="margin:12px 14px 0"
+                  :title="\App\Support\Format::n($run->HeldBackRows).' shift lines held back from '.$run->CompleteTo?->copy()->addDay()->format('d M')">
+            <p>The recon is not complete on {{ $run->CompleteTo?->copy()->addDay()->format('d M') }}: a shift is
+               missing or short of lines, closings are not captured, or POS is not posted. That day and every
+               day after it are left out, because balancing them would pin "the latest count" on one nobody
+               has taken. Finish the balancing or the posting at the site and preview again.</p>
+        </x-notice>
+    @endif
 
     @if ($run->BlockedChains > 0)
         {{-- The count is the finding and stays on screen; the reasoning behind
@@ -95,11 +112,13 @@
             <p>A chain is blocked <strong>whole</strong>: if any one of its shifts trips a test, none of it
                is amended. Half balancing around a fault is how a data problem gets dressed up as a
                performance figure.</p>
-            <p>The reasons, worst first: the window ends <em>over</em> (nothing can fix that); a shift sold
-               or closed holding more than it ever received; <strong>the chain is already broken in the
-               source</strong> — an opening that is not the previous closing, which makes the whole method
-               meaningless for that item; an amendment larger than a cap allows; or too few active shifts
-               to move anything between.</p>
+            <p>The reasons, worst first: a shift is <em>over by a whole pack</em> — an issue not written up,
+               which is captured, not balanced away; the stock falls with <em>no till sales</em> against it — a
+               PLU or recipe fault nobody is charged for; a shift sold or closed holding more than it ever
+               received; the window, or a stretch between two repaired openings, ends <em>over</em>; an
+               amendment larger than a cap allows; or too few active shifts to move anything between.</p>
+            <p>An opening that is not the previous closing no longer blocks: it is <strong>repaired</strong> —
+               the opening is set to the previous closing, which stands — and reported as S10a or S10b.</p>
             <p>Open a row to see which shift did it and what the rest of the chain looks like.</p>
         </x-notice>
     @endif
@@ -260,7 +279,7 @@
                     data-detail-url="{{ route('app.stockrecon.line', [$run, $line]) }}">
                     @if ($run->isOpen())
                         <td class="pick">
-                            @if ($line->WouldAmend && $line->CommitState === 'pending')
+                            @if ($line->isWritable())
                                 <input type="checkbox" name="lines[]" value="{{ $line->Id }}" data-check
                                        aria-label="Amend {{ $line->StockItemNo }} on {{ $line->TransactionDate->toDateString() }} shift {{ $line->ShiftNo }}"
                                        @checked($line->Selected)>
@@ -334,7 +353,7 @@
                              shifts" is the wrong sentence to read immediately
                              before writing one. --}}
                         <td class="fit-min">
-                            @if ($line->WouldAmend && ! $line->ChainBlocked && $line->CommitState === 'pending')
+                            @if ($line->isWritable())
                                 <button type="submit" name="only" value="{{ $line->Id }}"
                                         class="btn-ghost btn-row"
                                         data-confirm-single
