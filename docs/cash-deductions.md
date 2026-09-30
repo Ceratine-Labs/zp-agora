@@ -78,8 +78,8 @@ along the way, so there is no event and no listener to keep in step. The one
 row is read three times.
 
 The gap it leaves: **an approved short that is never posted is on no cashup,
-so nobody is deducted for it.** PumpIT had the same gap: 3 to 13 shorts a
-month, R600 to R4,654, Mar–Aug 2026. The Cash and Payroll tabs say so before a
+so nobody is deducted for it.** PumpIT had the same gap: 28 shorts worth
+R11,488 from March to August 2026, none of them in June. The Cash and Payroll tabs say so before a
 period is built (`usp_Cash_GetUnpostedStaffShorts`) and link to those shorts,
 filtered to Approved. Cash-bag shorts are left out of that count because they
 reach payroll directly.

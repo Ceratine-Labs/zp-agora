@@ -6,8 +6,8 @@
    schedule, and so the payroll file, by one road: posted onto a cashup's pump
    shortages leg, where usp_Cash_DeductionCashShorts reads it as pump_short. A
    short that is approved and never posted is on no cashup, so it is deducted
-   from nobody, and nothing says so. PumpIT was the same, and live shows 3 to
-   13 such shorts a month (R600 to R4 654, Mar–Aug 2026).
+   from nobody, and nothing says so. PumpIT was the same: live shows 28 such
+   shorts worth R11 488 from March to August 2026, none in June.
 
    This counts them, so the Deductions screen can say, before a period is
    built, what is about to miss payroll and where to post it.
