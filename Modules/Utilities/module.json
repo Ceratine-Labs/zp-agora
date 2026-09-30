@@ -1,0 +1,11 @@
+{
+    "name": "Utilities",
+    "alias": "utilities",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 50,
+    "requires": [],
+    "providers": [
+        "Modules\\Utilities\\Providers\\UtilitiesServiceProvider"
+    ]
+}

@@ -1,0 +1,11 @@
+{
+    "name": "Assets",
+    "alias": "assets",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 50,
+    "requires": ["Core", "Reports"],
+    "providers": [
+        "Modules\\Assets\\Providers\\AssetsServiceProvider"
+    ]
+}

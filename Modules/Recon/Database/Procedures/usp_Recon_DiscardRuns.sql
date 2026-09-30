@@ -32,7 +32,12 @@
 
    So a run is protected when EITHER
      · its status says it was executed — 'committed' or 'reversed'; or
-     · anything hangs off it in ReconBatch, ReconMatch or ReconStamp.
+     · anything hangs off it in ReconBatch, ReconMatch, ReconStamp or
+       ReconAllocation (the split by cashier a cash-bag match confirmed, added
+       27 Sep 2026: usp_Recon_ManualMatch writes it with the batch, so the
+       batch test already covers it, and it is named anyway because a list of
+       "what hangs off a run" that leaves one out is how the 9 Sep orphans
+       happened).
    The second test is the rule stated literally and the first is the cheap
    catch for a commit that stamped nothing (usp_Recon_Commit sets 'committed'
    even when every line was blocked, which is conservative and correct). Either
@@ -126,6 +131,8 @@ BEGIN
                                 WHERE m.BranchId = r.BranchId AND m.RunId = r.Id)
                      OR EXISTS (SELECT 1 FROM agora.ReconStamp s
                                 WHERE s.BranchId = r.BranchId AND s.RunId = r.Id)
+                     OR EXISTS (SELECT 1 FROM agora.ReconAllocation a
+                                WHERE a.BranchId = r.BranchId AND a.RunId = r.Id)
                 THEN 1 ELSE 0 END,
            CASE WHEN r.FailureCode IS NOT NULL THEN 1 ELSE 0 END
     FROM agora.ReconRun r
@@ -133,9 +140,10 @@ BEGIN
       AND (@RunId IS NULL OR r.Id = @RunId)
       AND (@ReconArea IS NULL OR r.ReconArea = @ReconArea)
       /* The two sweep narrowings. They are ignored for a named run: a person
-         who asked for run 412 by its id asked for run 412. */
+         who asked for run 412 by its id asked for run 412. CreatedAt is UTC
+         (the application writes it), so the age is measured on UTC too. */
       AND (@RunId IS NOT NULL OR @OlderThanDays IS NULL
-           OR r.CreatedAt < DATEADD(day, -@OlderThanDays, SYSDATETIME()))
+           OR r.CreatedAt < DATEADD(day, -@OlderThanDays, SYSUTCDATETIME()))
       AND (@RunId IS NOT NULL OR @CreatedBy IS NULL OR r.CreatedBy = @CreatedBy);
 
     IF @RunId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM @Targets)
@@ -156,7 +164,7 @@ BEGIN
 
         UPDATE r
         SET r.Status = 'closed',
-            r.UpdatedAt = SYSDATETIME(),
+            r.UpdatedAt = SYSUTCDATETIME(),
             r.UpdatedBy = @UserId
         FROM agora.ReconRun r
         INNER JOIN @Targets t ON t.Id = r.Id
@@ -178,7 +186,7 @@ BEGIN
 
         UPDATE r
         SET r.Status = CASE WHEN t.Failed = 1 THEN 'failed' ELSE 'previewed' END,
-            r.UpdatedAt = SYSDATETIME(),
+            r.UpdatedAt = SYSUTCDATETIME(),
             r.UpdatedBy = @UserId
         FROM agora.ReconRun r
         INNER JOIN @Targets t ON t.Id = r.Id

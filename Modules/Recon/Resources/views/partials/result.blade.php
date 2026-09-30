@@ -99,13 +99,17 @@
             <span class="dg-bar-gap"></span>
 
             {{-- The two SIDES, for the whole run: every bank line behind every
-                 proposal, and every deposit. Instant on a committed run, which
+                 proposal, and every deposit. A cash-bag run's deposits link says
+                 so (`area`), and its file comes with each bag's cashier and the
+                 split line it was accounted on (ReconMopsSideGrid); every other
+                 area's link is what it always was. Instant on a committed run, which
                  reads agora.ReconMatch; on a preview each proposal has to be
                  drilled, so the button says how long that is likely to take
                  rather than looking broken while it does it. --}}
             @php($drilled = $run->Status !== 'committed')
             @php($seconds = (int) ceil($run->lines->count() * 0.2))
             @php($sideNote = $drilled ? ' — about '.$seconds.' seconds, because each proposal is re-read' : '')
+            @php($bagArea = $run->ReconArea === 'CashBags' ? ['area' => 'CashBags'] : [])
             <span class="dg-sides">
                 <span class="dg-sides-label">All rows, both sides</span>
 
@@ -122,10 +126,10 @@
                 <span class="dg-side-pair">
                     <span class="dg-side-name">Deposits</span>
                     <a class="btn-ghost sm" data-extract
-                       href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'run' => $run->Id, 'format' => 'xlsx']) }}"
+                       href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'run' => $run->Id] + $bagArea + ['format' => 'xlsx']) }}"
                        title="Every deposit behind every proposal on this run{{ $sideNote }}">.xlsx</a>
                     <a class="btn-ghost sm" data-extract
-                       href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'run' => $run->Id, 'format' => 'csv']) }}"
+                       href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'run' => $run->Id] + $bagArea + ['format' => 'csv']) }}"
                        title="Every deposit behind every proposal on this run{{ $sideNote }}">.csv</a>
                 </span>
             </span>
@@ -223,7 +227,11 @@
                 @if ($run->ReconArea === 'ABSA')<th class="num">CC</th><th class="num">DD</th>@endif
                 <th class="num">Deposits</th>
                 <th class="num">Deposit</th>
-                <th class="num">Difference</th>
+                {{-- Bank less deposits, so negative is money the bank did not
+                     receive: the sign the cash-bag split and the match message
+                     use (Ryan, 27 Sep 2026). DiffAmount is stored the other
+                     way round; ReconRunLine::bankLessDeposits() turns it. --}}
+                <th class="num" title="The bank side less the deposits: negative is money the bank did not receive">Bank less deposits</th>
                 <th>Rule</th>
             </tr>
         </x-slot:head>
@@ -289,7 +297,7 @@
                 @endif
                 <td class="num">{{ $line->MopsTxns ?: '—' }}</td>
                 <td class="num">{{ $line->MopsTxns ? \App\Support\Format::r($line->MopsTotal) : '—' }}</td>
-                <td class="num">{{ (float) $line->DiffAmount === 0.0 ? '—' : \App\Support\Format::r($line->DiffAmount) }}</td>
+                <td class="num">{{ (float) $line->DiffAmount === 0.0 ? '—' : \App\Support\Format::r($line->bankLessDeposits()) }}</td>
                 <td class="muted" style="font-size:11px">
                     @if ($line->UsedBankStart !== null)
                         {{-- Finding 11 — branch 7 extracting from past the end of its own

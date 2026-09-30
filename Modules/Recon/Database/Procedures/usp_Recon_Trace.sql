@@ -3,7 +3,8 @@
  *
  * Read by:  Recon -> Trace
  * Reads:    agora.ReconRun, ReconRunLine, ReconBatch, ReconMatch, ReconStamp,
- *           and the legacy estate through agora.vw_* — read-only, always.
+ *           ReconAllocation, and the legacy estate through agora.vw_* —
+ *           read-only, always.
  * Writes:   nothing.
  *
  * THE QUESTION THIS ANSWERS. "Where did batch 4412 come from." Until now that
@@ -13,7 +14,7 @@
  * findings ("who stamped the historical reconciliations?") could only be
  * guessed at from 1,570 orphaned bank lines.
  *
- * ONE TERM, SEVEN ANSWERS. The person types a batch number, a bank reference,
+ * ONE TERM, EIGHT ANSWERS. The person types a batch number, a bank reference,
  * a bag, a slip, a terminal or a run id — they do not know, and should not
  * have to say, which kind of thing it is. So every set below is asked the same
  * question and each says what it found:
@@ -25,6 +26,10 @@
  *   5  stamps         what was written, and whether it was applied or reversed
  *   6  bank lines     the legacy statement rows still carrying it
  *   7  deposits       the BRN_DailyBanking family, all five, unioned
+ *   8  allocations    the split by cashier a cash-bag match confirmed
+ *                     (agora.ReconAllocation), and the staff short each line
+ *                     is due. Last, so sets 1–7 keep their positions for every
+ *                     caller that reads them by index. (27 Sep 2026.)
  *
  * A set that finds nothing returns no rows, and the screen says which sets
  * were empty — "nothing in the ledger, three rows on the statement" is an
@@ -337,4 +342,50 @@ BEGIN
     WHERE (@AllBranches = 1 OR deposits.BranchId IN (SELECT BranchId FROM @Branch))
       AND (@AllAllowed  = 1 OR deposits.BranchId IN (SELECT BranchId FROM @Allowed))
     ORDER BY deposits.TxDate DESC, deposits.Reference;
+
+    /* ---- 8. Whose cash it was — the split by cashier ----------------------
+       Reached the ways a batch is (its run, its number, its reference or any
+       bag in it), and also by the cashier's code or name, so "what has
+       AM261117 been accounted" is one trace. Reversed lines come back too,
+       marked: the figures confirmed stay readable after a match is undone. */
+    SELECT TOP (@MaxRows)
+        a.Id,
+        a.RunId,
+        a.BatchId,
+        a.BatchNo,
+        a.BranchId,
+        b.Name AS BranchName,
+        a.CashierCode,
+        a.CashierName,
+        a.Bags,
+        a.Banked,
+        a.DropSafe,
+        a.FirstBagDate,
+        a.LastBagDate,
+        a.DerivedShare,
+        a.Share,
+        a.Accountable,
+        a.Basis,
+        a.ShortStatus,
+        a.StaffShortsNo,
+        a.ConfirmedAt,
+        u.UserName AS ConfirmedByName,
+        a.ReversedAt,
+        a.ReversalReason
+    FROM agora.ReconAllocation a
+    LEFT JOIN agora.Branch b ON b.BranchId = a.BranchId AND b.DeletedAt IS NULL
+    LEFT JOIN agora.[User] u ON u.Id = a.ConfirmedBy
+    WHERE (@AllBranches = 1 OR a.BranchId IN (SELECT BranchId FROM @Branch))
+      AND (@AllAllowed  = 1 OR a.BranchId IN (SELECT BranchId FROM @Allowed))
+      AND (a.RunId IN (SELECT RunId FROM @Lines)
+        OR (@Number IS NOT NULL AND (a.BatchNo = @Number OR a.RunId = @Number OR a.StaffShortsNo = @Number))
+        OR a.CashierCode LIKE @Like
+        OR a.CashierName LIKE @Like
+        OR EXISTS (SELECT 1 FROM agora.ReconBatch bt
+                   WHERE bt.BranchId = a.BranchId AND bt.Id = a.BatchId
+                     AND (bt.KeyRef LIKE @Like OR bt.KeyRef2 LIKE @Like))
+        OR EXISTS (SELECT 1 FROM agora.ReconMatch m
+                   WHERE m.BranchId = a.BranchId AND m.BatchId = a.BatchId
+                     AND m.SourceKeyJson LIKE @Like))
+    ORDER BY a.BatchNo DESC, a.Banked DESC, a.Id;
 END

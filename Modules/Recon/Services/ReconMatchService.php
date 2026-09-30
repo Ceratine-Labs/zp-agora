@@ -5,6 +5,9 @@ namespace Modules\Recon\Services;
 use App\Support\ProcedureService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Modules\Cash\Services\StaffShortService;
+use Throwable;
 
 /**
  * The seam between the manual-match screen and its two procedures.
@@ -23,6 +26,12 @@ class ReconMatchService
     /**
      * Everything on both sides, with the colour that says which references
      * appear on both.
+     *
+     * On CashBags each deposit row also carries CashierCode, CashierName —
+     * the cashier who dropped the bag — and DropSafeAmount, what they declared
+     * at the safe, and on no other area, so the screen can tell from the rows
+     * alone whether there is a cashier to show. Passed through untouched: the
+     * procedure decides the shape.
      *
      * @return array{bank: Collection<int, object>, mops: Collection<int, object>, summary: object|null}
      */
@@ -97,8 +106,15 @@ class ReconMatchService
      * `$basis` is set when the rows came from an accepted suggestion. It is
      * recorded on the run and changes nothing about what is checked.
      *
+     * `$allocation` is the cash-bag split the clerk confirmed — one line per
+     * cashier among the ticked bags, `code` null for the bags that record
+     * none. Required on CashBags and refused on every other area, both by the
+     * procedure, which also groups the bags itself and refuses a split that is
+     * not theirs or does not add up (ALLOCATION_INCOMPLETE). Null sends none.
+     *
      * @param  array<int, int>  $bankLineIds
      * @param  array<int, array{id: int|null, key: string, dt: string, amt: float}>  $deposits
+     * @param  array<int, array{code: string|null, banked: string|null, share: string|null}>|null  $allocation
      */
     public function match(
         string $area,
@@ -109,8 +125,9 @@ class ReconMatchService
         array $deposits,
         ?string $reason = null,
         ?string $basis = null,
+        ?array $allocation = null,
     ): object {
-        return $this->procedures->write('usp_Recon_ManualMatch', [
+        $status = $this->procedures->write('usp_Recon_ManualMatch', [
             'BranchId' => $branchId,
             'ReconArea' => $area,
             'FromDate' => $from->toDateString(),
@@ -121,6 +138,36 @@ class ReconMatchService
             'StampMode' => (string) config('recon.stamp_mode'),
             'UserId' => auth()->id(),
             'Basis' => $basis,
+            'AllocationJson' => $allocation === null ? null : json_encode(array_values($allocation)),
         ]);
+
+        if ($area === 'CashBags') {
+            self::tellStaffShortApprovers('manual match');
+        }
+
+        return $status;
+    }
+
+    /**
+     * T040: a cash-bag match raises its staff shorts INSIDE the procedure,
+     * which cannot send mail — so the approvers are told here, once the match
+     * has committed, by the Cash module's pending-mail run (the same one
+     * `php artisan cash:staff-short-mail` makes). After a reversal it tells the
+     * raiser of any short the reversal declined.
+     *
+     * A mail is never allowed to undo or fail the match: anything thrown is
+     * logged and swallowed, and a short whose approvers were not told stays
+     * unstamped on agora.StaffShort for the next run to pick up.
+     */
+    public static function tellStaffShortApprovers(string $after): void
+    {
+        try {
+            app(StaffShortService::class)->sendPending();
+        } catch (Throwable $e) {
+            Log::error('agora.staffshort.mail-after-recon-failed', [
+                'after' => $after,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

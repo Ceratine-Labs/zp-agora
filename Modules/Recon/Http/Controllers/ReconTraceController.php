@@ -34,7 +34,7 @@ class ReconTraceController extends Controller
 {
     use AreaWorkbench;
 
-    /** The seven result sets, in the order the procedure returns them. */
+    /** The eight result sets, in the order the procedure returns them. */
     private const SETS = [
         'runs' => 'Runs',
         'proposals' => 'Proposals',
@@ -43,6 +43,7 @@ class ReconTraceController extends Controller
         'stamps' => 'Stamps',
         'bank' => 'Bank statement',
         'deposits' => 'Deposits',
+        'allocations' => 'Split by cashier',
     ];
 
     public function __construct(

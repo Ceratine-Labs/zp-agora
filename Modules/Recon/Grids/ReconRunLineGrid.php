@@ -7,6 +7,7 @@ use App\Grid\GridDefinition;
 use App\Grid\Sources\EloquentSource;
 use App\Grid\Sources\GridSource;
 use Modules\Recon\Models\ReconRunLine;
+use Modules\Recon\Services\ReconService;
 
 /**
  * A reconciliation run's proposals, as a grid — for the EXTRACT.
@@ -36,6 +37,8 @@ use Modules\Recon\Models\ReconRunLine;
  */
 class ReconRunLineGrid extends GridDefinition
 {
+    public function __construct(private ReconService $service) {}
+
     public function key(): string
     {
         return 'app.recon.run';
@@ -78,11 +81,28 @@ class ReconRunLineGrid extends GridDefinition
             new GridColumn(key: 'BankDD', label: 'DD', format: 'money', visible: false),
             new GridColumn(key: 'MopsTxns', label: 'Deposits', format: 'number', sort: 'MopsTxns'),
             new GridColumn(key: 'MopsTotal', label: 'Deposit', format: 'money', sort: 'MopsTotal', total: true),
-            new GridColumn(key: 'DiffAmount', label: 'Difference', format: 'money', sort: 'DiffAmount', total: true),
+            // Bank less deposits (Ryan, 27 Sep 2026): negative is money the
+            // bank did not receive, as on the run page and in the cash-bag
+            // split. DiffAmount is stored the other way round and is not
+            // changed; the query turns it (source()). No header filter: a
+            // WHERE cannot name a computed column.
+            new GridColumn(key: 'BankLessDeposits', label: 'Bank less deposits', format: 'money', sort: 'BankLessDeposits',
+                filter: 'none', total: true),
             new GridColumn(key: 'BankNarrative', label: 'Narrative', wide: true, visible: false),
             new GridColumn(key: 'BlockReason', label: 'Why it was skipped', wide: true, visible: false),
             new GridColumn(key: 'NearRefNote', label: 'Pairing note', wide: true, visible: false),
             new GridColumn(key: 'UsedProcessOrder', label: 'Rule', format: 'number', visible: false),
+
+            // Cash bags only (27 Sep 2026): the split by cashier the proposal's
+            // batch was confirmed with, in words, and what its staff shorts
+            // come to. Filled by ReconAllocationSummarySource; empty on an
+            // auto run, which stamps no split. Shown by default only where the
+            // run page says the run is one of cash bags (see cashBags()).
+            // Filled in PHP after the page is read, so neither has a header
+            // filter — there is no column for a WHERE to name.
+            new GridColumn(key: 'AccountedTo', label: 'Accounted to', wide: true, filter: 'none', visible: $this->cashBags()),
+            new GridColumn(key: 'ShortDue', label: 'Staff short due', format: 'money', filter: 'none', total: true,
+                visible: $this->cashBags()),
         ];
     }
 
@@ -90,11 +110,16 @@ class ReconRunLineGrid extends GridDefinition
     {
         $runId = $this->runId();
 
-        return new EloquentSource(
+        $proposals = new EloquentSource(
             // A closure, not a builder: a shared one accumulates the last
             // request's where clauses.
             query: fn () => ReconRunLine::query()
                 ->acrossBranches()
+                // Every stored column, and the difference turned round for
+                // display. ORDER BY may name the alias; WHERE may not, hence
+                // no filter on it.
+                ->select('*')
+                ->selectRaw('-[DiffAmount] AS [BankLessDeposits]')
                 // 0 matches nothing. An extract asked for without a run must
                 // come back empty, never as every proposal in the estate.
                 ->where('RunId', $runId ?? 0),
@@ -111,9 +136,13 @@ class ReconRunLineGrid extends GridDefinition
                 'BankTotal' => 'BankTotal',
                 'MopsTxns' => 'MopsTxns',
                 'MopsTotal' => 'MopsTotal',
-                'DiffAmount' => 'DiffAmount',
+                'BankLessDeposits' => 'BankLessDeposits',
             ],
         );
+
+        // The split rides on the rows of the page, after the proposals' own
+        // filters, sort and paging have run — see the class it names.
+        return new ReconAllocationSummarySource($proposals, $runId, $this->service);
     }
 
     /** The screen's own order: as the procedure proposed them. */
@@ -126,6 +155,21 @@ class ReconRunLineGrid extends GridDefinition
     public function branchSelector(): bool
     {
         return false;
+    }
+
+    /**
+     * Whether the run page said this is a cash-bag run (`area=CashBags`).
+     *
+     * Read off the request, not the database: the catalogue is asked for on
+     * every request and must stay cheap (GridDefinition). The run page sets it
+     * from the run it is showing, and it rides into the extract link with the
+     * rest of the query. It decides only whether the split's two columns are
+     * shown by default; a wrong value leaves them empty or hidden, nothing
+     * else.
+     */
+    private function cashBags(): bool
+    {
+        return request()->query('area') === 'CashBags';
     }
 
     /**

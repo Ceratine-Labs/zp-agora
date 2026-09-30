@@ -1,0 +1,11 @@
+{
+    "name": "Cash",
+    "alias": "cash",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 12,
+    "requires": ["Core"],
+    "providers": [
+        "Modules\\Cash\\Providers\\CashServiceProvider"
+    ]
+}

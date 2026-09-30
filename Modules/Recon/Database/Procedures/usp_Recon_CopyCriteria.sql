@@ -137,7 +137,8 @@ BEGIN
 
     IF @Apply = 1
     BEGIN
-        DECLARE @Now datetime2(0) = SYSDATETIME();
+        /* UTC, the application's clock — see usp_Recon_Commit. */
+        DECLARE @Now datetime2(0) = SYSUTCDATETIME();
 
         BEGIN TRANSACTION;
 

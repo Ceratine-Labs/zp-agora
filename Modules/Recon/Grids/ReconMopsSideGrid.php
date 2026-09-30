@@ -48,9 +48,37 @@ class ReconMopsSideGrid extends GridDefinition
             new GridColumn(key: 'SourceDate', label: 'Date', format: 'date'),
             new GridColumn(key: 'Detail', label: 'Detail', wide: true),
             new GridColumn(key: 'Amount', label: 'Amount', format: 'money', total: true),
+
+            // Cash bags only (27 Sep 2026): whose bag it was, what was declared
+            // at the drop safe, and the line of the confirmed split the bag's
+            // cash was accounted on. The line is the CASHIER's, so it repeats
+            // on each of their bags and carries no total — adding it down the
+            // bags would count a cashier's share once per bag.
+            new GridColumn(key: 'CashierName', label: 'Cashier', visible: $this->cashBags()),
+            new GridColumn(key: 'CashierCode', label: 'Cashier code', mono: true, visible: $this->cashBags()),
+            new GridColumn(key: 'DropSafeAmount', label: 'Drop safe', format: 'money', total: true, visible: $this->cashBags()),
+            new GridColumn(key: 'AllocationBatchNo', label: 'Cashier line: batch', mono: true, visible: $this->cashBags()),
+            new GridColumn(key: 'AllocationShare', label: 'Cashier line: share of the variance', format: 'money', visible: $this->cashBags()),
+            new GridColumn(key: 'AllocationAccountable', label: 'Cashier line: accountable', format: 'money', visible: $this->cashBags()),
+            new GridColumn(key: 'AllocationShort', label: 'Cashier line: staff short', visible: $this->cashBags()),
+
             new GridColumn(key: 'SourceId', label: 'Source id', mono: true, visible: false),
             new GridColumn(key: 'LineId', label: 'Proposal id', mono: true, visible: false),
         ];
+    }
+
+    /**
+     * Whether the extract was asked for from a cash-bag run.
+     *
+     * The run page and the drill panel say so in the link (`area=CashBags`),
+     * because the catalogue must not touch the database to find out: the
+     * cashier columns are declared for every area, like the CC and DD legs on
+     * the proposals, and only shown by default where they can hold anything.
+     * A wrong value costs nothing — the columns come out empty.
+     */
+    private function cashBags(): bool
+    {
+        return request()->query('area') === 'CashBags';
     }
 
     public function source(): GridSource

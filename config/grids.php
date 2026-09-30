@@ -2,6 +2,21 @@
 
 use App\Grid\Definitions\BranchGrid;
 use App\Grid\Definitions\DayCloseGrid;
+use Modules\Assets\Grids\AssetMovementGrid;
+use Modules\Assets\Grids\AssetRegisterGrid;
+use Modules\Assets\Grids\AssetRepairGrid;
+use Modules\Cash\Grids\CashupGrid;
+use Modules\Cash\Grids\Deductions\CashShortGrid as DeductionCashShortGrid;
+use Modules\Cash\Grids\Deductions\NonIntDetailGrid as DeductionNonIntDetailGrid;
+use Modules\Cash\Grids\Deductions\NonIntSummaryGrid as DeductionNonIntSummaryGrid;
+use Modules\Cash\Grids\Deductions\ScheduleGrid as DeductionScheduleGrid;
+use Modules\Cash\Grids\Deductions\StockLossDetailGrid as DeductionStockLossDetailGrid;
+use Modules\Cash\Grids\Deductions\StockLossSummaryGrid as DeductionStockLossSummaryGrid;
+use Modules\Cash\Grids\DropSafeGrid;
+use Modules\Cash\Grids\PumpShortageGrid;
+use Modules\Cash\Grids\StaffShortGrid;
+use Modules\Cash\Grids\ZreadGrid;
+use Modules\Cash\Grids\ZreadNoCashupGrid;
 use Modules\Core\Grids\UserGrid;
 use Modules\Product\Grids\CriticalLineGrid;
 use Modules\Product\Grids\StockItemGrid;
@@ -13,6 +28,7 @@ use Modules\Recon\Grids\ReconRunLineGrid;
 use Modules\StockRecon\Grids\StockReconExceptionGrid;
 use Modules\StockRecon\Grids\StockReconRunGrid;
 use Modules\StockRecon\Grids\StockReconRunLineGrid;
+use Modules\Utilities\Grids\UtilityReadingGrid;
 
 /*
 |--------------------------------------------------------------------------
@@ -128,6 +144,49 @@ return [
         // the standard extract endpoint serves it. In journal mode that
         // extract IS the deliverable: the worklist an admin applies by hand.
         'app.stockrecon.run' => StockReconRunLineGrid::class,
+
+        // Z-reads for a site and period with the proposer's call on each —
+        // who, which till, which shift — and the clerk's decision beside it.
+        'app.cash.zread' => ZreadGrid::class,
+
+        // Cashups by till, shift and day with the legacy variance, the Z-read
+        // check and Agora's confirm/close state; and the Z-reads no cashup
+        // was captured against.
+        'app.cash.cashups' => CashupGrid::class,
+        'app.cash.cashups.nocashup' => ZreadNoCashupGrid::class,
+
+        // Each pump attendant's short by shift: the cashups' pump shortages leg,
+        // with the staff short behind each line.
+        'app.cash.pumpshortages' => PumpShortageGrid::class,
+
+        // Bags dropped at a site, in the safe or collected, with the reason
+        // and manager a bag over the threshold carries.
+        'app.cash.dropsafe.bags' => DropSafeGrid::class,
+
+        // Staff shorts raised, approved, declined and posted, with the reason
+        // code and the note as typed.
+        'app.cash.staffshorts.list' => StaffShortGrid::class,
+
+        // The head-office deduction tabs (T041) — PumpIT's five payroll
+        // reports, row for row — and the built schedule the payroll file is
+        // taken from.
+        'app.cash.deductions' => DeductionCashShortGrid::class,
+        'app.cash.deductions.stockloss' => DeductionStockLossSummaryGrid::class,
+        'app.cash.deductions.stocklossdetail' => DeductionStockLossDetailGrid::class,
+        'app.cash.deductions.nonint' => DeductionNonIntSummaryGrid::class,
+        'app.cash.deductions.nonintdetail' => DeductionNonIntDetailGrid::class,
+        'app.cash.deductions.payroll' => DeductionScheduleGrid::class,
+
+        // One row per meter per day off BRN_UtilityTransaction, usage
+        // computed once in agora.vw_UtilityReading.
+        'app.utilities.index' => UtilityReadingGrid::class,
+
+        // The asset register at the provisional SARS periods, what has moved
+        // (reversed movements stay, marked), and the repair job cards with
+        // the 30-day comeback flag and the approved request's cost.
+        'app.assets.register' => AssetRegisterGrid::class,
+        'app.assets.movement' => AssetMovementGrid::class,
+        'app.assets.repairs' => AssetRepairGrid::class,
 
         'app.dev.grids:dayclose' => DayCloseGrid::class,
         'app.dev.grids:branches' => BranchGrid::class,

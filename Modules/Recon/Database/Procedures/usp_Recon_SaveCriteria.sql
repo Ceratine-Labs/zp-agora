@@ -65,7 +65,8 @@ BEGIN
     IF @ReconArea NOT IN ('ABSA', 'FNB', 'CashMachine', 'CashBags', 'SmartATM')
         THROW 51000, 'AGORA:UNKNOWN_AREA:That is not a reconciliation area.', 1;
 
-    DECLARE @Now datetime2(0) = SYSDATETIME();
+    /* UTC, the application's clock — see usp_Recon_Commit. */
+    DECLARE @Now datetime2(0) = SYSUTCDATETIME();
 
     /*
      * AN OVERRIDE SHADOWS A RULE, AND A RULE IS AN AutoReconId.

@@ -17,7 +17,7 @@
 
      day-close            a trading day whose DayBalance bit is still 0
      unallocated-zreads   a till reading with no till, no shift and no employee
-     open-cashups         a cashup on a day that has not balanced
+     open-cashups         a cashup nobody has signed off (vw_CashupTotals.IsOpen)
      purchase-approvals   Approved = 0, IsDeclined = 0, Posted = 0
      staff-shorts         Approved = 0, IsDeclined = 0
      drop-safe            a bag with CollectionId = 0 — dropped, never collected
@@ -109,32 +109,35 @@ BEGIN
 
         UNION ALL
 
-        /* Till readings nobody has claimed. */
+        /* Till readings nobody has claimed — the Unallocated Z-reads rule
+           exactly (usp_Reports_GridUnallocatedZReads): all three empty in
+           PumpIT, and not allocated in Agora either (agora.vw_CashZread). */
         SELECT z.BranchId, 'unallocated-zreads', 'Unallocated Z-reads',
                'app.reports.show/unallocated-zreads', 20,
-               COUNT(*), MIN(z.ZReadDate), CONVERT(money, SUM(z.Sales))
-        FROM agora.vw_ZRead z
-        WHERE z.ZReadDate >= @DateFrom AND z.ZReadDate <= @DateTo
-          AND ISNULL(z.TillNo, 0) = 0
-          AND ISNULL(z.ShiftNo, 0) = 0
-          AND ISNULL(z.EmployeeCode, '') = ''
+               COUNT(*), MIN(z.ZReadAt), CONVERT(money, SUM(z.Sales))
+        FROM agora.vw_CashZread z
+        WHERE z.ZReadAt >= @DateFrom AND z.ZReadAt < DATEADD(day, 1, @DateTo)
+          AND z.IsAllocated = 0
+          AND z.IsPartlyAllocated = 0
         GROUP BY z.BranchId
 
         UNION ALL
 
-        /* Cashups on a day that has not balanced. LEFT JOIN, not INNER: a day
-           with no ledger row at all has certainly not been closed off, and an
-           inner join would quietly drop exactly those. */
-        SELECT d.BranchId, 'open-cashups', 'Open cashups',
+        /* Cashups nobody has signed off: agora.vw_CashupTotals.IsOpen (Cash,
+           T037), the one rule usp_Reports_GridOpenCashups and Cash → Cashups
+           also answer from. For a cashup Agora has never touched it is the
+           rule this arm used before — the day has not balanced, and a day
+           with no ledger row at all has not either; a cashup a manager closed
+           in Agora leaves the count. Only the header and the day ledger are
+           read: the legs the view can add up are not referenced, so they are
+           not summed (0.8 s for 90 days at every site, 27 Sep 2026). */
+        SELECT t.BranchId, 'open-cashups', 'Open cashups',
                'app.reports.show/open-cashups', 30,
-               COUNT(*), MIN(d.TransactionDate), CONVERT(money, SUM(d.ClosingBalance))
-        FROM agora.vw_DailyBanking d
-        LEFT JOIN agora.vw_ReconImports r
-               ON r.BranchId = d.BranchId
-              AND r.ReconDate = CONVERT(date, d.TransactionDate)
-        WHERE d.TransactionDate >= @DateFrom AND d.TransactionDate < DATEADD(day, 1, @DateTo)
-          AND ISNULL(r.DayBalance, 0) = 0
-        GROUP BY d.BranchId
+               COUNT(*), MIN(t.TransactionAt), CONVERT(money, SUM(ISNULL(t.ZRead, 0)))
+        FROM agora.vw_CashupTotals t
+        WHERE t.TransactionAt >= @DateFrom AND t.TransactionAt < DATEADD(day, 1, @DateTo)
+          AND t.IsOpen = 1
+        GROUP BY t.BranchId
 
         UNION ALL
 

@@ -133,6 +133,7 @@ CREATE TABLE dbo.DBF_P3TRANS_ZREAD (
     TERMNUM                          CHAR(3)          NOT NULL,
     LOGFILE                          CHAR(10)         NOT NULL,
     USERID                           CHAR(6)          NOT NULL,
+    [LOCATION]                       VARCHAR(10)      NOT NULL,
     Sales                            DECIMAL(38,6)    NULL,
     TillNo                           INT              NULL,
     ShiftNo                          INT              NULL,

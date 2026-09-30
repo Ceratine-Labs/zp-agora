@@ -32,7 +32,7 @@ class ReportsContractTest extends TestCase
     {
         foreach (config('reports.reports') as $key => $report) {
             $this->assertFileExists(
-                base_path("Modules/Reports/Database/Procedures/{$report['procedure']}.sql"),
+                $this->procedureFile($report['procedure']),
                 "Report [{$key}] names [{$report['procedure']}], which has no .sql file. "
                 .'A procedure nothing deploys reads like the rule the system follows, and the database has never seen it.'
             );
@@ -88,7 +88,7 @@ class ReportsContractTest extends TestCase
          */
         foreach (config('reports.reports') as $key => $report) {
             $sql = file_get_contents(
-                base_path("Modules/Reports/Database/Procedures/{$report['procedure']}.sql")
+                $this->procedureFile($report['procedure'])
             );
 
             foreach ($report['columns'] as $column) {
@@ -163,6 +163,14 @@ class ReportsContractTest extends TestCase
         $paths = DB::table(config('agora.schema').'.MenuItem')->pluck('Path')->all();
 
         foreach (config('reports.reports') as $key => $report) {
+            // A report whose screen belongs to another module (utility-meters
+            // is Utilities' capture screen) is reached through that module's
+            // own menu entry and declares none here — as the Reports
+            // MenuSeeder already allows.
+            if (empty($report['menu'])) {
+                continue;
+            }
+
             $this->assertContains(
                 $report['menu'],
                 $paths,
@@ -188,5 +196,17 @@ class ReportsContractTest extends TestCase
         // on NULL rather than being handed to the procedure to ignore.
         $this->assertNull($method->invoke($this->service, $report, ['sort' => 'DayEnds'])['SortColumn']);
         $this->assertNull($method->invoke($this->service, $report, ['sort' => 'DROP TABLE'])['SortColumn']);
+    }
+
+    /**
+     * A report's procedure usually ships with Reports, but one can be owned by
+     * the module whose screen it serves (usp_Utilities_GridReadings) — look
+     * wherever a module keeps its procedures.
+     */
+    private function procedureFile(string $procedure): string
+    {
+        $files = glob(base_path("Modules/*/Database/Procedures/{$procedure}.sql")) ?: [];
+
+        return $files[0] ?? base_path("Modules/Reports/Database/Procedures/{$procedure}.sql");
     }
 }

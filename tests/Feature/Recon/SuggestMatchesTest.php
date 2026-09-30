@@ -287,7 +287,9 @@ class SuggestMatchesTest extends TestCase
             ->assertSee('data-diff="-18.06"', false)
             ->assertSee('name="reason" required', false)
             ->assertSee('Force match')
-            ->assertSee('−R18.06')
+            // Shown bank less deposits (Ryan, 27 Sep 2026); data-diff above
+            // keeps the stored deposits-less-bank sign for the script.
+            ->assertSee('+R18.06')
             ->assertSee('data-suggest-run="close"', false)
             ->assertSee('Force all 1 close');
     }

@@ -22,6 +22,36 @@
 
    READ-ONLY. Table variables only.
 
+   CASH BAGS CARRY THEIR CASHIER, AND THE SPLIT (27 Sep 2026). A bag belongs
+   to the cashier who dropped it, and a cash-bag match by hand keeps the split
+   by cashier the clerk confirmed (agora.ReconAllocation). So the CashBags
+   branch returns eight more columns AFTER the seven every area returns — the
+   shape is decided by the area, exactly as usp_Recon_GetSides decides it, and
+   ABSA, FNB, CashMachine and SmartATM return the columns they always did:
+
+     CashierCode, CashierName, DropSafeAmount
+                   off agora.vw_DailyBankingCashBags, which resolved them one
+                   row per bag (v1__13j). A blank code is NULL, as everywhere.
+     AllocationBatchNo, AllocationShare, AllocationAccountable,
+     AllocationShortStatus, AllocationStaffShortsNo
+                   the line of the split this bag's cash was accounted on: the
+                   batch that holds the bag NOW (agora.ReconMatch names it by
+                   the bag's own id; a reversed batch no longer holds it), and
+                   that batch's line for the bag's cashier. The line is the
+                   CASHIER's, so a cashier with three bags shows the same share
+                   on all three — it is not a per-bag figure and must not be
+                   added up down the bags. NULL where no unreversed batch with
+                   a split holds the bag, which is every bag an auto run
+                   stamped and every bag still outstanding.
+
+   One row per bag, exactly as before. The bags are found by the one copy of
+   the matching rule into @Bags, and only then looked up — by the bag's own id
+   in the view, and in the split — so the lookups cost one seek per bag the
+   proposal holds, not one per bag in the window. @WithCashier = 0 returns the
+   seven columns and skips the lookups: that is how agora.usp_Recon_Commit
+   asks, because it captures this procedure with INSERT … EXEC into the shape
+   it has always used. Measured on live, 27 Sep 2026: see v1__13pz.
+
    @BatchKey, @MatchMode and @MopsConvention must be the values the RUN used —
    ReconRun.ParamsJson stores them for exactly this. The criteria resolution
    below is identical to the ported previews': every rule for the branch and
@@ -72,7 +102,16 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_DrillMops]
      * has had @IncludeReconciled since the commit needed it; this is the
      * deposit side catching up.
      */
-    @IncludeReconciled bit           = 0
+    @IncludeReconciled bit           = 0,
+    /*
+     * CashBags only: whether the bags come back with their cashier and the
+     * split line they were accounted on (the eight columns in the header).
+     * ON by default, for the screen and the extracts. usp_Recon_Commit passes
+     * 0: it captures the drill with INSERT … EXEC into the seven columns it
+     * has always used, and should not pay for lookups it throws away. Every
+     * other area ignores it.
+     */
+    @WithCashier       bit           = 1
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -203,6 +242,19 @@ BEGIN
         ORDER BY d.TransactionDate;
 
     ELSE IF @ReconArea = 'CashBags'
+    BEGIN
+        /* The bags this proposal is made of, found ONCE, by the one copy of
+           the matching rule, and held in the order they are returned in. The
+           cashier and the split are then looked up for these bags only — never
+           for the whole window, and never at all for the commit, which asks
+           with @WithCashier = 0 (see the parameter). */
+        DECLARE @Bags TABLE (
+            Seq int IDENTITY(1, 1) PRIMARY KEY,
+            SourceRef nvarchar(50), SourceDate datetime, Amount money, Detail nvarchar(200),
+            SourceId bigint, SourceKey nvarchar(50), ReconBatchNoPumpIT int
+        );
+
+        INSERT INTO @Bags (SourceRef, SourceDate, Amount, Detail, SourceId, SourceKey, ReconBatchNoPumpIT)
         /* A bag's reference is its collection's DBagNo, falling back to its own
            number. Bag level and collection level are different grains, so the
            collection is aggregated before it is joined — a straight join
@@ -254,6 +306,58 @@ BEGIN
                                 REPLACE(REPLACE(REPLACE(REPLACE(RTRIM(r.Ref), '-', ''), '/', ''), ' ', ''), '_', ''),
                                 b.NarrKey) > 0))))
         ORDER BY g.TransactionDate;
+
+        IF @WithCashier = 0
+            /* The commit's shape: the seven columns it has always captured. */
+            SELECT SourceRef, SourceDate, Amount, Detail, SourceId, SourceKey, ReconBatchNoPumpIT
+            FROM @Bags
+            ORDER BY Seq;
+        ELSE
+            SELECT b.SourceRef, b.SourceDate, b.Amount, b.Detail, b.SourceId, b.SourceKey,
+                   b.ReconBatchNoPumpIT,
+                   /* Whose bag, and the split line it was accounted on — see
+                      the header. After the seven every area returns. */
+                   v.CashierCode               AS CashierCode,
+                   v.CashierName               AS CashierName,
+                   v.DropSafeAmount            AS DropSafeAmount,
+                   al.BatchNo                  AS AllocationBatchNo,
+                   al.Share                    AS AllocationShare,
+                   al.Accountable              AS AllocationAccountable,
+                   al.ShortStatus              AS AllocationShortStatus,
+                   al.StaffShortsNo            AS AllocationStaffShortsNo
+            FROM @Bags b
+            /* The bag's own row in the view, by its id — an index seek on
+               (SSBranchId, DailyBankingCashBagID) on live. The view is one row
+               per bag; TOP 1 so a label can never change the row count. */
+            OUTER APPLY (
+                SELECT TOP 1 NULLIF(x.CashierCode, N'') AS CashierCode, x.CashierName, x.DropSafeAmount
+                FROM agora.vw_DailyBankingCashBags x
+                WHERE x.BranchId = @BranchId AND x.DailyBankingCashBagID = b.SourceId
+            ) v
+            /* The split line this bag's cash was accounted on. The batch
+               holding the bag is found by the bag's own id in
+               agora.ReconMatch, and only one that has not been reversed holds
+               it; the line is that batch's for the bag's cashier, NULL-safe,
+               because the bags with no cashier recorded have a line of their
+               own. A bag is in one unreversed batch at most and (BranchId,
+               BatchId, CashierCode) is the split's natural key, so TOP 1 never
+               has a choice to make. Agora's own tables only. */
+            OUTER APPLY (
+                SELECT TOP 1 al.BatchNo, al.Share, al.Accountable, al.ShortStatus, al.StaffShortsNo
+                FROM agora.ReconMatch m
+                JOIN agora.ReconBatch bt
+                  ON bt.BranchId = m.BranchId AND bt.Id = m.BatchId AND bt.State = 'committed'
+                JOIN agora.ReconAllocation al
+                  ON al.BranchId = m.BranchId AND al.BatchId = m.BatchId AND al.ReversedAt IS NULL
+                 AND ISNULL(al.CashierCode, N'') = ISNULL(v.CashierCode, N'')
+                WHERE m.BranchId = @BranchId
+                  AND m.SourceTable = 'BRN_DailyBankingCashBags'
+                  AND m.SourceId = b.SourceId
+                  AND m.Side = 'mops'
+                ORDER BY m.BatchId DESC
+            ) al
+            ORDER BY b.Seq;
+    END
 
     ELSE IF @ReconArea = 'SmartATM'
         /* Paired inside the trading-day window the bank narrative names, and

@@ -40,14 +40,20 @@
    page UNTICKS the rows named here rather than removing their tick boxes — the
    clerk can put a tick back, and the commit re-check has the final word.
 
-   TWO CLOCKS, AND WHY "SINCE" NEEDS CARE. ReconRun.CreatedAt is written by the
-   application, in its own timezone (config app.timezone, 'UTC'), while
-   ReconBatch.CreatedAt is written by usp_Recon_Commit from SYSDATETIME(), which
-   on ZP-MIST-SVR is +02:00. Compared raw, "committed after the preview" would
-   also catch batches committed up to two hours BEFORE it. So the preview time
-   is moved onto the server's clock first: back to UTC by the offset the
-   application passes (@AppUtcOffsetMinutes, 0 for a UTC application), then
-   forward by the server's own offset from UTC.
+   ONE CLOCK, AND THE ONE OFFSET THAT IS LEFT. ReconRun.CreatedAt is written by
+   the application, in its own timezone (config app.timezone, 'UTC'), and
+   ReconBatch.CreatedAt by usp_Recon_Commit and usp_Recon_ManualMatch from
+   SYSUTCDATETIME(). Until 24 Sep 2026 the batches carried SYSDATETIME(), which
+   on ZP-MIST-SVR is +02:00, and this procedure moved the preview time forward
+   by the server's offset to meet them. v1__13py put the writers on UTC and
+   shifted the rows already written back by that offset, so the server's
+   offset is no longer applied here, and must not come back: applied to UTC
+   batches it would push the preview two hours forward and miss every claim
+   made in those two hours.
+   What remains is the application's own offset (@AppUtcOffsetMinutes, 0 for a
+   UTC application): the preview time goes back to UTC by it, and each claim's
+   time comes forward onto the application's clock by it. Both are no-ops
+   while app.timezone is UTC.
 
    Returns two sets:
      1. one row — Pending (reconcilable and not yet committed), PendingTotal,
@@ -74,14 +80,12 @@ BEGIN
     IF @Area IS NULL
         THROW 51000, 'AGORA:RUN_NOT_FOUND:That run does not exist on this branch.', 1;
 
-    /* The preview time on the server's clock, which is the clock the batches
-       carry — and, going the other way, each claim's time on the
-       application's clock, so the page can say "ten minutes ago" and mean it.
-       See the header. */
-    DECLARE @ServerOffset int = DATEDIFF(minute, SYSUTCDATETIME(), SYSDATETIME()),
-            @AppOffset    int = ISNULL(@AppUtcOffsetMinutes, 0);
-    DECLARE @PreviewedAtServer datetime2(0) =
-        DATEADD(minute, @ServerOffset, DATEADD(minute, -@AppOffset, @PreviewedAt));
+    /* The preview time in UTC, which is the clock the batches carry — and,
+       going the other way, each claim's time on the application's clock, so
+       the page can say "ten minutes ago" and mean it. No server offset: see
+       the header. */
+    DECLARE @AppOffset int = ISNULL(@AppUtcOffsetMinutes, 0);
+    DECLARE @PreviewedAtUtc datetime2(0) = DATEADD(minute, -@AppOffset, @PreviewedAt);
 
     DECLARE @Pending TABLE (
         RunLineId      bigint PRIMARY KEY,
@@ -111,7 +115,7 @@ BEGIN
           AND b.State     = 'committed'
           AND b.KeyRef    = l.KeyRef
           AND ISNULL(b.KeyRef2, N'') = ISNULL(l.KeyRef2, N'')
-          AND b.CreatedAt > @PreviewedAtServer
+          AND b.CreatedAt > @PreviewedAtUtc
         ORDER BY b.CreatedAt DESC
     ) c
     WHERE l.BranchId = @BranchId
@@ -128,7 +132,7 @@ BEGIN
     FROM @Pending;
 
     SELECT RunLineId, KeyRef, KeyRef2, ClaimedByRunId, ClaimedBatchNo,
-           DATEADD(minute, @AppOffset, DATEADD(minute, -@ServerOffset, ClaimedAt)) AS ClaimedAt,
+           DATEADD(minute, @AppOffset, ClaimedAt) AS ClaimedAt,
            ClaimedBy
     FROM @Pending
     WHERE ClaimedByRunId IS NOT NULL

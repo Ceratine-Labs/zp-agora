@@ -96,4 +96,10 @@
     </x-card>
 
     @include('recon::partials.result', ['run' => $run, 'area' => $area, 'stampMode' => $run->StampMode])
+
+    {{-- A cash-bag match by hand: whose cash it was, as the clerk confirmed
+         it, kept with the batch — reversed or not. Nothing on any other run. --}}
+    @if ($allocation)
+        @include('recon::partials.run-allocation', ['allocation' => $allocation])
+    @endif
 </x-app-shell>

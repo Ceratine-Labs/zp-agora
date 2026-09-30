@@ -30,6 +30,32 @@
  * itself travels beside it, in text, because colour alone is not a label
  * anybody can read out, search for, or see.
  *
+ * CASH BAGS NAME THEIR CASHIER, AND ONLY CASH BAGS (27 Sep 2026). A bag
+ * belongs to the cashier who dropped it, and that person is who the cash is
+ * accounted to — so result set 2 for CashBags carries three more columns,
+ * AFTER every column the other areas return:
+ *
+ *   CashierCode  the drop-safe row's cashier, trimmed. NULL: the bag has no
+ *                drop-safe row (none in the 90 days to 27 Sep 2026; 3,438
+ *                bags before 6 Jun 2025, of which 138 were still outstanding
+ *                on 27 Sep 2026, all dated Jun-Oct 2023), or a blank code.
+ *   CashierName  "Surname FirstName" off BRN_Employee at this branch. NULL
+ *                when the code did not resolve — never an empty string, so
+ *                the screen can say so rather than print a blank.
+ *   DropSafeAmount  BRN_DropSafe.Amount, what was declared at the safe, off
+ *                the same drop-safe row. Amount stays CashBagAmount, what the
+ *                bag was banked as, and it is what the match and the cashier
+ *                split add up; this is shown BESIDE it (Ryan, 9 Sep 2026) so a
+ *                bag adjusted between the safe and the bank is visible rather
+ *                than reconciled away. NULL: no drop-safe row.
+ *
+ * All three come straight off agora.vw_DailyBankingCashBags (v1__13j), which is
+ * one row per bag by construction; nothing here joins the drop safe or the
+ * employee list again, so the row count is the view's row count. The other
+ * four areas have no per-row cashier and their result set 2 is exactly the
+ * shape it was, column for column — a column that is always NULL would read
+ * as "cashier unknown" on every ABSA settlement, which is not true.
+ *
  * @State  outstanding  ReconState = 1 / ReconBatchNoPumpIT = 0. The default,
  *                      and what a person pairing by hand is looking at.
  *         reconciled   what has already been claimed, for checking a figure.
@@ -155,7 +181,12 @@ BEGIN
         RowNo int IDENTITY(1,1) PRIMARY KEY,
         SourceId bigint NULL, SourceKey nvarchar(100), SourceRef nvarchar(50),
         SourceRef2 nvarchar(50), SourceDate datetime, Amount money,
-        PairKey nvarchar(50), ReconBatchNoPumpIT int
+        PairKey nvarchar(50), ReconBatchNoPumpIT int,
+        /* CashBags only — see the header. Wider than the source columns
+           (nvarchar(11), and 20 + 1 + 35) so a widened legacy column is a
+           longer value here rather than a truncation error. */
+        CashierCode nvarchar(50) NULL, CashierName nvarchar(200) NULL,
+        DropSafeAmount money NULL
     );
 
     IF @ReconArea = 'ABSA'
@@ -207,12 +238,18 @@ BEGIN
 
     ELSE IF @ReconArea = 'CashBags'
         /* The one deposit table with a key of its own, so a manual match on
-           this area can address its rows by id rather than by value. */
-        INSERT INTO @Mops (SourceId, SourceKey, SourceRef, SourceRef2, SourceDate, Amount, PairKey, ReconBatchNoPumpIT)
+           this area can address its rows by id rather than by value.
+
+           The cashier is read off the view, which already resolved it one row
+           per bag (v1__13j). The code arrives trimmed; NULLIF turns a blank
+           one into the NULL that "no cashier recorded" is everywhere else. */
+        INSERT INTO @Mops (SourceId, SourceKey, SourceRef, SourceRef2, SourceDate, Amount, PairKey, ReconBatchNoPumpIT,
+                           CashierCode, CashierName, DropSafeAmount)
         SELECT TOP (@MaxRows) d.DailyBankingCashBagID,
                LTRIM(RTRIM(d.CashBagNo)), LTRIM(RTRIM(d.CashBagNo)), NULL,
                d.TransactionDate, d.CashBagAmount,
-               LTRIM(RTRIM(d.CashBagNo)), d.ReconBatchNoPumpIT
+               LTRIM(RTRIM(d.CashBagNo)), d.ReconBatchNoPumpIT,
+               NULLIF(d.CashierCode, ''), d.CashierName, d.DropSafeAmount
         FROM agora.vw_DailyBankingCashBags d
         WHERE d.BranchId = @BranchId
           AND d.TransactionDate >= @FromDate AND d.TransactionDate <= @ToDate
@@ -301,20 +338,44 @@ BEGIN
     LEFT JOIN @Pair p ON p.PairKey = b.PairKey
     ORDER BY ISNULL(p.ColourIndex, 2147483647), b.LineDate, b.BankStatementLineID;
 
-    SELECT m.RowNo,
-           m.SourceId,
-           m.SourceKey,
-           m.SourceRef,
-           m.SourceRef2,
-           m.SourceDate,
-           m.Amount,
-           m.PairKey,
-           ISNULL(p.ColourIndex, 0) AS ColourIndex,
-           m.ReconBatchNoPumpIT,
-           CONVERT(bit, CASE WHEN m.ReconBatchNoPumpIT = 0 THEN 1 ELSE 0 END) AS IsOutstanding
-    FROM @Mops m
-    LEFT JOIN @Pair p ON p.PairKey = m.PairKey
-    ORDER BY ISNULL(p.ColourIndex, 2147483647), m.SourceDate, m.SourceKey;
+    /* Two statements rather than one with the cashier columns always present:
+       the shape itself says whether this area names a cashier per row, so the
+       other four areas return exactly what they returned before and the
+       screen draws a Cashier column only where there is one. Everything above
+       the last three columns is the same list in the same order. */
+    IF @ReconArea = 'CashBags'
+        SELECT m.RowNo,
+               m.SourceId,
+               m.SourceKey,
+               m.SourceRef,
+               m.SourceRef2,
+               m.SourceDate,
+               m.Amount,
+               m.PairKey,
+               ISNULL(p.ColourIndex, 0) AS ColourIndex,
+               m.ReconBatchNoPumpIT,
+               CONVERT(bit, CASE WHEN m.ReconBatchNoPumpIT = 0 THEN 1 ELSE 0 END) AS IsOutstanding,
+               m.CashierCode,
+               m.CashierName,
+               m.DropSafeAmount
+        FROM @Mops m
+        LEFT JOIN @Pair p ON p.PairKey = m.PairKey
+        ORDER BY ISNULL(p.ColourIndex, 2147483647), m.SourceDate, m.SourceKey;
+    ELSE
+        SELECT m.RowNo,
+               m.SourceId,
+               m.SourceKey,
+               m.SourceRef,
+               m.SourceRef2,
+               m.SourceDate,
+               m.Amount,
+               m.PairKey,
+               ISNULL(p.ColourIndex, 0) AS ColourIndex,
+               m.ReconBatchNoPumpIT,
+               CONVERT(bit, CASE WHEN m.ReconBatchNoPumpIT = 0 THEN 1 ELSE 0 END) AS IsOutstanding
+        FROM @Mops m
+        LEFT JOIN @Pair p ON p.PairKey = m.PairKey
+        ORDER BY ISNULL(p.ColourIndex, 2147483647), m.SourceDate, m.SourceKey;
 
     /* Result set 3: what the screen needs to describe itself honestly — how
        many of each side, how much, how many pairs have a colour, and whether

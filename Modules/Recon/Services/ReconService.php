@@ -163,13 +163,19 @@ class ReconService
      */
     public function reverse(ReconRun $run, string $reason): object
     {
-        return $this->procedures->write('usp_Recon_Reverse', [
+        $status = $this->procedures->write('usp_Recon_Reverse', [
             'BranchId' => $run->BranchId,
             'RunId' => $run->Id,
             'BatchId' => null,
             'Reason' => $reason,
             'UserId' => auth()->id(),
         ]);
+
+        // A reversal declines the staff shorts its match raised (T040); their
+        // raisers are told. Guarded: a mail never fails the reversal.
+        ReconMatchService::tellStaffShortApprovers('reverse');
+
+        return $status;
     }
 
     /**
@@ -369,6 +375,36 @@ class ReconService
     }
 
     /**
+     * The split by cashier a cash-bag run's matches were confirmed with.
+     *
+     * agora.usp_Recon_GetAllocation: the lines (reversed ones included,
+     * marked) and, per batch, the sums of those lines beside the batch's own
+     * figures and whether they tie. Null on any other area, and on a CashBags
+     * run with no split — an auto run stamps no split, only a match by hand
+     * does — so the caller has one test for "nothing to show".
+     *
+     * @return array{lines: Collection<int, object>, batches: Collection<int, object>}|null
+     */
+    public function allocation(ReconRun $run): ?array
+    {
+        if ($run->ReconArea !== 'CashBags') {
+            return null;
+        }
+
+        $sets = $this->procedures->callSets('usp_Recon_GetAllocation', [
+            'BranchId' => $run->BranchId,
+            'RunId' => $run->Id,
+        ]);
+
+        $lines = $sets[0] ?? collect();
+
+        return $lines->isEmpty() ? null : [
+            'lines' => $lines,
+            'batches' => $sets[1] ?? collect(),
+        ];
+    }
+
+    /**
      * The rows behind one proposal.
      *
      * A proposal is an aggregate — two bank lines totalling R15,137.40 against
@@ -522,12 +558,56 @@ class ReconService
          * BRN_DailyBanking* tables and would find nothing anyway now that
          * ReconBatchNoPumpIT is set.
          */
+        if ($run->ReconArea !== 'CashBags') {
+            $mops = $connection->select("
+                SELECT m.SourceDate,
+                       JSON_VALUE(m.SourceKeyJson, '$.ref') AS SourceRef,
+                       JSON_VALUE(m.SourceKeyJson, '$.key') AS Detail,
+                       m.Amount
+                FROM [{$schema}].[ReconMatch] m
+                WHERE m.RunLineId = ? AND m.Side = 'mops'
+                ORDER BY m.SourceDate, m.Id
+            ", [$line->Id]);
+
+            return [
+                'bank' => collect($bank),
+                'mops' => collect($mops),
+            ];
+        }
+
+        /*
+         * CASH BAGS carry their cashier and the split line they were accounted
+         * on, in the same columns usp_Recon_DrillMops returns for them, so a
+         * committed line and a drilled one read the same. The bag is the one
+         * deposit with an id of its own (SourceId), which names its row in
+         * agora.vw_DailyBankingCashBags exactly; the split is THIS batch's
+         * (m.BatchId), for the bag's cashier, NULL-safe. The view is one row
+         * per bag and the split's natural key is (BranchId, BatchId,
+         * CashierCode), so neither join can add a row — and the row count here
+         * stays the count of ReconMatch rows, as before.
+         */
         $mops = $connection->select("
             SELECT m.SourceDate,
                    JSON_VALUE(m.SourceKeyJson, '$.ref') AS SourceRef,
                    JSON_VALUE(m.SourceKeyJson, '$.key') AS Detail,
-                   m.Amount
+                   m.Amount,
+                   m.SourceId,
+                   NULLIF(c.CashierCode, N'') AS CashierCode,
+                   c.CashierName,
+                   c.DropSafeAmount,
+                   al.BatchNo       AS AllocationBatchNo,
+                   al.Share         AS AllocationShare,
+                   al.Accountable   AS AllocationAccountable,
+                   al.ShortStatus   AS AllocationShortStatus,
+                   al.StaffShortsNo AS AllocationStaffShortsNo
             FROM [{$schema}].[ReconMatch] m
+            OUTER APPLY (SELECT TOP 1 v.CashierCode, v.CashierName, v.DropSafeAmount
+                         FROM [{$schema}].[vw_DailyBankingCashBags] v
+                         WHERE v.BranchId = m.BranchId AND v.DailyBankingCashBagID = m.SourceId) c
+            OUTER APPLY (SELECT TOP 1 a.BatchNo, a.Share, a.Accountable, a.ShortStatus, a.StaffShortsNo
+                         FROM [{$schema}].[ReconAllocation] a
+                         WHERE a.BranchId = m.BranchId AND a.BatchId = m.BatchId
+                           AND ISNULL(a.CashierCode, N'') = ISNULL(NULLIF(c.CashierCode, N''), N'')) al
             WHERE m.RunLineId = ? AND m.Side = 'mops'
             ORDER BY m.SourceDate, m.Id
         ", [$line->Id]);

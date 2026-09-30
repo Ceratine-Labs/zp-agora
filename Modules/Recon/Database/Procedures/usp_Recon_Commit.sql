@@ -5,8 +5,10 @@
    RECORDED run proposed, and write down exactly what was stamped so it can be
    undone.
 
-   ** THIS IS THE ONLY PROCEDURE IN AGORA THAT WRITES TO THE CUSTOMER'S
-   ** ESTATE. It writes three things and nothing else:
+   ** ONE OF THE PROCEDURES CLAUDE.md RULE 1 NAMES AS WRITING TO THE
+   ** CUSTOMER'S ESTATE. The list lives there, with the columns each one may
+   ** touch, and nothing joins it without Ryan's named go-ahead.
+   ** This one writes three things and nothing else:
    **
    **   PumpIT.dbo.SS_UniqueNumber              the batch counter, incremented
    **   PumpIT.dbo.RCN_BankStatementLinesPumpIT ReconBatchNo, ReconState = 2
@@ -234,7 +236,11 @@ BEGIN
                unlike the bank side there is no @MopsClaimed to move it into.
                The screen passes 1; the writer passes 0 and behaves exactly as
                it did before the parameter existed. */
-            @IncludeReconciled = 0;
+            @IncludeReconciled = 0,
+            /* The seven columns @DrillM has always held, on every area. On
+               cash bags the screen also asks for each bag's cashier and split
+               line; the commit reads neither, so it does not pay for them. */
+            @WithCashier = 0;
 
         INSERT INTO @Bank SELECT @Id, * FROM @Drill;
         INSERT INTO @Mops SELECT @Id, * FROM @DrillM;
@@ -305,7 +311,11 @@ BEGIN
 
     BEGIN TRANSACTION;
 
-    DECLARE @No int, @BatchId bigint, @Now datetime2(0) = SYSDATETIME();
+    /* UTC, the application's clock (config app.timezone), so CommittedAt sits
+       on the same clock as the CreatedAt the preview wrote. SYSDATETIME() is
+       the server's wall clock, +02:00 on ZP-MIST-SVR, and put "Committed"
+       two hours in the future on the run page (fixed 24 Sep 2026, v1__13py). */
+    DECLARE @No int, @BatchId bigint, @Now datetime2(0) = SYSUTCDATETIME();
 
     DECLARE go CURSOR LOCAL FAST_FORWARD FOR
         SELECT RunLineId, KeyRef, KeyRef2, MopsRef FROM @Rows WHERE Outcome IS NULL;

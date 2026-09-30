@@ -22,7 +22,36 @@
    The batch number is NOT returned to SS_UniqueNumber. Gaps in a counter are
    harmless; handing the same number out twice is not.
 
-   Refusals: BATCH_NOT_FOUND · ALREADY_REVERSED · REASON_REQUIRED
+   THE SPLIT BY CASHIER (task 01a084fd-07f8, 27 Sep 2026). A cash-bag manual
+   match keeps its split in agora.ReconAllocation. Reversing the batch marks
+   those lines reversed, in the same transaction — ReversedAt, ReversedBy and
+   the reason, as the batch carries them — and never deletes them: the numbers
+   the clerk confirmed stay readable beside the reversal. A line whose staff
+   short was due and not yet raised ('pending') becomes 'cancelled', because
+   nothing is due once the match is undone.
+
+   A SHORT THE MATCH RAISED (T040; Ryan, 27 Sep 2026, PM decision 01a0e388):
+     · still waiting for approval  DECLINED, inside this transaction, through
+                                   agora.usp_Cash_DeclineStaffShort, with a
+                                   reason naming the reversal; its line
+                                   becomes 'cancelled' and keeps StaffShortsNo
+     · already declined            nothing to do; its line becomes 'cancelled'
+     · approved                    the reversal is REFUSED (SHORT_RAISED),
+                                   naming the short and telling the clerk to
+                                   WITHDRAW it in Cash first
+                                   (usp_Cash_WithdrawStaffShort, PM decision
+                                   01a0e5b5); once withdrawn it is declined, and
+                                   the reversal goes through as below
+     · posted to a cashup          REFUSED (SHORT_RAISED): a posted short is not
+                                   withdrawn. Agora never posts one a match
+                                   raised (CASH_SHORT_FROM_RECON), so only a
+                                   post made in PumpIT's own client gets here
+   So the only PumpIT write this adds is the decline's (its header lists it:
+   BRN_StaffShorts IsDeclined, DeclinedReason, DeclinedByUserId, DeclinedDate).
+
+   Refusals: BATCH_NOT_FOUND · ALREADY_REVERSED · REASON_REQUIRED ·
+             SHORT_RAISED — and agora.usp_Cash_DeclineStaffShort's own, which
+             roll the whole reversal back
    ============================================================================ */
 
 CREATE OR ALTER PROCEDURE [agora].[usp_Recon_Reverse]
@@ -63,7 +92,47 @@ BEGIN
         THROW 51000, 'AGORA:BATCH_NOT_FOUND:No committed reconciliation matches that on this branch.', 1;
     END
 
-    DECLARE @Now datetime2(0) = SYSDATETIME(), @Bank int = 0, @Mops int = 0;
+    /*
+     * T040 CALL SITE — the staff shorts this match raised.
+     *
+     * Reversing a match must not leave a cashier charged for a variance that
+     * no longer exists. Ryan, 27 Sep 2026 (PM decision 01a0e388): a short
+     * still waiting for approval is DECLINED automatically, in the
+     * transaction below; one that has been approved or posted stops the
+     * reversal until it is dealt with in Cash — an approved one by
+     * withdrawing it there (PM decision 01a0e5b5), after which it is declined
+     * and this goes through. Read here, before anything is
+     * written, like every other refusal; re-checked under lock by the decline.
+     */
+    DECLARE @Raised TABLE (AllocId bigint PRIMARY KEY, BatchNo int, StaffShortsNo int, CashierCode nvarchar(50),
+                           Found bit, Approved bit, Declined bit, Posted bit);
+
+    INSERT INTO @Raised (AllocId, BatchNo, StaffShortsNo, CashierCode, Found, Approved, Declined, Posted)
+    SELECT a.Id, a.BatchNo, a.StaffShortsNo, a.CashierCode,
+           CASE WHEN s.StaffShortsNo IS NULL THEN 0 ELSE 1 END,
+           ISNULL(s.Approved, 0), ISNULL(s.IsDeclined, 0),
+           CASE WHEN ISNULL(s.IsSelectedForDailyBanking, 0) = 1 OR p.StaffShortsNo IS NOT NULL THEN 1 ELSE 0 END
+    FROM agora.ReconAllocation a
+    JOIN @Targets t ON t.BatchId = a.BatchId
+    LEFT JOIN [PumpIT].dbo.BRN_StaffShorts s ON s.SSBranchId = a.BranchId AND s.StaffShortsNo = a.StaffShortsNo
+    OUTER APPLY (SELECT TOP 1 x.StaffShortsNo FROM [PumpIT].dbo.BRN_DailyBankingEmployees x
+                 WHERE x.SSBranchId = a.BranchId AND x.StaffShortsNo = a.StaffShortsNo) p
+    WHERE a.BranchId = @BranchId AND a.ReversedAt IS NULL AND a.ShortStatus = 'raised';
+
+    IF EXISTS (SELECT 1 FROM @Raised WHERE Declined = 0 AND (Approved = 1 OR Posted = 1))
+    BEGIN
+        DECLARE @Held nvarchar(2048) = (
+            SELECT TOP 1 CONCAT(N'AGORA:SHORT_RAISED:This match raised staff short ', r.StaffShortsNo, N' for ', r.CashierCode,
+                                CASE WHEN r.Posted = 1
+                                     THEN N', and it is on a cashup, which counts it — it cannot be withdrawn, so this match cannot be reversed until the short is taken off that cashup.'
+                                     ELSE N', and it has already been approved. Withdraw it in Cash first (Cash → Staff shorts → the short → Withdraw), then reverse the match.' END,
+                                N' Nothing was changed.')
+            FROM @Raised r WHERE r.Declined = 0 AND (r.Approved = 1 OR r.Posted = 1) ORDER BY r.StaffShortsNo);
+        THROW 51000, @Held, 1;
+    END
+
+    /* UTC, the application's clock — see usp_Recon_Commit. */
+    DECLARE @Now datetime2(0) = SYSUTCDATETIME(), @Bank int = 0, @Mops int = 0, @Lines int = 0;
 
     BEGIN TRANSACTION;
 
@@ -132,6 +201,50 @@ BEGIN
     JOIN @Targets t ON t.BatchId = b.Id
     WHERE b.BranchId = @BranchId;
 
+    /* The shorts it raised that are still waiting: declined, through Cash,
+       with a reason naming this reversal. */
+    DECLARE @DeclineNo int, @DeclineBatch int, @DeclineReason nvarchar(400), @Declined int = 0;
+
+    DECLARE waiting CURSOR LOCAL FAST_FORWARD FOR
+        SELECT StaffShortsNo, BatchNo FROM @Raised
+        WHERE Found = 1 AND Declined = 0 AND Approved = 0 AND Posted = 0
+        ORDER BY StaffShortsNo;
+    OPEN waiting;
+    FETCH NEXT FROM waiting INTO @DeclineNo, @DeclineBatch;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @DeclineReason = LEFT(CONCAT(N'Recon batch ', @DeclineBatch, N' reversed: ', @Reason), 400);
+
+        EXEC agora.usp_Cash_DeclineStaffShort
+             @BranchId      = @BranchId,
+             @StaffShortsNo = @DeclineNo,
+             @Reason        = @DeclineReason,
+             @WriteMode     = 'live',
+             @UserId        = @UserId,
+             @Quiet         = 1;
+
+        SET @Declined = @Declined + 1;
+        FETCH NEXT FROM waiting INTO @DeclineNo, @DeclineBatch;
+    END
+
+    CLOSE waiting;
+    DEALLOCATE waiting;
+
+    /* The split by cashier goes with its batch: marked, never deleted, the
+       figures left as they were confirmed. A short that was due and never
+       raised is no longer due, and neither is one the reversal declined (or
+       an approver had): 'cancelled', keeping the number it was raised as. */
+    UPDATE a
+    SET a.ReversedAt = @Now, a.ReversedBy = @UserId, a.ReversalReason = @Reason,
+        a.ShortStatus = CASE WHEN a.ShortStatus IN ('pending', 'raised') THEN 'cancelled' ELSE a.ShortStatus END,
+        a.UpdatedAt = @Now, a.UpdatedBy = @UserId
+    FROM agora.ReconAllocation a
+    JOIN @Targets t ON t.BatchId = a.BatchId
+    WHERE a.BranchId = @BranchId
+      AND a.ReversedAt IS NULL;
+    SET @Lines = @@ROWCOUNT;
+
     /* The proposals go back to pending, so the run can be executed again once
        whatever caused the reversal is dealt with. */
     UPDATE l
@@ -159,6 +272,13 @@ BEGIN
            'REVERSED'       AS Code,
            CONVERT(nvarchar(10), (SELECT COUNT(*) FROM @Targets)) + ' batch(es) reversed — '
              + CONVERT(nvarchar(10), @Bank) + ' bank lines and '
-             + CONVERT(nvarchar(10), @Mops) + ' deposit rows put back.' AS Message,
+             + CONVERT(nvarchar(10), @Mops) + ' deposit rows put back.'
+             + CASE WHEN @Lines = 0 THEN ''
+                    ELSE ' The split by cashier (' + CONVERT(nvarchar(10), @Lines) + ' line(s)) is kept, marked reversed.' END
+             + CASE WHEN @Declined = 0 THEN ''
+                    ELSE ' Staff short' + CASE WHEN @Declined = 1 THEN ' ' ELSE 's ' END
+                         + (SELECT STRING_AGG(CONVERT(nvarchar(12), StaffShortsNo), ', ') WITHIN GROUP (ORDER BY StaffShortsNo)
+                            FROM @Raised WHERE Found = 1 AND Declined = 0 AND Approved = 0 AND Posted = 0)
+                         + ' declined with it.' END AS Message,
            CONVERT(bigint, (SELECT COUNT(*) FROM @Targets)) AS Id;
 END

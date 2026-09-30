@@ -122,7 +122,7 @@
                     <th>Batch</th>
                     <th class="num">Deposits</th>
                     <th class="num">Days</th>
-                    <th class="num" title="The deposits less the bank side. Only a close suggestion has one.">Difference</th>
+                    <th class="num" title="The bank side less the deposits: negative is money the bank did not receive. Only a close suggestion has one.">Bank less deposits</th>
                     {{-- A floor, not a width: the reading and its caution are the
                          sentence a clerk decides on, and eleven columns squeezed
                          it to a word a line. --}}
@@ -136,7 +136,12 @@
                     $tier = $tiers[$s->Confidence] ?? $tiers['possible'];
                     $isStrong = $s->Confidence === 'strong';
                     $isClose = $s->Confidence === 'close';
+                    // Stored deposits less bank (the sign ManualMatch records);
+                    // SHOWN bank less deposits, as every recon screen shows it
+                    // (Ryan, 27 Sep 2026). $diff stays the stored sign because
+                    // data-diff feeds recon-suggest.js, which words it itself.
                     $diff = (float) ($s->DiffAmount ?? 0);
+                    $bankLess = -$diff;
                     $takings = substr((string) $s->MopsFrom, 0, 10) === substr((string) $s->MopsTo, 0, 10)
                         ? substr((string) $s->MopsFrom, 0, 10)
                         : substr((string) $s->MopsFrom, 0, 10).' – '.substr((string) $s->MopsTo, 5, 5);
@@ -153,11 +158,11 @@
                     <td class="mono" style="font-size:11px">{{ Str::limit((string) $s->Batches, 30) }}</td>
                     <td class="num">{{ \App\Support\Format::n($s->MopsRows) }}</td>
                     <td class="num">{{ $s->LagDays }}</td>
-                    {{-- Signed as the procedure records it: deposits less bank.
-                         An exact suggestion has no difference, which is a dash,
-                         never R0.00. --}}
+                    {{-- Bank less deposits: negative is money the bank did not
+                         receive. An exact suggestion has no difference, which is
+                         a dash, never R0.00. --}}
                     <td class="num" @if ($isClose) data-tone="serious" @endif>
-                        {{ $isClose ? ($diff > 0 ? '+' : '−').\App\Support\Format::r(abs($diff)) : '—' }}
+                        {{ $isClose ? ($bankLess > 0 ? '+' : '−').\App\Support\Format::r(abs($bankLess)) : '—' }}
                     </td>
                     <td style="font-size:12px">
                         {{ $s->Basis }}
@@ -177,7 +182,7 @@
                                       ? ($live ? 'Force this match in PumpIT?' : 'Record this forced match?')
                                       : ($live ? 'Match this suggestion in PumpIT?' : 'Record this match?') }}"
                                   data-confirm-text="{{ $isClose
-                                      ? 'Bank '.\App\Support\Format::r($s->BankTotal).' against deposits of '.\App\Support\Format::r($s->MopsTotal).': a variance of '.\App\Support\Format::r(abs($diff)).'. Your reason is recorded with the batch and shown wherever it is. '.($live ? 'Every row is re-read first, and it can be reversed from the run it creates.' : 'Journal mode: nothing in PumpIT changes.')
+                                      ? 'Bank '.\App\Support\Format::r($s->BankTotal).' against deposits of '.\App\Support\Format::r($s->MopsTotal).': a variance of '.\App\Support\Format::r($bankLess).', bank less deposits — the bank is '.\App\Support\Format::r(abs($bankLess)).($bankLess < 0 ? ' short of' : ' over').' the deposits. Your reason is recorded with the batch and shown wherever it is. '.($live ? 'Every row is re-read first, and it can be reversed from the run it creates.' : 'Journal mode: nothing in PumpIT changes.')
                                       : ($live
                                           ? $s->BankLines.' bank '.Str::plural('line', (int) $s->BankLines).' and '.$s->MopsRows.' '.Str::plural('deposit', (int) $s->MopsRows).', '.\App\Support\Format::r($s->BankTotal).' each side. Every row is re-read first, and it can be reversed from the run it creates.'
                                           : 'Journal mode: the match is recorded here and nothing in PumpIT changes.') }}"

@@ -22,6 +22,37 @@
     reason field and the Match button all belong to the same submission, and a
     component that opened its own form would put them in two.
 
+    A CASHIER COLUMN WHERE THE DEPOSIT HAS ONE (27 Sep 2026). A cash bag
+    belongs to the cashier who dropped it, and GetSides returns CashierCode and
+    CashierName on CashBags rows only. The column follows the SHAPE of the rows
+    rather than the area's name, as the time beside the date follows the value:
+    the other four areas' rows carry no such column and render exactly as they
+    did. Never a blank cell — a code that did not resolve at the branch shows
+    the code and says it is not on the employee list, and a bag with no
+    drop-safe row says that. Each deposit row also carries the cashier as data
+    (`data-cashier-code`, empty for a bag with no drop-safe row, and
+    `data-cashier-name` only when it resolved), so a script can group the
+    ticked bags by cashier without reading the text.
+
+    THE DROP-SAFE AMOUNT BESIDE THE BAG'S (27 Sep 2026). Amount is what the
+    bag was banked as (CashBagAmount), and it is what the match and the split
+    add up. What was declared at the safe (BRN_DropSafe.Amount) sits beside it,
+    and a bag where the two differ carries an "adjusted" chip — Ryan's call of
+    9 Sep 2026, so an adjusted bag is seen rather than reconciled away. The
+    Second column is always blank on cash bags, so it gives way to this one.
+    The row carries it as `data-drop-safe` (empty for no drop-safe row).
+
+    THE SPLIT BY CASHIER (27 Sep 2026). Where the rows carry a cashier, a panel
+    above the two sides — hidden until a bag is ticked — groups the ticked bags
+    by cashier: bags, banked, drop safe, a share of the variance and what that
+    leaves them accountable for. The share is DERIVED pro rata by what each
+    banked (Ryan, 9 Sep 2026) and can be changed by hand; the split has to add
+    up to the variance or the Match button stays disabled, and the procedure
+    refuses it anyway (ALLOCATION_INCOMPLETE). The panel posts one hidden field,
+    `allocation`, as JSON; recon-match.js draws the lines and keeps it in step.
+    agora.usp_Recon_ManualMatch is the authority on the derived share — the
+    script mirrors its arithmetic to draw the default, nothing more.
+
     Props:
       bank     rows from agora.usp_Recon_GetSides, result set 1
       mops     the same procedure's result set 2
@@ -43,7 +74,49 @@
     // honest — two distant groups sharing a hue is a smaller problem than a
     // group with no hue at all — and the chip still says which is which.
     $palette = 10;
+    // Read off the result set's shape: only CashBags rows carry the column,
+    // and a result set has one shape, so the first row answers for all of
+    // them. No rows, no column — the empty state says there is nothing to
+    // attribute.
+    $cashier = $mops->isNotEmpty() && property_exists($mops->first(), 'CashierCode');
 @endphp
+
+@if ($cashier)
+    {{-- The split by cashier. Hidden until a bag is ticked; recon-match.js
+         draws one line per cashier among the ticked bags and keeps the hidden
+         field below in step with what is on screen. It lives inside the
+         page's form like everything else here, so it posts with the match. --}}
+    <div data-match-allocation hidden>
+        <input type="hidden" name="allocation" value="" data-alloc-json>
+
+        <div class="twopane" style="grid-template-columns:1fr">
+            <div class="twopane-side">
+                <div class="twopane-head">
+                    <h3>Who the cash is accounted to</h3>
+                    <span class="muted" data-alloc-head></span>
+                </div>
+
+                <x-table dense id="match-alloc">
+                    <x-slot:head>
+                        <tr>
+                            <th>Cashier</th>
+                            <th class="num">Bags</th>
+                            <th class="num">Banked</th>
+                            <th class="num">Drop safe</th>
+                            <th class="num">Share of the variance</th>
+                            <th class="num">Accountable</th>
+                        </tr>
+                    </x-slot:head>
+                </x-table>
+
+                <div class="twopane-head" style="border-bottom:0;border-top:1px solid var(--line)">
+                    <span data-alloc-state style="font-size:12px"></span>
+                    <button type="button" class="btn-ghost" data-alloc-reset hidden>Put back the derived split</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
 
 <div class="twopane" data-two-pane>
     <div class="twopane-side">
@@ -107,14 +180,24 @@
                 {{ \App\Support\Format::r($summary->MopsTotal ?? 0) }}</span>
         </div>
 
-        <x-table dense :count="$mops->count()" id="match-mops" tools
+        {{-- `fit` on cash bags only: the cashier and the drop-safe amount
+             make it the widest deposit table, and at half a 1440px window the
+             Amount column scrolled out of sight. fit pins the numeric columns
+             to their content, so the surplus goes to the cashier's name. The
+             other areas render as they always have. --}}
+        <x-table dense :fit="$cashier" :count="$mops->count()" id="match-mops" tools
                  empty="Nothing on the deposit side is outstanding for this site and period.">
             <x-slot:head>
                 <tr>
                     <th class="pick"><input type="checkbox" data-pane-all="mops" aria-label="Select every deposit"></th>
                     <th>Date &amp; time</th>
                     <th>{{ $keyLabel }}</th>
-                    <th>Second</th>
+                    @if ($cashier)
+                        <th>Cashier</th>
+                        <th class="num">Drop safe</th>
+                    @else
+                        <th>Second</th>
+                    @endif
                     <th class="num">Amount</th>
                 </tr>
             </x-slot:head>
@@ -122,7 +205,12 @@
             @foreach ($mops as $row)
                 <tr class="{{ $row->ColourIndex > 0 ? 'pk pk-'.((($row->ColourIndex - 1) % $palette) + 1) : '' }}"
                     data-pane-row="mops" data-pair-key="{{ $row->PairKey }}"
-                    data-amount="{{ $row->Amount }}">
+                    data-amount="{{ $row->Amount }}"
+                    @if ($cashier)
+                        data-cashier-code="{{ $row->CashierCode }}"
+                        @if (! blank($row->CashierName)) data-cashier-name="{{ $row->CashierName }}" @endif
+                        data-drop-safe="{{ $row->DropSafeAmount ?? '' }}"
+                    @endif>
                     <td class="pick">
                         {{-- The deposit family mostly has no id of its own, so
                              the row is named by the triple that identifies it,
@@ -154,7 +242,50 @@
                     <td>
                         <x-chip :tone="$row->ColourIndex > 0 ? 'good' : 'neutral'">{{ $row->SourceKey }}</x-chip>
                     </td>
-                    <td class="mono" style="font-size:11px">{{ $row->SourceRef2 ?? '—' }}</td>
+                    @unless ($cashier)
+                        <td class="mono" style="font-size:11px">{{ $row->SourceRef2 ?? '—' }}</td>
+                    @endunless
+                    @if ($cashier)
+                        {{-- data-sort is what the column's filter lists and
+                             sorts on, so "one cashier's bags" is a tick in
+                             the filter rather than a search through names. --}}
+                        @if (blank($row->CashierCode))
+                            <td data-sort="No drop-safe row">
+                                <span class="muted" style="font-size:11px"
+                                      title="This bag has no BRN_DropSafe row, so nothing records who dropped it">no drop-safe row</span>
+                            </td>
+                        @elseif (blank($row->CashierName))
+                            <td data-sort="{{ $row->CashierCode }} · not on the employee list">
+                                <span class="mono">{{ $row->CashierCode }}</span>
+                                <x-chip tone="warn" :dot="false"
+                                        title="The drop safe names this code, and BRN_Employee has no one by it at this site">not on the employee list</x-chip>
+                            </td>
+                        @else
+                            <td data-sort="{{ $row->CashierName }} · {{ $row->CashierCode }}">
+                                {{ $row->CashierName }}
+                                <span class="mono muted" style="font-size:11px">{{ $row->CashierCode }}</span>
+                            </td>
+                        @endif
+
+                        {{-- What was declared at the safe, beside what was
+                             banked. Compared in cents: both arrive as money
+                             strings with four places. --}}
+                        @if ($row->DropSafeAmount === null)
+                            <td class="num"><span class="muted" style="font-size:11px">—</span></td>
+                        @elseif ((int) round((float) $row->DropSafeAmount * 100) !== (int) round((float) $row->Amount * 100))
+                            {{-- The chip on a line of its own under the
+                                 figure: beside it, it widened the column
+                                 enough to push Amount out of a half-width
+                                 pane, for the one bag in fifteen it marks. --}}
+                            <td class="num" data-sort="{{ $row->DropSafeAmount }}">
+                                {{ \App\Support\Format::r($row->DropSafeAmount) }}
+                                <div><x-chip tone="warn" :dot="false"
+                                        title="Declared {{ \App\Support\Format::r($row->DropSafeAmount) }} at the drop safe; the bag was banked as {{ \App\Support\Format::r($row->Amount) }}">adjusted</x-chip></div>
+                            </td>
+                        @else
+                            <td class="num" data-sort="{{ $row->DropSafeAmount }}">{{ \App\Support\Format::r($row->DropSafeAmount) }}</td>
+                        @endif
+                    @endif
                     <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>
                 </tr>
             @endforeach

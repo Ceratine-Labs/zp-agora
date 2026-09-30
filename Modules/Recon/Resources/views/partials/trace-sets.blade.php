@@ -1,7 +1,8 @@
 {{--
-    The seven answers, in the order a reconciliation happens: what was
-    proposed, what was allocated, what was touched, what was written — and
-    then the estate as it stands right now, which is the check on all of it.
+    The eight answers, in the order a reconciliation happens: what was
+    proposed, what was allocated, what was touched, whose cash it was, what
+    was written — and then the estate as it stands right now, which is the
+    check on all of it.
 
     Each card folds away once read and says plainly when it found nothing.
     An empty set is an answer here, not an absence: "no batch was ever
@@ -39,7 +40,7 @@
     <x-table tools :count="$sets['proposals']->count()" empty="No proposal carries this value.">
         <x-slot:head>
             <tr><th>Run</th><th>Reference</th><th>Outcome</th><th class="num">Bank</th>
-                <th class="num">Deposit</th><th class="num">Difference</th><th>State</th><th>Rule</th></tr>
+                <th class="num">Deposit</th><th class="num" title="The bank side less the deposits: negative is money the bank did not receive">Bank less deposits</th><th>State</th><th>Rule</th></tr>
         </x-slot:head>
         @foreach ($sets['proposals'] as $row)
             <tr>
@@ -52,7 +53,8 @@
                     @if ($row->NearRefNote)<br><span class="drill-line-id">{{ $row->NearRefNote }}</span>@endif</td>
                 <td class="num">{{ \App\Support\Format::r($row->BankTotal) }}</td>
                 <td class="num">{{ \App\Support\Format::r($row->MopsTotal) }}</td>
-                <td class="num">{{ (float) $row->DiffAmount === 0.0 ? '—' : \App\Support\Format::r($row->DiffAmount) }}</td>
+                {{-- Stored deposits less bank; shown bank less deposits, as the run page shows it. --}}
+                <td class="num">{{ (float) $row->DiffAmount === 0.0 ? '—' : \App\Support\Format::r(-(float) $row->DiffAmount) }}</td>
                 <td>{{ $row->CommitState }}@if ($row->ReconBatchNo)<br><span class="drill-line-id">batch {{ $row->ReconBatchNo }}</span>@endif
                     @if ($row->BlockReason)<br><span class="drill-line-id">{{ $row->BlockReason }}</span>@endif</td>
                 <td class="muted" style="font-size:11px">
@@ -106,6 +108,41 @@
                 <td class="muted" style="font-size:11px">
                     state {{ $row->PriorReconState ?? '—' }}, batch {{ $row->PriorBatchNo ?? '—' }}
                 </td>
+            </tr>
+        @endforeach
+    </x-table>
+</x-card>
+
+{{-- Cash bags only. Share is bank less bags, so a negative share is money
+     missing — the only kind that is due as a staff short. --}}
+<x-card title="Split by cashier"
+        sub="Whose cash a cash-bag match was accounted to, as the clerk confirmed it, and the staff short each line is due"
+        collapsible flush>
+    <x-table tools :count="$sets['allocations']->count()" empty="No cash-bag match carrying this value was split by cashier.">
+        <x-slot:head>
+            <tr><th>Batch</th><th>Cashier</th><th class="num">Bags</th><th class="num">Banked</th>
+                <th class="num">Drop safe</th><th class="num">Share</th><th class="num">Accountable</th>
+                <th>Staff short</th><th>Confirmed</th></tr>
+        </x-slot:head>
+        @foreach ($sets['allocations'] as $row)
+            {{-- The words every recon screen uses for a short, from one place. --}}
+            @php($short = \Modules\Recon\Support\StaffShort::describe($row->ShortStatus, $row->Share, $row->StaffShortsNo))
+            <tr>
+                <td class="mono">{{ $row->BatchNo }}
+                    <br><a class="drill-line-id" href="{{ route('app.recon.run', $row->RunId) }}">run #{{ $row->RunId }}</a></td>
+                <td>@if ($row->CashierCode){{ $row->CashierName ?? $row->CashierCode }}
+                        <br><span class="drill-line-id">{{ $row->CashierCode }}</span>
+                    @else<span class="muted">No cashier recorded</span>@endif</td>
+                <td class="num">{{ \App\Support\Format::n($row->Bags) }}</td>
+                <td class="num">{{ \App\Support\Format::r($row->Banked) }}</td>
+                <td class="num">{{ $row->DropSafe === null ? '—' : \App\Support\Format::r($row->DropSafe) }}</td>
+                <td class="num">{{ \App\Support\Format::r($row->Share) }}
+                    @if ($row->Basis === 'manual')<br><span class="drill-line-id">by hand; derived {{ \App\Support\Format::r($row->DerivedShare) }}</span>@endif</td>
+                <td class="num">{{ \App\Support\Format::r($row->Accountable) }}</td>
+                <td><x-chip :tone="$short[0]">{{ $short[1] }}</x-chip>
+                    @if ($row->ReversedAt)<br><span class="drill-line-id">reversed — {{ $row->ReversalReason }}</span>@endif</td>
+                <td class="muted">{{ $row->ConfirmedByName ?? '—' }}
+                    <br><span style="font-size:11px">{{ $row->ConfirmedAt ? \Illuminate\Support\Carbon::parse($row->ConfirmedAt)->diffForHumans() : '—' }}</span></td>
             </tr>
         @endforeach
     </x-table>

@@ -115,6 +115,7 @@ return [
             'columns' => [
                 ['key' => 'BranchName', 'label' => 'Site', 'type' => 'text', 'sort' => 'BranchName'],
                 ['key' => 'ZReadDate', 'label' => 'Date', 'type' => 'date', 'sort' => 'ZReadDate'],
+                ['key' => 'Location', 'label' => 'Location', 'type' => 'text', 'sort' => 'Location'],
                 ['key' => 'EodCounter', 'label' => 'EOD', 'type' => 'text', 'sort' => 'EodCounter'],
                 ['key' => 'TerminalNo', 'label' => 'Terminal', 'type' => 'text', 'sort' => 'TerminalNo'],
                 ['key' => 'LogFile', 'label' => 'Log file', 'type' => 'text', 'sort' => 'LogFile'],
@@ -129,8 +130,8 @@ return [
             'group' => 'The day',
             'menu' => 'the-day/open-cashups',
             'procedure' => 'usp_Reports_GridOpenCashups',
-            'blurb' => 'Cashups on a trading day that has never been balanced. Replaces the three '
-                .'"Cashups Not Closed <FY>" reports with one date range.',
+            'blurb' => 'Cashups nobody has signed off — not closed by a manager in Agora, and not on a day PumpIT '
+                .'has balanced. Replaces the three "Cashups Not Closed <FY>" reports with one date range.',
             'was' => ['Cashups Not Closed 2024 FY', 'Cashups Not Closed 2025 FY', 'Cashups Not Closed 2026 FY'],
             'columns' => [
                 ['key' => 'BranchName', 'label' => 'Site', 'type' => 'text', 'sort' => 'BranchName'],
@@ -138,8 +139,9 @@ return [
                 ['key' => 'ShiftDescription', 'label' => 'Shift', 'type' => 'text'],
                 ['key' => 'TillDescription', 'label' => 'Till', 'type' => 'text', 'sort' => 'TillNo'],
                 ['key' => 'EmployeeName', 'label' => 'Cashier', 'type' => 'text', 'sort' => 'EmployeeName'],
-                ['key' => 'ZReading', 'label' => 'Z-reading', 'type' => 'money', 'sort' => 'ZReading'],
+                ['key' => 'ZReading', 'label' => 'Z read', 'type' => 'money', 'sort' => 'ZReading'],
                 ['key' => 'Variance', 'label' => 'Variance', 'type' => 'money', 'sort' => 'Variance'],
+                ['key' => 'Status', 'label' => 'Cashup', 'type' => 'chip'],
                 ['key' => 'HoldingUp', 'label' => 'Holding it up', 'type' => 'text', 'sort' => 'HoldingUp'],
                 ['key' => 'AgeDays', 'label' => 'Age (days)', 'type' => 'number', 'sort' => 'AgeDays'],
             ],
@@ -284,25 +286,30 @@ return [
         ],
 
         'daily-banking' => [
-            'label' => 'Daily banking',
+            'label' => 'Daily banking — manager\'s view',
             'group' => 'Capture',
-            'menu' => 'capture/daily-banking',
+            // No `menu`: head office's Today → Capture → Daily banking opens the
+            // Daily Banking screen (Cash, app.cash.banking), where a cashup is
+            // opened, confirmed and closed. This is the same rows as a report in
+            // the library, and Cash → Cashups is the same rows as a working grid.
             'procedure' => 'usp_Reports_GridDailyBanking',
-            'blurb' => 'The daily banking as each till declared it: the Z-reading against the legs it '
-                .'was made up of, and the variance the cashier carried.',
-            'was' => [],
+            'blurb' => 'Every cashup with its Z read, what was actually declared across its legs and the variance '
+                .'— the same figures PumpIT\'s Daily Banking shows — and where it stands.',
+            'was' => ['Daily Banking - Managers View'],
             'columns' => [
                 ['key' => 'BranchName', 'label' => 'Site', 'type' => 'text', 'sort' => 'BranchName'],
                 ['key' => 'TransactionDate', 'label' => 'Date', 'type' => 'date', 'sort' => 'TransactionDate'],
                 ['key' => 'ShiftDescription', 'label' => 'Shift', 'type' => 'text'],
                 ['key' => 'TillDescription', 'label' => 'Till', 'type' => 'text', 'sort' => 'TillNo'],
                 ['key' => 'EmployeeName', 'label' => 'Cashier', 'type' => 'text', 'sort' => 'EmployeeName'],
-                ['key' => 'ZReading', 'label' => 'Z-reading', 'type' => 'money', 'sort' => 'ZReading'],
-                ['key' => 'DeclaredLegs', 'label' => 'Declared', 'type' => 'money', 'sort' => 'DeclaredLegs'],
-                ['key' => 'DeclaredVsZ', 'label' => 'Declared vs Z', 'type' => 'money', 'sort' => 'DeclaredVsZ'],
-                ['key' => 'CashierVariance', 'label' => 'Cashier variance', 'type' => 'money', 'sort' => 'CashierVariance'],
-                ['key' => 'AttendantShort', 'label' => 'Attendant short', 'type' => 'money', 'sort' => 'AttendantShort'],
-                ['key' => 'Status', 'label' => 'Status', 'type' => 'chip', 'sort' => 'Status'],
+                ['key' => 'ZReading', 'label' => 'Z read', 'type' => 'money', 'sort' => 'ZReading'],
+                ['key' => 'ActualTotal', 'label' => 'Actual total', 'type' => 'money', 'sort' => 'ActualTotal'],
+                ['key' => 'Variance', 'label' => 'Variance', 'type' => 'money', 'sort' => 'Variance'],
+                ['key' => 'CashBags', 'label' => 'Cash bags', 'type' => 'money', 'sort' => 'CashBags'],
+                ['key' => 'Cards', 'label' => 'Cards', 'type' => 'money', 'sort' => 'Cards'],
+                ['key' => 'PumpShortages', 'label' => 'Pump shortages', 'type' => 'money', 'sort' => 'PumpShortages'],
+                ['key' => 'ZreadCheck', 'label' => 'Z-read', 'type' => 'chip', 'sort' => 'ZreadCheck'],
+                ['key' => 'Status', 'label' => 'Cashup', 'type' => 'chip', 'sort' => 'Status'],
             ],
         ],
 
@@ -330,14 +337,23 @@ return [
             ],
         ],
 
+        /*
+         | Owned by Utilities (T056) since 27 Sep 2026: the `Utility meter
+         | readings` definition binds to the procedure behind the utilities
+         | screen's own grid, so the library and the screen give one answer.
+         | No `menu` key — Capture → Utility meters now opens the capture
+         | screen itself (Modules/Utilities MenuSeeder). The report's old
+         | procedure, usp_Reports_GridUtilityMeters, is still deployed and now
+         | unused; retiring it belongs to the Reports procedures migration.
+         */
         'utility-meters' => [
-            'label' => 'Utility meters',
+            'label' => 'Utility meter readings',
             'group' => 'Capture',
-            'menu' => 'capture/utility-meters',
-            'procedure' => 'usp_Reports_GridUtilityMeters',
-            'blurb' => 'Meter readings by site and meter, with the usage each implies. Usage is derived '
-                .'here rather than read — the legacy screen rewrites it with an UPDATE, and Agora never '
-                .'writes to PumpIT.',
+            'procedure' => 'usp_Utilities_GridReadings',
+            'blurb' => 'Every meter reading by site and meter, with the usage each implies: the closing, less '
+                .'the previous reading whenever it was taken, less prepaid units. A day PumpIT holds as 0 / 0 '
+                .'has not been read and shows as No reading, with no usage. The same procedure as the grid on '
+                .'the utilities screen.',
             'was' => [],
             'columns' => [
                 ['key' => 'BranchName', 'label' => 'Site', 'type' => 'text', 'sort' => 'BranchName'],

@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Modules\Recon\Models\ReconRun;
 use Modules\Recon\Models\ReconRunLine;
 use Modules\Recon\Services\ReconService;
+use Modules\Recon\Support\StaffShort;
 
 /**
  * The rows BEHIND a run's proposals — one side of them — as a grid source.
@@ -176,6 +177,21 @@ final class ReconSideSource implements GridSource
             'Detail' => $row->Detail ?? null,
             'SourceId' => $row->SourceId ?? null,
             'Amount' => $row->Amount ?? null,
+            // Cash bags only: whose bag, and the split line it was accounted
+            // on. Both reads return these under the same names (the drill for
+            // a proposal, agora.ReconMatch for a stamped one); every other
+            // area has none and they stay empty.
+            'CashierName' => $row->CashierName ?? null,
+            'CashierCode' => $row->CashierCode ?? null,
+            'DropSafeAmount' => $row->DropSafeAmount ?? null,
+            'AllocationBatchNo' => $row->AllocationBatchNo ?? null,
+            'AllocationShare' => $row->AllocationShare ?? null,
+            'AllocationAccountable' => $row->AllocationAccountable ?? null,
+            'AllocationShort' => StaffShort::words(
+                $row->AllocationShortStatus ?? null,
+                $row->AllocationShare ?? null,
+                $row->AllocationStaffShortsNo ?? null,
+            ),
         ]);
     }
 

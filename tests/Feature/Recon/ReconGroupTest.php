@@ -2,11 +2,16 @@
 
 namespace Tests\Feature\Recon;
 
+use App\Support\ProcedureService;
+use Closure;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\User;
 use Modules\Recon\Models\ReconRun;
 use Modules\Recon\Models\ReconRunGroup;
+use Modules\Recon\Services\ReconGroupService;
+use Modules\Recon\Services\ReconService;
+use PDOException;
 use Tests\TestCase;
 
 /**
@@ -21,6 +26,9 @@ use Tests\TestCase;
 class ReconGroupTest extends TestCase
 {
     private const NAME = 'TEST-group';
+
+    /** @var array<int, string> the procedures a stubbed ProcedureService was asked for */
+    private array $asked = [];
 
     protected function tearDown(): void
     {
@@ -300,6 +308,99 @@ class ReconGroupTest extends TestCase
 
         $this->assertArrayHasKey($site, $reloaded->runsByBranch()->all(),
             'The group screen keys its rows by branch off this.');
+    }
+
+    /**
+     * A site the procedure refuses records the procedure's own code.
+     *
+     * The catch used to read `$e->getCode() ?: 'REFUSED'`. getCode() is PHP's
+     * integer code, always 0 on an AgoraProcException — the AGORA code lives on
+     * code() — so every refused site in a group said REFUSED, whatever the
+     * procedure had actually THROWn.
+     *
+     * The procedure layer is stubbed at execute(), beneath the real parser:
+     * the refusal arrives as the message a THROW produces, and ProcedureService
+     * turns it into the exception exactly as it would on the instance. No
+     * procedure is sent to any database; only the TEST- rows are written.
+     */
+    public function test_a_site_refused_by_the_procedure_records_its_agora_code(): void
+    {
+        $group = $this->startGroup();
+        $site = $this->siteWithCriteria();
+        $procedures = $this->refusingProcedures('TEST_PREVIEW_REFUSED');
+
+        $run = (new ReconGroupService(new ReconService($procedures)))->runBranch($group, $site);
+
+        $this->assertSame([config('recon.areas.ABSA.procedure')], $this->asked,
+            'The preview procedure, and only it, should have been asked.');
+        $this->assertSame('failed', $run->Status);
+        $this->assertSame('TEST_PREVIEW_REFUSED', $run->FailureCode,
+            'The run must carry the code the procedure THREW, not the fallback.');
+        $this->assertSame('The test procedure refused this site.', $run->FailureMessage);
+        $this->assertSame('TEST_PREVIEW_REFUSED', $run->fresh()?->FailureCode, 'And so must the row.');
+        $this->assertSame(1, $group->fresh()?->FailedCount);
+    }
+
+    /** The same holds when a site is refused at the post rather than the preview. */
+    public function test_a_post_refused_by_the_procedure_reports_its_agora_code(): void
+    {
+        $group = $this->startGroup();
+        $site = $this->siteWithCriteria();
+
+        // A previewed run with no lines: the post is refused before any line
+        // could matter, so there is nothing for it to have proposed.
+        $run = ReconRun::create([
+            'BranchId' => $site,
+            'GroupRef' => $group->GroupRef,
+            'ReconArea' => $group->ReconArea,
+            'FromDate' => $group->FromDate->toDateString(),
+            'ToDate' => $group->ToDate->toDateString(),
+            'Status' => 'previewed',
+            'StampMode' => config('recon.stamp_mode'),
+            'ProcedureName' => config('agora.schema').'.'.config('recon.areas.ABSA.procedure'),
+            'ParamsJson' => $group->ParamsJson,
+            'Note' => self::NAME,
+            'CreatedBy' => $this->admin()->getKey(),
+            'CreatedAt' => now(),
+        ]);
+
+        $procedures = $this->refusingProcedures('TEST_COMMIT_REFUSED');
+
+        $results = (new ReconGroupService(new ReconService($procedures)))->commit($group, [$run->Id]);
+
+        $this->assertSame(['usp_Recon_Commit'], $this->asked);
+        $this->assertCount(1, $results);
+        $this->assertFalse($results[0]['ok']);
+        $this->assertSame('TEST_COMMIT_REFUSED', $results[0]['code'],
+            'The post must report the code the procedure THREW, not the fallback.');
+        $this->assertSame('previewed', $run->fresh()?->Status, 'A refused post leaves the run as it was.');
+    }
+
+    /**
+     * A ProcedureService whose every call is refused the way a THROW is.
+     *
+     * Only execute() is replaced, so translate() — the parser that reads
+     * `AGORA:{Code}:{message}` off the driver's message — is the real one.
+     * Each procedure asked for is written to $asked.
+     */
+    private function refusingProcedures(string $code): ProcedureService
+    {
+        return new class($code, fn (string $procedure) => $this->asked[] = $procedure) extends ProcedureService
+        {
+            public function __construct(private string $refusal, private Closure $record)
+            {
+                parent::__construct();
+            }
+
+            protected function execute(string $procedure, array $params): array
+            {
+                ($this->record)($procedure);
+
+                throw $this->translate(new PDOException(
+                    "SQLSTATE[42000]: [Microsoft][ODBC Driver 18 for SQL Server][SQL Server]AGORA:{$this->refusal}:The test procedure refused this site."
+                ), $procedure);
+            }
+        };
     }
 
     /**

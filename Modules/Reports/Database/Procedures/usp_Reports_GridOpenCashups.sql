@@ -2,27 +2,34 @@
    agora.usp_Reports_GridOpenCashups
 
    WHAT IT IS FOR
-   Cashups a manager has never closed off — a till was counted, the money was
-   declared, and the day it belongs to has still not been balanced.
+   Cashups nobody has signed off — a till was counted, the money was declared,
+   and neither a manager in Agora nor head office in PumpIT has closed it.
 
    WHO READS IT
    Head office. It is the queue behind the legacy "Cashups Not Closed <FY>"
    reports, which existed once per financial year; this is one report with a
-   date range.
+   date range. The working screen is Cash → Cashups with "Open cashups"
+   (agora.usp_Cash_GridCashups @Show = 'open'), which answers from the same
+   rule.
 
-   THE TRAP THIS PROCEDURE EXISTS TO AVOID
-   BRN_DailyBanking has a `Posted` bit, and it is the obvious column to use.
-   It is 0 on ALL 164,019 rows — measured 4 Sep 2026 — so a report built on it
-   would call every cashup in the company's history open, and be believed for
-   about a week. `Posted` is returned here, named as itself, so anyone reaching
-   for it can see what it does.
+   THE RULE is agora.vw_CashupTotals.IsOpen, stated once in Cash (T037):
+     · closed by a manager in Agora            — not open
+     · confirmed in Agora, PumpIT day balanced — not open
+     · confirmed in Agora, day not balanced    — open, waiting on a close
+     · nothing in Agora, day balanced          — not open ("Day balanced")
+     · nothing in Agora, day not balanced      — open
+   For every cashup Agora has never touched that is exactly the rule this
+   report has used since 4 Sep 2026: the day is not balanced
+   (RCN_ReconImports.DayBalance). What says a day is finished is DayBalance —
+   not SiteClosedOff, and not the header's `Posted` bit, which is 0 on every
+   one of the customer's rows and would call the whole history open.
 
-   What actually says a day is finished is RCN_ReconImports.DayBalance. Not
-   SiteClosedOff either — see usp_Reports_GridDayClose for the measurements.
+   A cashup whose day has no RCN_ReconImports row at all has certainly not
+   been closed off, and is open — "No day-close record" in HoldingUp.
 
-   THE JOIN IS A LEFT JOIN ON PURPOSE
-   A cashup whose day has no ledger row at all has certainly not been closed
-   off, and an inner join would drop exactly those rows: the worst ones.
+   Variance is the legacy Daily Banking grid's variance (fifteen legs less the
+   Z-read — dbo.sp_GetDailyBankingWithMOPS), not the stored EmployeeAmount,
+   which goes stale when a leg moves after the save.
 
    Cashups are transactional. Nothing here offers a delete, and nothing in this
    module writes.
@@ -49,6 +56,7 @@ BEGIN
     SET @PageSize = CASE WHEN ISNULL(@PageSize, 50) BETWEEN 1 AND 100000 THEN @PageSize ELSE 50 END;
     SET @Search   = NULLIF(LTRIM(RTRIM(ISNULL(@Search, ''))), '');
 
+    DECLARE @From DATETIME = @DateFrom, @To DATETIME = DATEADD(day, 1, CONVERT(DATETIME, @DateTo));
     DECLARE @Branch TABLE (BranchId int PRIMARY KEY);
 
     /* The empty-string trap. STRING_SPLIT('', ',') returns ONE row holding an
@@ -65,56 +73,50 @@ BEGIN
     DECLARE @AllBranches bit = CASE WHEN EXISTS (SELECT 1 FROM @Branch) THEN 0 ELSE 1 END;
 
     SELECT
-        d.BranchId,
+        t.BranchId,
         b.Name                                          AS BranchName,
-        d.TransactionDate,
-        d.ShiftNo,
+        t.TransactionDate,
+        t.ShiftNo,
         s.ShiftDescription,
-        d.TillNo,
-        t.TillDescription,
-        d.EmployeeCode,
+        t.TillNo,
+        tl.TillDescription,
+        t.EmployeeCode,
         e.EmployeeName,
-        d.DayEndNo,
-        d.ClosingBalance                                AS ZReading,
-        d.EmployeeAmount                                AS Variance,
-        d.CreditCardAmount,
-        d.EFuelAmount,
-        d.DirectDepositAmount,
-        d.Note,
-        ISNULL(r.DayBalance, 0)                         AS DayBalanced,
-        ISNULL(r.ShortsConfirmed, 0)                    AS ShortsConfirmed,
-        CASE WHEN r.BranchId IS NULL THEN 'No day-close record'
-             WHEN r.ShortsConfirmed = 0 THEN 'Shorts not confirmed'
+        t.DayEndNo,
+        t.ZRead                                         AS ZReading,
+        t.ActualTotal,
+        t.Variance,
+        t.ZreadCheck,
+        t.[Status],
+        t.Note,
+        t.DayBalanced,
+        t.ShortsConfirmed,
+        CASE WHEN t.AgoraStatus = 'confirmed' THEN 'Waiting on a manager''s close'
+             WHEN t.DayRecorded = 0           THEN 'No day-close record'
+             WHEN t.ShortsConfirmed = 0       THEN 'Shorts not confirmed'
              ELSE 'Day not balanced' END                AS HoldingUp,
-        DATEDIFF(day, d.TransactionDate, @DateTo)       AS AgeDays,
-        d.Posted                                        AS DeadPostedFlag
+        DATEDIFF(day, t.TransactionDate, @DateTo)       AS AgeDays
     INTO #Rows
-    FROM agora.vw_DailyBanking d
-    JOIN agora.vw_Branch b ON b.BranchId = d.BranchId
-    LEFT JOIN agora.vw_ReconImports r
-           ON r.BranchId = d.BranchId
-          AND r.ReconDate = CONVERT(date, d.TransactionDate)
-    LEFT JOIN agora.vw_Shift s
-           ON s.BranchId = d.BranchId AND s.ShiftNo = d.ShiftNo
-    LEFT JOIN agora.vw_Till t
-           ON t.BranchId = d.BranchId AND t.TillNo = d.TillNo
-    LEFT JOIN agora.vw_Employee e
-           ON e.BranchId = d.BranchId AND e.EmployeeCode = d.EmployeeCode
-    WHERE d.TransactionDate >= @DateFrom AND d.TransactionDate < DATEADD(day, 1, @DateTo)
-      AND ISNULL(r.DayBalance, 0) = 0
-      AND (@AllBranches = 1 OR d.BranchId IN (SELECT BranchId FROM @Branch))
+    FROM agora.vw_CashupTotals t
+    JOIN agora.vw_Branch b ON b.BranchId = t.BranchId
+    LEFT JOIN agora.vw_Shift s    ON s.BranchId = t.BranchId AND s.ShiftNo = t.ShiftNo
+    LEFT JOIN agora.vw_Till tl    ON tl.BranchId = t.BranchId AND tl.TillNo = t.TillNo
+    LEFT JOIN agora.vw_Employee e ON e.BranchId = t.BranchId AND e.EmployeeCode = t.EmployeeCode
+    WHERE t.TransactionAt >= @From AND t.TransactionAt < @To
+      AND t.IsOpen = 1
+      AND (@AllBranches = 1 OR t.BranchId IN (SELECT BranchId FROM @Branch))
       AND (@Search IS NULL
            OR b.Name          LIKE '%' + @Search + '%'
            OR e.EmployeeName  LIKE '%' + @Search + '%'
-           OR d.EmployeeCode  LIKE '%' + @Search + '%'
-           OR d.DayEndNo      LIKE '%' + @Search + '%');
+           OR t.EmployeeCode  LIKE '%' + @Search + '%'
+           OR t.DayEndNo      LIKE '%' + @Search + '%');
 
     DECLARE @Total bigint = (SELECT COUNT_BIG(*) FROM #Rows);
 
     SELECT r.BranchId, r.BranchName, r.TransactionDate, r.ShiftNo, r.ShiftDescription,
            r.TillNo, r.TillDescription, r.EmployeeCode, r.EmployeeName, r.DayEndNo,
-           r.ZReading, r.Variance, r.CreditCardAmount, r.EFuelAmount, r.DirectDepositAmount,
-           r.Note, r.DayBalanced, r.ShortsConfirmed, r.HoldingUp, r.AgeDays, r.DeadPostedFlag
+           r.ZReading, r.ActualTotal, r.Variance, r.ZreadCheck, r.[Status],
+           r.Note, r.DayBalanced, r.ShortsConfirmed, r.HoldingUp, r.AgeDays
     FROM #Rows r
     ORDER BY
         CASE WHEN @SortAsc = 1 THEN

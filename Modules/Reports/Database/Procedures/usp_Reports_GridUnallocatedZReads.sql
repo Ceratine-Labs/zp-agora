@@ -18,14 +18,25 @@
 
    All THREE must be empty. A reading with a till but no employee is partially
    allocated, not unallocated, and it is deliberately not in this queue — it is
-   returned by the same report with @Search over the till, and it is a different
-   conversation with the branch. Measured 4 Sep 2026: 1,965 fully unallocated
-   readings out of 166,230.
+   a different conversation with the branch. Measured 4 Sep 2026: 1,965 fully
+   unallocated readings out of 166,230; 27 Sep 2026: 1,962 of 169,773.
+
+   AND AGORA'S OWN ALLOCATIONS COUNT (T036, 27 Sep 2026). A Z-read allocated on
+   Cash -> ZREAD Allocation is recorded in agora.ZreadAllocation, and — while
+   config('cash.zread.stamp_mode') is 'live' — stamped onto the PumpIT row as
+   well. This reads agora.vw_CashZread, which states the rule once: Agora's
+   allocation over the legacy row's. IsAllocated = 0 AND IsPartlyAllocated = 0
+   is exactly sp_MissingZREAD's all-three-empty rule, with Agora's allocations
+   taken out, so the queue empties the moment a Z-read is saved in Agora
+   whether or not the stamp is on.
+
+   Location (ARCH, WINBRANCH, AURA ...) is returned because it is part of the
+   Z-read's key: the same terminal number means a different till on another POS.
 
    WHY THE TRIMS MATTER
    EOD_CNTR, TERMNUM, LOGFILE and USERID are fixed-width CHAR columns that carry
-   trailing spaces. agora.vw_ZRead trims them, which is why an equality against
-   any of them works here and does not against the base table.
+   trailing spaces. agora.vw_CashZread trims them, which is why an equality
+   against any of them works here and does not against the base table.
 
    READ-ONLY.
 
@@ -69,18 +80,19 @@ BEGIN
     SELECT
         z.BranchId,
         b.Name                                      AS BranchName,
-        z.ZReadDate,
+        z.ZReadAt                                   AS ZReadDate,
+        z.Location,
         z.EodCounter,
         z.TerminalNo,
         z.LogFile,
         z.PosUserId,
         z.Sales,
-        z.TillNo,
-        z.ShiftNo,
-        z.EmployeeCode,
+        z.LegacyTillNo                              AS TillNo,
+        z.LegacyShiftNo                             AS ShiftNo,
+        z.LegacyEmployeeCode                        AS EmployeeCode,
         z.IsCaptured,
         z.MistEod,
-        DATEDIFF(day, z.ZReadDate, @DateTo)         AS AgeDays,
+        DATEDIFF(day, z.ZReadAt, @DateTo)           AS AgeDays,
 
         /* The POS user id is the only clue the loader leaves about who was on
            the till. It is not an EmployeeCode and must never be treated as one
@@ -89,15 +101,15 @@ BEGIN
         CASE WHEN z.PosUserId IS NULL OR z.PosUserId = '' THEN 'No POS user either'
              ELSE 'POS user ' + z.PosUserId END      AS Clue
     INTO #Rows
-    FROM agora.vw_ZRead z
+    FROM agora.vw_CashZread z
     JOIN agora.vw_Branch b ON b.BranchId = z.BranchId
-    WHERE z.ZReadDate >= @DateFrom AND z.ZReadDate < DATEADD(day, 1, @DateTo)
-      AND ISNULL(z.TillNo, 0) = 0
-      AND ISNULL(z.ShiftNo, 0) = 0
-      AND ISNULL(z.EmployeeCode, '') = ''
+    WHERE z.ZReadAt >= @DateFrom AND z.ZReadAt < DATEADD(day, 1, @DateTo)
+      AND z.IsAllocated = 0
+      AND z.IsPartlyAllocated = 0
       AND (@AllBranches = 1 OR z.BranchId IN (SELECT BranchId FROM @Branch))
       AND (@Search IS NULL
            OR b.Name        LIKE '%' + @Search + '%'
+           OR z.Location    LIKE '%' + @Search + '%'
            OR z.EodCounter  LIKE '%' + @Search + '%'
            OR z.TerminalNo  LIKE '%' + @Search + '%'
            OR z.LogFile     LIKE '%' + @Search + '%'
@@ -105,19 +117,21 @@ BEGIN
 
     DECLARE @Total bigint = (SELECT COUNT_BIG(*) FROM #Rows);
 
-    SELECT r.BranchId, r.BranchName, r.ZReadDate, r.EodCounter, r.TerminalNo,
+    SELECT r.BranchId, r.BranchName, r.ZReadDate, r.Location, r.EodCounter, r.TerminalNo,
            r.LogFile, r.PosUserId, r.Sales, r.TillNo, r.ShiftNo, r.EmployeeCode,
            r.IsCaptured, r.MistEod, r.AgeDays, r.Clue
     FROM #Rows r
     ORDER BY
         CASE WHEN @SortAsc = 1 THEN
             CASE @SortColumn WHEN 'BranchName' THEN r.BranchName
+                             WHEN 'Location'   THEN r.Location
                              WHEN 'EodCounter' THEN r.EodCounter
                              WHEN 'TerminalNo' THEN r.TerminalNo
                              WHEN 'LogFile'    THEN r.LogFile
                              WHEN 'PosUserId'  THEN r.PosUserId END END ASC,
         CASE WHEN @SortAsc = 0 THEN
             CASE @SortColumn WHEN 'BranchName' THEN r.BranchName
+                             WHEN 'Location'   THEN r.Location
                              WHEN 'EodCounter' THEN r.EodCounter
                              WHEN 'TerminalNo' THEN r.TerminalNo
                              WHEN 'LogFile'    THEN r.LogFile
@@ -133,7 +147,7 @@ BEGIN
         CASE WHEN @SortAsc = 0 THEN
             CASE @SortColumn WHEN 'ZReadDate' THEN CONVERT(datetime2, r.ZReadDate) END END DESC,
         /* Oldest first — a queue is worked from the back. */
-        r.ZReadDate, r.BranchName, r.EodCounter, r.TerminalNo, r.LogFile
+        r.ZReadDate, r.BranchName, r.Location, r.EodCounter, r.TerminalNo, r.LogFile
     OFFSET (@Page - 1) * @PageSize ROWS FETCH NEXT @PageSize ROWS ONLY;
 
     SELECT @Total AS TotalRows;

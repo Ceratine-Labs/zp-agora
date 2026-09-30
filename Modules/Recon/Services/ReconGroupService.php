@@ -130,7 +130,7 @@ class ReconGroupService
             // system hides.
             return $this->recordFailure($group, $branchId, 'NO_CRITERIA', $e->getMessage());
         } catch (AgoraProcException $e) {
-            return $this->recordFailure($group, $branchId, $e->getCode() ?: 'REFUSED', $e->getMessage());
+            return $this->recordFailure($group, $branchId, $e->code() ?: 'REFUSED', $e->getMessage());
         } catch (QueryException $e) {
             // A fault rather than a refusal — the estate said something we did
             // not plan for. It still must not stop the other twenty-five.
@@ -203,7 +203,7 @@ class ReconGroupService
                 $results[] = [
                     'run' => $run,
                     'ok' => false,
-                    'code' => $e->getCode() ?: 'REFUSED',
+                    'code' => $e->code() ?: 'REFUSED',
                     'message' => $e->getMessage(),
                     'rows' => 0,
                 ];

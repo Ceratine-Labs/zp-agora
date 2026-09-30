@@ -1071,6 +1071,8 @@ The branch day and what does not reconcile: day-close spine and branch console, 
 
 **Notes for the builder:** Stock loss by employee depends on T049 (STK_StockReconEmployees, RCN_ReconArea); stub the tab until then and finish it in T049's acceptance.
 
+**As built (30 Sep 2026):** see [`docs/cash-deductions.md`](cash-deductions.md). Two departures from the deliverables above: "non-integrated" is what PumpIT's own non-integrated report means, the Lotto/Electricity/Airtime areas, because that report is what the tab has to match (tender shortfalls stay with the recon reports); and the export is `usp_Cash_ExportPayroll`. Stock loss reads `STK_StockReconEmployees` directly, so it is not stubbed.
+
 
 ##### T042 · Write once, flow everywhere: the till-short event reaches cashup, deduction schedule and payroll from one capture
 
@@ -1085,6 +1087,8 @@ The branch day and what does not reconcile: day-close spine and branch console, 
 **Acceptance**
 
 - Capturing one short produces exactly one cashup effect, one deduction row and one payroll line (phpunit asserts counts); the PR guard fires with the right message
+
+**As built (30 Sep 2026):** no event and no listeners. The short is keyed once and read three times: the cashup, the schedule and the file each read the one pump-shortages line the post writes, so a listener would only be a second copy to keep in step. The deliverable that was added is a warning on the Deductions screen for approved shorts on no cashup, which PumpIT silently left off payroll (`usp_Cash_GetUnpostedStaffShorts`). The PR guard was dropped (decision 01a0e420). Proof: phpunit `Cash/WriteOnceTest`; see [`docs/cash-deductions.md`](cash-deductions.md).
 
 
 #### E09 · Bank reconciliation
@@ -1770,7 +1774,7 @@ The mockup is a concept build on demonstration data. It shows *what* every scree
 |---|---|---|---|
 | D-01 | A **new PM project** for Agora (customer Zulu Petroleum) or tasks under the existing ZP-NQL project. | New project "Agora" with the three milestones; ZP-NQL keeps its own. | Opus task creation |
 | D-02 | **Where Agora is hosted** (a ZP box beside the SQL instance, or a Ceratine-managed VPS like zp-db.ceratine.com) and whether a **staging** restore of PumpIT can be provisioned. | Ceratine-managed Ubuntu VPS with sqlsrv drivers, pointed at PumpIT over the same private link ZP-NQL uses; staging = a second database on the same instance restored monthly. | T078, parity |
-| D-03 | **Grants for the `agora_app` login.** *Corrected 23 Sep 2026.* The original ask was db_owner on PumpIT, written before Agora had its own database. db_owner on **Agora**; db_datareader on **PumpIT**, **MIST_Import** and **Alteryx**; plus UPDATE on exactly the PumpIT tables the recon stamps write: `RCN_BankStatementLinesPumpIT`, `BRN_DailyBankingABSA` / `FNB` / `Deposita` / `CashBags` / `SmartATM`, `SS_UniqueNumber`, `STK_StockReconLine` (CLAUDE.md rule 1). | Until granted, Agora runs as `Revteck` (sysadmin). A read-only grant on PumpIT would stop bank and stock recon the day it applied. | cutover off `Revteck` |
+| D-03 | **Grants for the `agora_app` login.** *Corrected 23 Sep 2026.* The original ask was db_owner on PumpIT, written before Agora had its own database. db_owner on **Agora**; db_datareader on **PumpIT**, **MIST_Import** and **Alteryx**; plus UPDATE on exactly the PumpIT tables the recon stamps write: `RCN_BankStatementLinesPumpIT`, `BRN_DailyBankingABSA` / `FNB` / `Deposita` / `CashBags` / `SmartATM`, `SS_UniqueNumber`, `STK_StockReconLine`; and, from 27 Sep 2026, INSERT + UPDATE on each capture table as it is built — `BRN_UtilityTransaction` and the cashup header + leg tables, UPDATE on `DBF_P3TRANS_ZREAD` for the Z-read stamp, UPDATE on the eleven cashup pool tables' banked flags, INSERT on `BRN_TillBalance` + UPDATE on `SS_UniqueNumber` section 3 for till balances, INSERT/UPDATE/DELETE on `BRN_DropSafe` + INSERT on `BRN_DropSafe_Collection` for the drop safe, and INSERT + UPDATE on `BRN_StaffShorts`, UPDATE on `SS_UniqueNumber` section 2 and INSERT on `BRN_DailyBankingEmployees` for staff shorts, so far (CLAUDE.md rule 1 is the list). | Until granted, Agora runs as `Revteck` (sysadmin). A read-only grant on PumpIT would stop bank and stock recon the day it applied. | cutover off `Revteck` |
 | D-04 | **PascalCase columns** (matches the estate) vs Laravel snake_case. | PascalCase, handled by `BaseModel`. | T003 |
 | D-05 | **Payroll file layout** for deductions. | CSV per employee per period; confirm with ZP payroll. | T041 |
 | D-06 | Sources for **roster / clock-in / overtime** and **site audit scores**. | Not in v1 unless ZP names a source. | T065, T068 |

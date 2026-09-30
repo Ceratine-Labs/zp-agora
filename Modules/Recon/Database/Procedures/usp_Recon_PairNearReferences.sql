@@ -132,7 +132,7 @@ BEGIN
                            + ' apart. MOPS_EndPosition is stored as an end position in some areas and a '
                            + 'length in others, and the column does not say which — so this pairing is '
                            + 'an inference, not the configured rule.',
-        b.UpdatedAt        = SYSDATETIME()
+        b.UpdatedAt        = SYSUTCDATETIME()
     FROM agora.ReconRunLine b
     JOIN @Pairs p ON p.BankLineId = b.Id
     JOIN agora.ReconRunLine d ON d.Id = p.DepositLineId AND d.BranchId = b.BranchId
@@ -158,7 +158,7 @@ BEGIN
         r.OtherRows       = a.OtherRows,
         r.MopsTotal       = a.MopsTotal,
         r.MatchedTotal    = a.MatchedTotal,
-        r.UpdatedAt       = SYSDATETIME()
+        r.UpdatedAt       = SYSUTCDATETIME()
     FROM agora.ReconRun r
     CROSS APPLY (
         SELECT COUNT(*) AS TotalRows,

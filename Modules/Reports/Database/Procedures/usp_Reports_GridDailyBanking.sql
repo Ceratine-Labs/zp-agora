@@ -2,42 +2,41 @@
    agora.usp_Reports_GridDailyBanking
 
    WHAT IT IS FOR
-   The daily banking as each till declared it: the Z-reading against the legs it
-   was made up of, and the variance the cashier carried.
+   Daily banking — manager's view: every cashup in the period, with the
+   Z-read it was balanced against, what it actually totals, the variance, the
+   cash bags, the cards and the pump shortages, whether the Z-read agrees and
+   where the cashup stands. The legacy "Daily Banking - Managers View".
 
    WHO READS IT
-   The branch, capturing; head office, checking. This is the whole population —
-   usp_Reports_GridOpenCashups is the same rows narrowed to days that have not
-   balanced.
+   Head office, from the report library. The working screen with the same rows
+   is Cash → Cashups (agora.usp_Cash_GridCashups), where a cashup can be opened,
+   confirmed and closed.
 
-   THE LEGS
-   BRN_DailyBanking carries the summary legs on the cashup row itself: credit
-   card, two manual card fields, e-fuel and direct deposits. The per-tender
-   detail lives in the BRN_DailyBanking<Tender> tables the Recon module reads —
-   this report is the cashup, not the settlement, and it stops at the cashup.
+   THE FIGURES ARE CASH'S. Since T037 every figure comes from
+   agora.vw_CashupTotals, which computes the actual total and the variance
+   exactly as PumpIT's own Daily Banking grid does (dbo.sp_GetDailyBankingWithMOPS:
+   fifteen legs less ClosingBalance) — so this report, the Cashups grid and the
+   Daily Banking screen cannot disagree about a variance.
 
-   Declared is the sum of the legs. It is NOT stored anywhere: the legacy screen
-   adds it up in the client, which is why two people can disagree about it. It
-   is computed here, once, and DeclaredVsZ is the difference against the
-   Z-reading, so the row says whether it balanced without anyone adding up.
+   What it replaced, and why: until 27 Sep 2026 this report called
+   CreditCardAmount + EFuelAmount + DirectDepositAmount "Declared". Those three
+   header columns are the card total and two columns that are 0 on every row
+   since 2024; the cashup is declared in the eighteen BRN_DailyBanking<Leg>
+   tables, which the report never read. Its "Declared vs Z" was therefore the
+   card takings less the whole Z-read. ActualTotal and Variance replace both.
 
-   ⚠ CardAmount1 and CardAmount2 are the SPLIT of CreditCardAmount, not two more
-   legs beside it — CreditCardAmount = CardAmount1 + CardAmount2 on every one of
-   the 35,697 rows in 2026. The three are all in the SELECT, so the obvious
-   Declared is the sum of all of them, and it is wrong by the card takings.
-   CardSplitDisagrees is on the row so the day that stops being true is visible
-   rather than silently changing what Declared means.
+   PumpShortages is BRN_DailyBankingEmployees — the pump attendants' shorts on
+   the cashup — which PumpIT adds into the actual total like any other leg.
+   StoredVariance is what PumpIT last wrote to EmployeeAmount; it differs from
+   Variance when a leg moved after the cashup was saved.
 
-   EmployeeAmount is the cashier's own variance as PumpIT records it, and is
-   returned beside DeclaredVsZ rather than instead of it — they are different
-   figures and where they disagree, that is the finding.
-
-   `Posted` on this table is 0 on all 164,019 rows and means nothing. See
-   usp_Reports_GridOpenCashups.
+   Status is one word — Open, Confirmed, Closed, or Day balanced (closed off in
+   PumpIT) — and ZreadCheck one of Agrees, No Z-read, Z-read differs, Other
+   cashier (see agora.vw_CashupTotals).
 
    READ-ONLY.
 
-     EXEC agora.usp_Reports_GridDailyBanking @BranchIds = '9', @DateFrom = '2026-09-01';
+     EXEC agora.usp_Reports_GridDailyBanking @BranchIds = '6', @DateFrom = '2026-05-22', @DateTo = '2026-05-22';
    ============================================================================ */
 
 CREATE OR ALTER PROCEDURE [agora].[usp_Reports_GridDailyBanking]
@@ -59,6 +58,7 @@ BEGIN
     SET @PageSize = CASE WHEN ISNULL(@PageSize, 50) BETWEEN 1 AND 100000 THEN @PageSize ELSE 50 END;
     SET @Search   = NULLIF(LTRIM(RTRIM(ISNULL(@Search, ''))), '');
 
+    DECLARE @From DATETIME = @DateFrom, @To DATETIME = DATEADD(day, 1, CONVERT(DATETIME, @DateTo));
     DECLARE @Branch TABLE (BranchId int PRIMARY KEY);
 
     /* The empty-string trap. STRING_SPLIT('', ',') returns ONE row holding an
@@ -75,106 +75,79 @@ BEGIN
     DECLARE @AllBranches bit = CASE WHEN EXISTS (SELECT 1 FROM @Branch) THEN 0 ELSE 1 END;
 
     SELECT
-        d.BranchId,
+        t.BranchId,
         b.Name                                      AS BranchName,
-        d.TransactionDate,
-        d.ShiftNo,
+        t.TransactionDate,
+        t.ShiftNo,
         s.ShiftDescription,
-        d.TillNo,
-        t.TillDescription,
-        d.EmployeeCode,
+        t.TillNo,
+        tl.TillDescription,
+        t.EmployeeCode,
         e.EmployeeName,
-        d.DayEndNo,
-        d.ClosingBalance                            AS ZReading,
-        d.CreditCardAmount,
-        d.CardAmount1,
-        d.CardAmount2,
-        d.EFuelAmount,
-        d.DirectDepositAmount,
-        /* CardAmount1 and CardAmount2 are the SPLIT of CreditCardAmount, not
-           legs beside it: CreditCardAmount = CardAmount1 + CardAmount2 on all
-           35,697 rows of 2026, measured 4 Sep 2026. Adding all three — which
-           is what the column names invite — doubled the card takings and put
-           R250,319 of phantom variance on a till that had balanced. */
-        CONVERT(money, ISNULL(d.CreditCardAmount, 0) + ISNULL(d.EFuelAmount, 0)
-                     + ISNULL(d.DirectDepositAmount, 0))                        AS DeclaredLegs,
-        CONVERT(money, ISNULL(d.CreditCardAmount, 0) + ISNULL(d.EFuelAmount, 0)
-                     + ISNULL(d.DirectDepositAmount, 0) - ISNULL(d.ClosingBalance, 0)) AS DeclaredVsZ,
-        CASE WHEN ABS(ISNULL(d.CreditCardAmount, 0)
-                    - (ISNULL(d.CardAmount1, 0) + ISNULL(d.CardAmount2, 0))) > 0.005
-             THEN CONVERT(bit, 1) ELSE CONVERT(bit, 0) END                      AS CardSplitDisagrees,
-        d.EmployeeAmount                            AS CashierVariance,
-        /* The pump attendant's short for the same till and shift, which is a
-           different row and a different person from the cashier variance above.
-           Aggregated, because a shift can carry more than one attendant. */
-        p.AttendantShort,
-        LEFT(d.Note, 400)                           AS Note,
-        ISNULL(r.DayBalance, 0)                     AS DayBalanced,
-        CASE WHEN ISNULL(r.DayBalance, 0) = 1 THEN 'Day balanced'
-             WHEN ISNULL(d.EmployeeAmount, 0) <> 0 THEN 'Cashier variance'
-             ELSE 'Open' END                        AS Status,
-        d.Imported,
-        d.CreateDateTime                            AS CapturedAt,
-        d.Posted                                    AS DeadPostedFlag
+        t.DayEndNo,
+        t.ZRead                                     AS ZReading,
+        t.ActualTotal,
+        t.Variance,
+        t.CashBags,
+        t.Cards,
+        t.StaffShorts                               AS PumpShortages,
+        t.StoredVariance,
+        t.ZreadCheck,
+        t.[Status],
+        t.DayBalanced,
+        LEFT(t.Note, 400)                           AS Note,
+        t.CapturedAt
     INTO #Rows
-    FROM agora.vw_DailyBanking d
-    JOIN agora.vw_Branch b ON b.BranchId = d.BranchId
-    LEFT JOIN agora.vw_Shift s    ON s.BranchId = d.BranchId AND s.ShiftNo = d.ShiftNo
-    LEFT JOIN agora.vw_Till t     ON t.BranchId = d.BranchId AND t.TillNo = d.TillNo
-    LEFT JOIN agora.vw_Employee e ON e.BranchId = d.BranchId AND e.EmployeeCode = d.EmployeeCode
-    LEFT JOIN agora.vw_ReconImports r
-           ON r.BranchId = d.BranchId AND r.ReconDate = CONVERT(date, d.TransactionDate)
-    OUTER APPLY (
-        SELECT SUM(x.AmountShort) AS AttendantShort
-        FROM agora.vw_DailyBankingEmployee x
-        WHERE x.BranchId = d.BranchId
-          AND x.TransactionDate = d.TransactionDate
-          AND x.ShiftNo = d.ShiftNo
-          AND x.TillNo  = d.TillNo
-    ) p
-    WHERE d.TransactionDate >= @DateFrom AND d.TransactionDate < DATEADD(day, 1, @DateTo)
-      AND (@AllBranches = 1 OR d.BranchId IN (SELECT BranchId FROM @Branch))
+    FROM agora.vw_CashupTotals t
+    JOIN agora.vw_Branch b ON b.BranchId = t.BranchId
+    LEFT JOIN agora.vw_Shift s    ON s.BranchId = t.BranchId AND s.ShiftNo = t.ShiftNo
+    LEFT JOIN agora.vw_Till tl    ON tl.BranchId = t.BranchId AND tl.TillNo = t.TillNo
+    LEFT JOIN agora.vw_Employee e ON e.BranchId = t.BranchId AND e.EmployeeCode = t.EmployeeCode
+    WHERE t.TransactionAt >= @From AND t.TransactionAt < @To
+      AND (@AllBranches = 1 OR t.BranchId IN (SELECT BranchId FROM @Branch))
       AND (@Search IS NULL
            OR b.Name         LIKE '%' + @Search + '%'
            OR e.EmployeeName LIKE '%' + @Search + '%'
-           OR d.EmployeeCode LIKE '%' + @Search + '%'
-           OR d.DayEndNo     LIKE '%' + @Search + '%'
-           OR d.Note         LIKE '%' + @Search + '%');
+           OR t.EmployeeCode LIKE '%' + @Search + '%'
+           OR t.DayEndNo     LIKE '%' + @Search + '%'
+           OR t.Note         LIKE '%' + @Search + '%');
 
     DECLARE @Total bigint = (SELECT COUNT_BIG(*) FROM #Rows);
 
     SELECT r.BranchId, r.BranchName, r.TransactionDate, r.ShiftNo, r.ShiftDescription,
            r.TillNo, r.TillDescription, r.EmployeeCode, r.EmployeeName, r.DayEndNo,
-           r.ZReading, r.CreditCardAmount, r.CardAmount1, r.CardAmount2, r.EFuelAmount,
-           r.DirectDepositAmount, r.DeclaredLegs, r.DeclaredVsZ, r.CardSplitDisagrees,
-           r.CashierVariance, r.AttendantShort, r.Note,
-           r.DayBalanced, r.Status, r.Imported, r.CapturedAt, r.DeadPostedFlag
+           r.ZReading, r.ActualTotal, r.Variance, r.CashBags, r.Cards, r.PumpShortages,
+           r.StoredVariance, r.ZreadCheck, r.[Status], r.DayBalanced, r.Note, r.CapturedAt
     FROM #Rows r
     ORDER BY
         CASE WHEN @SortAsc = 1 THEN
             CASE @SortColumn WHEN 'BranchName'   THEN r.BranchName
                              WHEN 'EmployeeName' THEN r.EmployeeName
                              WHEN 'DayEndNo'     THEN r.DayEndNo
-                             WHEN 'Status'       THEN r.Status END END ASC,
+                             WHEN 'ZreadCheck'   THEN r.ZreadCheck
+                             WHEN 'Status'       THEN r.[Status] END END ASC,
         CASE WHEN @SortAsc = 0 THEN
             CASE @SortColumn WHEN 'BranchName'   THEN r.BranchName
                              WHEN 'EmployeeName' THEN r.EmployeeName
                              WHEN 'DayEndNo'     THEN r.DayEndNo
-                             WHEN 'Status'       THEN r.Status END END DESC,
+                             WHEN 'ZreadCheck'   THEN r.ZreadCheck
+                             WHEN 'Status'       THEN r.[Status] END END DESC,
         CASE WHEN @SortAsc = 1 THEN
-            CASE @SortColumn WHEN 'ZReading'        THEN CONVERT(decimal(38,6), r.ZReading)
-                             WHEN 'DeclaredLegs'    THEN CONVERT(decimal(38,6), r.DeclaredLegs)
-                             WHEN 'DeclaredVsZ'     THEN CONVERT(decimal(38,6), r.DeclaredVsZ)
-                             WHEN 'CashierVariance' THEN CONVERT(decimal(38,6), r.CashierVariance)
-                             WHEN 'AttendantShort'  THEN CONVERT(decimal(38,6), r.AttendantShort)
-                             WHEN 'TillNo'          THEN CONVERT(decimal(38,6), r.TillNo) END END ASC,
+            CASE @SortColumn WHEN 'ZReading'      THEN CONVERT(decimal(38,6), r.ZReading)
+                             WHEN 'ActualTotal'   THEN CONVERT(decimal(38,6), r.ActualTotal)
+                             WHEN 'Variance'      THEN CONVERT(decimal(38,6), r.Variance)
+                             WHEN 'CashBags'      THEN CONVERT(decimal(38,6), r.CashBags)
+                             WHEN 'Cards'         THEN CONVERT(decimal(38,6), r.Cards)
+                             WHEN 'PumpShortages' THEN CONVERT(decimal(38,6), r.PumpShortages)
+                             WHEN 'TillNo'        THEN CONVERT(decimal(38,6), r.TillNo) END END ASC,
         CASE WHEN @SortAsc = 0 THEN
-            CASE @SortColumn WHEN 'ZReading'        THEN CONVERT(decimal(38,6), r.ZReading)
-                             WHEN 'DeclaredLegs'    THEN CONVERT(decimal(38,6), r.DeclaredLegs)
-                             WHEN 'DeclaredVsZ'     THEN CONVERT(decimal(38,6), r.DeclaredVsZ)
-                             WHEN 'CashierVariance' THEN CONVERT(decimal(38,6), r.CashierVariance)
-                             WHEN 'AttendantShort'  THEN CONVERT(decimal(38,6), r.AttendantShort)
-                             WHEN 'TillNo'          THEN CONVERT(decimal(38,6), r.TillNo) END END DESC,
+            CASE @SortColumn WHEN 'ZReading'      THEN CONVERT(decimal(38,6), r.ZReading)
+                             WHEN 'ActualTotal'   THEN CONVERT(decimal(38,6), r.ActualTotal)
+                             WHEN 'Variance'      THEN CONVERT(decimal(38,6), r.Variance)
+                             WHEN 'CashBags'      THEN CONVERT(decimal(38,6), r.CashBags)
+                             WHEN 'Cards'         THEN CONVERT(decimal(38,6), r.Cards)
+                             WHEN 'PumpShortages' THEN CONVERT(decimal(38,6), r.PumpShortages)
+                             WHEN 'TillNo'        THEN CONVERT(decimal(38,6), r.TillNo) END END DESC,
         CASE WHEN @SortAsc = 1 THEN
             CASE @SortColumn WHEN 'TransactionDate' THEN CONVERT(datetime2, r.TransactionDate) END END ASC,
         CASE WHEN @SortAsc = 0 THEN

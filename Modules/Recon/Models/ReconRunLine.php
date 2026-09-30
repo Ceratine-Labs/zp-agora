@@ -171,4 +171,19 @@ class ReconRunLine extends BaseModel
     {
         return ($this->RulesInGroup ?? 1) > 1;
     }
+
+    /**
+     * The difference as every recon screen shows it: BANK LESS DEPOSITS, so
+     * negative is money the bank did not receive — the sign the cash-bag
+     * split and the match message use. Ryan, 27 Sep 2026 (PM decision).
+     *
+     * Display only. DiffAmount is stored as the ported previews return it
+     * (Diff_MOPS_BANK, deposits less bank) and stays that way; this is the
+     * one place the run page turns it round. The proposals extract does the
+     * same in SQL (ReconRunLineGrid, BankLessDeposits).
+     */
+    public function bankLessDeposits(): float
+    {
+        return -(float) $this->DiffAmount;
+    }
 }

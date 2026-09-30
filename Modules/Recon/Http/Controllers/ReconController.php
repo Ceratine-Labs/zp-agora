@@ -32,11 +32,20 @@ use Modules\Recon\Services\ReconService;
  * on the screen when the decision was made; here the preview is recorded, and
  * an execution can only ever act on the rows that run already holds.
  *
- * Execute is not wired to a write yet. It writes into the CUSTOMER'S
- * database, which needs an explicit go-ahead, and the procedure it would be
- * replacing is the one we formally recommended ZP stop using on 18 August
- * 2026. The button is present, it says exactly that, and it is disabled —
- * a screen that hid the step would be a worse answer than one that names it.
+ * Execute writes into the CUSTOMER'S database, and has since 4 September 2026
+ * on Ryan's go-ahead. agora.usp_Recon_Commit stamps ReconState and
+ * ReconBatchNo on RCN_BankStatementLinesPumpIT and ReconBatchNoPumpIT on the
+ * BRN_DailyBanking family, under a batch number drawn from SS_UniqueNumber.
+ * A match made by hand, or an accepted suggestion, stamps the same columns
+ * through usp_Recon_ManualMatch. Both record each row's prior state in
+ * agora.ReconMatch, so Reverse (usp_Recon_Reverse) puts back what was there;
+ * only the counter is never wound back.
+ *
+ * The switch is config('recon.stamp_mode'), a literal and not an env var. The
+ * services pass it to the procedures; this controller only shows it.
+ * 'journal' records the decision and moves nothing in PumpIT.
+ * What 'live' turned on, and what ZP have still not answered, is written down
+ * beside the setting and in docs/recon-execute.md.
  */
 class ReconController extends Controller
 {
@@ -268,6 +277,10 @@ class ReconController extends Controller
      * the Suggestions tab rather than to the run, because the clerk is working
      * down a list; and the "match every strong suggestion" press posts each one
      * as JSON, so a refusal is one row's answer rather than a dead page.
+     *
+     * A cash-bag match also carries `allocation`, the split by cashier the
+     * clerk confirmed (see allocation() below). It is required there and
+     * refused on every other area — both by the procedure.
      */
     public function match(Request $request, string $area, BranchContext $context): RedirectResponse|JsonResponse
     {
@@ -311,6 +324,7 @@ class ReconController extends Controller
                 $deposits,
                 trim((string) $request->input('reason')) ?: null,
                 $basis,
+                $this->allocation($request->input('allocation')),
             );
         } catch (AgoraProcException $e) {
             if ($request->expectsJson()) {
@@ -361,6 +375,46 @@ class ReconController extends Controller
             ->route('app.recon.run', $status->Id)
             ->with('executed', $status->Message)
             ->with('executedCode', $status->Code);
+    }
+
+    /**
+     * The cash-bag split the clerk confirmed, as the screen posted it.
+     *
+     * One hidden field carrying JSON, kept in step with the split on screen by
+     * recon-match.js — the lines are drawn in the browser as boxes are ticked,
+     * so there is no fixed set of inputs to post. Only the SHAPE is settled
+     * here: a code or null, and two amounts in rand and cents, or null where
+     * what arrived is not one. Whether the split is the one these bags give,
+     * and whether it adds up, is agora.usp_Recon_ManualMatch's to decide, and
+     * a null line is its to refuse. Nothing posted, or nothing readable, is
+     * null — which on CashBags is a refusal and everywhere else is the normal
+     * case.
+     *
+     * @return array<int, array{code: string|null, banked: string|null, share: string|null}>|null
+     */
+    protected function allocation(mixed $posted): ?array
+    {
+        $lines = is_string($posted) && trim($posted) !== '' ? json_decode($posted, true) : null;
+
+        if (! is_array($lines) || $lines === []) {
+            return null;
+        }
+
+        $amount = fn (mixed $value): ?string => is_scalar($value)
+            && preg_match('/^-?\d+(\.\d{1,2})?$/', trim((string) $value)) === 1
+                ? trim((string) $value)
+                : null;
+
+        return array_values(array_map(
+            fn (mixed $line): array => [
+                'code' => is_array($line) && is_scalar($line['code'] ?? null) && trim((string) $line['code']) !== ''
+                    ? trim((string) $line['code'])
+                    : null,
+                'banked' => is_array($line) ? $amount($line['banked'] ?? null) : null,
+                'share' => is_array($line) ? $amount($line['share'] ?? null) : null,
+            ],
+            $lines,
+        ));
     }
 
     /** The runs made in this area — the person's own first, everyone's on request. */
@@ -629,6 +683,12 @@ class ReconController extends Controller
          * stop.
          */
         $request->query->set('run', (string) $run->Id);
+        // On cash bags, the area too, so the extract shows the split by
+        // cashier without its catalogue having to read the run. It rides into
+        // the extract link with `run`; every other area's link is unchanged.
+        if ($run->ReconArea === 'CashBags') {
+            $request->query->set('area', $run->ReconArea);
+        }
 
         return view('recon::run', [
             'run' => $run->load('lines'),
@@ -641,14 +701,17 @@ class ReconController extends Controller
             // Checked on every open, not once: a preview resumed a fortnight
             // later is exactly the one somebody else has been working through.
             'freshness' => $this->service->freshness($run),
+            // Who the cash is accounted to, on a cash-bag match by hand: the
+            // split the clerk confirmed, kept with the batch. Null otherwise.
+            'allocation' => $this->service->allocation($run),
         ]);
     }
 
     /**
      * Mark a run complete: it leaves the working list and stays on record.
      *
-     * Today a clerk who has looked at a preview and decided nothing needs
-     * stamping can only discard it, which destroys the record of the read.
+     * Without it, a clerk who has looked at a preview and decided nothing needs
+     * stamping could only discard it, which destroys the record of the read.
      * The procedure refuses a run with anything processed against it.
      */
     public function close(ReconRun $run): RedirectResponse

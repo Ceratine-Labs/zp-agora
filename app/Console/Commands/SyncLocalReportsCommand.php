@@ -229,6 +229,28 @@ class SyncLocalReportsCommand extends Command
         // that works for narrow tables and fails on BRN_Employee.
         $perBatch = max(1, (int) floor(900 / count($columns)));
 
+        /*
+         * The customer's ids are copied as they are, so a synced row keeps the
+         * id it has on live. Where the stub column is an IDENTITY — which
+         * database/stubs/pumpit-utilities.sql makes BRN_UtilityTransaction's,
+         * because agora.usp_Utilities_Save inserts without one exactly as the
+         * legacy client does — SQL Server refuses an explicit value unless
+         * IDENTITY_INSERT is on.
+         *
+         * IN THE SAME BATCH AS THE INSERT, not as a statement of its own. The
+         * sqlsrv driver runs every prepared statement through sp_prepexec, and
+         * a SET inside that scope reverts the moment it returns — so a
+         * separate `SET IDENTITY_INSERT … ON` is on for exactly as long as it
+         * takes to switch itself off again. Found by running it. Inserting
+         * explicit ids also moves the identity past the highest of them, so
+         * the next row the save procedure inserts cannot collide with a
+         * synced one.
+         */
+        $identity = $this->identityColumn($stub, $database, $table);
+        [$before, $after] = $identity !== null && in_array($identity, $columns, true)
+            ? ["SET IDENTITY_INSERT [{$database}].dbo.[{$table}] ON; ", "; SET IDENTITY_INSERT [{$database}].dbo.[{$table}] OFF;"]
+            : ['', ''];
+
         foreach (array_chunk($rows, $perBatch) as $chunk) {
             $values = [];
             foreach ($chunk as $row) {
@@ -237,14 +259,33 @@ class SyncLocalReportsCommand extends Command
                 }
             }
 
-            $stub->insert(
-                "INSERT INTO [{$database}].dbo.[{$table}] ({$select}) VALUES "
-                .implode(', ', array_fill(0, count($chunk), $placeholders)),
+            $stub->statement(
+                $before
+                ."INSERT INTO [{$database}].dbo.[{$table}] ({$select}) VALUES "
+                .implode(', ', array_fill(0, count($chunk), $placeholders))
+                .$after,
                 $values
             );
         }
 
         return count($rows);
+    }
+
+    /**
+     * The stub table's IDENTITY column, or null when it has none — which is
+     * every stub table except BRN_UtilityTransaction today. Read from the
+     * stub's own catalogue, because the stub file may have been changed since
+     * the table was made.
+     */
+    private function identityColumn(Connection $stub, string $database, string $table): ?string
+    {
+        $row = $stub->selectOne(
+            "SELECT ic.name FROM [{$database}].sys.identity_columns ic
+             WHERE ic.object_id = OBJECT_ID(?)",
+            ["[{$database}].dbo.[{$table}]"]
+        );
+
+        return $row === null ? null : (string) $row->name;
     }
 
     /**

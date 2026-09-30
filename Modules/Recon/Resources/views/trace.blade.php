@@ -10,11 +10,11 @@
     </x-page-head>
 
     <x-card title="What are you looking for?"
-            :sub="'Answered by '.$procedure.' — seven questions of the same value, in one call'">
+            :sub="'Answered by '.$procedure.' — eight questions of the same value, in one call'">
         <form method="GET" action="{{ route('app.recon.trace') }}">
             <div class="field-row">
                 <x-field name="q" label="Reference or number" :value="$term"
-                         help="At least three characters. A batch, a bag, a slip, a terminal, a device, part of a bank narrative, or a run number." />
+                         help="At least three characters. A batch, a bag, a slip, a terminal, a device, part of a bank narrative, a cashier, or a run number." />
 
                 <x-field name="from" label="From" type="date" :value="$from"
                          help="The statement table is inside a 249 GB live database, so the window is not optional. Ninety days by default." />

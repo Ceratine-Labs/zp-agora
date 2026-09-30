@@ -180,9 +180,9 @@
             <span class="muted">{{ $mopsOpen->count() }} · {{ \App\Support\Format::r($mopsOpen->sum('Amount')) }}</span>
             @if ($mops->isNotEmpty())
                 <span class="drill-export">
-                    <a href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'line' => $line->Id, 'format' => 'xlsx']) }}"
+                    <a href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'line' => $line->Id] + ($run->ReconArea === 'CashBags' ? ['area' => 'CashBags'] : []) + ['format' => 'xlsx']) }}"
                        data-extract title="This proposal's deposits as .xlsx">.xlsx</a>
-                    <a href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'line' => $line->Id, 'format' => 'csv']) }}"
+                    <a href="{{ route('app.grids.extract', ['grid' => 'app.recon.run:mops', 'line' => $line->Id] + ($run->ReconArea === 'CashBags' ? ['area' => 'CashBags'] : []) + ['format' => 'csv']) }}"
                        data-extract title="This proposal's deposits as .csv">.csv</a>
                 </span>
             @endif
@@ -222,6 +222,7 @@
                                 : '—' }}</td>
                             <td class="mono">{{ $row->SourceRef ?: '—' }}
                                 @if ($row->Detail)<br><span class="drill-line-id">{{ $row->Detail }}</span>@endif
+                                @include('recon::partials.bag-cashier', ['row' => $row])
                             </td>
                             <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>
                         </tr>
@@ -248,6 +249,7 @@
                                 : '—' }}</td>
                             <td class="mono">{{ $row->SourceRef ?: '—' }}
                                 @if ($row->Detail)<br><span class="drill-line-id">{{ $row->Detail }}</span>@endif
+                                @include('recon::partials.bag-cashier', ['row' => $row])
                             </td>
                             <td class="mono">batch {{ $row->ReconBatchNoPumpIT }}</td>
                             <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>

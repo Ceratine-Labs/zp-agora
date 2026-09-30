@@ -60,11 +60,13 @@
                  updated as boxes are ticked, because the question "do these
                  two sides agree" is the only question this screen asks and
                  making somebody add up two columns to answer it would be
-                 absurd. --}}
+                 absurd. The difference is bank less deposits, the sign of the
+                 split below it and of every recon screen (Ryan, 27 Sep 2026);
+                 recon-match.js keeps it in step. --}}
             <x-statstrip data-match-totals :stats="[
                 ['label' => 'Selected on the bank', 'value' => 'R0.00', 'note' => '0 lines'],
                 ['label' => 'Selected deposits', 'value' => 'R0.00', 'note' => '0 rows'],
-                ['label' => 'Difference', 'value' => 'R0.00', 'note' => 'deposit less bank'],
+                ['label' => 'Bank less deposits', 'value' => 'R0.00', 'note' => 'the bank side less the deposits'],
                 ['label' => 'References paired', 'value' => \App\Support\Format::n($summary->ColouredKeys ?? 0),
                  'note' => 'appear on both sides', 'tone' => ($summary->ColouredKeys ?? 0) > 0 ? 'good' : 'neutral'],
             ]" />
