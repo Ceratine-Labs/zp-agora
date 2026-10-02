@@ -36,3 +36,28 @@
 // The sites multi-select is taller than a one-line field and should take the
 // width it needs rather than be squeezed into an auto-fit column with a date.
 .field-wide { grid-column: 1 / -1; }
+
+// The audit trail's correction panel (2 Oct 2026): a changed figure reads as
+// the old one struck through beside the new, the way the customer report
+// reads a correction, so the eye lands on exactly the cells that moved.
+.audit-change {
+  display: grid; gap: 12px; padding: 14px 16px;
+  // It opens inside a row of the report table, which is far wider than the
+  // window. Pinned to the visible width and to the left edge of the scroll
+  // box, so the panel reads whole without sideways scrolling.
+  position: sticky; left: 0;
+  max-width: min(1240px, calc(100vw - 72px));
+  .facts { margin: 0; }
+}
+.audit-change-note { font-size: 12.5px; color: var(--muted); margin: 0; line-height: 1.5; max-width: 90ch; }
+.audit-change-detail pre {
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.5; margin: 8px 0 0;
+  padding: 10px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r);
+  overflow-x: auto; max-height: 360px;
+}
+.ba { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ba-old { text-decoration: line-through; color: var(--muted); margin-right: 6px; }
+.ba-changed .ba-new { font-weight: 600; }
+.ba-short { color: var(--crit-ink); }
+.ba-over { color: var(--warn-ink); }
+.ba-old.ba-short, .ba-old.ba-over { color: var(--muted); }

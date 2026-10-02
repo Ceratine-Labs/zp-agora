@@ -81,6 +81,20 @@ class ReportsController extends Controller
     }
 
     /**
+     * One audit trail change, opened under its row (row-detail.js) or on a page
+     * of its own when the link is followed directly.
+     */
+    public function auditChange(string $ledger, int $id, Request $request, BranchContext $context): View
+    {
+        $allowed = $context->workspace() === 'branch' ? array_filter([$context->id()]) : $context->allowed();
+
+        $found = $this->service->auditChange($ledger, $id, $allowed)
+            ?? throw new NotFoundHttpException('No such change, or not one you may see.');
+
+        return view($request->ajax() ? 'reports::audit.change' : 'reports::audit.page', $found);
+    }
+
+    /**
      * Which branches the report may see.
      *
      * In the BRANCH workspace the site is already pinned and the selector does

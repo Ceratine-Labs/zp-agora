@@ -667,6 +667,20 @@ class ComponentCatalogue
                     ['value', 'mixed', 'null', 'The raw value from the procedure'],
                 ],
             ],
+            [
+                'name' => 'x-reports::before-after',
+                'group' => 'Module-scoped',
+                'summary' => 'A figure a correction may have changed: the old value struck through beside the new when they differ, the figure alone when not.',
+                'mockup' => 'dg td',
+                'notes' => 'Built for the audit trail\'s correction panel (2 Oct 2026), which reads a correction the way the customer report does — the old figure struck through beside the new — so the eye lands on exactly the cells that moved. `dp` widens to 3 on its own for a weighed figure; `signed` colours a negative short and a positive over, for a variance. Through `App\Support\Format`.',
+                'gallery' => false,
+                'props' => [
+                    ['before', 'int|float|string|null', 'null', 'What PumpIT held before'],
+                    ['after', 'int|float|string|null', 'null', 'What it holds after'],
+                    ['dp', 'int', '0', 'Decimal places; a weighed figure shows 3 regardless'],
+                    ['signed', 'bool', 'false', 'Colour a negative short and a positive over'],
+                ],
+            ],
         ];
 
         return self::$cache = collect($components)

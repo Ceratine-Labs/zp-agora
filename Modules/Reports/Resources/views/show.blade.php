@@ -83,9 +83,14 @@
             </x-notice>
         @endif
 
+        {{-- A report that declares `detail` opens each row under itself
+             (feature-rules §3.5, row-detail.js): the route, and which of the
+             row's columns fill its parameters. --}}
+        @php($detail = $report['detail'] ?? null)
         <x-table :count="$rows->count()" :total="$total"
                  procedure="agora.{{ $report['procedure'] }}"
-                 :empty="__('reports::reports.nothing')">
+                 :empty="__('reports::reports.nothing')"
+                 :data-row-detail="$detail ? 'row' : null">
             <x-slot:head>
                 <tr>
                     @foreach ($report['columns'] as $column)
@@ -105,7 +110,7 @@
             </x-slot:head>
 
             @foreach ($rows as $row)
-                <tr>
+                <tr @if ($detail) data-detail-url="{{ route($detail['route'], collect($detail['params'])->map(fn (string $column) => $row->{$column} ?? null)->all()) }}" @endif>
                     @foreach ($report['columns'] as $column)
                         @php($numeric = in_array($column['type'], ['number', 'money', 'litres'], true))
                         <td @class(['num' => $numeric])>

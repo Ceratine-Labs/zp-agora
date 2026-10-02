@@ -145,6 +145,7 @@ Lives in a module rather than the shared library, and is used as <x-{alias}::nam
 | Component | Props | What it is | Notes |
 |---|---|---|---|
 | `<x-reports::cell>` | `type` `value` | One table cell, formatted from the column's declared type. | Types: `text number money litres date datetime bool chip`. Every figure goes through `App\Support\Format`, never `number_format`; a missing value is an em dash, never `R0.00`. `chip` maps a procedure's Status wording to a tone by keyword, so a new phrase falls to neutral rather than to a fatal. |
+| `<x-reports::before-after>` | `before` `after` `dp` `signed` | A figure a correction may have changed: the old value struck through beside the new when they differ, the figure alone when not. | Built for the audit trail's correction panel (2 Oct 2026), which reads a correction the way the customer report does — the old figure struck through beside the new — so the eye lands on exactly the cells that moved. `dp` widens to 3 on its own for a weighed figure; `signed` colours a negative short and a positive over, for a variance. Through `App\Support\Format`. |
 
 Every prop, every variant and the mockup class names each component carries are rendered at `/dev/components`, which is where this table is generated from. Add a component to `Modules\Core\Support\ComponentCatalogue` and run `php artisan agora:components-doc`; `scripts/check-components.sh` fails the build if you forget.
 

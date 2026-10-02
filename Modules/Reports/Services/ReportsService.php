@@ -24,6 +24,28 @@ class ReportsService
     public function __construct(protected ProcedureService $procedures) {}
 
     /**
+     * One audit trail change, opened (2 Oct 2026): the row itself and what it
+     * changed in context — the item's shifts in that stock recon run, or the
+     * rows a bank recon batch stamped. Null when the change does not exist or
+     * sits outside the sites the person may see.
+     *
+     * @param  array<int, int>  $allowed  the sites the person may see; [] = every site
+     * @return array{change: object, context: Collection<int, object>}|null
+     */
+    public function auditChange(string $ledger, int $id, array $allowed): ?array
+    {
+        $sets = $this->procedures->callSets('usp_Reports_GetAuditChange', [
+            'Ledger' => $ledger,
+            'LedgerId' => $id,
+            'AllowedBranchIds' => $allowed === [] ? null : implode(',', $allowed),
+        ]);
+
+        $change = ($sets[0] ?? collect())->first();
+
+        return $change === null ? null : ['change' => $change, 'context' => $sets[1] ?? collect()];
+    }
+
+    /**
      * The `branches` request parameter, whichever shape it arrives in.
      *
      * The selector is `<select name="branches[]" multiple>`, so a submitted

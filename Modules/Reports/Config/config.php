@@ -391,5 +391,50 @@ return [
                 ['key' => 'Status', 'label' => 'Status', 'type' => 'chip', 'sort' => 'Status'],
             ],
         ],
+
+        /* -------------------------------------------------------- Governance */
+
+        /*
+         | Every change Agora has made in PumpIT (Ryan, 1 Oct 2026: "save all
+         | auto amendments we make … so we can refer back to it"). Read from
+         | agora.vw_PumpItChange, which reads the ledgers the reversals run on.
+         | No `menu` key: it hangs under Control → Governance → Audit trail
+         | (AuditTrailMenuSeeder), not under Today. The procedure also returns
+         | Detail — a capture's field-level before/after as JSON — which is left
+         | off the grid because it runs to kilobytes; Ledger and Record name it.
+         */
+        'audit-trail' => [
+            'label' => 'Audit trail',
+            'group' => 'Governance',
+            'procedure' => 'usp_Reports_GridAuditTrail',
+            // Click a row: the correction opened, the way the customer report
+            // reads one (usp_Reports_GetAuditChange, 2 Oct 2026).
+            'detail' => ['route' => 'app.reports.audit.change', 'params' => ['ledger' => 'Ledger', 'id' => 'LedgerId']],
+            'blurb' => 'Every change Agora has made in PumpIT, newest first: stock recon counts, bank recon '
+                .'stamps, Z-read allocations, utility readings and the captures. Each row says which PumpIT row '
+                .'changed, from what to what, why, who pressed it and when, and whether it was reversed. It reads '
+                .'the same records a Reverse puts back from, so it goes back to the first change and cannot '
+                .'disagree with them. Times are SAST. The last 30 days unless you choose dates.',
+            'was' => [],
+            'columns' => [
+                ['key' => 'ChangedAt', 'label' => 'When', 'type' => 'datetime', 'sort' => 'ChangedAt'],
+                ['key' => 'BranchName', 'label' => 'Site', 'type' => 'text', 'sort' => 'BranchName'],
+                ['key' => 'Module', 'label' => 'Area', 'type' => 'text', 'sort' => 'Module'],
+                ['key' => 'Action', 'label' => 'Action', 'type' => 'text', 'sort' => 'Action'],
+                ['key' => 'RowKey', 'label' => 'Row changed', 'type' => 'text', 'sort' => 'RowKey'],
+                ['key' => 'Change', 'label' => 'Before → after', 'type' => 'text'],
+                ['key' => 'Reason', 'label' => 'Why', 'type' => 'text'],
+                ['key' => 'ChangedBy', 'label' => 'By', 'type' => 'text', 'sort' => 'ChangedBy'],
+                ['key' => 'State', 'label' => 'State', 'type' => 'chip', 'sort' => 'State'],
+                ['key' => 'ReversedAt', 'label' => 'Reversed', 'type' => 'datetime', 'sort' => 'ReversedAt'],
+                ['key' => 'ReversedBy', 'label' => 'Reversed by', 'type' => 'text'],
+                ['key' => 'ReversalReason', 'label' => 'Reversal reason', 'type' => 'text'],
+                ['key' => 'Ref', 'label' => 'Press', 'type' => 'text', 'sort' => 'Ref'],
+                ['key' => 'PumpItTable', 'label' => 'PumpIT table', 'type' => 'text', 'sort' => 'PumpItTable'],
+                ['key' => 'WriteMode', 'label' => 'Mode', 'type' => 'text'],
+                ['key' => 'Ledger', 'label' => 'Ledger', 'type' => 'text'],
+                ['key' => 'LedgerId', 'label' => 'Record', 'type' => 'number'],
+            ],
+        ],
     ],
 ];
