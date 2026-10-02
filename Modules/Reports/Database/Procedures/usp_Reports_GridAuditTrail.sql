@@ -17,8 +17,8 @@
    Head office, Control → Governance → Audit trail. Search finds a row by
    item, reference, batch, run or person.
 
-   READ-ONLY. The default window is the last 30 days, because the bank recon
-   stamps alone run to thousands a week.
+   READ-ONLY. The default window is the last 7 days: the bank recon stamps
+   alone run to ~35,000 a week (2 Oct 2026, live: 152,644 in a month).
 
      EXEC agora.usp_Reports_GridAuditTrail @Search = 'Dunhill';
    ============================================================================ */
@@ -35,9 +35,10 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Reports_GridAuditTrail]
 AS
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT ON;   -- it fills temp tables, and the checker counts those as writes
 
     SET @DateTo   = ISNULL(@DateTo, CONVERT(date, GETDATE()));
-    SET @DateFrom = ISNULL(@DateFrom, DATEADD(day, -30, @DateTo));
+    SET @DateFrom = ISNULL(@DateFrom, DATEADD(day, -7, @DateTo));
     SET @Page     = CASE WHEN ISNULL(@Page, 1) < 1 THEN 1 ELSE @Page END;
     SET @PageSize = CASE WHEN ISNULL(@PageSize, 50) BETWEEN 1 AND 100000 THEN @PageSize ELSE 50 END;
     SET @Search   = NULLIF(LTRIM(RTRIM(ISNULL(@Search, ''))), '');
@@ -54,78 +55,111 @@ BEGIN
       AND TRY_CONVERT(int, LTRIM(RTRIM(s.value))) IS NOT NULL;
 
     DECLARE @AllBranches bit = CASE WHEN EXISTS (SELECT 1 FROM @Branch) THEN 0 ELSE 1 END;
+    DECLARE @Total bigint;
 
-    SELECT
-        c.BranchId,
-        ISNULL(b.Name, CONCAT(N'Site ', c.BranchId)) AS BranchName,
-        c.ChangedAt,
-        cu.UserName         AS ChangedBy,
-        c.Module,
-        c.Action,
-        c.PumpItTable,
-        c.RowKey,
-        c.Change,
-        c.Reason,
-        c.Ref,
-        c.WriteMode,
-        c.State,
-        c.ReversedAt,
-        ru.UserName         AS ReversedBy,
-        c.ReversalReason,
-        c.Ledger,
-        c.LedgerId,
-        c.Detail
-    INTO #Rows
-    FROM agora.vw_PumpItChange c
+    CREATE TABLE #Page (Rn int PRIMARY KEY, BranchId int, Ledger nvarchar(40) COLLATE DATABASE_DEFAULT, LedgerId bigint);
+
+    /* TWO SPEEDS. The view's text columns (the row, the change, the reason) are
+       the expensive part: the bank recon arm builds them from JSON and a bank
+       statement line per stamp, and a month is ~150,000 stamps. So with no
+       search and a sort on a cheap column, find the page on the cheap columns
+       first and build the text for those rows only (2 Oct 2026: the first
+       version built every row and ran four minutes on live). A search or a sort
+       on a text column has to read the text, and takes the slow road. */
+    IF @Search IS NULL AND (@SortColumn IS NULL OR @SortColumn IN ('ChangedAt', 'Module', 'Action', 'PumpItTable', 'State'))
+    BEGIN
+        SELECT c.BranchId, c.Ledger, c.LedgerId, c.ChangedAt, c.Module, c.Action, c.PumpItTable, c.State
+        INTO #Keys
+        FROM agora.vw_PumpItChange c
+        WHERE c.ChangedAt >= @DateFrom AND c.ChangedAt < DATEADD(day, 1, @DateTo)
+          AND (@AllBranches = 1 OR c.BranchId IN (SELECT BranchId FROM @Branch));
+
+        SET @Total = (SELECT COUNT_BIG(*) FROM #Keys);
+
+        INSERT INTO #Page (Rn, BranchId, Ledger, LedgerId)
+        SELECT k.Ord, k.BranchId, k.Ledger, k.LedgerId
+        FROM (SELECT k.*,
+                     ROW_NUMBER() OVER (ORDER BY
+                        CASE WHEN @SortAsc = 1 THEN CASE @SortColumn WHEN 'Module' THEN k.Module WHEN 'Action' THEN k.Action
+                                                    WHEN 'PumpItTable' THEN k.PumpItTable WHEN 'State' THEN k.State END END ASC,
+                        CASE WHEN @SortAsc = 0 THEN CASE @SortColumn WHEN 'Module' THEN k.Module WHEN 'Action' THEN k.Action
+                                                    WHEN 'PumpItTable' THEN k.PumpItTable WHEN 'State' THEN k.State END END DESC,
+                        CASE WHEN @SortAsc = 1 AND @SortColumn = 'ChangedAt' THEN k.ChangedAt END ASC,
+                        k.ChangedAt DESC, k.Ledger, k.LedgerId) AS Ord
+              FROM #Keys k) k
+        WHERE k.Ord > (@Page - 1) * @PageSize AND k.Ord <= @Page * @PageSize;
+    END
+    ELSE
+    BEGIN
+        SELECT c.BranchId, c.Ledger, c.LedgerId, c.ChangedAt, c.ReversedAt, c.Module, c.Action, c.PumpItTable,
+               c.RowKey, c.Ref, c.State, b.Name AS BranchName, cu.UserName AS ChangedBy
+        INTO #Rows
+        FROM agora.vw_PumpItChange c
+        LEFT JOIN agora.vw_Branch b ON b.BranchId = c.BranchId
+        OUTER APPLY (SELECT TOP 1 u.UserName FROM agora.[User] u WHERE u.Id = c.ChangedBy) cu
+        WHERE c.ChangedAt >= @DateFrom AND c.ChangedAt < DATEADD(day, 1, @DateTo)
+          AND (@AllBranches = 1 OR c.BranchId IN (SELECT BranchId FROM @Branch))
+          AND (@Search IS NULL
+               OR c.RowKey      LIKE '%' + @Search + '%'
+               OR c.Change      LIKE '%' + @Search + '%'
+               OR c.Reason      LIKE '%' + @Search + '%'
+               OR c.Ref         LIKE '%' + @Search + '%'
+               OR c.Module      LIKE '%' + @Search + '%'
+               OR c.Action      LIKE '%' + @Search + '%'
+               OR c.PumpItTable LIKE '%' + @Search + '%'
+               OR b.Name        LIKE '%' + @Search + '%'
+               OR cu.UserName   LIKE '%' + @Search + '%');
+
+        SET @Total = (SELECT COUNT_BIG(*) FROM #Rows);
+
+        INSERT INTO #Page (Rn, BranchId, Ledger, LedgerId)
+        SELECT r.Ord, r.BranchId, r.Ledger, r.LedgerId
+        FROM (SELECT r.*,
+                     ROW_NUMBER() OVER (ORDER BY
+                        CASE WHEN @SortAsc = 1 THEN
+                            CASE @SortColumn WHEN 'BranchName'  THEN r.BranchName
+                                             WHEN 'ChangedBy'   THEN r.ChangedBy
+                                             WHEN 'Module'      THEN r.Module
+                                             WHEN 'Action'      THEN r.Action
+                                             WHEN 'PumpItTable' THEN r.PumpItTable
+                                             WHEN 'RowKey'      THEN r.RowKey
+                                             WHEN 'Ref'         THEN r.Ref
+                                             WHEN 'State'       THEN r.State END END ASC,
+                        CASE WHEN @SortAsc = 0 THEN
+                            CASE @SortColumn WHEN 'BranchName'  THEN r.BranchName
+                                             WHEN 'ChangedBy'   THEN r.ChangedBy
+                                             WHEN 'Module'      THEN r.Module
+                                             WHEN 'Action'      THEN r.Action
+                                             WHEN 'PumpItTable' THEN r.PumpItTable
+                                             WHEN 'RowKey'      THEN r.RowKey
+                                             WHEN 'Ref'         THEN r.Ref
+                                             WHEN 'State'       THEN r.State END END DESC,
+                        CASE WHEN @SortAsc = 1 THEN
+                            CASE @SortColumn WHEN 'ChangedAt'  THEN r.ChangedAt
+                                             WHEN 'ReversedAt' THEN r.ReversedAt END END ASC,
+                        CASE WHEN @SortAsc = 0 THEN
+                            CASE @SortColumn WHEN 'ChangedAt'  THEN r.ChangedAt
+                                             WHEN 'ReversedAt' THEN r.ReversedAt END END DESC,
+                        r.ChangedAt DESC, r.Ledger, r.LedgerId) AS Ord
+              FROM #Rows r) r
+        WHERE r.Ord > (@Page - 1) * @PageSize AND r.Ord <= @Page * @PageSize;
+    END
+
+    /* The page itself, text and all — built for these rows only. CROSS APPLY
+       with the key in the predicate lets each arm of the view seek its own
+       ledger by (BranchId, Id) rather than build every row and join. */
+    SELECT c.BranchId,
+           ISNULL(b.Name, CONCAT(N'Site ', c.BranchId)) AS BranchName,
+           c.ChangedAt, cu.UserName AS ChangedBy, c.Module, c.Action, c.PumpItTable,
+           c.RowKey, c.Change, c.Reason, c.Ref, c.WriteMode, c.State, c.ReversedAt,
+           ru.UserName AS ReversedBy, c.ReversalReason, c.Ledger, c.LedgerId, c.Detail
+    FROM #Page p
+    CROSS APPLY (SELECT v.* FROM agora.vw_PumpItChange v
+                 WHERE v.BranchId = p.BranchId AND v.Ledger = p.Ledger AND v.LedgerId = p.LedgerId) c
     LEFT JOIN agora.vw_Branch b ON b.BranchId = c.BranchId
     OUTER APPLY (SELECT TOP 1 u.UserName FROM agora.[User] u WHERE u.Id = c.ChangedBy) cu
     OUTER APPLY (SELECT TOP 1 u.UserName FROM agora.[User] u WHERE u.Id = c.ReversedBy) ru
-    WHERE c.ChangedAt >= @DateFrom AND c.ChangedAt < DATEADD(day, 1, @DateTo)
-      AND (@AllBranches = 1 OR c.BranchId IN (SELECT BranchId FROM @Branch))
-      AND (@Search IS NULL
-           OR c.RowKey      LIKE '%' + @Search + '%'
-           OR c.Change      LIKE '%' + @Search + '%'
-           OR c.Reason      LIKE '%' + @Search + '%'
-           OR c.Ref         LIKE '%' + @Search + '%'
-           OR c.Module      LIKE '%' + @Search + '%'
-           OR c.Action      LIKE '%' + @Search + '%'
-           OR c.PumpItTable LIKE '%' + @Search + '%'
-           OR b.Name        LIKE '%' + @Search + '%'
-           OR cu.UserName   LIKE '%' + @Search + '%');
-
-    DECLARE @Total bigint = (SELECT COUNT_BIG(*) FROM #Rows);
-
-    SELECT r.BranchId, r.BranchName, r.ChangedAt, r.ChangedBy, r.Module, r.Action, r.PumpItTable,
-           r.RowKey, r.Change, r.Reason, r.Ref, r.WriteMode, r.State, r.ReversedAt, r.ReversedBy,
-           r.ReversalReason, r.Ledger, r.LedgerId, r.Detail
-    FROM #Rows r
-    ORDER BY
-        CASE WHEN @SortAsc = 1 THEN
-            CASE @SortColumn WHEN 'BranchName'  THEN r.BranchName
-                             WHEN 'ChangedBy'   THEN r.ChangedBy
-                             WHEN 'Module'      THEN r.Module
-                             WHEN 'Action'      THEN r.Action
-                             WHEN 'PumpItTable' THEN r.PumpItTable
-                             WHEN 'RowKey'      THEN r.RowKey
-                             WHEN 'Ref'         THEN r.Ref
-                             WHEN 'State'       THEN r.State END END ASC,
-        CASE WHEN @SortAsc = 0 THEN
-            CASE @SortColumn WHEN 'BranchName'  THEN r.BranchName
-                             WHEN 'ChangedBy'   THEN r.ChangedBy
-                             WHEN 'Module'      THEN r.Module
-                             WHEN 'Action'      THEN r.Action
-                             WHEN 'PumpItTable' THEN r.PumpItTable
-                             WHEN 'RowKey'      THEN r.RowKey
-                             WHEN 'Ref'         THEN r.Ref
-                             WHEN 'State'       THEN r.State END END DESC,
-        CASE WHEN @SortAsc = 1 THEN
-            CASE @SortColumn WHEN 'ChangedAt'  THEN r.ChangedAt
-                             WHEN 'ReversedAt' THEN r.ReversedAt END END ASC,
-        CASE WHEN @SortAsc = 0 THEN
-            CASE @SortColumn WHEN 'ChangedAt'  THEN r.ChangedAt
-                             WHEN 'ReversedAt' THEN r.ReversedAt END END DESC,
-        r.ChangedAt DESC, r.Ledger, r.LedgerId
-    OFFSET (@Page - 1) * @PageSize ROWS FETCH NEXT @PageSize ROWS ONLY;
+    ORDER BY p.Rn;
 
     SELECT @Total AS TotalRows;
 END

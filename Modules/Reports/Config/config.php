@@ -414,7 +414,7 @@ return [
                 .'stamps, Z-read allocations, utility readings and the captures. Each row says which PumpIT row '
                 .'changed, from what to what, why, who pressed it and when, and whether it was reversed. It reads '
                 .'the same records a Reverse puts back from, so it goes back to the first change and cannot '
-                .'disagree with them. Times are SAST. The last 30 days unless you choose dates.',
+                .'disagree with them. Times are SAST. The last 7 days unless you choose dates.',
             'was' => [],
             'columns' => [
                 ['key' => 'ChangedAt', 'label' => 'When', 'type' => 'datetime', 'sort' => 'ChangedAt'],

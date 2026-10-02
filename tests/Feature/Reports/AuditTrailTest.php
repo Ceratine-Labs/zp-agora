@@ -102,6 +102,26 @@ class AuditTrailTest extends TestCase
         $this->assertSame($sorted, $times, 'With no sort chosen the newest change comes first.');
     }
 
+    public function test_pages_follow_on_from_each_other_newest_first_without_overlap(): void
+    {
+        $call = fn (int $page) => app(ProcedureService::class)->callSets('usp_Reports_GridAuditTrail', [
+            'DateFrom' => '2000-01-01', 'DateTo' => '2099-12-31', 'Page' => $page, 'PageSize' => 5,
+        ])[0];
+
+        $one = $call(1);
+        $two = $call(2);
+        if ($two->isEmpty()) {
+            $this->markTestSkipped('Fewer than six changes in this database.');
+        }
+
+        $key = fn ($r) => $r->Ledger.'#'.$r->LedgerId;
+        $this->assertCount(5, $one);
+        $this->assertSame([], array_intersect($one->map($key)->all(), $two->map($key)->all()), 'Page 2 repeats page 1.');
+        $this->assertGreaterThanOrEqual((string) $two->first()->ChangedAt, (string) $one->last()->ChangedAt,
+            'Page 2 starts after page 1 ends, newest first.');
+        $this->assertNotNull($one->first()->Change, 'The page carries its text, built for these rows.');
+    }
+
     public function test_the_audit_trail_renders_under_control_governance(): void
     {
         $admin = User::query()->acrossBranches()->where('EmailAddress', config('agora.admin.email'))->first();
