@@ -786,9 +786,17 @@ tr.tt-page-out { display: none; }
 
      `:not(.field-check)` because a bool field's second <label> is the
      checkbox row, not a caption. */
-  > label:not(.field-check) {
+  > label:not(.field-check), > .field-label > label {
     font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
     margin-bottom: 10px;
+  }
+  /* With an info button beside it the row carries the gap, not the label —
+     and is held to the label's own height, so a field with a button lines
+     up with one without. The button overhangs by a pixel or two. */
+  > .field-label {
+    margin-bottom: 10px; height: 15px; flex-wrap: nowrap;
+    > label { margin-bottom: 0; }
+    .info-btn { width: 16px; height: 16px; font-size: 10px; }
   }
   input[type="text"], input[type="date"], input[type="number"], select {
     background: var(--surface); color: var(--ink);
@@ -874,6 +882,42 @@ tr.tt-page-out { display: none; }
      bottom margin, so the last one cannot leave a gap under the group. */
   > .explainer-body { display: flex; flex-direction: column; gap: 16px; }
 }
+
+/* <x-info>: standing explanation behind a small "i". The panel floats under
+   the button rather than pushing the page down, so opening one never moves
+   the control somebody was about to press. info.js keeps it on screen. */
+.info {
+  position: relative; display: inline-block; vertical-align: middle;
+  font: 400 13px/1.55 var(--font-text); letter-spacing: normal; text-transform: none;
+  > summary.info-btn {
+    list-style: none; cursor: pointer; user-select: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--muted);
+    font: italic 600 11px/1 Georgia, 'Times New Roman', serif;
+    &::marker, &::-webkit-details-marker { display: none; }
+    &:hover { color: var(--brand-ink); border-color: var(--brand); }
+    &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  }
+  &[open] > summary.info-btn { background: var(--brand-soft); color: var(--brand-ink); border-color: var(--brand); }
+  > .info-body {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+    width: min(440px, calc(100vw - 32px));
+    padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r);
+    background: var(--surface); box-shadow: var(--shadow-pop);
+    color: var(--ink-2); text-align: left; white-space: normal;
+    display: flex; flex-direction: column; gap: 8px;
+    p, ul { margin: 0; }
+    ul { padding-left: 18px; }
+    strong { color: var(--ink); }
+    /* A notice inside the panel keeps its colour but loses its own margin. */
+    .notice { margin: 0; }
+  }
+}
+.info-wide > .info-body { width: min(680px, calc(100vw - 32px)); }
+
+/* A title with its info button beside it — page head, card head, field label. */
+.ph-title, .card-t, .field-label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* The five reconciliation areas on the recon hub. */
 .area-grid {

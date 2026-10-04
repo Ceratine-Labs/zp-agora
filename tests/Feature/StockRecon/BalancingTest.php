@@ -262,6 +262,64 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * ZRP, 4 Oct 2026: a break of 1, 2 or 3 units does not split the chain.
+     *
+     * 19 Jul shift 3 opens at 28 against a previous closing of 30. Split there,
+     * the stretch before it would end on 19 Jul shift 1 with that closing
+     * pinned, and the stretch after would end eight over — U4, the whole chain
+     * blocked. Kept, the opening is repaired, the closing before it moves to
+     * absorb the over (30 → 39), and the chain balances as if the break were
+     * not there. The two units are still reported: on the row and as S10a.
+     */
+    public function test_a_break_of_three_or_fewer_keeps_the_chain_going_and_is_reported(): void
+    {
+        $this->setCounts('2026-07-19', 3, ['QtyOpen_Original' => 28, 'QtyOpen' => 28]);
+
+        $run = $this->preview();
+        $lines = $run->lines->where('StockItemNo', self::ITEM)->keyBy(fn ($l) => $l->TransactionDate->toDateString().'/'.$l->ShiftNo);
+
+        $broken = $lines['2026-07-19/3'];
+
+        $this->assertTrue($broken->BreakKept, 'A two-unit break is kept.');
+        $this->assertEqualsWithDelta(-2.0, (float) $broken->ChainBreak, 0.005);
+        $this->assertSame('S10a', $broken->ExceptionCode, 'A kept break is still on the exceptions tab.');
+        $this->assertStringStartsWith('Break -2 kept', $broken->Outcome, 'The qty is on the row.');
+        $this->assertNull($broken->AuditCode, 'S13 does not read a break that small.');
+
+        $this->assertTrue($lines->every(fn ($l) => ! $l->ChainBlocked), 'The chain is not split, so no stretch of it ends over.');
+        $this->assertEqualsWithDelta(39.0, (float) $lines['2026-07-19/1']->QtyCloseNew, 0.005,
+            'The closing before a kept break moves: the chain balances through it.');
+        $this->assertEqualsWithDelta(39.0, (float) $broken->QtyOpenNew, 0.005, 'The opening follows it.');
+        $this->assertTrue($lines->every(fn ($l) => (float) $l->QtyVarNew <= 0.005), 'No shift ends over.');
+        $this->assertEqualsWithDelta(-5.0, $lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.001, 'The invariant still holds.');
+        $this->assertSame(1, (int) $run->fresh()->KeptBreaks);
+
+        $exceptions = collect(DB::connection(config('agora.connections.app'))
+            ->select('EXEC agora.usp_StockRecon_GridExceptions @RunId = ?, @PageSize = 1000', [$run->Id]))
+            ->firstWhere('Id', $broken->Id);
+
+        $this->assertNotNull($exceptions, 'The kept break is on the exceptions grid.');
+        $this->assertEqualsWithDelta(-2.0, (float) $exceptions->ChainBreak, 0.005, 'With its qty.');
+    }
+
+    /** At 0 the option restores the split: the same break blocks the chain, as before 4 Oct. */
+    public function test_keeping_breaks_can_be_switched_off(): void
+    {
+        $this->setCounts('2026-07-19', 3, ['QtyOpen_Original' => 28, 'QtyOpen' => 28]);
+
+        $run = $this->service->preview(
+            self::BRANCH, self::AREA, Carbon::parse('2026-07-17'), Carbon::parse('2026-07-21'),
+            ['KeepBreaksUpTo' => 0], note: 'TEST-balancing',
+        )->load('lines');
+
+        $lines = $run->lines->where('StockItemNo', self::ITEM);
+
+        $this->assertTrue($lines->every(fn ($l) => ! $l->BreakKept));
+        $this->assertTrue($lines->contains(fn ($l) => $l->FlagNetOver), 'Split, the stretch after the break ends over.');
+        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked));
+    }
+
+    /**
      * The client's rule 5: an over within 10% of a whole issue multiple is an
      * issue not written up. It is captured, never balanced away — so the chain
      * is reported and the shift carries S1.

@@ -93,6 +93,29 @@ balancing now read the repaired opening, the closing before a repair is pinned,
 and the break is reported (S10a / S10b). The dormant guard that fired on broken
 chains reads the repaired opening too, so it still holds.
 
+### A break of 3 or fewer keeps the chain going — since 4 Oct 2026
+
+ZRP asked that a break of 1, 2 or 3 units stop splitting the chain. A break no
+bigger than the run option `KeepBreaksUpTo` (default 3, 0 restores the split)
+is still **repaired** — the opening set to the previous closing — but it does
+**not** start a new segment, so the closing before it is free to move and the
+chain balances straight through. It is reported: `BreakKept` on the line, the
+qty in the outcome (`Break -2 kept: …`), the **Break** column on the proposals
+and exceptions tables, and S10a / S10b on the exceptions tab as before. S12 and
+S13 read only breaks bigger than the option, on the audit of PumpIT and on the
+check of what a commit would write, so a kept break never withdraws its own
+chain as F3.
+
+**The client's own engine still flags it.** The pack's S12 is "a previous
+closing moved at a break", any size. Agora now moves that closing at a kept
+break, so the Tuesday engine reports S12 on those shifts until it is given the
+same tolerance.
+
+Measured, Engen Bethlehem 1–27 Sep on the local copy, kept (3) against split
+(0): 121 breaks, 63 of them kept; reported chains 192 → 187; U4 chains 49 → 36;
+shifts written 10 → 25; S12/S13 audit rows 22 → 5; every clear chain still
+balances to exactly T.
+
 ---
 
 ## The client's rules (ZRP weekly pack, 23 Sep 2026)
@@ -108,7 +131,7 @@ Where each rule lands:
 | Pack rule | In Agora |
 |---|---|
 | 1. Variance = POS − (opening + issued − closing) | Unchanged. |
-| 3. Opening must equal the previous closing; amend the **opening**, never the closing | A break is **repaired**, not blocked: `QtyOpenNew` = the previous closing (the shift before the window for the first row). The closing before a repaired opening is **pinned** — the chain is balanced in segments split at each repair — because the pack flags any moved previous closing at a break as S12. Reported as **S10a** (opening below: stock vanished) or **S10b** (above). |
+| 3. Opening must equal the previous closing; amend the **opening**, never the closing | A break is **repaired**, not blocked: `QtyOpenNew` = the previous closing (the shift before the window for the first row). The closing before a repaired opening is **pinned** — the chain is balanced in segments split at each repair — because the pack flags any moved previous closing at a break as S12. Reported as **S10a** (opening below: stock vanished) or **S10b** (above). **A break of 3 or fewer does not split** (ZRP, 4 Oct 2026 — see above). |
 | 4. Over → nil, never a short; a short never grows; the latest closing stands | Unchanged — it is what the reverse running maximum already did. The last active shift of each segment is pinned. |
 | 5. An over within 10% of a whole issue multiple is an issue not written up | **S1**, blocks the chain: captured, never balanced away. Multiples come from `agora.StockIssueMultiple` (head office's workbook, seeded by `IssueMultipleSeeder`), falling back to `vw_StockItem.IssueMultiple` — PumpIT's column is ≥ 2 on 1 of 2,433 items at the pack's sites. |
 | 10. Analyse a site only up to its last complete recon day | Stage 0 of the preview. A day is complete when every shift the site normally runs carries ≥ 95% of its normal lines with ≥ half its normal share of closings, and POS is posted on ≥ half the normal share. The first incomplete day and everything after it is **held back** (`CompleteTo`, `HeldBackRows`). Option `HoldBackIncomplete`, default on. |

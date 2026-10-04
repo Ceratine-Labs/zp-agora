@@ -127,6 +127,33 @@ class AreaSelectorTest extends TestCase
         }
     }
 
+    /**
+     * A month, then weeks inside it — not free dates (ZRP, 4 Oct 2026). The
+     * week selects post `from` and `to`, so the request is unchanged; they
+     * follow the month, and the end may not be set before the start.
+     */
+    public function test_the_period_is_a_month_then_weeks_within_it(): void
+    {
+        $this->actingAs($this->admin());
+
+        $page = $this->get(route('app.stockrecon.index', ['from' => '2026-09-07', 'to' => '2026-09-20']))->assertOk();
+
+        // Selects, not date inputs (the runs grid below has date filters of its own).
+        $page->assertSee('<select id="f-from" name="from"', false);
+        $page->assertSee('<select id="f-to" name="to"', false);
+        $page->assertSee('name="month"', false);
+        $page->assertSee('<option value="2026-09" selected>', false);
+        $page->assertSee('data-linked-select="month"', false);
+        $page->assertSee('data-not-before="from"', false);
+        $this->assertMatchesRegularExpression('/value="2026-09-07"\s+data-when="2026-09"\s+selected>Week 2 · 7–13 Sep</',
+            $page->getContent(), 'The From week opens on the week ?from= falls in.');
+        $this->assertMatchesRegularExpression('/value="2026-09-20"\s+data-when="2026-09"\s+selected>Week 3 · 14–20 Sep</',
+            $page->getContent(), 'The To week opens on the week ?to= ends.');
+
+        // The standing text is behind an info button, not on the page.
+        $page->assertSee('class="info', false);
+    }
+
     private function admin(): User
     {
         $user = User::query()->acrossBranches()

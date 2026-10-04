@@ -67,6 +67,7 @@ use Illuminate\Support\Carbon;
  * @property bool $RestoresHand
  * @property bool $FlagAuditConflict
  * @property string|null $AuditCode
+ * @property bool $BreakKept
  * @property-read StockReconRun $run
  */
 class StockReconRunLine extends BaseModel
@@ -123,6 +124,7 @@ class StockReconRunLine extends BaseModel
         'FlagNoPosLink' => 'boolean',
         'RestoresHand' => 'boolean',
         'FlagAuditConflict' => 'boolean',
+        'BreakKept' => 'boolean',
         'ChainBlocked' => 'boolean',
         'WouldAmend' => 'boolean',
         'Selected' => 'boolean',

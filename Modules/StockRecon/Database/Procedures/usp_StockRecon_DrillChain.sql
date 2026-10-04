@@ -94,6 +94,8 @@ BEGIN
            amending the opening. Kept, under its old name, so the panel can say
            how many openings the balancing repairs. */
         SUM(CONVERT(int, rl.FlagChainBroken))                AS RepairedOpenings,
+        /* Of those, the ones small enough that the chain runs through them. */
+        SUM(CONVERT(int, rl.BreakKept))                      AS KeptBreaks,
         SUM(CASE WHEN rl.AuditCode IS NOT NULL THEN 1 ELSE 0 END) AS AuditShifts,
         MAX(rl.IssueMultiple)                               AS IssueMultiple,
         MAX(CASE WHEN rl.FlagIssueWentNowhere   = 1 THEN 'An issue went nowhere'                        END) AS BlockIssueNowhere,
@@ -148,6 +150,7 @@ BEGIN
            how much the counted opening missed it. */
         rl.PrevClose,
         rl.ChainBreak,
+        rl.BreakKept,
         /* What PumpIT held when the run was made, so a hand amendment the
            commit puts back is visible beside the count it goes back to. */
         rl.QtyOpenNow,

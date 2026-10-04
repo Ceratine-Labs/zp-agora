@@ -6,65 +6,30 @@
     chain. Making them two buttons would be two passes that can disagree.
 --}}
 <x-app-shell title="Stock recon centre">
-    <x-page-head
-        eyebrow="Control · stock"
-        title="Stock recon centre"
-        blurb="Re-cut the shift closing counts so a count that was carried forward stops reading as a
-               loss, and report what no amendment can fix. The preview reads the customer's recon lines
-               and changes nothing.">
+    {{-- The standing explanation — the invariant and what a commit does — sits
+         behind the info button beside the title (ZRP, 4 Oct 2026: the users
+         skipped every paragraph on this screen). Nothing about THIS visit goes
+         in there: a refusal, a discard and an open run stay on the page. --}}
+    <x-page-head eyebrow="Control · stock" title="Stock recon centre">
+        <x-slot:info>
+            <p>A shift's variance is <code>POS &minus; (Open + Issued &minus; Close)</code>, and one shift's
+               closing <em>is</em> the next shift's opening. Balancing moves a closing count, which shifts
+               variance from one shift to the next: it decides <strong>who carries</strong> a loss and cannot
+               make it smaller. A window that ends <strong>over</strong> sold more than it received — it is
+               reported, never balanced.</p>
+            @if ($stampMode === 'journal')
+                <p><strong>Journal mode.</strong> A commit records each amendment in Agora with the prior counts;
+                   nothing in PumpIT moves.</p>
+            @else
+                <p><strong>A commit writes <code>QtyOpen</code> and <code>QtyClose</code> to PumpIT</strong>, only
+                   on the ticked rows, re-checking each first. Every prior pair is recorded, so a run can be
+                   reversed exactly. Issues and the <code>_Original</code> columns are never touched.</p>
+            @endif
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.reports.index') }}">Reports</a>
         </x-slot:actions>
     </x-page-head>
-
-    {{-- Standing explanation — the invariant the screen follows from, and what
-         a commit does. Both are true on every visit and neither is about the
-         run in hand, so they fold as a group and the summary line names what
-         is behind it. The panels below this one do not fold: a refusal, a
-         discard and an open run are all answers about THIS visit.
-
-         The live-commit warning used to sit open on the argument that nobody
-         should have to open something to learn a problem exists. It still
-         should not: the summary says a commit writes to PumpIT, so the fact is
-         on the screen closed, and only the detail is behind the fold. --}}
-    <x-explainer remember="stockrecon-intro"
-                 summary="{{ $stampMode === 'journal'
-                    ? 'How balancing works, and what a commit records'
-                    : 'How balancing works, and what a commit writes to PumpIT' }}">
-        <x-notice tone="info" title="{{ __('stockrecon::stockrecon.invariant') }}">
-            <p>A shift's variance is <code>POS &minus; (Open + Issued &minus; Close)</code>, and one shift's
-               closing count <em>is</em> the next shift's opening. Raising a closing by <em>d</em> lifts that
-               shift's variance by <em>d</em> and drops the next one's by exactly <em>d</em>, so over the
-               window everything cancels except at the two ends. Balancing decides which shift carries the
-               loss; it cannot make the loss smaller.</p>
-            <p>That is why a window ending <strong>over</strong> is the finding rather than a rounding
-               problem: more was sold than the books ever received, and no set of closing counts changes it.
-               Those chains are reported, never balanced.</p>
-        </x-notice>
-
-        @if ($stampMode === 'journal')
-            <x-notice tone="warn" title="Amendments are recorded here, not written to PumpIT">
-                <p>A commit records every amendment in <code>agora.StockReconAmendment</code> — the shift, the
-                   prior pair, the new pair — and nothing in PumpIT moves. The extract from a committed run is
-                   then the worklist an admin applies by hand.</p>
-                <p>Nothing else is different. The arithmetic, the ticks, the confirmation and the reversal are
-                   the same in both modes.</p>
-            </x-notice>
-        @else
-            <x-notice tone="stop" title="Committing amends the counts in PumpIT">
-                <p>A commit writes <code>QtyOpen</code> and <code>QtyClose</code> back to
-                   <code>STK_StockReconLine</code> in the customer's live database. It acts on the ticked rows
-                   and no others, re-checks every one against the source first, and skips anything whose counts
-                   have moved since the preview.</p>
-                <p><strong>It is reversible.</strong> Each shift's prior pair is recorded before anything moves,
-                   so a reversal puts back precisely what was changed — not the original counts, so an earlier
-                   hand amendment is not thrown away with it. The procedure this replaces can undo nothing.</p>
-                <p>Two things it will not touch: <code>QtyIssued</code>, because amending an issue changes the
-                   window's total rather than redistributing it, and the <code>_Original</code> columns, which
-                   are what make a re-preview propose the same amendment rather than one on top of the last.</p>
-            </x-notice>
-        @endif
-    </x-explainer>
 
     @if (session('refusal'))
         {{-- Open by default: a refusal is the answer, not context for one. --}}
@@ -75,17 +40,24 @@
 
     @if (session('discarded') !== null)
         <x-notice tone="info"
-                  :title="session('discarded') === 0 ? 'Nothing to discard' : session('discarded').' '.Str::plural('preview', session('discarded')).' discarded'"
-                  style="margin-bottom:16px">
-            <p>Previews only. Nothing in the customer's databases was touched, and any run that had been
-               committed was kept — a committed run is the only record of what it amended.</p>
-        </x-notice>
+                  :title="session('discarded') === 0 ? 'Nothing to discard' : session('discarded').' '.Str::plural('preview', session('discarded')).' discarded — committed runs kept'"
+                  style="margin-bottom:16px" />
     @endif
 
     @include('stockrecon::partials.open-run')
 
-    <x-card title="Balance a period"
-            sub="Reads agora.vw_StockReconLine over PumpIT and writes nothing. Two seconds for a branch-month.">
+    <x-card title="Balance a period">
+        <x-slot:info>
+            <p>The preview reads the recon lines in PumpIT and writes nothing there. A branch-month takes a
+               couple of seconds.</p>
+            <p>Both ends of the period are anchors — the first opening and the last closing are believed — so
+               the period fixes the residual short before anything else happens.</p>
+            @if ($excluded !== [])
+                <p>Left out everywhere: areas grouped
+                   @foreach ($excluded as $group)<code>{{ $group }}</code>@if (! $loop->last), @endif @endforeach
+                   — lotto, airtime and electricity are virtual products with no issues and no count.</p>
+            @endif
+        </x-slot:info>
         <form method="POST" action="{{ route('app.stockrecon.preview') }}">
             @csrf
 
@@ -98,7 +70,6 @@
                     <div class="field">
                         <label>Site</label>
                         <p class="field-fixed">{{ $branches->firstWhere('BranchId', $branchId)?->Name ?? 'Not set' }}</p>
-                        <p class="field-help">Your workspace is pinned to this site.</p>
                     </div>
                     <input type="hidden" name="branch_id" value="{{ $branchId }}">
                 @else
@@ -108,7 +79,7 @@
                     <x-field name="branch_id" label="Site"
                              :choices="$branches->pluck('Name', 'BranchId')->all()"
                              :value="old('branch_id', $branchId ?: null)"
-                             help="Trading sites only — the administrative entities count no stock. Choosing one loads its counting areas." />
+                             info="Trading sites only — the administrative entities count no stock." />
                 @endif
 
                 {{-- The areas belong to the site, so the list follows the
@@ -145,34 +116,45 @@
                                 'when' => $a->BranchId,
                                 'label' => $a->AreaDescription,
                             ]))->all()"
-                         help="One area at a time is the working habit: the proposals table is deliberately not paged, because a paged commit form is a form that writes rows nobody looked at." />
+                         info="One area at a time is the working habit: it keeps the proposals short enough to read before committing." />
 
-                <x-field name="from" label="From" type="date" :value="old('from', $from)"
-                         help="Both ends are anchors — the first opening and the last closing are believed — so the window fixes the residual short before anything else happens." />
+                {{-- A MONTH, THEN WEEKS INSIDE IT, not free dates (ZRP, 4 Oct
+                     2026). Monday–Sunday weeks — the client's pack reviews
+                     those — cut at the month's edge; ReconPeriods builds them.
+                     The two week selects ARE `from` and `to`, so the request
+                     and the run are unchanged, and they follow the month
+                     through linked-select.js exactly as the area follows the
+                     site. Same week in both is one week; different weeks are a
+                     run of them. `notBefore` keeps the end after the start. --}}
+                <x-field name="month" label="Month" :choices="$months" :value="old('month', $month)" />
 
-                <x-field name="to" label="To" type="date" :value="old('to', $to)" />
+                <x-field name="from" label="From week" linked="month"
+                         :value="old('from', $from)"
+                         :choices="collect($weeks)->flatMap(fn ($ws, $m) => collect($ws)->map(fn ($w) => [
+                             'value' => $w['from'], 'when' => $m, 'label' => $w['label'],
+                         ]))->values()->all()" />
+
+                <x-field name="to" label="To week" linked="month" not-before="from"
+                         :value="old('to', $to)"
+                         :choices="collect($weeks)->flatMap(fn ($ws, $m) => collect($ws)->map(fn ($w) => [
+                             'value' => $w['to'], 'when' => $m, 'label' => $w['label'],
+                         ]))->values()->all()" />
 
                 {{-- What to call it. A clerk previews the same period several
                      times while tightening the caps, and "August Hot Foods,
                      tight caps" is how they find the one they meant an hour
                      later. Optional: an unnamed run is listed by its period. --}}
                 <x-field name="note" label="Name this run" :value="old('note')"
-                         help="Optional. Yours to find it by — it appears on the run list and on the run itself." />
+                         info="Optional. Yours to find it by on the run list." />
             </div>
 
             <details class="params-extra" @if (old('options')) open @endif>
-                <summary>Plausibility caps ({{ count($options) }})</summary>
-                <p class="field-help" style="margin:8px 0 12px">
-                    Every one of these <strong>blocks</strong> rather than bends: a chain that needs more
-                    than a cap allows is reported untouched, never amended half way. The defaults are the
-                    loose end of each, so the first thing you see is what the method would do — tighten
-                    one on purpose, after reading the blocked list.
-                </p>
-                <div class="field-row">
+                <summary>Options ({{ count($options) }})</summary>
+                <div class="field-row" style="margin-top:12px">
                     @foreach ($options as $name => $option)
                         <x-field :name="'options['.$name.']'"
                                  :label="$option['label']"
-                                 :help="$option['help']"
+                                 :info="$option['help']"
                                  :type="$option['type'] === 'decimal' ? 'number' : $option['type']"
                                  :min="$option['min'] ?? null"
                                  :max="$option['max'] ?? null"
@@ -188,17 +170,6 @@
             </div>
         </form>
 
-        <x-slot:foot>
-            @if ($excluded !== [])
-                <p class="field-help">
-                    Excluded throughout: areas whose group is
-                    @foreach ($excluded as $group)<code>{{ $group }}</code>@if (! $loop->last), @endif @endforeach.
-                    Lotto, airtime and electricity are virtual products — no issue is ever captured and no
-                    physical count is ever taken — so they read as a permanent, enormous net over and
-                    cannot be reconciled as stock, on the same reasoning that keeps fuel out of the pack.
-                </p>
-            @endif
-        </x-slot:foot>
     </x-card>
 
     {{--

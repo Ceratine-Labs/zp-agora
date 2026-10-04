@@ -20,7 +20,19 @@
 
 <div class="drill-chain">
     <header>
-        <h4>{{ $item->StockItemDescription ?? $line->StockItemNo }}</h4>
+        <div class="card-t">
+            <h4>{{ $item->StockItemDescription ?? $line->StockItemNo }}</h4>
+            {{-- The reading notes, behind a button (ZRP, 4 Oct 2026). --}}
+            <x-info label="How to read this chain" class="info-wide">
+                <p>Balancing amends the closing count; the opening follows, because it <em>is</em> the previous
+                   closing. Where the counted opening missed the previous closing, the opening is repaired: a
+                   break of 3 or fewer is balanced straight through, a bigger one splits the chain and the
+                   closing before it stands.</p>
+                <p>Where two people were on a shift both are named: the counts cannot say which of them a
+                   variance belongs to. A red chip beside the outcome is hand balancing already in PumpIT that
+                   the rules do not allow; the commit puts it back.</p>
+            </x-info>
+        </div>
         <p class="muted">
             {{ $item->AreaDescription ?? 'area '.$line->AreaNo }}
             · item <code>{{ $line->StockItemNo }}</code>
@@ -32,20 +44,16 @@
 
     <x-statstrip :stats="[
         ['label' => 'Chain total (T)', 'value' => \App\Support\Format::n($item?->ChainNetVar, 3),
-         'note' => \App\Support\Format::r($item?->ChainNetVarValue).' · fixed by the dates, unchanged by any amendment',
+         'note' => \App\Support\Format::r($item?->ChainNetVarValue),
          'tone' => (float) ($item?->ChainNetVar ?? 0) > 0.005 ? 'warn' : 'neutral'],
         ['label' => 'Shifts', 'value' => \App\Support\Format::n($item?->ChainShifts),
          'note' => \App\Support\Format::n($item?->ActiveShifts).' active, '.\App\Support\Format::n($item?->DormantShifts).' dormant'],
         ['label' => 'Chain', 'value' => ($item?->ChainBlocked ? 'Reported' : 'Balanceable'),
-         'note' => $item?->ChainBlocked ? 'blocked whole' : 'every over goes to zero',
          'tone' => $item?->ChainBlocked ? 'serious' : 'good'],
         /* How many different people appear anywhere on this chain. One is a
            chain a single person is answerable for; six is a chain where a
            persistent short is about the item or the process, not a person. */
-        ['label' => 'People on it', 'value' => \App\Support\Format::n($item?->DistinctEmployeeSets),
-         'note' => (int) ($item?->DistinctEmployeeSets ?? 0) > 1
-             ? 'a short spread across several is about the item, not a person'
-             : 'one person across the whole chain'],
+        ['label' => 'People on it', 'value' => \App\Support\Format::n($item?->DistinctEmployeeSets)],
     ]" />
 
     @if ($blocks->isNotEmpty())
@@ -54,19 +62,19 @@
                 @foreach ($blocks as $why)<li>{{ $why }}</li>@endforeach
             </ul>
             @if ($item?->BlockNoPosLink)
-                <p><strong>This is not a loss.</strong> The counts fall and the till shows next to nothing
-                   against the item, so the selling PLU or recipe is not reducing it. Link it and re-run;
-                   nobody is charged for a short the system made.</p>
+                <p><strong>Not a loss:</strong> the selling PLU or recipe is not reducing this item. Link it and
+                   re-run; nobody is charged.</p>
             @endif
         </x-notice>
     @endif
 
     @if ((int) ($item?->RepairedOpenings ?? 0) > 0)
-        <x-notice tone="warn" :title="$item->RepairedOpenings.' '.Str::plural('opening', (int) $item->RepairedOpenings).' not equal to the previous closing'">
-            <p>The client's rule: the <strong>opening</strong> is amended to the previous closing, and the
-               closing stands. The shift that opened wrong carries the difference, and the closing before it
-               is not moved by the balancing either. An opening <em>below</em> the previous closing is stock
-               that vanished between shifts — it is on the exceptions report as S10a whatever happens here.</p>
+        <x-notice tone="warn" collapsible
+                  :title="$item->RepairedOpenings.' '.Str::plural('opening', (int) $item->RepairedOpenings).' not equal to the previous closing'
+                      .((int) ($item->KeptBreaks ?? 0) > 0 ? ' — '.$item->KeptBreaks.' small, chain kept' : '')">
+            <p>The opening is amended to the previous closing. A break of 3 or fewer is balanced through; a
+               bigger one splits the chain and the closing before it stands. An opening <em>below</em> the
+               previous closing (S10a) stays on the exceptions report either way.</p>
         </x-notice>
     @endif
 
@@ -127,8 +135,10 @@
                     {{ \App\Support\Format::n($shift->QtyOpen, 3) }}
                     @if (abs((float) $shift->ChainBreak) > 0.0005)
                         <x-chip :tone="(float) $shift->ChainBreak < 0 ? 'crit' : 'warn'" :dot="false"
-                                :title="'Previous closing '.\App\Support\Format::n($shift->PrevClose, 3)">
+                                :title="'Previous closing '.\App\Support\Format::n($shift->PrevClose, 3)
+                                    .($shift->BreakKept ? ' — small, the chain runs through it' : ' — the chain is split here')">
                             {{ (float) $shift->ChainBreak < 0 ? 'S10a' : 'S10b' }}
+                            {{ \App\Support\Format::n($shift->ChainBreak, 3) }}{{ $shift->BreakKept ? ' kept' : '' }}
                         </x-chip>
                     @endif
                 </td>
@@ -165,16 +175,4 @@
         @endforeach
     </x-table>
 
-    <p class="field-help">
-        <strong>Two people on a shift is not two people to charge.</strong> Where a shift is shared the
-        panel names both and says so: the counts cannot tell you which of them the variance belongs to,
-        and a screen that showed one name would be deciding that on your behalf.
-    </p>
-    <p class="field-help">
-        Balancing amends the closing count; the opening follows, because it <em>is</em> the previous
-        closing. Where the counted opening was not the previous closing, the opening is repaired and the
-        closing before it stands. Both are written when this run is committed, and a chip beside the
-        outcome marks what the hand balancing already in PumpIT did that the rules do not allow — the
-        commit puts that back.
-    </p>
 </div>

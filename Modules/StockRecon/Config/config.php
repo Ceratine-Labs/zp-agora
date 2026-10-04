@@ -42,15 +42,11 @@ return [
     'name' => 'StockRecon',
 
     /*
-    | How far back a preview looks by default.
-    |
-    | A fortnight rather than a month, and the reason is arithmetic rather than
-    | taste: BOTH ends of the window are anchors — the opening count of the
-    | first shift and the closing count of the last are believed — so the
-    | window choice FIXES the residual short before anything else happens. A
-    | short window is a conservative one. The form allows anything.
+    | There is no free date range any more (ZRP, 4 Oct 2026). The form offers a
+    | month and the Monday–Sunday weeks inside it, and opens on the last full
+    | week — see Services/ReconPeriods. BOTH ends of the window are anchors, so
+    | a week is also the conservative choice.
     */
-    'default_days' => 14,
 
     /*
     | Balancing writes to the CUSTOMER'S estate. This literal decides whether
@@ -173,6 +169,23 @@ return [
         ],
 
         /*
+        | ZRP, 4 Oct 2026: a break of 1, 2 or 3 units should not split a chain.
+        | The opening is still repaired to the previous closing and the break
+        | reported (S10a/S10b, with its qty), but the closing before it may move,
+        | so the chain balances straight through. 0 splits at every break, as
+        | the pack's rule 3 reads on its own.
+        */
+        'KeepBreaksUpTo' => [
+            'label' => 'Keep the chain going through a break of up to',
+            'help' => 'Units. An opening that misses the previous closing by this much or less is repaired '
+                .'and reported, but does not split the chain. 0 splits at every break.',
+            'default' => 3,
+            'type' => 'int',
+            'min' => 0,
+            'max' => 99,
+        ],
+
+        /*
         | Rule 10 of the client's pack: a site is analysed only up to its last
         | complete recon day — every shift in on 95% of its lines, closings in,
         | POS posted. Later days are held back and counted on the run, because
@@ -225,7 +238,8 @@ return [
             'blurb' => 'Stock vanished between two shifts and nobody carries it — the pack calls it the known '
                 .'manipulation route. Rule 3: the OPENING is amended to the previous closing, which stands, '
                 .'and the incoming shift carries the difference. Balancing does that repair; the line stays '
-                .'on this report because somebody has to explain it.'],
+                .'on this report because somebody has to explain it. A break of 3 or fewer (the run\'s '
+                .'"keep the chain going" option) is repaired the same way but does not split the chain.'],
         'E1' => ['tone' => 'crit', 'label' => 'No till sales linked',
             'test' => 'T < −max(3, pack) over 2+ days and Σ POS ≤ 10% of |T|',
             'blocks' => true,
@@ -262,7 +276,7 @@ return [
             'test' => 'Open > Close of the shift before',
             'blocks' => false,
             'blurb' => 'Stock appeared between shifts, which can hide an over or offset a short. Repaired '
-                .'like S10a: the opening is amended to the previous closing.'],
+                .'like S10a: the opening is amended to the previous closing. A small one keeps the chain going.'],
         'F1' => ['tone' => 'warn', 'label' => 'Data fault',
             'test' => 'a count below zero, or a correction larger than the caps allow',
             'blocks' => true,

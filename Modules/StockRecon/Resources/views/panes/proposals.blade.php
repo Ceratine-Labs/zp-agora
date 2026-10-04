@@ -76,31 +76,30 @@
          'note' => \App\Support\Format::n($run->UnitsAmended, 3).' units moved', 'tone' => 'good'],
         ['label' => 'Chains balanceable', 'value' => \App\Support\Format::n($run->BalanceableChains),
          'note' => 'of '.\App\Support\Format::n($run->ChainCount), 'tone' => 'good'],
-        ['label' => 'Chains reported', 'value' => \App\Support\Format::n($run->BlockedChains),
-         'note' => 'blocked whole, never half balanced', 'tone' => 'serious'],
+        ['label' => 'Chains reported', 'value' => \App\Support\Format::n($run->BlockedChains), 'tone' => 'serious'],
         ['label' => 'Unrecorded issue', 'value' => \App\Support\Format::r($run->NetOverValue),
-         'note' => \App\Support\Format::n($run->NetOverUnits, 3).' units no amendment can fix', 'tone' => 'warn'],
+         'note' => \App\Support\Format::n($run->NetOverUnits, 3).' units', 'tone' => 'warn'],
         ['label' => 'Shifts over', 'value' => \App\Support\Format::n($run->OverRowsBefore).' → '.\App\Support\Format::n($run->OverRowsAfter),
-         'note' => 'an over is not credible: it is corrected', 'tone' => 'neutral'],
+         'tone' => 'neutral'],
         ['label' => 'Shifts short', 'value' => \App\Support\Format::n($run->ShortRowsBefore).' → '.\App\Support\Format::n($run->ShortRowsAfter),
-         'note' => \App\Support\Format::r($run->ShortValueAfter).' after — the floor, not a target', 'tone' => 'neutral'],
-        ['label' => 'Dormant shifts', 'value' => \App\Support\Format::n($run->DormantRows),
-         'note' => 'never charged, and they move as a block'],
+         'note' => \App\Support\Format::r($run->ShortValueAfter).' after', 'tone' => 'neutral'],
+        ['label' => 'Dormant shifts', 'value' => \App\Support\Format::n($run->DormantRows)],
+        /* Kept breaks are the ones of KeepBreaksUpTo or fewer that the chain
+           runs through (ZRP, 4 Oct 2026); the rest split their chain. */
         ['label' => 'Openings repaired', 'value' => \App\Support\Format::n($run->RepairedOpenings),
-         'note' => 'set to the previous closing, which stands', 'tone' => $run->RepairedOpenings > 0 ? 'warn' : 'neutral'],
+         'note' => $run->KeptBreaks > 0 ? \App\Support\Format::n($run->KeptBreaks).' small, chain kept' : null,
+         'tone' => $run->RepairedOpenings > 0 ? 'warn' : 'neutral'],
         ['label' => 'Hand balancing breaches', 'value' => \App\Support\Format::n($run->AuditRows),
-         'note' => 'already in PumpIT — see Exceptions', 'tone' => $run->AuditRows > 0 ? 'serious' : 'neutral'],
+         'note' => $run->AuditRows > 0 ? 'see Exceptions' : null, 'tone' => $run->AuditRows > 0 ? 'serious' : 'neutral'],
     ]" />
 
     @if ($run->HeldBackRows > 0)
         {{-- Rule 10 of the client's pack. A data problem, not a finding, and
              the pack says to report it first. --}}
-        <x-notice tone="stop" style="margin:12px 14px 0"
-                  :title="\App\Support\Format::n($run->HeldBackRows).' shift lines held back from '.$run->CompleteTo?->copy()->addDay()->format('d M')">
-            <p>The recon is not complete on {{ $run->CompleteTo?->copy()->addDay()->format('d M') }}: a shift is
-               missing or short of lines, closings are not captured, or POS is not posted. That day and every
-               day after it are left out, because balancing them would pin "the latest count" on one nobody
-               has taken. Finish the balancing or the posting at the site and preview again.</p>
+        <x-notice tone="stop" collapsible style="margin:12px 14px 0"
+                  :title="\App\Support\Format::n($run->HeldBackRows).' shift lines held back from '.$run->CompleteTo?->copy()->addDay()->format('d M').' — the recon is not finished that day'">
+            <p>A shift is missing or short of lines, closings are not captured, or POS is not posted. That day
+               and every day after it are left out. Finish it at the site and preview again.</p>
         </x-notice>
     @endif
 
@@ -109,17 +108,9 @@
              it is the same paragraph every time and folds away once read. --}}
         <x-notice tone="warn" collapsible style="margin:12px 14px 0"
                   :title="$run->BlockedChains.' '.Str::plural('chain', $run->BlockedChains).' reported rather than balanced'">
-            <p>A chain is blocked <strong>whole</strong>: if any one of its shifts trips a test, none of it
-               is amended. Half balancing around a fault is how a data problem gets dressed up as a
-               performance figure.</p>
-            <p>The reasons, worst first: a shift is <em>over by a whole pack</em> — an issue not written up,
-               which is captured, not balanced away; the stock falls with <em>no till sales</em> against it — a
-               PLU or recipe fault nobody is charged for; a shift sold or closed holding more than it ever
-               received; the window, or a stretch between two repaired openings, ends <em>over</em>; an
-               amendment larger than a cap allows; or too few active shifts to move anything between.</p>
-            <p>An opening that is not the previous closing no longer blocks: it is <strong>repaired</strong> —
-               the opening is set to the previous closing, which stands — and reported as S10a or S10b.</p>
-            <p>Open a row to see which shift did it and what the rest of the chain looks like.</p>
+            <p>If any shift trips a test, none of the chain is amended: an over of a whole pack, no till sales
+               linked, a shift that sold or closed holding more than it received, a stretch that ends over, an
+               amendment over a cap, or too few active shifts. Open a row to see which.</p>
         </x-notice>
     @endif
 
@@ -164,21 +155,16 @@
                     {{ $ready }} {{ Str::plural('shift', $ready) }}
                 </button>
 
-                <x-slot:note>
-                    <strong>A page is not a scope.</strong> A ticked shift on any page is in this
-                    press and in the count above; only the outcome pills and the column filters
-                    take rows out of it, and the amber note beside the button says when they are.
+                <x-info label="What this press does">
+                    <p>A ticked shift on any page is in the press. Only the outcome pills and the column filters
+                       take rows out of it.</p>
                     @if ($stampMode === 'live')
-                        Writes <code>QtyOpen</code> and <code>QtyClose</code> on the recon line in PumpIT.
-                        It acts on the ticked rows and no others. Every one is re-checked first: a shift
-                        counted again since the preview is skipped and reported. Each row's prior pair is
-                        stored, so this is reversible from this page — the legacy procedure can undo
-                        nothing.
+                        <p>Writes <code>QtyOpen</code> and <code>QtyClose</code> in PumpIT on the ticked rows only,
+                           re-checking each first. Reversible from this page.</p>
                     @else
-                        <strong>Journal mode.</strong> Every amendment is recorded in Agora with the
-                        shift's prior counts beside the new ones, and nothing in PumpIT changes.
+                        <p><strong>Journal mode:</strong> recorded in Agora only; nothing in PumpIT changes.</p>
                     @endif
-                </x-slot:note>
+                </x-info>
             </x-action-bar>
         @endif
 
@@ -192,14 +178,12 @@
                 ({{ \App\Support\Format::n($emptyLines->count()) }}
                 {{ Str::plural('shift', $emptyLines->count()) }})
                 @if ($hideEmpty)
-                    carried no movement and no variance and {{ $emptyChains === 1 ? 'is' : 'are' }} hidden —
+                    with no movement hidden —
                     <a href="{{ route('app.stockrecon.run', [$run, 'empty' => 'show']) }}">show them</a>.
                 @else
-                    carried no movement and no variance —
+                    with no movement —
                     <a href="{{ route('app.stockrecon.run', $run) }}">hide them</a>.
                 @endif
-                A chain with one active shift and a real short stays on the list either way: that is
-                the case nobody can balance, not an empty one.
             </p>
         @endif
 
@@ -241,6 +225,10 @@
                     <th class="fit-min">Date</th>
                     <th class="num">Shift</th>
                     <th class="num">Open</th>
+                    {{-- How far the opening missed the previous closing. A
+                         small one keeps the chain going but is still a figure
+                         somebody has to explain (ZRP, 4 Oct 2026). --}}
+                    <th class="num">Break</th>
                     <th class="num">Issued</th>
                     <th class="num">Close</th>
                     <th class="num">POS</th>
@@ -330,6 +318,9 @@
                     <td class="fit-min">{{ $line->TransactionDate->format('d M') }}</td>
                     <td class="num">{{ $line->ShiftNo }}</td>
                     <td class="num">{{ \App\Support\Format::n($line->QtyOpen, 3) }}</td>
+                    <td class="num" @if (abs((float) $line->ChainBreak) > 0.0005) title="Previous closing {{ \App\Support\Format::n($line->PrevClose, 3) }}{{ $line->BreakKept ? ' — kept in the chain' : ' — the chain is split here' }}" @endif>
+                        {{ abs((float) $line->ChainBreak) > 0.0005 ? \App\Support\Format::n($line->ChainBreak, 3) : '—' }}
+                    </td>
                     <td class="num">{{ (float) $line->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($line->QtyIssued, 3) }}</td>
                     <td class="num">{{ \App\Support\Format::n($line->QtyClose, 3) }}</td>
                     <td class="num">{{ (float) $line->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($line->QtyPOS, 3) }}</td>
@@ -399,15 +390,13 @@
                 Committed {{ $run->CommittedAt?->diffForHumans() }} —
                 {{ \App\Support\Format::n($run->CommittedRows) }} {{ Str::plural('shift', $run->CommittedRows) }},
                 {{ \App\Support\Format::n($run->CommittedUnits, 3) }} units{{ $run->StampMode === 'journal' ? ', recorded in Agora only' : ', written to PumpIT' }}.
-                A reversal puts back exactly what was written, using the prior counts recorded per row.
-                The legacy procedure has no reversal at all.
             </p>
         </footer>
     @elseif ($run->Status === 'reversed')
         <footer class="run-actions">
             <p class="field-help">
                 Reversed {{ $run->ReversedAt?->diffForHumans() }} — {{ $run->ReversalReason }}.
-                The proposals are pending again and can be committed once whatever caused it is dealt with.
+                The proposals are pending again.
             </p>
         </footer>
     @endif

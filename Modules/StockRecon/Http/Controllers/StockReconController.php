@@ -16,6 +16,7 @@ use Modules\Core\Models\Branch;
 use Modules\StockRecon\Http\Requests\BalancePreviewRequest;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
+use Modules\StockRecon\Services\ReconPeriods;
 use Modules\StockRecon\Services\StockReconService;
 
 /**
@@ -60,7 +61,15 @@ class StockReconController extends Controller
     public function index(Request $request, BranchContext $context): View
     {
         $branchId = (int) $request->query('branch_id', $context->id() ?? 0);
-        $days = (int) config('stockrecon.default_days');
+
+        /*
+         * A month, then a week or a run of weeks inside it (ZRP, 4 Oct 2026),
+         * opening on the last full week. ?from= and ?to= still work, and pick
+         * the month they fall in.
+         */
+        $week = ReconPeriods::lastFullWeek(Carbon::today());
+        $from = (string) $request->query('from', $week['from']);
+        $months = ReconPeriods::months(Carbon::today());
 
         $branches = $this->branches();
 
@@ -81,8 +90,11 @@ class StockReconController extends Controller
                 $branches->pluck('BranchId')->map(fn ($id) => (int) $id)->all()
             ),
             'areaNo' => (int) $request->query('area_no', 0),
-            'from' => $request->query('from', Carbon::today()->subDays($days)->toDateString()),
-            'to' => $request->query('to', Carbon::today()->toDateString()),
+            'from' => $from,
+            'to' => $request->query('to', $week['to']),
+            'month' => substr($from, 0, 7),
+            'months' => $months,
+            'weeks' => collect(array_keys($months))->mapWithKeys(fn ($m) => [$m => ReconPeriods::weeks($m)])->all(),
             'options' => $this->service->options(),
             'excluded' => (array) config('stockrecon.excluded_area_groups'),
             'stampMode' => config('stockrecon.stamp_mode'),

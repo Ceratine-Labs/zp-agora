@@ -24,6 +24,7 @@
 @props([
     'title' => null,
     'sub' => null,
+    'infoWide' => false,
     'flush' => false,
     'collapsible' => false,
     'open' => false,
@@ -43,6 +44,9 @@
             </div>
             @isset($actions)<div class="right">{{ $actions }}</div>@endisset
         </summary>
+        {{-- A button inside a <summary> would fold the card as well, so on a
+             collapsible card the explanation leads the body instead. --}}
+        @isset($info)<div class="field-help" style="padding:10px 14px 0">{{ $info }}</div>@endisset
         <div class="{{ $body }}">{{ $slot }}</div>
         @isset($foot){{ $foot }}@endisset
     </details>
@@ -51,7 +55,16 @@
         @if ($title)
             <header class="card-h">
                 <div>
-                    <h3>{{ $title }}</h3>
+                    @isset($info)
+                        {{-- `info`: standing explanation behind a button
+                             beside the title (<x-info>). --}}
+                        <div class="card-t">
+                            <h3>{{ $title }}</h3>
+                            <x-info :class="$infoWide ? 'info-wide' : ''" :label="'About '.Str::lower($title)">{{ $info }}</x-info>
+                        </div>
+                    @else
+                        <h3>{{ $title }}</h3>
+                    @endisset
                     @if ($sub)<div class="sub">{{ $sub }}</div>@endif
                 </div>
                 @isset($actions)<div class="right">{{ $actions }}</div>@endisset

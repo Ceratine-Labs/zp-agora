@@ -722,6 +722,19 @@
             </div>
         </x-core::gallery-entry>
 
+        <x-core::gallery-entry name="x-info">
+            <div class="gal-variant">
+                <p class="eyebrow">Beside a title — press the i</p>
+                <div class="card-t">
+                    <h3 style="margin:0">Balance a period</h3>
+                    <x-info label="About balancing">
+                        <p>Balancing moves a closing count, which shifts variance from one shift to the next. It
+                           decides who carries a loss; it cannot make it smaller.</p>
+                    </x-info>
+                </div>
+            </div>
+        </x-core::gallery-entry>
+
         <x-core::gallery-entry name="x-loader">
             <div class="gal-variant">
                 <p class="eyebrow">Inline — where a fragment will land. The page's own overlay is this, over the page, after 300 ms</p>

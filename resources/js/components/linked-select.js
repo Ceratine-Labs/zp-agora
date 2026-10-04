@@ -23,21 +23,29 @@
  * browser honours, and moved out of the way by wrapping it in a detached
  * fragment would lose the user's place. Disabled + hidden is the pair that
  * works everywhere.
+ *
+ * `data-not-before="<name>"` also drops every option whose value sorts before
+ * that control's — the stock recon "to week" after its "from week" (ISO dates
+ * sort as text). The server still refuses an end before the start.
  */
 export default function linkedSelect() {
     document.querySelectorAll('[data-linked-select]').forEach((dependent) => {
         const form = dependent.closest('form');
         const controller = form?.querySelector(`[name="${dependent.dataset.linkedSelect}"]`);
+        const floor = dependent.dataset.notBefore
+            ? form?.querySelector(`[name="${dependent.dataset.notBefore}"]`)
+            : null;
 
         if (!controller) return;
 
         const apply = () => {
             const value = String(controller.value ?? '');
+            const min = floor ? String(floor.value ?? '') : '';
             let selectedIsGone = false;
 
             dependent.querySelectorAll('option').forEach((option) => {
                 const when = option.dataset.when;
-                const applies = when === undefined || when === value;
+                const applies = (when === undefined || when === value) && option.value >= min;
 
                 option.hidden = !applies;
                 option.disabled = !applies;
@@ -56,6 +64,7 @@ export default function linkedSelect() {
         };
 
         controller.addEventListener('change', apply);
+        floor?.addEventListener('change', apply);
         apply();
     });
 }

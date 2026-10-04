@@ -49,6 +49,15 @@
  * its own last closing pinned. An over that its own segment cannot absorb is
  * a net over and is reported, never pushed across a count the rule says stands.
  *
+ * EXCEPT A SMALL ONE (ZRP, 4 Oct 2026). A break of @KeepBreaksUpTo units or
+ * fewer — 1, 2 or 3 by default — does not split the chain. The opening is
+ * still repaired to the previous closing, but the closing before it is free to
+ * move, so the chain balances straight through; the break is reported on the
+ * row (BreakKept, the qty in the outcome) and on the exceptions tab as S10a or
+ * S10b as before. S12 and S13 ignore a break that small, on the audit of what
+ * is in PumpIT and on the check of what Agora is about to write, so a kept
+ * break never withdraws its own chain as F3. 0 restores the old split.
+ *
  * RULE 3 OF OURS, THE DORMANT SHIFT, is structural rather than a special case.
  * A shift whose (repaired) opening equals its closing, with nothing issued and
  * nothing sold, did not trade. SegSeq numbers only the active shifts, so a
@@ -73,6 +82,7 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_PreviewBalancing]
     @UseOriginalCounts    BIT             = 1,
     @HoldBackIncomplete   BIT             = 1,
     @ExcludedAreaGroups   NVARCHAR(400)   = NULL,   -- CSV of STK_Area.AreaGroup
+    @KeepBreaksUpTo       DECIMAL(18,4)   = 3,      -- a break this small keeps the chain going
     @UserId               INT             = NULL
 AS
 BEGIN
@@ -89,6 +99,11 @@ BEGIN
        pack reports, and a row left unwritten over it leaves one in PumpIT.
        Half the three decimals the ledger stores. */
     DECLARE @tol DECIMAL(18,4) = 0.0005;
+
+    /* The size a break has to EXCEED to split the chain. Below it the break is
+       kept: repaired, reported, and balanced through. At 0 every break splits,
+       which is how it worked from 30 Sep to 4 Oct 2026. */
+    DECLARE @split DECIMAL(18,4) = ISNULL(CASE WHEN @KeepBreaksUpTo > 0 THEN @KeepBreaksUpTo ELSE 0 END, 0) + @tol;
 
     IF @RunId IS NULL OR NOT EXISTS (SELECT 1 FROM agora.StockReconRun WHERE BranchId = @BranchId AND Id = @RunId)
         THROW 51000, 'AGORA:NO_RUN:That run does not exist for this branch.', 1;
@@ -346,6 +361,9 @@ BEGIN
     )
     SELECT rep.*,
            CONVERT(bit, CASE WHEN ABS(rep.ChainBreak) > @tol THEN 1 ELSE 0 END) AS LinkBroken,
+           /* Broken, but small enough to keep the chain going. */
+           CONVERT(bit, CASE WHEN ABS(rep.ChainBreak) > @tol
+                              AND ABS(rep.ChainBreak) <= @split THEN 1 ELSE 0 END)  AS BreakKept,
            /* As the staff counted it, before any repair — what the screen
               calls "counted". */
            CONVERT(decimal(18,4), rep.QtyPOS - (rep.QtyOpen + rep.QtyIssued - rep.QtyClose)) AS QtyVar,
@@ -360,14 +378,15 @@ BEGIN
 
     /* Segments and sequence numbers. A repaired break starts a new segment, so
        the closing before it is the last closing of the segment before — pinned,
-       exactly as the latest count is. SegSeq counts active shifts inside the
+       exactly as the latest count is. A KEPT break does not: the segment, and
+       the balancing, run straight through it. SegSeq counts active shifts inside the
        segment; ActiveSeq and ActiveLen are the whole chain's, for the screen
        and for the denominators of N1, N2 and L1. */
     IF OBJECT_ID('tempdb..#gate') IS NOT NULL DROP TABLE #gate;
 
     ;WITH segd AS (
         SELECT r.*,
-               SUM(CONVERT(int, r.LinkBroken)) OVER (
+               SUM(CASE WHEN r.LinkBroken = 1 AND r.BreakKept = 0 THEN 1 ELSE 0 END) OVER (
                    PARTITION BY r.AreaNo, r.StockItemNo
                    ORDER BY r.TransactionDate, r.ShiftNo
                    ROWS UNBOUNDED PRECEDING)                                  AS SegNo
@@ -628,8 +647,10 @@ BEGIN
     )
     SELECT a.*,
            CASE
-               WHEN ABS(a.BreakOrig) > @tol AND ABS(a.QtyOpenNow - a.PrevCloseNow) > @tol     THEN 'S13'
-               WHEN ABS(a.BreakOrig) > @tol AND ABS(a.PrevCloseNow - a.PrevCloseOrig) > @tol  THEN 'S12'
+               /* A break no bigger than @KeepBreaksUpTo is not one the chain
+                  stops at, so neither of these reads it. */
+               WHEN ABS(a.BreakOrig) > @split AND ABS(a.QtyOpenNow - a.PrevCloseNow) > @tol   THEN 'S13'
+               WHEN ABS(a.BreakOrig) > @split AND ABS(a.PrevCloseNow - a.PrevCloseOrig) > @tol THEN 'S12'
                WHEN a.StaffVar > 0.5 AND a.HandVar < -0.5                                    THEN 'S7'
                WHEN a.StaffVar < 0   AND a.HandVar < a.StaffVar - 0.5                        THEN 'S8'
                WHEN a.IsLastInWindow = 1 AND @AtDataEnd = 1
@@ -711,10 +732,13 @@ BEGIN
        S7 it does not have is still handing the client a new flag. */
     judged AS (
         SELECT p.*,
-               CASE WHEN ABS(p.BreakOrig) > @tol AND ABS(p.EffOpenNew - p.PrevCloseP)     > @tol THEN 1 ELSE 0 END AS S13After,
-               CASE WHEN ABS(p.BreakOrig) > @tol AND ABS(p.QtyOpenNow - p.PrevCloseNow)   > @tol THEN 1 ELSE 0 END AS S13Now,
-               CASE WHEN ABS(p.BreakOrig) > @tol AND ABS(p.PrevCloseP - p.PrevCloseOrig)  > @tol THEN 1 ELSE 0 END AS S12After,
-               CASE WHEN ABS(p.BreakOrig) > @tol AND ABS(p.PrevCloseNow - p.PrevCloseOrig) > @tol THEN 1 ELSE 0 END AS S12Now,
+               /* @split, not @tol, for the reason the audit above uses it: a
+                  closing that moves at a KEPT break is the chain balancing
+                  through it, which is the whole point of keeping it. */
+               CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.EffOpenNew - p.PrevCloseP)     > @tol THEN 1 ELSE 0 END AS S13After,
+               CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.QtyOpenNow - p.PrevCloseNow)   > @tol THEN 1 ELSE 0 END AS S13Now,
+               CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.PrevCloseP - p.PrevCloseOrig)  > @tol THEN 1 ELSE 0 END AS S12After,
+               CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.PrevCloseNow - p.PrevCloseOrig) > @tol THEN 1 ELSE 0 END AS S12Now,
                CASE WHEN p.StaffVar > 0.5 AND p.VarP    < -0.5                 THEN 1 ELSE 0 END AS S7After,
                CASE WHEN p.StaffVar > 0.5 AND p.HandVar < -0.5                 THEN 1 ELSE 0 END AS S7Now,
                CASE WHEN p.StaffVar < 0   AND p.VarP    < p.StaffVar - 0.5     THEN 1 ELSE 0 END AS S8After,
@@ -783,7 +807,7 @@ BEGIN
         FlagBigAmendment, FlagPctAmendment, FlagNegativeClose, FlagShortChain,
         FlagDormantMoved, FlagChainBroken, ChainBlocked,
         PrevClose, ChainBreak, QtyOpenNow, QtyCloseNow, QtyIssuedOrig, IssueMultiple,
-        FlagPackOver, FlagNoPosLink, RestoresHand, FlagAuditConflict, AuditCode,
+        FlagPackOver, FlagNoPosLink, RestoresHand, FlagAuditConflict, AuditCode, BreakKept,
         ExceptionCode, Outcome, WouldAmend, Selected, CommitState,
         ItemDescription, POSCode, StockLocation, AreaDescription,
         EmployeeCodes, EmployeeNames, EmployeeCount,
@@ -800,7 +824,7 @@ BEGIN
         a.FlagBigAmendment, a.FlagPctAmendment, a.FlagNegativeClose, a.FlagShortChain,
         a.FlagDormantMoved, a.LinkBroken, a.ChainBlocked,
         a.PrevClose, a.ChainBreak, a.QtyOpenNow, a.QtyCloseNow, a.QtyIssuedOrig, NULLIF(a.Mult, 0),
-        a.FlagPackOver, a.FlagNoPosLink, a.RestoresHand, a.FlagAuditConflict, a.AuditCode,
+        a.FlagPackOver, a.FlagNoPosLink, a.RestoresHand, a.FlagAuditConflict, a.AuditCode, a.BreakKept,
 
         /* The class, ranked most serious first; a line is reported under the
            first test it trips. Codes are the pack's where the pack defines the
@@ -850,6 +874,10 @@ BEGIN
             WHEN a.FlagAuditConflict = 1      THEN 'Audit conflict: an issue changed at balancing, counts cannot fix it'
             WHEN a.FlagShortChain = 1         THEN 'Chain too short: not enough active shifts in the window'
             WHEN a.ChainBlocked = 1           THEN 'Held back: another shift on this item blocks the chain'
+            /* The qty leads, so it is on the pill and in the extract. At most
+               74 characters against the column's 80. */
+            WHEN a.BreakKept = 1              THEN N'Break ' + FORMAT(a.ChainBreak, '+0.###;-0.###')
+                                                   + N' kept: opening set to the previous closing, chain runs through'
             WHEN a.ChainBreak < -@tol         THEN 'Opening repaired: raised to the previous closing, this shift carries it'
             WHEN a.ChainBreak >  @tol         THEN 'Opening repaired: lowered to the previous closing'
             WHEN a.IsDormant = 1              THEN 'Dormant: opening and closing held equal, no stock moved'
@@ -928,6 +956,7 @@ BEGIN
         r.CompleteTo        = @CompleteTo,
         r.HeldBackRows      = @HeldBackRows,
         r.RepairedOpenings  = t.RepairedOpenings,
+        r.KeptBreaks        = t.KeptBreaks,
         r.AuditRows         = t.AuditRows,
         r.UpdatedAt         = SYSDATETIME(),
         r.UpdatedBy         = @UserId
@@ -948,7 +977,10 @@ BEGIN
             CONVERT(decimal(18,3), ISNULL(SUM(ABS(EffAmend)), 0))                       AS UnitsAmended,
             CONVERT(decimal(18,2), ISNULL(SUM(CASE WHEN EffVarNew < -@eps THEN -EffVarNew * SellPrice ELSE 0 END), 0)) AS ShortValueAfter,
             ISNULL(SUM(CASE WHEN LinkBroken = 1 AND (ChainBlocked = 0 OR RestoresHand = 1) THEN 1 ELSE 0 END), 0) AS RepairedOpenings,
-            ISNULL(SUM(CASE WHEN AuditCode IS NOT NULL THEN 1 ELSE 0 END), 0)           AS AuditRows
+            ISNULL(SUM(CASE WHEN AuditCode IS NOT NULL THEN 1 ELSE 0 END), 0)           AS AuditRows,
+            /* Of the repaired openings above — the same rows — the ones the
+               chain ran through. */
+            ISNULL(SUM(CASE WHEN BreakKept = 1 AND (ChainBlocked = 0 OR RestoresHand = 1) THEN 1 ELSE 0 END), 0) AS KeptBreaks
         FROM #apply
     ) t
     CROSS JOIN (

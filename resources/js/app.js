@@ -8,6 +8,7 @@ import confirmForm from './components/confirm-form';
 import checkAll from './components/check-all';
 import tabs from './components/tabs';
 import disclosure from './components/disclosure';
+import info from './components/info';
 import runbar from './components/runbar';
 import tip from './components/tip';
 import dataGrid from './components/data-grid';
@@ -33,6 +34,7 @@ rowDetail();
 checkAll();
 tabs();
 disclosure();
+info();
 runbar();
 // Does nothing on a page with no group in flight, which is every page but one.
 reconGroup();
@@ -101,6 +103,7 @@ window.Agora.hydrate = (root) => {
     checkAll(root);
     tabs(root);
     disclosure(root);
+    info(root);
     runbar(root);
     reconMatch(root);
     tableTools(root);

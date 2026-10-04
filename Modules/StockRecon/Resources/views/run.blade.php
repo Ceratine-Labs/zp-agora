@@ -15,10 +15,9 @@
     <x-page-head
         eyebrow="Stock recon centre"
         :title="'Run #'.$run->Id.' — '.($branch?->Name ?? 'site '.$run->BranchId)"
-        :blurb="$run->FromDate->toDateString().' to '.$run->ToDate->toDateString()
-                .' ('.$run->days().' '.Str::plural('day', $run->days()).'), '
-                .($run->AreaNo === null ? 'every counting area' : 'one counting area')
-                .'. The caps are stored with the run, so this answer stays reproducible.'">
+        :blurb="$run->FromDate->format('j M Y').' to '.$run->ToDate->format('j M Y')
+                .' · '.$run->days().' '.Str::plural('day', $run->days())
+                .' · '.($run->AreaNo === null ? 'every counting area' : 'one counting area')">
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.stockrecon.index') }}">Run another</a>
             @unless ($run->isCommitted())
@@ -43,8 +42,7 @@
         <x-notice :tone="session('committedCode') === 'COMMITTED' ? 'info' : 'warn'"
                   :title="session('committed')" style="margin-bottom:16px">
             @if ($skipped->isEmpty())
-                <p>Every ticked shift went through. Each one was re-read first and its counts re-checked
-                   against the source as it stands now, not as it stood at preview time.</p>
+                <p>Every ticked shift went through.</p>
             @else
                 <p>{{ $skipped->count() }} {{ Str::plural('shift', $skipped->count()) }} skipped rather
                    than written over — the counts have moved since the preview:</p>
@@ -68,9 +66,7 @@
 
     {{-- Provenance, not the answer: it has to be on the page and it should not
          be the first thing between the reader and the run. --}}
-    <x-card title="What this run was given"
-            sub="The exact arguments, stored so these figures stay reproducible after the caps are changed"
-            collapsible flush>
+    <x-card title="What this run was given" collapsible flush>
         <x-table dense :count="count($run->params()) + 4">
             <x-slot:head>
                 <tr><th class="l">Argument</th><th class="l">Value</th></tr>

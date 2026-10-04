@@ -16,7 +16,9 @@
     areas are numbered per site — area 11 exists at a dozen branches — so the
     stock recon centre renders every site's areas at once and lets
     `linked-select.js` narrow them. `when` is the controlling value each option
-    belongs to; `linked` names the control it follows.
+    belongs to; `linked` names the control it follows. `notBefore` names a
+    second control whose value this one's options may not sort below — the
+    stock recon "to week" after its "from week".
 
     `step` exists because `min` and `max` alone are a trap on a decimal. A
     number input's step defaults to 1, so a control declared min="0.01"
@@ -30,6 +32,7 @@
     'name',
     'label' => '',
     'help' => null,
+    'info' => null,
     'type' => 'text',
     'choices' => null,
     'value' => null,
@@ -37,13 +40,23 @@
     'max' => null,
     'step' => null,
     'linked' => null,
+    'notBefore' => null,
     'placeholder' => null,
 ])
 
 @php($id = 'f-'.str_replace(['[', ']', '.'], '-', $name))
 
 <div {{ $attributes->merge(['class' => 'field']) }}>
-    <label for="{{ $id }}">{{ $label }}</label>
+    @if ($info)
+        {{-- `info` is `help` behind a button: for an explanation people read
+             once, where `help` is a line they need every time. --}}
+        <div class="field-label">
+            <label for="{{ $id }}">{{ $label }}</label>
+            <x-info :label="'About '.Str::lower($label)">{{ $info }}</x-info>
+        </div>
+    @else
+        <label for="{{ $id }}">{{ $label }}</label>
+    @endif
 
     @if ($type === 'bool')
         <label class="field-check">
@@ -53,7 +66,8 @@
         </label>
     @elseif ($choices)
         <select id="{{ $id }}" name="{{ $name }}"
-                @if ($linked) data-linked-select="{{ $linked }}" @endif>
+                @if ($linked) data-linked-select="{{ $linked }}" @endif
+                @if ($notBefore) data-not-before="{{ $notBefore }}" @endif>
             @foreach ($choices as $key => $text)
                 @if (is_array($text))
                     {{-- The list form: the value is inside the row, because two

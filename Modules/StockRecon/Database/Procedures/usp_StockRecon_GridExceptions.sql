@@ -150,6 +150,11 @@ BEGIN
             rl.IsDormant,
             rl.ActiveLen,
             rl.QtyOpen, rl.QtyIssued, rl.QtyClose, rl.QtyPOS, rl.QtyVar,
+            /* How far the opening missed the previous closing, and whether the
+               chain was kept going through it (ZRP, 4 Oct 2026: a break of 1–3
+               no longer splits the chain, but its qty is reported here). */
+            rl.ChainBreak,
+            rl.BreakKept,
             rl.ChainNetVar,
             rl.SellPrice,
             /* What the exception is WORTH, which is the column this report is
@@ -228,7 +233,7 @@ BEGIN
         Id, RunId, BranchId, AreaNo, AreaName, StockItemNo, ItemDescription, POSCode, StockLocation,
         EmployeeNames, EmployeeCount,
         TransactionDate, ShiftNo, ExceptionCode, AuditCode, Outcome, IsDormant, ActiveLen,
-        QtyOpen, QtyIssued, QtyClose, QtyPOS, QtyVar, ChainNetVar, SellPrice, ExceptionValue
+        QtyOpen, QtyIssued, QtyClose, QtyPOS, QtyVar, ChainBreak, BreakKept, ChainNetVar, SellPrice, ExceptionValue
     FROM #Rows
     ORDER BY
         CASE WHEN @SortAsc = 1 THEN

@@ -26,35 +26,56 @@ import { test } from './support/fixtures.js';
  * shape being tested, not a limitation of it.
  */
 test.describe('stock recon centre', () => {
-    test('the standing explanation is folded away but says what it holds', async ({ signedIn: page }) => {
+    test('the standing explanation is behind the info button beside the title', async ({ signedIn: page }) => {
         await page.goto('/app/stock-recon');
 
         await expect(page.getByRole('heading', { name: 'Stock recon centre', level: 1 })).toBeVisible();
 
-        // Ryan, 22 Sep 2026: the invariant and the commit warning are true on
-        // every visit and are not about the run in hand, so they fold as a
-        // group and the work leads instead. Closed on arrival.
-        const explainer = page.locator('details.explainer');
-        await expect(explainer).toHaveJSProperty('open', false);
-        await expect(page.getByText(/Balancing moves variance between shifts/)).toBeHidden();
+        // ZRP, 4 Oct 2026: the paragraphs on this screen went unread, so they
+        // sit behind an "i". Closed on arrival; one press opens it, Escape
+        // closes it again.
+        const info = page.locator('.page-head details.info');
+        await expect(info).toHaveJSProperty('open', false);
+        await expect(page.getByText(/decides who carries a loss/)).toBeHidden();
 
-        // Folded is not hidden: the summary has to say that a commit writes to
-        // PumpIT, or the fold has buried the one fact somebody needs before
-        // they press. This is the assertion that stops the summary being
-        // reworded into something decorative.
-        await expect(explainer.locator('summary')).toContainText(/commit writes to PumpIT|commit records/);
+        await info.locator('summary').click();
+        await expect(page.getByText(/decides who carries a loss/)).toBeVisible();
+        await expect(page.getByText(/A commit writes|Journal mode/)).toBeVisible();
 
-        await explainer.locator('summary').click();
-        await expect(page.getByText(/Balancing moves variance between shifts/)).toBeVisible();
-        await expect(page.getByText(/Committing amends the counts in PumpIT|recorded here, not written/)).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(info).toHaveJSProperty('open', false);
     });
 
     test('the hub names its exclusions', async ({ signedIn: page }) => {
         await page.goto('/app/stock-recon');
 
-        // Virtual products are out, and the screen says so rather than
-        // silently dropping them.
+        // Virtual products are out, and the form's info button says so rather
+        // than the screen silently dropping them.
+        await page.locator('.card-h details.info summary').first().click();
         await expect(page.getByText(/Virtual Items/)).toBeVisible();
+    });
+
+    test('the period is a month, then weeks inside it', async ({ signedIn: page }) => {
+        await page.goto('/app/stock-recon');
+
+        const form = page.locator('form[action$="/stock-recon/preview"]');
+        const month = form.locator('select[name="month"]');
+        const from = form.locator('select[name="from"]');
+        const to = form.locator('select[name="to"]');
+
+        // ZRP, 4 Oct 2026. A month narrows the weeks in the browser, and the
+        // end cannot be set before the start.
+        const months = await month.locator('option').evaluateAll((o) => o.map((x) => x.value));
+        await month.selectOption(months[1]);
+
+        const weeks = await from.locator('option:not([disabled])').allTextContents();
+        expect(weeks.length, 'four to six Monday-Sunday weeks in a month').toBeGreaterThanOrEqual(4);
+        expect(weeks[0]).toMatch(/^Week 1 · /);
+
+        await from.selectOption({ label: weeks[2] });
+        const ends = await to.locator('option:not([disabled])').allTextContents();
+        expect(ends[0], 'the first end offered is the week the start is in').toBe(weeks[2]);
+        expect(await to.inputValue() >= await from.inputValue(), 'the end follows the start').toBe(true);
     });
 
     test('the counting areas narrow to the chosen site, without a round trip', async ({ signedIn: page }) => {

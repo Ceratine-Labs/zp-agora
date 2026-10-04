@@ -44,6 +44,7 @@ class BalancePreviewRequest extends FormRequest
             'options.MinShiftsInChain' => ['nullable', 'integer'],
             'options.UseOriginalCounts' => ['nullable', 'boolean'],
             'options.HoldBackIncomplete' => ['nullable', 'boolean'],
+            'options.KeepBreaksUpTo' => ['nullable', 'integer'],
         ];
     }
 

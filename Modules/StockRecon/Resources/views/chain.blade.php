@@ -14,10 +14,8 @@
 --}}
 <x-app-shell :title="($item?->StockItemDescription ?? $line->StockItemNo).' — run #'.$run->Id" wide>
     <x-page-head
-        eyebrow="Stock recon centre"
-        :title="$item?->StockItemDescription ?? $line->StockItemNo"
-        :blurb="'Every shift of this item in run #'.$run->Id.'\'s window, counted beside balanced. '
-                .'The row you came from is marked.'">
+        :eyebrow="'Stock recon centre · run #'.$run->Id"
+        :title="$item?->StockItemDescription ?? $line->StockItemNo">
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.stockrecon.run', $run) }}">Back to the proposals</a>
             <a class="btn-ghost" href="{{ route('app.stockrecon.exceptions', $run) }}">Exceptions</a>

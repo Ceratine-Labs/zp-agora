@@ -36,13 +36,12 @@
     <div class="field-row">
         @if ($definition->searchable())
             <x-field :name="$p('q')" label="Search" :value="$grid->gridQuery->search"
-                     placeholder="Site, reference, name…"
-                     help="One filter across the columns worth searching. The source applies it, not the browser." />
+                     placeholder="Site, reference, name…" />
         @endif
 
         @if ($definition->dateRange())
             <x-field :name="$p('from')" label="From" type="date" :value="$grid->gridQuery->from"
-                     help="Leave empty and the procedure applies its own window." />
+                     info="Leave empty and the procedure applies its own window." />
             <x-field :name="$p('to')" label="To" type="date" :value="$grid->gridQuery->to" />
         @endif
 
@@ -61,7 +60,6 @@
                             @selected(in_array((int) $branch->BranchId, $grid->gridQuery->branchIds, true))>{{ $branch->Name }}</option>
                     @endforeach
                 </select>
-                <p class="field-help">None selected means every site you are granted.</p>
             </div>
         @endif
     </div>

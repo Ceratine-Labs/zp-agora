@@ -76,6 +76,8 @@ class StockReconExceptionGrid extends GridDefinition
             new GridColumn(key: 'TransactionDate', label: 'Date', format: 'date', sort: 'TransactionDate'),
             new GridColumn(key: 'ShiftNo', label: 'Shift', format: 'number'),
             new GridColumn(key: 'QtyOpen', label: 'Open', format: 'number'),
+            new GridColumn(key: 'ChainBreak', label: 'Break', format: 'number',
+                title: 'How far the opening missed the previous closing. 3 or fewer keeps the chain going.'),
             new GridColumn(key: 'QtyIssued', label: 'Issued', format: 'number'),
             new GridColumn(key: 'QtyClose', label: 'Close', format: 'number'),
             new GridColumn(key: 'QtyPOS', label: 'POS', format: 'number'),

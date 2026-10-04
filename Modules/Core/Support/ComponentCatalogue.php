@@ -635,6 +635,17 @@ class ComponentCatalogue
                 ],
             ],
             [
+                'name' => 'x-info',
+                'group' => 'Messages',
+                'summary' => 'Standing explanation behind a small "i" button beside a title or label.',
+                'mockup' => '—',
+                'notes' => 'For text people read once and then skip — how a screen works, what an option means, why a rule exists. Built when the stock recon screens moved every such paragraph behind one (ZRP, 4 Oct 2026). A `<details>`, so it opens with no JS; `info.js` closes it on Escape or a click elsewhere, keeps one open at a time and holds the panel inside the viewport. `<x-page-head>` and `<x-card>` take an `info` **slot** and place the button beside the title (`<x-card info-wide>` widens the panel); `<x-field>` takes an `info` **prop** in place of `help`. On a collapsible card the slot leads the body instead, because a button inside a `<summary>` would fold the card. Not for a refusal, a result or a count: those are the answer and stay on the page.',
+                'js' => 'info.js',
+                'props' => [
+                    ['label', 'string', "'What is this?'", 'The button\'s accessible name and tooltip'],
+                ],
+            ],
+            [
                 'name' => 'x-loader',
                 'group' => 'Messages',
                 'summary' => 'A wait, drawn as a cup of coffee: it fills, carries the ZRP badge, steams when full and goes round again until the action completes.',
