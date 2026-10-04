@@ -45,9 +45,7 @@
 
     @if (! $item->IsActive)
         <x-notice tone="warn" title="Retired">
-            This line has been retired in Agora. It stays here and stays in the customer's estate — the
-            history that references it has to remain readable — but it should not be offered on a new
-            counting sheet.
+            Retired in Agora: kept for the history that references it, but not offered on a new counting sheet.
         </x-notice>
     @endif
 
@@ -96,7 +94,10 @@
         </x-facts>
     </x-card>
 
-    <x-card title="What it costs and makes" sub="From that site's POS cost file, joined on branch, POS system and code">
+    <x-card title="What it costs and makes">
+        <x-slot:info>
+            <p>From that site's POS cost file, joined on branch, POS system and code.</p>
+        </x-slot:info>
         @if ($item->CostPrice === null)
             <x-empty-state
                 title="No POS record for this code"
@@ -167,7 +168,10 @@
     </x-card>
 
     @if ($isOverride && $legacy !== null)
-        <x-card title="Beside the customer's own row" sub="An override replaces its legacy row whole — this is what it replaced">
+        <x-card title="Beside the customer's own row">
+            <x-slot:info>
+                <p>An override replaces its legacy row whole. This is the row it replaced.</p>
+            </x-slot:info>
             <x-compare
                 :left="[
                     'Description' => $legacy->StockItemDescription,
@@ -198,41 +202,46 @@
                 @method('PUT')
                 <input type="hidden" name="StockItemNo" value="{{ $item->StockItemNo }}">
 
-                <p class="field-help" style="margin-top:0">
-                    Saving writes an <strong>Agora override</strong>. It replaces the customer's row for this
-                    line entirely and PumpIT's own table is never touched — which also means PumpIT's stock
-                    counts go on reading their copy until cutover. Park the override and their row is back
-                    in force, with the reason kept.
-                </p>
+                {{-- What saving does sits behind the "i" at the top of the form
+                     (4 Oct 2026). It writes an Agora override, never PumpIT, so
+                     there is no live-write warning to keep on the form. --}}
+                <div class="field-help" style="margin:0 0 1em">
+                    Saving writes an Agora override.
+                    <x-info class="info-wide" label="What saving does">
+                        <p>The override replaces the customer's row for this line entirely, and PumpIT's own table is
+                           never touched, so PumpIT's stock counts go on reading their copy until cutover.</p>
+                        <p>Park the override and their row is back in force, with the reason kept.</p>
+                    </x-info>
+                </div>
 
                 <div class="field-row">
                     <x-field name="StockItemDescription" label="Description"
                              :value="old('StockItemDescription', $item->StockItemDescription)"
-                             help="What the counter reads on the sheet." />
+                             info="What the counter reads on the sheet." />
                     <x-field name="POSCode" label="POS code"
                              :value="old('POSCode', $item->POSCode)"
-                             help="Unique per site AND POS system — not per site." />
+                             info="Unique per site AND POS system — not per site." />
                 </div>
 
                 <div class="field-row">
                     <x-field name="PosSystem" label="POS system"
                              :choices="['ARCH' => 'ARCH', 'WINBRANCH' => 'WINBRANCH', 'AURA' => 'AURA', 'NAMOS' => 'NAMOS', 'PILOT' => 'PILOT', 'ARCHLIQ' => 'ARCHLIQ']"
                              :value="old('PosSystem', $item->PosSystem)"
-                             help="Which till system carries it. Not a place." />
+                             info="Which till system carries it. Not a place." />
                     <x-field name="AreaNo" label="Counting area"
                              :choices="collect($areas)->mapWithKeys(fn ($a) => [$a->AreaNo => $a->AreaNo.' · '.$a->AreaDescription])->all()"
                              :value="old('AreaNo', $item->AreaNo)"
-                             help="Areas are numbered per site." />
+                             info="Areas are numbered per site." />
                 </div>
 
                 <div class="field-row">
                     <x-field name="PriceType" label="Price type"
                              :choices="['Selling Price' => 'Selling Price', 'Set Price' => 'Set Price', 'Factor' => 'Factor']"
                              :value="old('PriceType', $item->PriceType)"
-                             help="Selling Price and Factor are RECOMPUTED per branch by PumpIT out of the POS cost file — a value typed here will be overwritten there." />
+                             info="Selling Price and Factor are RECOMPUTED per branch by PumpIT out of the POS cost file — a value typed here will be overwritten there." />
                     <x-field name="SellingPrice" label="Sell (incl VAT)" type="number" step="0.0001" min="0"
                              :value="old('SellingPrice', $item->SellingPrice)"
-                             help="Four decimal places, because fifty live prices carry more than two." />
+                             help="Up to four decimal places." />
                 </div>
 
                 <div class="field-row">
@@ -241,7 +250,7 @@
                              :value="old('UOMCode', $item->UOMCode)" />
                     <x-field name="Factor" label="Factor" type="number" step="0.0001"
                              :value="old('Factor', $item->Factor)"
-                             help="Multiplier on cost when the price type is Factor." />
+                             info="Multiplier on cost when the price type is Factor." />
                 </div>
 
                 {{-- The four with no server-side rule anywhere in PumpIT. The old
@@ -252,10 +261,10 @@
                     <div class="field-row">
                         <x-field name="QtyVarAllowance" label="Variance allowance" type="number" step="0.0001"
                                  :value="old('QtyVarAllowance', $item->QtyVarAllowance)"
-                                 help="Above this a count is flagged." />
+                                 info="Above this a count is flagged." />
                         <x-field name="IssueMultiple" label="Issue multiple" type="number" step="0.0001"
                                  :value="old('IssueMultiple', $item->IssueMultiple)"
-                                 help="Stored as sent. PumpIT has no server-side rule for this — the old application enforces it, and Agora will not invent one." />
+                                 info="Stored as sent: PumpIT has no rule for it, and Agora does not invent one." />
                     </div>
                     <div class="field-row">
                         <x-field name="IsDoCloseQtyCalc" label="Closing quantity is calculated" type="bool"
@@ -273,10 +282,10 @@
 
                 <x-field name="IsActive" label="In use" type="bool"
                          :value="old('IsActive', $item->IsActive)"
-                         help="Unticking retires the line. It stays in the estate and in every count that references it — it just stops being offered." />
+                         info="Unticking retires the line: it stays in every count that references it, but stops being offered." />
 
                 <x-field name="reason" label="Why" :value="old('reason')"
-                         help="Kept with the override. Required, because a master change nobody can explain later is what this table exists to end." />
+                         info="Required. Kept with the override." />
 
                 <div class="btn-row">
                     <button type="submit" name="action" value="save" class="btn-primary">Save the override</button>

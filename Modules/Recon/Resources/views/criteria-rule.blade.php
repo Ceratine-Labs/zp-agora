@@ -1,9 +1,11 @@
 <x-app-shell :title="$area['label'].' — rule '.$order">
     <x-page-head
         eyebrow="Extraction configuration"
-        :title="($branch?->Name ?? 'Site '.$branchId).' — '.$area['label']"
-        :blurb="'Rule '.$order.' of this site\'s '.$area['label'].' configuration. What is in force here is what '
-                .'agora.'.$area['procedure'].' and both drills resolve against every time they run.'">
+        :title="($branch?->Name ?? 'Site '.$branchId).' — '.$area['label']">
+        <x-slot:info>
+            <p>What is in force on this rule is what <code>agora.{{ $area['procedure'] }}</code> and both drills
+               resolve against every time they run.</p>
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.recon.config', $area['key']) }}">All rules</a>
         </x-slot:actions>
@@ -17,8 +19,8 @@
 
     @if (session('configured'))
         <x-notice tone="info" :title="session('configured')" style="margin-bottom:16px">
-            <p>Every preview and both drills resolve against this from now on. Nothing was written to the
-               customer's <code>BRN_AutoReconCriteria</code> — reverting is switching the override off.</p>
+            <p>Every preview and both drills use this from now on. The customer's
+               <code>BRN_AutoReconCriteria</code> is unchanged; switching the override off reverts it.</p>
         </x-notice>
     @endif
 
@@ -32,7 +34,7 @@
         link off the grid landed on a page with no styling and no way back,
         which is exactly how Ryan found it on live.
     --}}
-    <x-card :title="'Rule '.$order" sub="The customer's row, Agora's override, and the form that changes it">
+    <x-card :title="'Rule '.$order">
         @include('recon::partials.criteria-edit')
     </x-card>
 </x-app-shell>

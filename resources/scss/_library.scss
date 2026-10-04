@@ -135,6 +135,12 @@
       label { opacity: .45; }
       select, input { opacity: .45; pointer-events: none; }
     }
+    /* With an info button the label row keeps the label's height, so the
+       parameters still line up across the row. */
+    .field-label {
+      height: 14px; flex-wrap: nowrap;
+      .info-btn { width: 15px; height: 15px; font-size: 9.5px; }
+    }
     .f-help  { font-size: 10.5px; color: var(--muted); }
     .f-error { font-size: 11px; color: var(--crit-ink); }
   }

@@ -6,10 +6,12 @@
     name without this page knowing about any of them.
 --}}
 <x-app-shell title="Users and access">
-    <x-page-head
-        eyebrow="Setup · People and assets"
-        title="Users and access"
-        blurb="Everyone who can sign in. Head office or branch is derived from how many branches a person is granted — exactly one is a site, more than one is head office.">
+    <x-page-head eyebrow="Setup · People and assets" title="Users and access">
+        <x-slot:info>
+            <p>Everyone who can sign in.</p>
+            <p>Head office or branch follows from the sites a person is granted: exactly one site makes them a
+               branch user at it, more than one makes them head office.</p>
+        </x-slot:info>
     </x-page-head>
 
     @if (session('status'))

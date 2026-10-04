@@ -15,13 +15,11 @@
     <x-notice tone="info" title="You have a run open" style="margin-bottom:16px">
         <p>
             <strong>{{ $open->Note ?: $open->FromDate?->toDateString().' to '.$open->ToDate?->toDateString() }}</strong>
-            — {{ config("recon.areas.{$open->ReconArea}.label", $open->ReconArea) }},
-            site {{ $open->BranchId }},
-            {{ \App\Support\Format::n($open->TotalRows) }} {{ Str::plural('proposal', $open->TotalRows) }},
-            {{ \App\Support\Format::n($open->MatchedRows) }} would reconcile
-            ({{ \App\Support\Format::r($open->MatchedTotal) }}).
-            Previewed {{ $open->CreatedAt?->diffForHumans() }} and never committed.
+            · {{ config("recon.areas.{$open->ReconArea}.label", $open->ReconArea) }}, site {{ $open->BranchId }}
+            · {{ \App\Support\Format::n($open->MatchedRows) }} would reconcile
+            ({{ \App\Support\Format::r($open->MatchedTotal) }})
+            · previewed {{ $open->CreatedAt?->diffForHumans() }}
+            &nbsp;<a class="btn-primary" href="{{ route('app.recon.run', $open) }}">Resume run #{{ $open->Id }}</a>
         </p>
-        <p><a class="btn-primary" href="{{ route('app.recon.run', $open) }}">Resume run #{{ $open->Id }}</a></p>
     </x-notice>
 @endif

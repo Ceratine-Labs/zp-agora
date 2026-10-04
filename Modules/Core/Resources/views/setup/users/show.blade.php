@@ -13,13 +13,22 @@
     to say plainly.
 --}}
 <x-app-shell :title="$person->UserName">
+    {{-- The blurb is the address. Not `?? 'no address'`: agora.User.EmailAddress
+         is NOT NULL and the address is the sign-in identity, so there is no
+         such row to describe. The edit screen requires one for the same reason.
+         What the menu and permission cards mean sits behind the info button
+         (Ryan, 4 Oct 2026); the Sites card carries its own. --}}
     <x-page-head
         eyebrow="Setup · Users and access"
         :title="$person->UserName"
-        {{-- Not `?? 'no address'`: agora.User.EmailAddress is NOT NULL and the
-             address is the sign-in identity, so there is no such row to
-             describe. The edit screen requires one for the same reason. --}}
         :blurb="$person->EmailAddress">
+        <x-slot:info>
+            <p><strong>Menu access</strong> is which menu entries this person sees, and so may open. Nothing
+               ticked means the whole menu. An entry that needs a permission they do not hold stays hidden
+               either way.</p>
+            <p><strong>Permissions</strong> are granted to the person by name — there is no other source. The
+               legacy type is carried over from PumpIT.</p>
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn" href="{{ route('app.setup.users.index') }}">Back to the list</a>
             @can('setup.users.edit')
@@ -35,9 +44,7 @@
     @if (! $person->IsActive || $person->IsLocked)
         <x-notice tone="warn" title="{{ $person->IsLocked ? 'Locked' : 'Deactivated' }}">
             This person cannot sign in.
-            {{ $person->IsLocked
-                ? 'The account is locked; clearing it is on the edit screen.'
-                : 'The account is deactivated, which is how somebody who has left is retired — the rows they wrote stay.' }}
+            @if ($person->IsLocked) The lock is cleared on the edit screen. @endif
         </x-notice>
     @endif
 
@@ -52,21 +59,23 @@
         ['label' => 'Code', 'value' => $person->UserCode ?? \App\Support\Format::NOTHING],
         ['label' => 'Type', 'value' => $person->UserType === 'branch' ? 'Branch' : ($person->UserType === 'ho' ? 'Head office' : \App\Support\Format::NOTHING), 'note' => $person->UserType === null ? 'No branch grants — sees every site' : null],
         ['label' => 'Sites granted', 'value' => $branchCount === 0 ? 'Every site' : \App\Support\Format::n($branchCount, 0)],
-        ['label' => 'Permissions', 'value' => \App\Support\Format::n($directCount, 0), 'note' => 'Granted by name'],
+        ['label' => 'Permissions', 'value' => \App\Support\Format::n($directCount, 0)],
         {{-- Carbon, not Format: App\Support\Format is money, volumes and
              percentages and has never had a date method. The written form is
              the grid's own (grid/_cell.blade.php), so the list and this screen
              cannot disagree about what a timestamp looks like. --}}
         ['label' => 'Last sign-in', 'value' => $person->LastSignInAt?->format('Y-m-d H:i') ?? 'Never'],
-        ['label' => 'Legacy type', 'value' => $person->LegacyUserType ?? \App\Support\Format::NOTHING, 'note' => 'From PumpIT'],
+        ['label' => 'Legacy type', 'value' => $person->LegacyUserType ?? \App\Support\Format::NOTHING],
     ]" />
 
-    <x-card title="Sites" sub="Which of the estate this person may see. Everything else is filtered out before a query runs.">
+    <x-card title="Sites">
+        <x-slot:info>
+            <p>Which sites this person may see. Everything else is filtered out before a query runs.</p>
+            <p>No site granted means every site: head office people are not given each site one by one to
+               keep up as new ones open.</p>
+        </x-slot:info>
             @if ($branchCount === 0)
-                <x-notice tone="info" title="Every site">
-                    No site is granted individually, and that IS the grant — head office people are not
-                    given every site to maintain as new ones open. The scope bar offers the whole estate.
-                </x-notice>
+                <x-notice tone="info" title="Every site — none granted individually" />
             @else
                 <ul class="perm-list">
                     @foreach ($grantedBranches as $branch)
@@ -76,15 +85,9 @@
         @endif
     </x-card>
 
-    <x-card title="Menu access"
-            sub="Which entries of the menu this person sees — and therefore may open."
-            collapsible :open="$menuRestricted">
+    <x-card title="Menu access" collapsible :open="$menuRestricted">
         @if (! $menuRestricted)
-            <x-notice tone="info" title="The whole menu">
-                Nothing is ticked for this person, and that IS the grant — an empty set is the whole menu,
-                the same way an empty set of sites is every site. Entries naming a permission they do not
-                hold are still hidden, because the screen behind one would refuse them anyway.
-            </x-notice>
+            <x-notice tone="info" title="The whole menu — nothing ticked" />
         @else
             @foreach ($menuWorkspaces as $code => $workspace)
                 @php($ticked = collect($workspace['rows'])->filter(fn ($row) => in_array((int) $row['item']->Id, $menuDirectIds, true)))
@@ -100,9 +103,7 @@
         @endif
     </x-card>
 
-    <x-card title="What that lets them do"
-            sub="Everything granted to this person by name. There is no other source."
-            collapsible open>
+    <x-card title="What that lets them do" collapsible open>
         @if ($effective === [])
             <x-empty-state text="Nothing is granted, so this person can sign in and do nothing." />
         @else

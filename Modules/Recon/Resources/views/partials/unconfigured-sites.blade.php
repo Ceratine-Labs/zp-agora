@@ -15,11 +15,8 @@
     <x-notice tone="info" collapsible :style="$noticeStyle ?? 'margin-bottom:16px'"
               :title="$unconfigured->count().' trading '.Str::plural('site', $unconfigured->count()).' left out — no '.$area['label'].' rules'">
         <p><strong>{{ $unconfigured->pluck('Name')->implode(', ') }}</strong>
-           {{ $unconfigured->count() === 1 ? 'has' : 'have' }} no extraction rule for this area, so a
-           preview could only refuse. {{ $unconfigured->count() === 1 ? 'It is' : 'They are' }} not previewed
-           and no failed run is recorded.</p>
-        <p class="field-help">If {{ $unconfigured->count() === 1 ? 'this site banks' : 'these sites bank' }}
-           through {{ $area['label'] }}, {{ $unconfigured->count() === 1 ? 'it is' : 'they are' }} not being
-           reconciled at all until a rule exists — add one on the Configuration tab.</p>
+           {{ $unconfigured->count() === 1 ? 'has' : 'have' }} no extraction rule for this area, so
+           {{ $unconfigured->count() === 1 ? 'it is' : 'they are' }} not previewed. Add a rule on the
+           Configuration tab to reconcile {{ $unconfigured->count() === 1 ? 'it' : 'them' }}.</p>
     </x-notice>
 @endif

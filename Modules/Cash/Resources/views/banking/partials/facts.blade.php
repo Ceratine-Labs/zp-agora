@@ -2,7 +2,8 @@
     One cashup's figures, as facts: the Z-read it is balanced against, what the
     legs actually total, the variance between them, whether the Z-read agrees,
     and where the cashup stands. Every figure is agora.usp_Cash_GetCashup's —
-    nothing here adds anything up.
+    nothing here adds anything up. What each figure means is in the screen's
+    info panel; the line under a figure is only what is true of THIS cashup.
 
     Props: $one (a usp_Cash_GetCashup cashup row), $tolerance (float)
 --}}
@@ -13,21 +14,18 @@
 
 <x-facts :columns="3">
     <x-fact label="Z read" :value="\App\Support\Format::r($one->ZRead)">
-        What the till says it took — the Z-read this cashup is balanced against
         @if ((int) $one->Zreads === 1 && abs((float) $one->ZreadSales - (float) $one->ZRead) > 0.01)
-            (the Z-read allocated to this till and shift says {{ \App\Support\Format::r($one->ZreadSales) }}).
+            The Z-read allocated to this till and shift says {{ \App\Support\Format::r($one->ZreadSales) }}.
         @else
-            (EOD {{ $one->DayEndNo ?? \App\Support\Format::NOTHING }}).
+            EOD {{ $one->DayEndNo ?? \App\Support\Format::NOTHING }}.
         @endif
     </x-fact>
     <x-fact label="Actual total" :value="\App\Support\Format::r($one->ActualTotal)">
-        Every leg below, added the way PumpIT's Daily Banking adds them.
         @if ((int) $one->NotCountedLines > 0)
             {{ $one->NotCountedLines }} {{ \Illuminate\Support\Str::plural('line', (int) $one->NotCountedLines) }} not counted: the customer, supplier or person is not on PumpIT's list.
         @endif
     </x-fact>
     <x-fact label="Variance" :value="\App\Support\Format::r($one->Variance)" :tone="$varianceTone">
-        Actual less Z read.
         @if (abs((float) $one->Variance) > $tolerance)
             Beyond R{{ \App\Support\Format::n($tolerance) }} either way — confirming it needs a reason.
         @endif

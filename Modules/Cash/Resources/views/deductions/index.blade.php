@@ -22,10 +22,18 @@
     $refused = (array) session('deductionRefused', []);
 @endphp
 <x-app-shell title="Cash shorts and deductions">
-    <x-page-head
-        eyebrow="Cash · head office"
-        title="Cash shorts and deductions"
-        blurb="What each person was short, the leniency allowed, and what comes off their pay — PumpIT's five payroll reports, and the schedule payroll is given.">
+    <x-page-head eyebrow="Cash · head office" title="Cash shorts and deductions">
+        <x-slot:info>
+            <p>What each person was short, the leniency allowed, and what comes off their pay. Each report tab is
+               PumpIT's report of the same name, row for row. <strong>Cash short deductions</strong>: a cashup's legs
+               less its Z reading; a short at or inside {{ Format::r($leniency) }} is written off, anything worse is
+               deducted <em>in full</em>. Pump attendant shorts and approved cash-bag shorts are deducted in full.</p>
+            <p><strong>Stock loss</strong>, at the selling price, goes to whoever was signed on to the counting area,
+               shared equally when several were — where to look, not proof of who took it. The schedule measures it per
+               area group against the period's days times the group's daily grace: inside, written off; beyond,
+               deducted in full. <strong>Non-integrated POS</strong> is the Lotto / Electricity / Airtime areas: a
+               person's share of the loss there, R1.00 or more.</p>
+        </x-slot:info>
         <x-slot:actions>
             @can('cash.staffshort.view')
                 <a class="btn-ghost" href="{{ route('app.cash.staffshorts.list') }}">Staff shorts</a>
@@ -73,10 +81,10 @@
         @case('cash')
             <x-statstrip :stats="[
                 ['label' => 'Shifts deducted', 'value' => Format::n($rows), 'note' => Format::n($t('Employees')).' people', 'tone' => 'neutral'],
-                ['label' => 'Cashier shorts', 'value' => $money('AllCashierShorts'), 'note' => 'before leniency', 'tone' => 'neutral'],
+                ['label' => 'Cashier shorts', 'value' => $money('AllCashierShorts'), 'tone' => 'neutral'],
                 ['label' => 'Leniency allowed', 'value' => $money('WrittenOffAmount'),
                  'note' => Format::n($t('WrittenOffShifts')).' shifts written off at or inside '.Format::r($leniency), 'tone' => 'good'],
-                ['label' => 'Deducted', 'value' => $money('Deduction'), 'note' => 'recovered from pay', 'tone' => 'serious'],
+                ['label' => 'Deducted', 'value' => $money('Deduction'), 'tone' => 'serious'],
             ]" />
             @break
         @case('stock')
@@ -85,7 +93,7 @@
         @case('nonintdetail')
             <x-statstrip :stats="[
                 ['label' => $tab === 'stock' || $tab === 'nonint' ? 'Employee / area lines' : 'Detail lines', 'value' => Format::n($rows), 'tone' => 'neutral'],
-                ['label' => 'Total loss', 'value' => $money('EmployeeTotalLoss'), 'note' => 'at the selling price', 'tone' => 'serious'],
+                ['label' => 'Total loss', 'value' => $money('EmployeeTotalLoss'), 'tone' => 'serious'],
                 ['label' => 'Employees', 'value' => Format::n($t('Employees')), 'tone' => 'neutral'],
                 ['label' => 'Areas', 'value' => Format::n($t('Areas')), 'tone' => 'neutral'],
             ]" />
@@ -93,9 +101,9 @@
         @case('payroll')
             <x-statstrip :stats="[
                 ['label' => 'Schedule lines', 'value' => Format::n($rows), 'note' => Format::n($t('Runs')).' run(s) in the period', 'tone' => 'neutral'],
-                ['label' => 'Short', 'value' => $money('Amount'), 'note' => 'everything that was short', 'tone' => 'neutral'],
-                ['label' => 'Written off', 'value' => $money('WrittenOffAmount'), 'note' => 'inside an allowance', 'tone' => 'good'],
-                ['label' => 'Deducted', 'value' => $money('Deducted'), 'note' => Format::n($t('Employees')).' people · the payroll file adds up to this', 'tone' => 'serious'],
+                ['label' => 'Short', 'value' => $money('Amount'), 'tone' => 'neutral'],
+                ['label' => 'Written off', 'value' => $money('WrittenOffAmount'), 'tone' => 'good'],
+                ['label' => 'Deducted', 'value' => $money('Deducted'), 'note' => Format::n($t('Employees')).' people', 'tone' => 'serious'],
             ]" />
             @break
     @endswitch
@@ -109,10 +117,15 @@
             $siteNames = $branches->whereIn('BranchId', $branchIds)->pluck('Name')->all();
             $scopeWords = $siteNames === [] ? 'every trading site you may see' : implode(', ', $siteNames);
         @endphp
-        <x-card title="The pay period" sub="Build the schedule, check it above, then take the payroll file." style="margin-top:16px">
+        <x-card title="The pay period" style="margin-top:16px">
+            <x-slot:info>
+                <p>Build the schedule, check it in the grid above, then take the payroll file — it adds up to the
+                   Deducted figure. The sites and the dates are the grid's: change them there.</p>
+                <p>A short reaches payroll only once it is on a cashup.</p>
+            </x-slot:info>
             <p class="field-help" style="margin-bottom:12px">
                 <strong>{{ $scopeWords }}</strong> · {{ \Illuminate\Support\Carbon::parse($from)->format('j M Y') }}
-                to {{ \Illuminate\Support\Carbon::parse($to)->format('j M Y') }}. Change the sites and the dates on the grid.
+                to {{ \Illuminate\Support\Carbon::parse($to)->format('j M Y') }}
             </p>
             <div class="form-actions" style="gap:8px">
                 @can('cash.deductions.build')
@@ -143,18 +156,4 @@
         </x-card>
     @endif
 
-    <x-explainer summary="Where these figures come from" remember="cash-deductions">
-        <x-notice tone="info" title="The same reports PumpIT prints">
-            <p>Each tab is PumpIT's report of the same name, row for row — measured identical on Engen Bethlehem for
-               August 2026. <strong>Cash short deductions</strong>: a cashup's legs added up, less the Z reading; a short
-               at or inside {{ Format::r($leniency) }} is written off, anything worse is deducted <em>in full</em> — there is
-               no partial rule. Pump attendant shorts and approved cash-bag shorts are deducted in full.</p>
-            <p><strong>Stock loss</strong> is attributed to whoever was signed on to the counting area, and shared equally
-               when several were — read it as where to look, not as proof of who took it. In the schedule it is measured
-               per area group against the days in the period times the group's daily grace: inside it, written off;
-               beyond it, deducted in full.</p>
-            <p><strong>Non-integrated POS</strong> in PumpIT means the Lotto / Electricity / Airtime areas: a person's share
-               of the loss there, R1.00 or more.</p>
-        </x-notice>
-    </x-explainer>
 </x-app-shell>

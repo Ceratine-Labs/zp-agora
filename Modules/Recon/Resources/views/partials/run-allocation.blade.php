@@ -45,17 +45,21 @@
     @endphp
 
     <x-card title="Who the cash is accounted to"
-            :sub="'Batch '.$batch->BatchNo.' · the split by cashier the clerk confirmed'
-                .($first?->ConfirmedByName ? ', by '.$first->ConfirmedByName : '')
-                .($first?->ConfirmedAt ? ' '.Carbon::parse($first->ConfirmedAt)->diffForHumans() : '')
-                .' · share is bank less bags'"
+            :sub="'Batch '.$batch->BatchNo.' · confirmed'
+                .($first?->ConfirmedByName ? ' by '.$first->ConfirmedByName : '')
+                .($first?->ConfirmedAt ? ' '.Carbon::parse($first->ConfirmedAt)->diffForHumans() : '')"
             flush style="margin-top:16px">
+        <x-slot:info>
+            <p>The split by cashier the clerk confirmed when matching, kept with the batch — reversed or not.</p>
+            <p><strong>Share</strong> is bank less bags: negative is money the bank did not receive.
+               <strong>Accountable</strong> is what that leaves the cashier answerable for.</p>
+        </x-slot:info>
 
         @if ($reversed)
             <x-notice tone="warn" style="margin:12px 14px 0"
                       :title="'Reversed '.($batch->ReversedAt ? Carbon::parse($batch->ReversedAt)->diffForHumans() : '').' — the split is kept, marked'">
-                <p>{{ rtrim((string) $batch->ReversalReason, '. ') }}. The bags went back to outstanding and no short is due from
-                   this batch any more; the lines below are what was confirmed before it was undone.</p>
+                <p>{{ rtrim((string) $batch->ReversalReason, '. ') }}. The bags are outstanding again and no short is due
+                   from this batch; the lines below are what was confirmed.</p>
             </x-notice>
         @endif
 
@@ -156,8 +160,7 @@
                 refuses a split that does not add up, so a row has changed since it was confirmed.
             @endunless
             @if ($lines->contains(fn (object $l) => $l->ShortStatus === 'pending'))
-                A short due has not been raised: staff shorts are raised by the Cash module, which is not built
-                yet, and nothing here raises one.
+                A short due has not been raised, and nothing here raises one.
             @endif
         </p>
     </x-card>

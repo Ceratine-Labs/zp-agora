@@ -39,7 +39,12 @@
         @php($rows = $item['key'] === 'other' ? $other : ($byChannel[$item['key']] ?? collect()))
         <x-tab-panel :key="$item['key']">
             @if (isset($held[$item['key']]))
-                <p class="muted" style="margin:10px 12px">{{ $held[$item['key']] }}</p>
+                {{-- The fact stays on the tab; the reason is behind the button.
+                     A <div>, because <details> cannot sit inside a <p>. --}}
+                <div class="muted" style="margin:10px 12px">
+                    Captured in PumpIT, not here.
+                    <x-info label="Why this leg is captured in PumpIT"><p>{{ $held[$item['key']] }}</p></x-info>
+                </div>
             @elseif ($canSave && $open && in_array($item['key'], $savable, true))
                 <div class="form-actions" style="margin:10px 12px">
                     @if ($item['key'] === 'FNB')

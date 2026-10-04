@@ -120,7 +120,7 @@
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn">Set this Z-read</button>
-                    <span class="field-help">Stages it by hand. Update ZREAD saves it.</span>
+                    <span class="field-help">Stages it; Update ZREAD saves it.</span>
                 </div>
             </form>
         @endif

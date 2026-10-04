@@ -37,14 +37,14 @@
 
     <x-params legend="The short">
         <x-param name="employee" label="Against" searchable :choices="['' => 'Choose the person'] + $people"
-                 :value="old('employee')" help="The person answerable for it — PumpIT's employee list at this site." />
+                 :value="old('employee')" help="The person answerable for it." />
         <x-param name="amount" label="Amount (R)" :value="old('amount')" placeholder="e.g. 120.50" />
         <x-param name="day" label="Day of the shift" type="date" :value="old('day', $now->toDateString())"
                  :max="$now->toDateString()" />
         <x-param name="reason" label="Reason" :choices="$reasonChoices" :value="old('reason')" />
         <x-param name="note" label="Note" :value="old('note')" placeholder="What happened — kept with the short" />
         <x-param name="till" label="Cashup till" :choices="$tillChoices" :value="old('till')"
-                 help="Optional: the cashup it belongs to, offered first when it is posted." />
+                 help="Optional — offered first when posting." />
         <x-param name="shift" label="Cashup shift" :choices="$shiftChoices" :value="old('shift')" />
     </x-params>
 

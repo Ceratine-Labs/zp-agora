@@ -16,6 +16,11 @@
     Decline and Withdraw (that row's columns), Post (the cashup's pump-shortages line, the
     short's flag and the header's totals — cash.cashup.write_mode as well).
 
+    The standing explanation — the life of a short, the reasons, and what
+    each press writes to PumpIT — sits behind the info button beside the title
+    (ZRP, 4 Oct 2026). Refusals, the figures and the opened short stay on the
+    page; every press that writes says so in its confirmation.
+
     Props: $scope, $branches, $pinned, $refusal, $shorts, $reasons, $employees,
            $summary, $trail, $tills, $shifts, $opened, $writeMode, $postMode
 --}}
@@ -30,10 +35,25 @@
 @endphp
 
 <x-app-shell title="Staff shorts">
-    <x-page-head
-        eyebrow="Branch functions · Cash"
-        title="Staff shorts"
-        blurb="Money a named person is answerable for — raised with a reason, approved or declined, and posted to a cashup's pump shortages.">
+    <x-page-head eyebrow="Branch functions · Cash" title="Staff shorts">
+        <x-slot:info>
+            <p>A short is <strong>raised</strong> against a person on the site's employee list with one of four
+               reasons — pump short, cashier short, stock loss, or other with a note. An <strong>approver</strong>,
+               emailed when it is raised, approves or declines it; the raiser is emailed the decision. It is charged
+               once <strong>posted</strong> to a cashup's pump shortages, from here or from Daily Banking. An approved
+               short not yet on a cashup can be <strong>withdrawn</strong>, with a reason.</p>
+            <p>A short a <strong>cash-bag match</strong> raised is never put on a cashup — the cashup already counted
+               those bags — and deductions read it directly. Shorts raised in PumpIT carry free text; each reads as the
+               reason its text matches, and the text as typed is kept as the note.</p>
+            @if ($live)
+                <p><strong>Raising, deciding and posting write to PumpIT</strong> (<code>BRN_StaffShorts</code>,
+                   and the cashup's pump shortages, <code>BRN_DailyBankingEmployees</code>, which moves its variance).
+                   What each press wrote, and what it replaced, is kept in Agora. Nothing is deleted.</p>
+            @else
+                <p><strong>Writing to PumpIT is off.</strong> This screen shows the site's staff shorts; nothing is
+                   written to PumpIT.</p>
+            @endif
+        </x-slot:info>
         <x-slot:actions>
             @if ($scope->isChosen() && $summary)
                 <x-chip :tone="(int) $summary->Waiting > 0 ? 'warn' : 'good'">Waiting: {{ \App\Support\Format::n($summary->Waiting) }}</x-chip>
@@ -48,7 +68,11 @@
 
     @include('cash::staffshorts.partials.outcome')
 
-    <x-card title="Which site" sub="One site. Shorts waiting for an approver, or approved and not on a cashup, are listed whatever their date; the days choose the rest.">
+    <x-card title="Which site">
+        <x-slot:info>
+            <p>Shorts waiting for an approver, or approved and not on a cashup, are listed whatever their date; the
+               days choose the rest.</p>
+        </x-slot:info>
         <form method="GET" action="{{ route('app.cash.staffshorts') }}">
             <x-params legend="Scope">
                 @if ($pinned)
@@ -69,20 +93,6 @@
         </form>
     </x-card>
 
-    @if ($live)
-        <x-notice tone="warn" title="Raising, deciding and posting write to PumpIT" style="margin-bottom:16px">
-            <p>A short raised here is a row in PumpIT's staff shorts (<code>BRN_StaffShorts</code>) under PumpIT's own
-               next number, written as its own screen writes it, with one of four reasons rather than free text. Approving
-               and declining change that row. Posting puts it on a cashup's pump shortages
-               (<code>BRN_DailyBankingEmployees</code>) — one line per person per cashup — and moves that cashup's variance.
-               What each press wrote, and what it replaced, is kept in Agora. Nothing is deleted.</p>
-        </x-notice>
-    @else
-        <x-notice tone="info" title="Writing to PumpIT is off" style="margin-bottom:16px">
-            <p>This screen shows the site's staff shorts. Nothing is written to PumpIT.</p>
-        </x-notice>
-    @endif
-
     @if (! $scope->isChosen())
         <x-empty-state title="Choose a site" text="Pick the site, and its staff shorts appear here — with the form to raise one." />
     @elseif ($refusal)
@@ -97,7 +107,7 @@
                 ['label' => 'Approved', 'value' => \App\Support\Format::n($summary->Approved ?? 0), 'note' => \App\Support\Format::r($summary->ApprovedAmount ?? 0).' not on a cashup yet',
                  'tone' => (int) ($summary->Approved ?? 0) > 0 ? 'serious' : 'neutral'],
                 ['label' => 'Posted', 'value' => \App\Support\Format::n($summary->Posted ?? 0), 'note' => \App\Support\Format::r($summary->PostedAmount ?? 0).' in these days', 'tone' => 'neutral'],
-                ['label' => 'Declined', 'value' => \App\Support\Format::n($summary->Declined ?? 0), 'note' => 'in these days', 'tone' => 'neutral'],
+                ['label' => 'Declined', 'value' => \App\Support\Format::n($summary->Declined ?? 0), 'tone' => 'neutral'],
             ]" />
         </x-card>
 
@@ -110,16 +120,21 @@
         @endif
 
         @if ($canRaise && ! $opened)
-            <x-card title="Raise a staff short"
-                    sub="A pump attendant's short for a shift is raised here as a pump short — that is what the cashup's pump shortages count once it is approved and posted."
-                    style="margin-top:16px">
+            <x-card title="Raise a staff short" style="margin-top:16px">
+                <x-slot:info>
+                    <p>A pump attendant's short for a shift is raised as a pump short — that is what the cashup's pump
+                       shortages count once it is approved and posted.</p>
+                    <p>The cashup till and shift are optional: given, posting offers that cashup first.</p>
+                </x-slot:info>
                 @include('cash::staffshorts.partials.raise-form', ['from' => 'desk'])
             </x-card>
         @endif
 
-        @foreach (['open' => [$open, 'Waiting and approved', 'Waiting for an approver first, then approved and not yet on a cashup — whatever their date.', 'Nothing is waiting at this site, and nothing approved is off a cashup.'],
-                   'rest' => [$rest, 'Posted and declined', 'Shorts of these days already on a cashup, or declined.', 'Nothing else was raised at this site in these days.']] as $key => [$rows, $title, $sub, $empty])
-            <x-card :title="$title" :sub="$sub" flush style="margin-top:16px">
+        {{-- No sub-line: the titles say what each list holds, and the scope
+             card's info says the open ones ignore the dates. --}}
+        @foreach (['open' => [$open, 'Waiting and approved', 'Nothing is waiting at this site, and nothing approved is off a cashup.'],
+                   'rest' => [$rest, 'Posted and declined', 'Nothing else was raised at this site in these days.']] as $key => [$rows, $title, $empty])
+            <x-card :title="$title" flush style="margin-top:16px">
                 <x-table :count="$rows->count()" procedure="agora.usp_Cash_GetStaffShorts" dense tools :empty="$empty">
                     <x-slot:head>
                         <tr>
@@ -152,22 +167,5 @@
             </x-card>
         @endforeach
 
-        <x-explainer summary="What a staff short is, and what each press writes" remember="cash-staffshorts">
-            <x-notice tone="info" title="Raised, approved, posted">
-                <p>A short is <strong>raised</strong> against a person on the site's employee list, for a day, with one of
-                   four reasons — pump short, cashier short, stock loss, other (which needs a note). It waits for an
-                   <strong>approver</strong>, who approves it or declines it with a reason; the approvers are emailed when
-                   it is raised, and the person who raised it when it is decided. An approved short is charged once it is
-                   <strong>posted</strong> to a cashup's pump shortages — from here, or from the Daily Banking screen's pump
-                   shortages leg. An approved short not yet on a cashup can be <strong>withdrawn</strong>, with a reason:
-                   the approval is taken back and it is declined.</p>
-                <p>A short a <strong>cash-bag match</strong> raised is never put on a cashup — the cashup already counted
-                   those bags in full — and deductions read it directly. To reverse such a match once its short is
-                   approved, withdraw the short first.</p>
-                <p>Shorts raised in PumpIT carry free text. Each reads as one of the five reasons by what was typed — the
-                   reason, else the note, else the "Driver Drinks" employee it was booked to (47 spellings of "pump short"
-                   are one reason) — and the text as typed is kept as the note.</p>
-            </x-notice>
-        </x-explainer>
     @endif
 </x-app-shell>

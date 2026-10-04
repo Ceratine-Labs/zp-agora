@@ -1,39 +1,34 @@
 <x-app-shell title="Auto reconciliation">
-    <x-page-head
-        eyebrow="Banking and reconciliation"
-        title="Auto reconciliation"
-        blurb="Preview what a reconciliation would do, then execute it. The preview reads the customer's
-               bank statement and deposit tables and changes nothing." />
-
-    @if ($stampMode === 'journal')
-        <x-notice tone="info" collapsible title="Preview only, deliberately" style="margin-bottom:16px">
-            <p>Execute writes the reconciliation stamp into PumpIT, and Agora does not write to the
-               customer's databases without an explicit decision on the record. Until that decision exists,
-               a run is previewed, recorded and reviewable, and nothing in PumpIT moves.</p>
-            <p>There is a second reason. The procedure Execute would be replacing — the live
-               <code>sp_AUTOReconcile_*_BankRecon</code> family — carries a comparison defect that stamps
-               bank lines against deposits that do not exist, and we recommended in writing on
-               18 August 2026 that ZP stop using it. Reproducing that behaviour behind a nicer button
-               would be the wrong thing to ship.</p>
-        </x-notice>
-    @endif
+    {{-- The standing explanation sits behind the info button beside the title
+         (4 Oct 2026: the users skipped every paragraph on these screens). The
+         trace used to be a sentence with a link in it; it is a button now. --}}
+    <x-page-head eyebrow="Banking and reconciliation" title="Auto reconciliation">
+        <x-slot:info>
+            <p>Preview what a reconciliation would do, then execute it. The preview reads the bank statement and
+               deposit tables in PumpIT and changes nothing.</p>
+            <p><strong>Trace a reference</strong> follows one batch number, bag, slip, terminal or piece of bank
+               narrative through every run, batch, stamp, statement line and deposit that touched it.</p>
+            @if ($stampMode === 'journal')
+                <p><strong>Journal mode.</strong> Execute records the run in Agora and nothing in PumpIT moves:
+                   writing the stamp to the customer's database needs a decision on the record first.</p>
+            @endif
+        </x-slot:info>
+        <x-slot:actions>
+            <a class="btn-ghost" href="{{ route('app.recon.trace') }}">Trace a reference</a>
+        </x-slot:actions>
+    </x-page-head>
 
     @include('recon::partials.open-run')
 
-    {{-- Not one of the five: a trace crosses all of them and both sides, so
-         it sits above the areas rather than inside one. --}}
-    <p class="field-help" style="margin-bottom:12px">
-        Chasing a single figure? <a href="{{ route('app.recon.trace') }}">Trace a reference</a> — a batch
-        number, a bag, a slip, a terminal or part of a bank narrative — and see every run, batch, stamp,
-        statement line and deposit that touched it.
-    </p>
-
-    <x-card title="The five areas" sub="Each one previews through its own procedure on the Agora database">
+    {{-- Each tile carries the first sentence of its area's blurb — what it
+         pairs against what. The rest of the blurb is behind the info button on
+         the area's own page. --}}
+    <x-card title="The five areas">
         <div class="area-grid">
             @foreach ($areas as $key => $area)
                 <a class="area-card" href="{{ route('app.recon.area', $key) }}">
                     <h3>{{ $area['label'] }}</h3>
-                    <p>{{ $area['blurb'] }}</p>
+                    <p>{{ Str::finish(Str::before($area['blurb'], '. '), '.') }}</p>
                     <span class="area-proc">agora.{{ $area['procedure'] }}</span>
                 </a>
             @endforeach

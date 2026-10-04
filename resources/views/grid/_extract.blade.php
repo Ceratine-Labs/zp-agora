@@ -17,7 +17,7 @@
            $definition, $slug
 --}}
     <x-drawer :id="'dg-'.$slug.'-extract'" title="Extract" copy
-              note="The file is what you are looking at — your filters, your sort, your visible columns, in your order. It is produced by re-running the same source with the page opened up, so the numbers cannot disagree with the ones above.">
+              note="What you are looking at: your filters, sort and visible columns, in your order.">
 
         @if ($grid->overCeiling())
             <x-notice tone="stop" title="Too big for a download">
@@ -38,10 +38,7 @@
                 <a class="btn-ghost" href="{{ $grid->extractUrl('csv') }}" data-extract>Download .csv</a>
             </div>
 
-            <p class="dg-extract-note">
-                Numbers come down as numbers and dates as dates, not as the formatted text on the screen —
-                so the receiving column adds up and sorts without being cleaned first.
-            </p>
+            <p class="dg-extract-note">Numbers and dates download as values, ready to add up and sort.</p>
 
             {{-- The copy button copies this. A textarea rather than a <pre>
                  because select-all inside one is a single keystroke, and on a

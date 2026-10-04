@@ -18,22 +18,23 @@
     </x-notice>
 @endif
 
-<x-card title="What to pair"
-        sub="The site and the period. Both sides are read live — nothing here is a stored preview.">
+<x-card title="What to pair">
+    <x-slot:info>
+        <p>Both sides are read live from PumpIT: nothing here is a stored preview.</p>
+    </x-slot:info>
     <form method="GET" action="{{ route('app.recon.match', $area['key']) }}" data-loader="Reading both sides…">
         <div class="field-row">
             @if ($pinned)
                 <div class="field">
                     <label>Site</label>
                     <p class="field-fixed">{{ $branches->firstWhere('BranchId', $branchId)?->Name ?? 'Not set' }}</p>
-                    <p class="field-help">Your workspace is pinned to this site.</p>
                 </div>
                 <input type="hidden" name="branch_id" value="{{ $branchId }}">
             @else
                 <x-field name="branch_id" label="Site"
                          :choices="['' => 'Choose a site'] + $branches->pluck('Name', 'BranchId')->all()"
                          :value="$branchId ?: ''"
-                         help="Pairing is always within one site — a deposit at one branch cannot settle another's statement." />
+                         info="Pairing is always within one site — a deposit at one branch cannot settle another's statement." />
             @endif
 
             <x-field name="from" label="From" type="date" :value="$from" />
@@ -42,7 +43,7 @@
             <x-field name="state" label="Show"
                      :choices="['outstanding' => 'Still outstanding', 'reconciled' => 'Already reconciled', 'all' => 'Everything']"
                      :value="$state ?? 'outstanding'"
-                     help="Outstanding is what you pair. The other two are for checking a figure." />
+                     info="Outstanding is what you pair. The other two are for checking a figure." />
         </div>
 
         <div class="form-actions">

@@ -26,21 +26,20 @@
 @endphp
 
 <x-app-shell title="Confirm Z-reads">
-    <x-page-head eyebrow="Cash" title="Confirm Z-reads"
-                 blurb="What the system proposes, one at a time. Confirm what is right; anything it cannot call waits for a desk." />
-
-    @if ($canConfirm)
-        @if ($live)
-            <x-notice tone="warn" title="Confirm writes to PumpIT">
-                <p>Each Confirm saves the Z-read in Agora and writes its till, shift and person onto its PumpIT row.
-                   What the row held before is recorded, so it can be reversed from ZREAD Allocation at a desk.</p>
-            </x-notice>
-        @else
-            <x-notice tone="info" title="The PumpIT stamp is off">
-                <p>Each Confirm saves the Z-read in Agora only; nothing is written to PumpIT.</p>
-            </x-notice>
-        @endif
-    @endif
+    <x-page-head eyebrow="Cash" title="Confirm Z-reads">
+        <x-slot:info>
+            <p>What the system proposes, one Z-read at a time. Confirm what is right; anything it cannot call waits for
+               a desk, on ZREAD Allocation.</p>
+            @if ($live)
+                <p><strong>Confirm writes to PumpIT:</strong> it saves the Z-read in Agora and writes its till, shift
+                   and person onto its PumpIT row. What the row held before is recorded, so it can be reversed from
+                   ZREAD Allocation at a desk.</p>
+            @else
+                <p><strong>The PumpIT stamp is off.</strong> Each Confirm saves the Z-read in Agora only; nothing is
+                   written to PumpIT.</p>
+            @endif
+        </x-slot:info>
+    </x-page-head>
 
     @if (session('zreadRefusal'))
         <x-notice tone="stop" title="That was not saved"><p>{{ session('zreadRefusal') }}</p></x-notice>

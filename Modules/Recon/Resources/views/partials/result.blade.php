@@ -14,31 +14,37 @@
     ];
 @endphp
 
+{{-- What each outcome means, and what a reversal does, is behind the info
+     button beside the title (4 Oct 2026); the strip keeps only figures. --}}
 <x-card :title="'Run #'.$run->Id"
         :sub="$run->FromDate->toDateString().' to '.$run->ToDate->toDateString().' · previewed in '.$run->PreviewMs.' ms'"
-        flush>
+        flush info-wide>
+    <x-slot:info>
+        <p><strong>Amount mismatch</strong>: both sides present, totals differ. <strong>Bank only</strong>: no
+           deposit behind the bank lines. <strong>Deposit only</strong>: deposits with no bank line.
+           <strong>Other</strong>: an unresolved rule or reference.</p>
+        <p><strong>Bank less deposits</strong>: negative is money the bank did not receive. Click a row to see
+           the bank lines and deposits behind it.</p>
+        <p>An executed run can be reversed from this page: every row goes back to what it held before, using
+           the prior state recorded per row.</p>
+    </x-slot:info>
     <x-statstrip :stats="[
         ['label' => 'Would reconcile', 'value' => \App\Support\Format::n($run->MatchedRows),
          'note' => \App\Support\Format::r($run->MatchedTotal), 'tone' => 'good'],
-        ['label' => 'Amount mismatch', 'value' => \App\Support\Format::n($run->MismatchRows),
-         'note' => 'both sides present, totals differ', 'tone' => 'warn'],
-        ['label' => 'Bank only', 'value' => \App\Support\Format::n($run->BankOnlyRows),
-         'note' => 'no deposit behind them', 'tone' => 'serious'],
-        ['label' => 'Deposit only', 'value' => \App\Support\Format::n($run->DepositOnlyRows),
-         'note' => 'never shown by the exe', 'tone' => 'neutral'],
-        ['label' => 'Other', 'value' => \App\Support\Format::n($run->OtherRows),
-         'note' => 'unresolved rule or reference', 'tone' => 'neutral'],
-        ['label' => 'Bank side', 'value' => \App\Support\Format::r($run->BankTotal), 'note' => 'total in scope'],
-        ['label' => 'Deposit side', 'value' => \App\Support\Format::r($run->MopsTotal), 'note' => 'total in scope'],
+        ['label' => 'Amount mismatch', 'value' => \App\Support\Format::n($run->MismatchRows), 'tone' => 'warn'],
+        ['label' => 'Bank only', 'value' => \App\Support\Format::n($run->BankOnlyRows), 'tone' => 'serious'],
+        ['label' => 'Deposit only', 'value' => \App\Support\Format::n($run->DepositOnlyRows), 'tone' => 'neutral'],
+        ['label' => 'Other', 'value' => \App\Support\Format::n($run->OtherRows), 'tone' => 'neutral'],
+        ['label' => 'Bank side', 'value' => \App\Support\Format::r($run->BankTotal)],
+        ['label' => 'Deposit side', 'value' => \App\Support\Format::r($run->MopsTotal)],
     ]" />
 
     @php($paired = $run->lines->filter->hasNearReference())
     @if ($paired->isNotEmpty())
         <x-notice tone="warn" collapsible style="margin:12px 14px 0"
                   :title="$paired->count().' '.Str::plural('row', $paired->count()).' paired on an inferred reference'">
-            <p>Each of these was two orphans — a bank line with no deposit at one end of the list and a
-               deposit with no bank line at the other — because the two sides extract the same reference to
-               a different length. They have been joined into one row and judged like any other:
+            <p>Each was an unpaired bank line and an unpaired deposit, because the two sides extract the same
+               reference to a different length. Joined into one row and judged like any other:
                <strong>{{ $paired->where('WouldReconcile', true)->count() }}</strong> now
                {{ $paired->where('WouldReconcile', true)->count() === 1 ? 'matches' : 'match' }},
                <strong>{{ $paired->where('WouldReconcile', false)->count() }}</strong> came out as amount
@@ -50,12 +56,9 @@
                 @endforeach
                 @if ($paired->count() > 12)<li>… and {{ $paired->count() - 12 }} more.</li>@endif
             </ul>
-            <p><strong>The pairing is an inference, not the configured rule.</strong>
-               <code>MOPS_EndPosition</code> is stored as an end position in some areas and a length in
-               others (finding 9), and the column does not say which. Setting
-               <em>Deposit-side positions</em> the other way on the preview form would make these match on
-               the configured extraction instead of on an inference — and if they do, that is the reading
-               this branch wants and the configuration should be corrected.</p>
+            <p><strong>The pairing is an inference, not the configured rule.</strong> If setting
+               <em>Deposit-side positions</em> the other way on the preview form makes these match, that is the
+               reading this site wants and its configuration should be corrected.</p>
         </x-notice>
     @endif
 
@@ -64,11 +67,9 @@
              it is the same paragraph every time and folds away once read. --}}
         <x-notice tone="stop" collapsible style="margin:12px 14px 0"
                   :title="$run->BankOnlyRows.' bank '.Str::plural('line', $run->BankOnlyRows).' with no deposit behind '.($run->BankOnlyRows === 1 ? 'it' : 'them')">
-            <p>These are the rows the live procedure treats as matched. Its comparison is
-               <code>IF @CurrAmount &lt;&gt; @MOPSAmount</code>, which is neither true nor false when there
-               is no deposit row, so it falls through to the <em>ELSE</em> — the matched branch. Under
-               Execute each one is stamped reconciled against nothing, and once stamped it drops out of
-               the outstanding list, so the mistake removes its own evidence.</p>
+            <p>The live procedure treats these as matched: its amount comparison falls through to the matched
+               branch when there is no deposit. Executed there, each is stamped reconciled against nothing and
+               drops out of the outstanding list.</p>
         </x-notice>
     @endif
 
@@ -161,10 +162,8 @@
                    that nobody has touched. The newest was run
                    <a href="{{ route('app.recon.run', (int) $newest->ClaimedByRunId) }}">#{{ $newest->ClaimedByRunId }}</a>{{ $newest->ClaimedBy ? ', by '.$newest->ClaimedBy : '' }},
                    {{ \Illuminate\Support\Carbon::parse($newest->ClaimedAt)->diffForHumans() }}.</p>
-                <p class="field-help">This reads Agora's own ledger: the same reference, committed by another
-                   Agora run in this area after this preview was made. A line stamped outside Agora since then is
-                   still caught when you press Reconcile — every row is re-checked, and anything that has moved is
-                   skipped. For a clean list, preview the period again.</p>
+                <p class="field-help">A line stamped outside Agora is still caught on Reconcile, which re-checks
+                   every row. For a clean list, preview the period again.</p>
             </x-notice>
         @endif
 
@@ -183,18 +182,16 @@
                 {{ $ready - $claimed->count() }} {{ Str::plural('batch', $ready - $claimed->count()) }}
             </button>
 
-            <x-slot:note>
+            <x-info label="What this press does">
                 @if ($stampMode === 'live')
-                    Stamps <code>ReconState</code> and <code>ReconBatchNo</code> in PumpIT, and
-                    <code>ReconBatchNoPumpIT</code> on the deposits. It acts on the ticked rows and no
-                    others — not on a second walk of the data, which is what the executable does. Every
-                    row is re-checked first: anything reconciled by something else since the preview, or
-                    whose two sides no longer balance, is skipped and reported. Reversible from this page.
+                    <p>Stamps <code>ReconState</code> and <code>ReconBatchNo</code> on the bank lines in PumpIT,
+                       and <code>ReconBatchNoPumpIT</code> on the deposits — on the ticked rows only.</p>
+                    <p>Every row is re-checked first: anything reconciled elsewhere since the preview, or whose
+                       two sides no longer balance, is skipped and reported. Reversible from this page.</p>
                 @else
-                    <strong>Journal mode.</strong> The decision is recorded here and nothing in PumpIT
-                    changes — the reviewed worklist offered to ZP on 18 August 2026.
+                    <p><strong>Journal mode:</strong> recorded in Agora only; nothing in PumpIT changes.</p>
                 @endif
-            </x-slot:note>
+            </x-info>
         </x-action-bar>
     @endif
 
@@ -346,21 +343,18 @@
                 Committed {{ $run->CommittedAt?->diffForHumans() }} —
                 {{ $run->CommittedRows }} {{ Str::plural('batch', $run->CommittedRows) }},
                 {{ \App\Support\Format::r($run->CommittedTotal) }}{{ $run->StampMode === 'journal' ? ', journal only' : '' }}.
-                A reversal puts back exactly what was stamped, using the prior state recorded per row.
-                The PumpIT executable has no reversal at all, which is how finding 2 was able to conceal itself.
             </p>
 
         @elseif ($run->Status === 'reversed')
             <p class="field-help">
                 Reversed {{ $run->ReversedAt?->diffForHumans() }} — {{ $run->ReversalReason }}.
-                The proposals are pending again and can be executed once whatever caused it is dealt with.
+                The proposals are pending again.
             </p>
 
         @elseif ($run->Status === 'closed')
             <p class="field-help">
-                Marked complete{{ $run->UpdatedAt ? ' '.$run->UpdatedAt->diffForHumans() : '' }}. Nothing was
-                stamped from this run, and it stays here as the record of what the preview found. It is out of
-                the open work list and out of every clear-previews sweep. Reopen it to reconcile anything on it.
+                Marked complete{{ $run->UpdatedAt ? ' '.$run->UpdatedAt->diffForHumans() : '' }} — nothing was
+                stamped from this run. Reopen it to reconcile anything on it.
             </p>
         @endif
     </footer>

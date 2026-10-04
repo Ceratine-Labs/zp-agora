@@ -7,7 +7,13 @@
     site.
 --}}
 <x-card title="Run every site"
-        :sub="'A period and the readings. '.$sites->count().' trading '.Str::plural('site', $sites->count()).' will be previewed, one at a time.'">
+        :sub="$sites->count().' trading '.Str::plural('site', $sites->count()).' to preview'">
+    <x-slot:info>
+        <p>One period and one set of readings, previewed for every site one at a time. Each site is recorded as
+           its own run, so a site that refuses is a row rather than a group that half happened.</p>
+        <p>The readings are stored once on the group and given to every site, so the runs in a group cannot
+           disagree about what they were given.</p>
+    </x-slot:info>
     @include('recon::partials.unconfigured-sites', ['unconfigured' => $unconfigured, 'area' => $area])
 
     <form method="POST" action="{{ route('app.recon.all.start', $area['key']) }}" data-loader="Starting every site…">
@@ -16,26 +22,22 @@
 
         <div class="field-row">
             <x-field name="from" label="From" type="date" :value="old('from', $from)"
-                     help="Bank line date and deposit date, inclusive. The same period is used for every site." />
+                     info="Bank line date and deposit date, inclusive. The same period is used for every site." />
 
             <x-field name="to" label="To" type="date" :value="old('to', $to)" />
 
             <x-field name="note" label="Name this run" :value="old('note')"
-                     help="Optional, and it goes on every run in the group — 'August month end' finds all twenty-six." />
+                     info="Optional. It goes on every run in the group, so one name finds them all." />
         </div>
 
         @if ($options)
             <details class="params-extra" @if (old('options')) open @endif>
                 <summary>Rules and readings ({{ count($options) }})</summary>
-                <p class="field-help" style="margin:8px 0 12px">
-                    Stored once on the group and given to every site, so a group whose runs disagree
-                    about the reading they were given cannot happen.
-                </p>
-                <div class="field-row">
+                <div class="field-row" style="margin-top:12px">
                     @foreach ($options as $name => $option)
                         <x-field :name="'options['.$name.']'"
                                  :label="$option['label']"
-                                 :help="$option['help']"
+                                 :info="$option['help']"
                                  :type="$option['type'] ?? 'text'"
                                  :choices="$option['choices'] ?? null"
                                  :min="$option['min'] ?? null"
@@ -53,7 +55,7 @@
     </form>
 </x-card>
 
-<x-card title="Recent group runs" sub="The last five presses across every site in this area" collapsible flush>
+<x-card title="Recent group runs" sub="The last five, every site in this area" collapsible flush>
     <x-table :count="$groups->count()" empty="No group has been run in this area yet.">
         <x-slot:head>
             <tr>

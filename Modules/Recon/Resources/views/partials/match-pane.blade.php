@@ -14,11 +14,9 @@
 @php($chosen = ($branchId ?? 0) > 0)
 
 @if (! $chosen)
-    <x-card title="Manual match" sub="Pick a site above">
+    <x-card title="Manual match">
         <x-empty-state title="Choose a site first">
-            <p>Pairing is always within one site. An empty pair of lists before a site is chosen would
-               read as “this site is clean”, which is a different answer from “you have not said which
-               site”.</p>
+            <p>Pairing is always within one site.</p>
         </x-empty-state>
     </x-card>
 @else
@@ -28,17 +26,18 @@
              screen must NOT — pairing by hand is precisely what a site with no
              configuration needs. But it has to say so, or the missing colours
              look like an absence of matches. --}}
-        <x-notice tone="warn" title="This site has no extraction rule configured" style="margin-bottom:16px">
-            <p>Both sides are still listed and can still be paired by hand — that is what this screen is
-               for. What is missing is the colour: with no <code>BRN_AutoReconCriteria</code> row there is
-               nothing to extract a reference from on the bank side, so no pair can be highlighted for
-               you. Automatic reconciliation cannot run here at all until the configuration exists.</p>
+        <x-notice tone="warn" collapsible title="This site has no extraction rule configured" style="margin-bottom:16px">
+            <p>Both sides can still be paired by hand. Nothing is coloured, because with no
+               <code>BRN_AutoReconCriteria</code> row no reference can be read from the bank side, and
+               automatic reconciliation cannot run here until one exists.</p>
         </x-notice>
     @endif
 
-    <x-card :title="'Pair by hand — '.$area['label']"
-            sub="Coloured where the same reference appears on both sides. Tick both sides, then match."
-            flush>
+    <x-card :title="'Pair by hand — '.$area['label']" flush>
+        <x-slot:info>
+            <p>Rows are coloured where the same reference appears on both sides. Tick both sides, then match.</p>
+            <p><strong>Bank less deposits</strong>: negative is money the bank did not receive.</p>
+        </x-slot:info>
         <form method="POST" action="{{ route('app.recon.match.save', $area['key']) }}" id="manual-match"
               data-loader="{{ $stampMode === 'live' ? 'Matching in PumpIT…' : 'Recording the match…' }}"
               {{-- Both panes: a filter on either side takes rows out of the
@@ -68,7 +67,7 @@
                 ['label' => 'Selected deposits', 'value' => 'R0.00', 'note' => '0 rows'],
                 ['label' => 'Bank less deposits', 'value' => 'R0.00', 'note' => 'the bank side less the deposits'],
                 ['label' => 'References paired', 'value' => \App\Support\Format::n($summary->ColouredKeys ?? 0),
-                 'note' => 'appear on both sides', 'tone' => ($summary->ColouredKeys ?? 0) > 0 ? 'good' : 'neutral'],
+                 'tone' => ($summary->ColouredKeys ?? 0) > 0 ? 'good' : 'neutral'],
             ]" />
 
             {{-- The press, above the two lists it pairs. Both panes are as
@@ -84,29 +83,30 @@
                      It belongs beside the button it gates, not under the
                      lists. --}}
                 <div class="field" data-match-reason hidden>
-                    <label for="match-reason">Why are these being matched despite the difference?</label>
+                    <div class="field-label">
+                        <label for="match-reason">Why are these being matched despite the difference?</label>
+                        <x-info label="About the reason">
+                            <p>Required whenever the two sides do not agree. It is the only record of the
+                               decision, and the variance travels with the batch wherever it is shown.</p>
+                        </x-info>
+                    </div>
                     {{-- 200: agora.ReconRunLine.BlockReason, where a forced match's reason
                          is kept. 300 let a longer one through to a truncation
                          error in the procedure. --}}
                     <input type="text" id="match-reason" name="reason" maxlength="200"
                            placeholder="A bank charge deducted at source, a short banking, a split deposit…">
-                    <p class="field-help">Required the moment the two sides do not agree. It is the only
-                       record of the decision, and the variance travels with the batch wherever it is
-                       shown afterwards.</p>
                 </div>
 
-                <x-slot:note>
+                <x-info label="What this press does">
                     @if ($stampMode === 'live')
-                        Stamps both sides in PumpIT and allocates a batch number from the customer's own
-                        counter. Every row is re-read first: anything reconciled by something else since
-                        this screen was drawn is refused rather than stamped over, and exactly as many
-                        rows are claimed as you ticked — never all the ones that look alike. Reversible
-                        from the run it takes you to.
+                        <p>Stamps both sides in PumpIT under a batch number from the customer's own counter.
+                           Every row is re-read first: anything reconciled elsewhere since this screen was
+                           drawn is refused, and exactly as many rows are claimed as you ticked.</p>
+                        <p>Reversible from the run it takes you to.</p>
                     @else
-                        <strong>Journal mode.</strong> The match is recorded here and nothing in PumpIT
-                        changes.
+                        <p><strong>Journal mode:</strong> recorded in Agora only; nothing in PumpIT changes.</p>
                     @endif
-                </x-slot:note>
+                </x-info>
             </x-action-bar>
 
             <x-two-pane-recon :bank="$bank" :mops="$mops" :summary="$summary"

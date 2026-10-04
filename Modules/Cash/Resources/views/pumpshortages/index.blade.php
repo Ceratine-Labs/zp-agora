@@ -10,10 +10,16 @@
     Props: $grid
 --}}
 <x-app-shell title="Pump shortages">
-    <x-page-head
-        eyebrow="Cash"
-        title="Pump shortages"
-        blurb="What each pump attendant was short, shift by shift — the pump shortages on every cashup, with the staff short that put each one there.">
+    <x-page-head eyebrow="Cash" title="Pump shortages">
+        <x-slot:info>
+            <p>What each pump attendant was short, shift by shift: the pump shortages leg of every cashup, with the
+               staff short that put each line there. A pump shortage reaches a cashup when an approved staff short is
+               posted to it. A row opens its cashup.</p>
+            <p><strong>Short</strong> is that line; the cashup adds it to its actual total and the deduction schedule
+               reads it as the attendant's short. <strong>Counted</strong> says whether the cashup counts it — PumpIT
+               drops an attendant who is not on its employee list. A till balance is not a pump shortage: it moves a
+               variance through expenses.</p>
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.cash.cashups') }}">Cashups</a>
             @can('cash.tillbalance.view')
@@ -24,13 +30,4 @@
 
     <x-data-grid :grid="$grid" surface />
 
-    <x-explainer summary="Where these figures come from" remember="cash-pumpshortages">
-        <x-notice tone="info" title="The pump shortages leg">
-            <p>A pump shortage reaches a cashup when a staff short raised against a pump attendant is approved and put on
-               the cashup in PumpIT. <strong>Short</strong> is that line; the cashup adds it to its actual total, and the
-               deduction schedule reads it as the attendant's short. <strong>Counted</strong> says whether the cashup
-               counts it at all — PumpIT drops an attendant who is not on its employee list.</p>
-            <p>A till balance is not a pump shortage: it moves a cashup's variance through its expenses.</p>
-        </x-notice>
-    </x-explainer>
 </x-app-shell>

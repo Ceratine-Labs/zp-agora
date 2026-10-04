@@ -28,26 +28,25 @@
             <x-params legend="Which asset">
                 <x-param name="asset" label="Asset" searchable
                          :choices="['' => 'Choose the asset'] + $assets->pluck('Label', 'PickKey')->all()"
-                         :value="old('asset')"
-                         help="Assets still on a register at the sites you can see. A disposed one cannot move." />
+                         :value="old('asset')" />
             </x-params>
         @endif
 
         <div class="field-row">
             <x-field name="MovementType" label="Movement" :choices="$typeChoices" :value="old('MovementType')" />
             <x-field name="MovementDate" label="Date" type="date" :value="old('MovementDate', now()->toDateString())"
-                     help="When it happened. Movements are kept in date order." />
+                     info="When it happened. Movements are kept in date order." />
         </div>
 
         <div class="field-row">
             <x-field name="ToBranchId" label="To site" :choices="$branchChoices" :value="old('ToBranchId')"
-                     help="For a transfer, where it went. For a return from repair, where it came back to, if not where it left from." />
+                     info="For a transfer, where it went. For a return from repair, where it came back to, if not where it left from." />
             <x-field name="Proceeds" label="Proceeds (excl VAT)" type="number" step="0.01" min="0" :value="old('Proceeds')"
-                     help="Sold or traded in: what it fetched. Nothing on a write-off." />
+                     info="Sold or traded in: what it fetched. Nothing on a write-off." />
         </div>
 
         <x-field name="reason" label="Reason" :value="old('reason')"
-                 help="Required when it leaves the register — sold, traded in or written off." />
+                 info="Required when it leaves the register — sold, traded in or written off." />
 
         <div class="btn-row">
             <button type="submit" class="btn-primary">Record it</button>

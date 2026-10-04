@@ -62,16 +62,14 @@
                 <dt>Changed</dt><dd>{{ $override->UpdatedAt?->diffForHumans() ?? $override->CreatedAt?->diffForHumans() ?? '—' }}</dd>
             </dl>
         @else
-            <p class="field-help">Nothing here yet. Saving below creates one; it takes effect for every
-               preview and both drills the moment it does.</p>
+            <p class="field-help">Nothing here yet. Saving below creates one, in force at once.</p>
         @endif
     </x-slot:right>
 </x-compare>
 
 @unless ($mayEdit)
     <x-notice tone="info" title="You may look, not change">
-        <p>Changing an extraction rule decides which bank lines reconcile against which deposits across a
-           whole site, so it sits behind <code>recon.criteria.edit</code> — Finance and Admin.</p>
+        <p>Changing an extraction rule needs <code>recon.criteria.edit</code> (Finance and Admin).</p>
     </x-notice>
 @else
     <form method="POST" action="{{ route('app.recon.config.save', $area['key']) }}">
@@ -93,15 +91,16 @@
 
             <x-field name="FilterValue" label="Filter value"
                      :value="old('FilterValue', $override?->FILTER_Value ?? $legacy?->FILTER_Value)"
-                     help="The narrative slice a rule only applies to. Blank means it applies to every line." />
+                     info="The narrative slice a rule only applies to. Blank means it applies to every line." />
         </div>
 
         <x-field name="reason" label="Why are you changing this?" required
-                 help="Kept with the override for good. A configuration change with no reason is what the legacy estate is full of." />
+                 info="Kept with the override for good." />
 
+        {{-- Left on the page, one line: it changes how the boxes above are
+             filled in, so it is read at the moment of saving, not once. --}}
         <p class="field-help">
-            An override <strong>replaces</strong> the customer's rule rather than patching it, so every
-            position above is part of it — a box left blank means this rule has no such position, not
+            An override <strong>replaces</strong> the customer's rule: a blank box means no such position, not
             &ldquo;leave what was there&rdquo;.
         </p>
 

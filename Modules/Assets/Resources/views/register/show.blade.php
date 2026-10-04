@@ -27,6 +27,10 @@
     <x-page-head eyebrow="Asset register"
                  :title="$asset->AssetNo.' · '.($asset->AssetTypeDescription ?: $asset->AssetTypeCode)"
                  :blurb="trim($asset->Make.' '.($asset->Model ?? '')).($asset->SerialNo ? ' · serial '.$asset->SerialNo : '').' · belongs to '.$asset->BranchName">
+        <x-slot:info>
+            <p>Depreciation is straight-line and monthly, from the month the asset was bought, and a month is
+               charged at its month end.@if ($provisional) The period for its group is provisional.@endif</p>
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn" href="{{ route('app.assets.register') }}">Back to the register</a>
             @if (! $gone)
@@ -68,16 +72,15 @@
 
     @if ($gone)
         <x-notice tone="info" title="{{ $asset->Status }} on {{ $date($asset->DisposedOn) }}">
-            It is off the register and no longer depreciates. It stays here, with everything that happened to it,
-            because the history that references it has to stay readable.
+            Off the register and no longer depreciated.
             @if ($asset->DisposalProceeds !== null)
                 It fetched {{ Format::r($asset->DisposalProceeds) }}.
             @endif
         </x-notice>
     @elseif ($away)
         <x-notice tone="warn" title="Away from its site">
-            It belongs to {{ $asset->BranchName }} and is standing at {{ $asset->LocatedAt }}. Either it is on loan,
-            or it was moved and nobody recorded it coming back.
+            It belongs to {{ $asset->BranchName }} and is standing at {{ $asset->LocatedAt }}: on loan, or back
+            home without the return being recorded.
         </x-notice>
     @endif
 
@@ -127,7 +130,10 @@
         </x-facts>
     </x-card>
 
-    <x-card title="Movements" sub="Newest first. A reversed movement stays, marked, with who took it back and why.">
+    <x-card title="Movements">
+        <x-slot:info>
+            <p>Newest first. A reversed movement stays, marked, with who took it back and why.</p>
+        </x-slot:info>
         <x-table procedure="agora.usp_Assets_GetAsset" :count="$movements->count()" dense
                  empty="Nothing has happened to this asset since it was registered.">
             <x-slot:head>
@@ -161,7 +167,10 @@
         </x-table>
     </x-card>
 
-    <x-card title="Job cards" sub="A comeback is a second call on this asset within 30 days of the one before.">
+    <x-card title="Job cards">
+        <x-slot:info>
+            <p>A comeback is a second call on this asset within 30 days of the one before.</p>
+        </x-slot:info>
         <x-table procedure="agora.usp_Assets_GetAsset" :count="$repairs->count()" dense
                  empty="No repair has been called in on this asset.">
             <x-slot:head>
@@ -192,8 +201,9 @@
         </x-table>
     </x-card>
 
+    {{-- The method that was this card's sub is behind the page's info button:
+         a collapsible card cannot carry one in its head. --}}
     <x-card title="Depreciation schedule"
-            sub="Straight-line, monthly, from the month it was bought{{ $provisional ? ' — at a provisional rate' : '' }}"
             collapsible remember="assets.asset.schedule" :open="false">
         @if ($noRate)
             <x-empty-state title="Not depreciated"
@@ -259,10 +269,9 @@
                     @csrf
                     <p class="field-help" style="margin-top:0">
                         {{ $latest->MovementTypeDescription }} on {{ $date($latest->MovementDate) }}, {{ $latest->FromSite }} → {{ $latest->ToSite }}.
-                        Reversing puts the asset back exactly where and as it was before it. The movement stays on
-                        the record, marked reversed.
                     </p>
-                    <x-field name="reason" label="Why" help="Required. Kept on the movement." />
+                    <x-field name="reason" label="Why" help="Required. Kept on the movement."
+                             info="Reversing puts the asset back exactly where and as it was before this movement. The movement stays on the record, marked reversed." />
                     <div class="btn-row">
                         <button type="submit" class="btn-primary">Reverse it</button>
                     </div>
@@ -280,11 +289,8 @@
                       data-confirm-action="Delete it" data-confirm-danger>
                     @csrf
                     @method('DELETE')
-                    <p class="field-help" style="margin-top:0">
-                        For an asset registered in error. One that really left the site is sold, traded in or written
-                        off instead — that is a movement, and it keeps the history.
-                    </p>
-                    <x-field name="reason" label="Why" help="Required. Kept against the row." />
+                    <x-field name="reason" label="Why" help="Required. Kept against the row."
+                             info="For an asset registered in error. One that really left the site is sold, traded in or written off instead — that is a movement, and it keeps the history." />
                     <div class="btn-row">
                         <button type="submit" class="btn-primary">Delete it</button>
                     </div>

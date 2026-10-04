@@ -21,7 +21,13 @@
 @endphp
 
 <x-app-shell :title="$report['label']">
-    <x-page-head eyebrow="Today" :title="$report['label']" :blurb="$report['blurb']">
+    {{-- What the report is sits behind the info button beside the title (Ryan,
+         4 Oct 2026). The caveat below stays open: it is what stops a report
+         like "Waste to approve" being read as something it is not. --}}
+    <x-page-head eyebrow="Today" :title="$report['label']">
+        <x-slot:info>
+            <p>{{ $report['blurb'] }}</p>
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.reports.index') }}">All reports</a>
         </x-slot:actions>
@@ -39,14 +45,16 @@
         </x-notice>
     @endif
 
-    <x-card title="Scope" sub="{{ __('reports::reports.read_only') }}">
+    <x-card title="Scope">
+        <x-slot:info>
+            <p>{{ __('reports::reports.read_only') }}</p>
+        </x-slot:info>
         <form method="GET">
             <div class="field-row">
             <x-field name="from" label="From" type="date" :value="request('from')"
-                     help="Leave empty and the procedure applies its own default window." />
+                     info="Leave empty and the procedure applies its own default window." />
             <x-field name="to" label="To" type="date" :value="request('to')" />
-            <x-field name="q" label="Search" :value="request('q')" placeholder="Site, reference, name…"
-                     help="One filter across the columns worth searching. The procedure applies it, not the browser." />
+            <x-field name="q" label="Search" :value="request('q')" placeholder="Site, reference, name…" />
 
             {{-- Rule 3.3: the branches selector belongs to head office. In the
                  branch workspace BranchContext has already pinned the site and
@@ -61,7 +69,6 @@
                                 @selected(in_array((int) $branch->BranchId, $selected, true))>{{ $branch->Name }}</option>
                         @endforeach
                     </select>
-                    <p class="field-help">None selected means every site you are granted.</p>
                 </div>
             @endif
 
@@ -77,9 +84,8 @@
     <x-card :title="$report['label']" flush>
         @if ($total > $ceiling)
             <x-notice tone="warn" title="{{ __('reports::reports.over_ceiling', ['ceiling' => number_format($ceiling)]) }}">
-                <p>This result set is {{ number_format($total) }} rows. The page shows
-                   {{ number_format($pageSize) }} at a time; a full extract of this size belongs in the
-                   export centre, which produces it out of the request cycle.</p>
+                <p>This result set is {{ number_format($total) }} rows; the page shows
+                   {{ number_format($pageSize) }} at a time.</p>
             </x-notice>
         @endif
 

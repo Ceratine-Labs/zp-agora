@@ -18,6 +18,11 @@
     marks are kept (see the procedure's header). Confirm and Close write
     Agora's database only.
 
+    The standing explanation — how the figures are worked out, what Confirm
+    and Close mean, and what a save writes to PumpIT — sits behind the info
+    button beside the title (ZRP, 4 Oct 2026: users skipped every paragraph).
+    Refusals, statuses and the counts of THIS day stay on the page.
+
     Props: $scope, $branches, $pinned, $refusal, $cashups, $zreads, $one, $lines,
            $events, $cards, $summary, $channels, $writeMode, $savable, $tolerance
 --}}
@@ -34,10 +39,28 @@
 @endphp
 
 <x-app-shell title="Daily Banking">
-    <x-page-head
-        eyebrow="Branch functions · Cash"
-        title="Daily Banking"
-        blurb="Cashups by shift and till: the Z read against what was actually declared, the variance between them, and who has agreed to it.">
+    <x-page-head eyebrow="Branch functions · Cash" title="Daily Banking">
+        <x-slot:info>
+            <p>Each cashup's <strong>Z read</strong> (what the till took) against its <strong>actual total</strong>
+               (every leg, added the way PumpIT's Daily Banking adds them). <strong>Variance</strong> is actual less
+               Z read. A line whose customer, supplier or person is not on PumpIT's list is not counted, as in
+               PumpIT, and is marked.</p>
+            <p><strong>Z-read</strong> says whether the Z-read allocated to the till and shift agrees with the
+               cashup. Confirming one that does not, or whose variance is beyond R{{ \App\Support\Format::n($tolerance) }}
+               either way, needs a reason. <strong>Confirm</strong> agrees to the figures; <strong>Close</strong> is a
+               manager's sign-off, once the confirmed figures have not moved; a manager can <strong>reopen</strong>
+               with a reason. All three are recorded in Agora only.</p>
+            @if ($cardSavable)
+                <p><strong>Saving a leg writes to PumpIT.</strong> "Load card amounts" and "Add from PumpIT" write the
+                   lines and bring the cashup's totals into line, creating the cashup from its Z-read if needed. A row
+                   added from a pool is marked banked there, so it cannot be banked twice. Prior values are recorded,
+                   a reconciled line is never changed, nothing is deleted. Fleet cards and direct deposits are captured
+                   in PumpIT; their tabs say why.</p>
+            @else
+                <p><strong>Saving to PumpIT is off.</strong> This screen reads PumpIT's cashups; nothing is written
+                   there.</p>
+            @endif
+        </x-slot:info>
         <x-slot:actions>
             @if ($scope->isChosen())
                 <a class="btn-ghost" href="{{ route('app.cash.banking.phone', $scope->withCashup(null, null)->query()) }}">On a phone: read and confirm</a>
@@ -56,7 +79,7 @@
         </x-notice>
     @endif
 
-    <x-card title="Which day" sub="One site, one trading day. Open a till and shift to see its legs.">
+    <x-card title="Which day">
         <form method="GET" action="{{ route('app.cash.banking') }}">
             <x-params legend="Scope">
                 @if ($pinned)
@@ -76,22 +99,8 @@
         </form>
     </x-card>
 
-    @if ($cardSavable)
-        <x-notice tone="warn" title="Saving a leg writes to PumpIT" style="margin-bottom:16px">
-            <p>"Load card amounts" and "Add from PumpIT" write the leg's lines into PumpIT's daily banking tables and bring
-               the cashup's Z read, card total and variance on <code>BRN_DailyBanking</code> into line — creating the
-               cashup from its Z-read if PumpIT has none yet. A row added from a pool (the drop safe, the device and
-               card files, the POS account sales and paid-outs, the cash purchase requests) is also marked banked there,
-               exactly as the PumpIT screen marks it, so it cannot be banked twice. What each row held before is
-               recorded. A reconciled line is never changed, and nothing is ever deleted.</p>
-            <p>Pump shortages, fleet cards and direct deposits are captured in PumpIT for now — each tab says why.
-               Confirm, Close and Reopen are Agora's own records and write nothing to PumpIT.</p>
-        </x-notice>
-    @else
-        <x-notice tone="info" title="Saving to PumpIT is off" style="margin-bottom:16px">
-            <p>This screen reads PumpIT's cashups and records confirmations and closes in Agora. Nothing is written to PumpIT.</p>
-        </x-notice>
-    @endif
+    {{-- What a save writes to PumpIT is in the page's info panel; each press
+         that writes says so again in its own confirmation. --}}
 
     @if (! $scope->isChosen())
         <x-empty-state title="Choose a site" text="Pick the site and the day, and its cashups appear here — each with its Z read, what was declared and the variance." />
@@ -106,9 +115,9 @@
                  'note' => $notCaptured->count() > 0 ? $notCaptured->count().' Z-read(s) not cashed up' : 'every allocated Z-read cashed up',
                  'tone' => $notCaptured->count() > 0 ? 'warn' : 'neutral'],
                 ['label' => 'Net variance', 'value' => \App\Support\Format::r($summary['variance']),
-                 'note' => 'actual less Z read', 'tone' => $service->varianceTone($summary['variance'])],
-                ['label' => 'Beyond R'.\App\Support\Format::n($tolerance), 'value' => \App\Support\Format::n($summary['beyond']),
-                 'note' => 'either way', 'tone' => $summary['beyond'] > 0 ? 'crit' : 'good'],
+                 'tone' => $service->varianceTone($summary['variance'])],
+                ['label' => 'Beyond ±R'.\App\Support\Format::n($tolerance), 'value' => \App\Support\Format::n($summary['beyond']),
+                 'tone' => $summary['beyond'] > 0 ? 'crit' : 'good'],
                 ['label' => 'To confirm', 'value' => \App\Support\Format::n($summary['toConfirm']),
                  'note' => $summary['toClose'].' waiting on a manager', 'tone' => $summary['toConfirm'] > 0 ? 'warn' : 'good'],
                 ['label' => 'Z-read disagrees', 'value' => \App\Support\Format::n($summary['disagree']),
@@ -147,7 +156,7 @@
         </x-card>
 
         @if ($notCaptured->isNotEmpty() || $unallocated->isNotEmpty())
-            <x-card title="Z-reads with no cashup" sub="Takings the till reported that nobody has cashed up yet." flush style="margin-top:16px">
+            <x-card title="Z-reads with no cashup" flush style="margin-top:16px">
                 @if ($unallocated->isNotEmpty())
                     <x-notice tone="warn" style="margin:12px">
                         <p>{{ $unallocated->count() }} {{ \Illuminate\Support\Str::plural('Z-read', $unallocated->count()) }} that day {{ $unallocated->count() === 1 ? 'is' : 'are' }} not allocated to a till and shift yet —
@@ -218,14 +227,19 @@
             @endif
 
             @if ($one !== null || $selectedZread !== null)
-                <x-card title="The legs" sub="What the cashier declared, leg by leg — the actual total is these added up." flush style="margin-top:16px">
+                <x-card title="The legs" flush style="margin-top:16px">
+                    <x-slot:info>
+                        <p>What the cashier declared, leg by leg; the actual total adds these up. A line marked
+                           <em>not counted</em> is left out of the total, as PumpIT leaves it out.</p>
+                        <p>Each tab offers a way to add its lines, or says why that leg is captured in PumpIT.</p>
+                    </x-slot:info>
                     @include('cash::banking.partials.legs', ['lines' => $lines, 'channels' => $channels, 'scope' => $scope,
                         'one' => $one, 'savable' => $savable, 'held' => $held])
                 </x-card>
             @endif
 
             @if ($events->isNotEmpty())
-                <x-card title="What has been done" sub="Every save, confirmation and close on this cashup, newest first. Times are UTC." flush style="margin-top:16px">
+                <x-card title="What has been done" flush style="margin-top:16px">
                     <x-table :count="$events->count()" procedure="agora.usp_Cash_GetCashup" dense>
                         <x-slot:head>
                             <tr>
@@ -252,28 +266,5 @@
                 </x-card>
             @endif
         @endif
-
-        <x-explainer summary="How the figures are worked out, and what is written" remember="cash-banking">
-            <x-notice tone="info" title="The figures">
-                <p><strong>Z read</strong> is the Z-read the cashup is balanced against (PumpIT's ClosingBalance).
-                   <strong>Actual total</strong> is every leg added the way PumpIT's own Daily Banking grid adds them:
-                   cash bags, accounts (debtors), Smart ATM, cash devices, direct deposits, pump shortages, expenses,
-                   fleet card, suppliers, ABSA, FNB, Yumbi, Yumbi vouchers, Infinity and Zapper. An account, expense,
-                   supplier or shortage whose code is not on PumpIT's list is not counted — PumpIT drops it the same way,
-                   and here it is shown and marked. <strong>Variance</strong> is actual less Z read.</p>
-                <p><strong>Z-read</strong> says whether the Z-read allocated to the till and shift on ZREAD Allocation
-                   agrees with the cashup — none allocated, a different figure, or another person's. Confirming a cashup
-                   whose Z-read does not agree, or whose variance is beyond R{{ \App\Support\Format::n($tolerance) }}
-                   either way, needs a reason.</p>
-            </x-notice>
-            <x-notice tone="info" title="Confirm, close and reopen">
-                <p>Confirm records that a person agrees to the figures as they stand; Close is a manager's sign-off, and
-                   only a confirmed cashup whose figures have not moved since can be closed. A manager can reopen a
-                   closed cashup, with a reason, to correct it. All three are Agora's own records — PumpIT's cashup has
-                   no status of its own. A cashup with neither whose PumpIT day has been
-                   balanced reads "Day balanced". Confirming does not yet tick the day's close-off: that waits for the
-                   day-close checklist.</p>
-            </x-notice>
-        </x-explainer>
     @endif
 </x-app-shell>

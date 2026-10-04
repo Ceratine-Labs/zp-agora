@@ -9,7 +9,7 @@
     allocated for this bag" is precisely what somebody opens this to learn.
 --}}
 
-<x-card title="Runs" sub="Previews that proposed something carrying this value" collapsible flush>
+<x-card title="Runs" collapsible flush>
     <x-table tools :count="$sets['runs']->count()" empty="No run has ever proposed anything carrying this value.">
         <x-slot:head>
             <tr><th>Run</th><th>Area</th><th>Site</th><th>Period</th><th>Status</th>
@@ -36,7 +36,7 @@
     </x-table>
 </x-card>
 
-<x-card title="Proposals" sub="The lines themselves, and what each was judged to be" collapsible flush>
+<x-card title="Proposals" collapsible flush>
     <x-table tools :count="$sets['proposals']->count()" empty="No proposal carries this value.">
         <x-slot:head>
             <tr><th>Run</th><th>Reference</th><th>Outcome</th><th class="num">Bank</th>
@@ -65,7 +65,7 @@
     </x-table>
 </x-card>
 
-<x-card title="Batches" sub="Batch numbers Agora allocated, from the customer's own counter" collapsible flush>
+<x-card title="Batches" collapsible flush>
     <x-table tools :count="$sets['batches']->count()" empty="No batch was ever allocated for this value.">
         <x-slot:head>
             <tr><th>Batch</th><th>Run</th><th>Site</th><th>Reference</th>
@@ -89,9 +89,7 @@
     </x-table>
 </x-card>
 
-<x-card title="Rows touched"
-        sub="One row per side, with what it held BEFORE Agora wrote to it — the record the executable never kept"
-        collapsible flush>
+<x-card title="Rows touched" collapsible flush>
     <x-table tools :count="$sets['matches']->count()" empty="Agora has never written to a row carrying this value.">
         <x-slot:head>
             <tr><th>Batch</th><th>Side</th><th>Source</th><th>Key</th><th>Date</th>
@@ -115,9 +113,7 @@
 
 {{-- Cash bags only. Share is bank less bags, so a negative share is money
      missing — the only kind that is due as a staff short. --}}
-<x-card title="Split by cashier"
-        sub="Whose cash a cash-bag match was accounted to, as the clerk confirmed it, and the staff short each line is due"
-        collapsible flush>
+<x-card title="Split by cashier" collapsible flush>
     <x-table tools :count="$sets['allocations']->count()" empty="No cash-bag match carrying this value was split by cashier.">
         <x-slot:head>
             <tr><th>Batch</th><th>Cashier</th><th class="num">Bags</th><th class="num">Banked</th>
@@ -148,7 +144,7 @@
     </x-table>
 </x-card>
 
-<x-card title="Stamps" sub="What Agora asked the customer's estate to become, and whether it was applied" collapsible flush>
+<x-card title="Stamps" collapsible flush>
     <x-table tools :count="$sets['stamps']->count()" empty="Nothing was ever stamped for this value.">
         <x-slot:head>
             <tr><th>Batch</th><th>Target</th><th>Key</th><th>Columns</th><th>State</th>
@@ -169,9 +165,7 @@
     </x-table>
 </x-card>
 
-<x-card title="Bank statement"
-        sub="The legacy rows as they stand right now — the check on everything above"
-        collapsible flush>
+<x-card title="Bank statement" sub="As it stands now" collapsible flush>
     <x-table tools :count="$sets['bank']->count()" empty="Nothing on the statement carries this value inside the window.">
         <x-slot:head>
             <tr><th>Line</th><th>Site</th><th>Date</th><th>Narrative</th>
@@ -200,7 +194,7 @@
     </x-table>
 </x-card>
 
-<x-card title="Deposits" sub="All five BRN_DailyBanking families, asked the same question" collapsible flush>
+<x-card title="Deposits" sub="All five deposit tables, as they stand now" collapsible flush>
     <x-table tools :count="$sets['deposits']->count()" empty="No deposit carries this value inside the window.">
         <x-slot:head>
             <tr><th>Area</th><th>Site</th><th>Date</th><th>Reference</th>

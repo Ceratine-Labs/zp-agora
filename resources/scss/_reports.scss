@@ -9,15 +9,10 @@
 // convention in the build; when there is one, this file moves into
 // Modules/Reports and this comment goes with it.
 
-// A report card carries two extra lines the recon hub's does not: what the
-// report replaces, and — where it applies — what it honestly cannot tell you.
+// A report card carries one extra line the recon hub's does not: what the
+// report replaces. (Its caveat moved to the report's info panel, 4 Oct 2026.)
 .report-was {
   font-size: 11px; color: var(--muted); margin: 0; line-height: 1.45;
-}
-.report-caveat {
-  font-size: 11.5px; line-height: 1.5; margin: 0;
-  color: var(--warn-ink); border-left: 2px solid var(--warn);
-  padding-left: 8px;
 }
 
 // The sort direction on a column header. A glyph rather than an icon: it costs

@@ -72,7 +72,7 @@
                 <input type="hidden" name="short" value="{{ $opened->StaffShortsNo }}">
                 <x-params legend="Decline">
                     <x-param name="decline_reason" label="Why" :value="old('decline_reason')"
-                             placeholder="e.g. No slips received" help="Required. The person who raised it reads it." />
+                             placeholder="e.g. No slips received" help="Required — emailed to the raiser." />
                 </x-params>
                 <div class="form-actions"><button type="submit" class="btn">Decline</button></div>
             </form>
@@ -80,10 +80,10 @@
     @endif
 
     @if ($fromRecon && in_array($opened->Status, ['Waiting', 'Approved'], true))
-        <x-notice tone="info" title="Raised by a cash-bag match — never put on a cashup" style="margin-top:12px">
-            <p>{{ $opened->SourceRef ?? 'A cash-bag match' }} raised this short. The cashup already counted those bags in
-               full, so the short is not posted to a cashup's pump shortages: deductions read it directly once it is
-               approved. To reverse the match, withdraw the short here first if it has been approved.</p>
+        <x-notice tone="info" title="Raised by a cash-bag match — never put on a cashup" collapsible style="margin-top:12px">
+            <p>{{ $opened->SourceRef ?? 'A cash-bag match' }} raised this short. The cashup already counted those bags,
+               so deductions read the short directly once it is approved. To reverse the match, withdraw an approved
+               short here first.</p>
         </x-notice>
     @endif
 
@@ -100,7 +100,7 @@
             <x-params legend="Withdraw the approval">
                 <x-param name="withdraw_reason" label="Why" :value="old('withdraw_reason')"
                          placeholder="e.g. Recon batch reversed — wrong bags"
-                         help="Required. An approved short not yet on a cashup is taken back and declined." />
+                         help="Required." />
             </x-params>
             <div class="form-actions"><button type="submit" class="btn">Withdraw</button></div>
         </form>

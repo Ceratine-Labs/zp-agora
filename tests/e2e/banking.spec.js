@@ -68,8 +68,10 @@ test.describe('Daily Banking', () => {
         await first.click();
         await page.waitForURL(/till=\d+/);
 
-        await expect(page.getByText('Actual total').first()).toBeVisible();
-        await expect(page.getByText('Variance').first()).toBeVisible();
+        // Visible matches only: the same words also sit in the page's info
+        // panel, closed, since 4 Oct 2026.
+        await expect(page.getByText('Actual total').filter({ visible: true }).first()).toBeVisible();
+        await expect(page.getByText('Variance').filter({ visible: true }).first()).toBeVisible();
 
         const tabs = page.getByRole('tablist', { name: 'Legs of the cashup' });
         await expect(tabs).toBeVisible();
@@ -115,7 +117,7 @@ test.describe('Daily Banking', () => {
 
         // "Add from …" writes PumpIT (the leg and the pool row's banked mark):
         // neither the link nor the list nor the press reaches someone who may not save.
-        await expect(page.getByText('Actual total').first()).toBeVisible();
+        await expect(page.getByText('Actual total').filter({ visible: true }).first()).toBeVisible();
         await expect(page.getByRole('link', { name: /^Add from / })).toHaveCount(0);
         await expect(page.getByText('agora.usp_Cash_GetCashupPool')).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Add ticked rows to PumpIT' })).toHaveCount(0);

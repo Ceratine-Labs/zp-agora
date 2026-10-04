@@ -16,6 +16,11 @@
     row — only a bag in the safe and on no cashup, the whole row kept in Agora
     first), Collect (a BRN_DropSafe_Collection row and each bag's CollectionId).
 
+    The standing explanation — what "in the safe" means, the rules a bag must
+    meet, and what each press writes to PumpIT — sits behind the info button
+    beside the title (ZRP, 4 Oct 2026). Refusals and the safe's own figures
+    stay on the page; every press that writes says so in its confirmation.
+
     Props: $scope, $branches, $pinned, $refusal, $bags, $collections, $reasons,
            $limitReasons, $employees, $summary, $editing, $voiding, $writeMode,
            $threshold
@@ -35,10 +40,23 @@
 @endphp
 
 <x-app-shell title="Drop safe">
-    <x-page-head
-        eyebrow="Branch functions · Cash"
-        title="Drop safe"
-        blurb="Bags dropped into the manual safe, why, and who witnessed them — and the collection that takes them to the bank.">
+    <x-page-head eyebrow="Branch functions · Cash" title="Drop safe">
+        <x-slot:info>
+            <p>A bag is <strong>in the safe</strong> from the drop until the security company collects it — PumpIT's
+               own rule; being on a cashup does not take it out. Every bag needs the manager who witnessed it, and one
+               over {{ \App\Support\Format::r($threshold) }} a reason. A bag number is used once at a site, and so is
+               the security company's bag.</p>
+            <p>A bag can be corrected, or voided if it was captured in error, only while it is in the safe and on no
+               cashup. Agora keeps what each correction replaced, and the whole of a voided row with its reason.</p>
+            @if ($live)
+                <p><strong>Dropping, correcting and collecting write to PumpIT</strong> (<code>BRN_DropSafe</code>,
+                   <code>BRN_DropSafe_Collection</code>), as its own screens write them; a void deletes the bag's row
+                   there. What each press wrote is kept in Agora.</p>
+            @else
+                <p><strong>Writing to PumpIT is off.</strong> This screen shows the safe and its collections; nothing
+                   is written to PumpIT.</p>
+            @endif
+        </x-slot:info>
         <x-slot:actions>
             @if ($scope->isChosen())
                 <x-chip :tone="\Modules\Cash\Services\DropSafeService::inSafeTone($inSafe)">In the safe: {{ \App\Support\Format::n($inSafe) }}{{ $inSafe > 0 ? ' · '.\App\Support\Format::r($summary->InSafeAmount ?? 0) : '' }}</x-chip>
@@ -53,7 +71,11 @@
 
     @include('cash::dropsafe.partials.outcome')
 
-    <x-card title="Which site" sub="One site. Everything in its safe is listed, however old; the days choose which collections are shown beside it.">
+    <x-card title="Which site">
+        <x-slot:info>
+            <p>Everything in the site's safe is listed, however old. The days choose which collections are shown
+               beside it.</p>
+        </x-slot:info>
         <form method="GET" action="{{ route('app.cash.dropsafe') }}">
             <x-params legend="Scope">
                 @if ($pinned)
@@ -74,21 +96,6 @@
         </form>
     </x-card>
 
-    @if ($live)
-        <x-notice tone="warn" title="Dropping, correcting and collecting write to PumpIT" style="margin-bottom:16px">
-            <p>A bag dropped here is a row in PumpIT's drop safe (<code>BRN_DropSafe</code>), written as its own drop
-               screen writes it. A correction changes that row, and a void deletes it — both only while the bag is still
-               in the safe and on no cashup. A collection writes the security company's collection
-               (<code>BRN_DropSafe_Collection</code>) and marks each bag it takes. What each press wrote, what a
-               correction replaced and the whole of a voided row are kept in Agora.</p>
-            <p>A bag number is used once at a site, and so is the security company's bag.</p>
-        </x-notice>
-    @else
-        <x-notice tone="info" title="Writing to PumpIT is off" style="margin-bottom:16px">
-            <p>This screen shows the safe and its collections. Nothing is written to PumpIT.</p>
-        </x-notice>
-    @endif
-
     @if (! $scope->isChosen())
         <x-empty-state title="Choose a site" text="Pick the site, and what is in its safe appears here — with the form to drop a bag and to collect them." />
     @elseif ($refusal)
@@ -103,16 +110,19 @@
                 ['label' => 'Oldest', 'value' => $summary?->OldestDropDate ? \Illuminate\Support\Carbon::parse($summary->OldestDropDate)->format('j M Y') : \App\Support\Format::NOTHING,
                  'note' => $summary?->OldestDropDate ? \Illuminate\Support\Carbon::parse($summary->OldestDropDate)->diffForHumans($now, ['parts' => 1]) : 'nothing waiting',
                  'tone' => 'neutral'],
-                ['label' => 'On a cashup', 'value' => \App\Support\Format::n($summary->InSafeOnCashup ?? 0), 'note' => 'of the bags in the safe', 'tone' => 'neutral'],
+                ['label' => 'On a cashup', 'value' => \App\Support\Format::n($summary->InSafeOnCashup ?? 0), 'note' => 'of '.\App\Support\Format::n($inSafe).' in the safe', 'tone' => 'neutral'],
                 ['label' => 'Collected', 'value' => \App\Support\Format::n($summary->Collections ?? 0),
                  'note' => \App\Support\Format::r($summary->CollectedAmount ?? 0).' in these days', 'tone' => 'neutral'],
             ]" />
         </x-card>
 
         @if ($voiding && $canVoid)
-            <x-card :title="'Void bag '.$voiding->BagNo"
-                    sub="For a bag captured in error — one that was never dropped. It is still in the safe and on no cashup, so it can go."
-                    style="margin-top:16px">
+            <x-card :title="'Void bag '.$voiding->BagNo" style="margin-top:16px">
+                <x-slot:info>
+                    <p>For a bag captured in error — one that was never dropped. It is still in the safe and on no
+                       cashup, so it can go: its row is deleted from PumpIT and kept whole in Agora with your reason,
+                       which is the only record of why it left.</p>
+                </x-slot:info>
                 <form method="POST" action="{{ route('app.cash.dropsafe.void') }}" id="dropsafe-void"
                       data-confirm="Void bag {{ $voiding->BagNo }} in PumpIT?"
                       data-confirm-text="The bag's row is DELETED from PumpIT's drop safe: {{ \App\Support\Format::r($voiding->Amount) }}, dropped {{ substr((string) $voiding->DropDate, 0, 10) }} by {{ $voiding->CashierName ?? $voiding->CashierCode }}. The whole row is kept in Agora with your reason, and the bag number can be used again. This cannot be undone in PumpIT."
@@ -125,7 +135,7 @@
                     <x-params legend="Why">
                         <x-param name="void_reason" label="Reason" :value="old('void_reason')"
                                  placeholder="Why this bag was never a bag — kept in Agora"
-                                 help="Required. It is the only record of why the bag left PumpIT." />
+                                 help="Required." />
                     </x-params>
                     <div class="form-actions">
                         <button type="submit" class="btn">Void the bag</button>
@@ -135,14 +145,25 @@
         @endif
 
         @if (($editing && $canEdit) || (! $editing && $canDrop))
-            <x-card :title="$editing ? 'Correct bag '.$editing->BagNo : 'Drop a bag'"
-                    :sub="$editing ? 'Still in the safe and on no cashup, so it can be corrected. Every change is kept in Agora beside what it replaced.' : 'A bag over '.\App\Support\Format::r($threshold).' needs a reason; every bag needs the manager who witnessed it.'"
-                    style="margin-top:16px">
+            <x-card :title="$editing ? 'Correct bag '.$editing->BagNo : 'Drop a bag'" style="margin-top:16px">
+                <x-slot:info>
+                    @if ($editing)
+                        <p>Still in the safe and on no cashup, so it can be corrected, its number included. Every change
+                           is kept in Agora beside what it replaced.</p>
+                    @else
+                        <p>Every bag needs the manager who witnessed it; one over {{ \App\Support\Format::r($threshold) }}
+                           needs a reason too. The bag stays in the safe until it is collected.</p>
+                    @endif
+                </x-slot:info>
                 @include('cash::dropsafe.partials.drop-form', ['from' => 'desk'])
             </x-card>
         @endif
 
-        <x-card title="In the safe" sub="Every bag at this site not yet collected, oldest first — the bags PumpIT's own collection screen offers." flush style="margin-top:16px">
+        <x-card title="In the safe" flush style="margin-top:16px">
+            <x-slot:info>
+                <p>Every bag at this site not yet collected, oldest first — the bags PumpIT's own collection screen
+                   offers.</p>
+            </x-slot:info>
             @if ($canCollect && $bags->isNotEmpty())
             <form method="POST" action="{{ route('app.cash.dropsafe.collect') }}" id="dropsafe-collect"
                   data-confirm="Collect the ticked bags in PumpIT?"
@@ -227,7 +248,11 @@
             @endif
         </x-card>
 
-        <x-card title="Collections" :sub="'Collected from this safe between '.\Illuminate\Support\Carbon::parse($scope->from)->format('j M').' and '.\Illuminate\Support\Carbon::parse($scope->to)->format('j M Y').', newest first — what the collection declares beside what its bags add up to.'" flush style="margin-top:16px">
+        <x-card title="Collections" :sub="\Illuminate\Support\Carbon::parse($scope->from)->format('j M').' – '.\Illuminate\Support\Carbon::parse($scope->to)->format('j M Y')" flush style="margin-top:16px">
+            <x-slot:info>
+                <p>Collected from this safe in these days, newest first. Where a collection declares a different count
+                   or total from what its bags add up to, the declared figure is shown beside it.</p>
+            </x-slot:info>
             <x-table :count="$collections->count()" procedure="agora.usp_Cash_GetDropSafe" dense tools
                      empty="Nothing was collected from this safe in these days.">
                 <x-slot:head>
@@ -259,23 +284,5 @@
             </x-table>
         </x-card>
 
-        <x-explainer summary="What the drop safe is, and what each press writes" remember="cash-dropsafe">
-            <x-notice tone="info" title="In the safe">
-                <p>A bag is <strong>in the safe</strong> from the moment it is dropped until the security company collects
-                   it — PumpIT's own rule, and the same list its collection screen offers. Being on a cashup does not take a
-                   bag out of the safe: it is banked on the cashup, and still has to be handed over.</p>
-                <p>A bag over {{ \App\Support\Format::r($threshold) }} needs a reason, and every bag needs the manager who
-                   witnessed it — PumpIT keeps one on every bag, and its own screens leave out a bag without one.</p>
-            </x-notice>
-            <x-notice tone="info" title="Correcting and voiding a bag">
-                <p>A bag can be corrected — its number included — only while it is still in the safe and on no cashup: a
-                   cashup's cash-bags leg carries its amount, and a collection its total, so a bag on either is left as it
-                   is. Agora keeps what each correction replaced.</p>
-                <p>A bag captured in error — never really dropped — can be <strong>voided</strong> under the same
-                   condition, with a reason: its row is deleted from PumpIT, as PumpIT's own screen deletes a wrong bag,
-                   and the whole row is kept in Agora beside the reason. Agora's record of every press is its own; nothing
-                   is written to PumpIT's audit log.</p>
-            </x-notice>
-        </x-explainer>
     @endif
 </x-app-shell>

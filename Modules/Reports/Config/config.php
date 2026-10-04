@@ -131,7 +131,7 @@ return [
             'menu' => 'the-day/open-cashups',
             'procedure' => 'usp_Reports_GridOpenCashups',
             'blurb' => 'Cashups nobody has signed off — not closed by a manager in Agora, and not on a day PumpIT '
-                .'has balanced. Replaces the three "Cashups Not Closed <FY>" reports with one date range.',
+                .'has balanced.',
             'was' => ['Cashups Not Closed 2024 FY', 'Cashups Not Closed 2025 FY', 'Cashups Not Closed 2026 FY'],
             'columns' => [
                 ['key' => 'BranchName', 'label' => 'Site', 'type' => 'text', 'sort' => 'BranchName'],
@@ -222,7 +222,7 @@ return [
             'procedure' => 'usp_Reports_GridWaste',
             'blurb' => 'Waste captured at a branch, by area, shift and item, with what it would have '
                 .'sold for. PumpIT records no approval state for waste, so this is captured waste, not '
-                .'a queue — see the procedure header.',
+                .'a queue.',
             'was' => [],
             'caveat' => 'PumpIT has no approval columns on STK_StockWasteLine, so there is no approval '
                 .'queue to report. An approval trail for waste would be Agora\'s own.',
@@ -412,9 +412,8 @@ return [
             'detail' => ['route' => 'app.reports.audit.change', 'params' => ['ledger' => 'Ledger', 'id' => 'LedgerId']],
             'blurb' => 'Every change Agora has made in PumpIT, newest first: stock recon counts, bank recon '
                 .'stamps, Z-read allocations, utility readings and the captures. Each row says which PumpIT row '
-                .'changed, from what to what, why, who pressed it and when, and whether it was reversed. It reads '
-                .'the same records a Reverse puts back from, so it goes back to the first change and cannot '
-                .'disagree with them. Times are SAST. The last 7 days unless you choose dates.',
+                .'changed, from what to what, why, who pressed it and when, and whether it was reversed. '
+                .'Times are SAST. The last 7 days unless you choose dates.',
             'was' => [],
             'columns' => [
                 ['key' => 'ChangedAt', 'label' => 'When', 'type' => 'datetime', 'sort' => 'ChangedAt'],

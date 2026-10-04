@@ -4,10 +4,12 @@
 @php($pane ??= $tab)
 <x-app-shell :title="$area['label'].' — auto reconciliation'"
              :wide="in_array($tab, ['config', 'runs'], true) || ($pane === 'centre' && ($scoped ?? false))">
-    <x-page-head
-        eyebrow="Auto reconciliation"
-        :title="$area['label']"
-        :blurb="$area['blurb']">
+    {{-- The area's blurb (config/recon.php) is standing explanation, so it
+         sits behind the info button beside the title rather than under it. --}}
+    <x-page-head eyebrow="Auto reconciliation" :title="$area['label']">
+        <x-slot:info>
+            <p>{{ $area['blurb'] }}</p>
+        </x-slot:info>
         <x-slot:actions>
             @if (in_array($pane, ['suggest', 'match'], true))
                 {{-- These two are tabs of the centre now; reached on their own
@@ -19,11 +21,9 @@
     </x-page-head>
 
     @if (session('discarded') !== null)
-        <x-notice tone="info" :title="session('discarded') === 0 ? 'Nothing to discard' : session('discarded').' '.Str::plural('preview', session('discarded')).' discarded'" style="margin-bottom:16px">
-            <p>Previews only. Nothing in the customer's databases was touched, and any run that had been
-               executed was kept — a committed run is the only record of what it stamped. Runs marked
-               complete were kept too: closing one is how you set it aside without losing it.</p>
-        </x-notice>
+        <x-notice tone="info"
+                  :title="session('discarded') === 0 ? 'Nothing to discard' : session('discarded').' '.Str::plural('preview', session('discarded')).' discarded — executed and completed runs kept'"
+                  style="margin-bottom:16px" />
     @endif
 
     @if (session('refusal'))

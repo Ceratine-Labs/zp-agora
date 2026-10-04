@@ -1,9 +1,14 @@
 <x-app-shell :title="'Run #'.$run->Id">
+    {{-- The blurb is facts about this run; why it can be trusted later is
+         behind the info button. --}}
     <x-page-head
         eyebrow="Auto reconciliation"
         :title="$area['label'].' — run #'.$run->Id"
-        blurb="A preview as it was recorded. The parameters are stored with it, so this answer can be
-               reproduced even after the customer edits their extraction rules.">
+        :blurb="'Site '.$run->BranchId.' · '.$run->FromDate->format('j M Y').' to '.$run->ToDate->format('j M Y')">
+        <x-slot:info>
+            <p>A preview as it was recorded. Its arguments are stored with it, so this answer can be reproduced
+               after the customer edits their extraction rules.</p>
+        </x-slot:info>
         <x-slot:actions>
             {{-- The centre, on this run's site, period and answer — where the
                  suggestions and the manual match sit beside it. --}}
@@ -50,8 +55,7 @@
             @php($lines = collect(session('executedLines', [])))
             @php($blocked = $lines->where('State', 'blocked'))
             @if ($blocked->isEmpty())
-                <p>Every selected batch went through. Each one was re-read first and its two sides
-                   re-checked against the estate as it stands now, not as it stood at preview time.</p>
+                <p>Every selected batch went through.</p>
             @else
                 <p>{{ $blocked->count() }} {{ Str::plural('batch', $blocked->count()) }} skipped rather
                    than stamped over — the estate has moved since the preview:</p>
@@ -79,9 +83,7 @@
 
     {{-- Provenance, not the answer: it has to be on the page and it should not
          be the first thing between the reader and the run. --}}
-    <x-card title="What this run was given"
-            sub="The exact arguments, stored so these figures stay reproducible after the customer edits their extraction rules"
-            collapsible flush>
+    <x-card title="What this run was given" collapsible flush>
         <x-table dense :count="count($run->params()) + 3">
             <x-slot:head>
                 <tr><th>Argument</th><th>Value</th></tr>

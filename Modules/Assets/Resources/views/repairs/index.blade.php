@@ -6,13 +6,23 @@
     supplier, the calls they took, the comebacks on their work and what their
     requests cost. It covers the sites and dates the grid is showing, so the
     two agree. "Comebacks only" is the Comeback column's tick list.
+
+    The comeback rule and what the tally covers are behind the info button
+    beside the title (4 Oct 2026), not in a blurb and a card sub.
 --}}
 @php
     use App\Support\Format;
 @endphp
 <x-app-shell title="Asset repair">
-    <x-page-head eyebrow="People and assets" title="Asset repair"
-                 blurb="Job cards by asset and supplier. A comeback is a second call on the same asset within 30 days of the one before; it counts against the supplier whose repair did not hold.">
+    <x-page-head eyebrow="People and assets" title="Asset repair">
+        <x-slot:info>
+            <p>Job cards by asset and supplier. A <strong>comeback</strong> is a second call on the same asset
+               within 30 days of the one before; it counts against the supplier whose repair did not hold.</p>
+            <p>The supplier tally covers the sites and dates the grid is showing, worst comeback rate first.</p>
+            @if ($maySave)
+                <p>A job card can be raised on any asset still on a register at the sites you can see.</p>
+            @endif
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn" href="{{ route('app.assets.register') }}">Register</a>
             <a class="btn" href="{{ route('app.assets.movement') }}">Movements</a>
@@ -40,9 +50,7 @@
         </x-notice>
     @endif
 
-    <x-card title="Comebacks by supplier"
-            sub="The calls each supplier took, and the comebacks on their work, for the sites and dates below. Worst rate first."
-            collapsible remember="assets.repairs.tally">
+    <x-card title="Comebacks by supplier" collapsible remember="assets.repairs.tally">
         <x-table procedure="agora.usp_Assets_Comebacks" :count="$tally['suppliers']->count()" dense tools
                  empty="No job cards for these sites and dates.">
             <x-slot:head>

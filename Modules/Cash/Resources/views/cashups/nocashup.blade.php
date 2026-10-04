@@ -7,10 +7,13 @@
     Props: $grid
 --}}
 <x-app-shell title="Z-reads with no cashup">
-    <x-page-head
-        eyebrow="Cash"
-        title="Z-reads with no cashup"
-        blurb="Takings the till reported and nobody has cashed up. Allocated first, then cashed up — an unallocated Z-read is on the Unallocated Z-reads queue.">
+    <x-page-head eyebrow="Cash" title="Z-reads with no cashup">
+        <x-slot:info>
+            <p>Allocated Z-reads with sales on them and no cashup for their till and shift that day: takings the till
+               reported that nobody has cashed up. A row opens that day on Daily Banking.</p>
+            <p>A Z-read is allocated first, then cashed up — an unallocated one is on the Unallocated Z-reads
+               queue.</p>
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.cash.zread') }}">ZREAD Allocation</a>
         </x-slot:actions>

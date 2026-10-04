@@ -35,15 +35,22 @@
                 @endforeach
             </ul>
         @else
-            <p>Every preview and both drills resolve against this from now on. Nothing was written to the
-               customer's <code>BRN_AutoReconCriteria</code> — reverting is switching the override off.</p>
+            <p>Every preview and both drills use this from now on. The customer's
+               <code>BRN_AutoReconCriteria</code> is unchanged; switching the override off reverts it.</p>
         @endif
     </x-notice>
 @endif
 
-<x-card title="Extraction configuration"
-        sub="What is in force, and what the customer's own table says. Click a rule to change it."
-        flush>
+{{-- What the two views of the grid mean is behind the info button; which one
+     is showing is the tab strip beside the title. --}}
+<x-card title="Extraction configuration" flush info-wide>
+    <x-slot:info>
+        <p>Each rule shows what is in force beside what the customer's own table says. Click a rule to change
+           it: an override lives in Agora and the customer's table is never written.</p>
+        <p><strong>Positions only</strong> shows where each rule reads. <strong>Check the narratives</strong>
+           reads the site's real bank narratives to show whether a rule reaches anything — a query across the
+           live statement table, so it runs only when asked.</p>
+    </x-slot:info>
     <x-slot:actions>
         {{-- The narrative check is a read across the customer's 249 GB
              statement table, so the screen asks rather than doing it on every
@@ -61,16 +68,6 @@
         @endcan
     </x-slot:actions>
 
-    @unless ($checked)
-        <p class="field-help" style="margin:12px 12px 18px">
-            <strong>Positions only.</strong> Whether a rule actually reaches anything can only be answered
-            by reading the site's real narratives, which is a query across the customer's live statement
-            table — so it is a button rather than something this page does every time it loads. Branch 7's
-            CashMachine rule reads from position 43 of 32-character narratives, and that is what
-            <em>Check the narratives</em> says out loud.
-        </p>
-    @endunless
-
     <x-data-grid :grid="$grid" :branches="$pinned ? null : $branches" />
 </x-card>
 
@@ -78,28 +75,24 @@
     <x-modal id="copy-config" title="Copy a site's configuration">
         <form method="POST" action="{{ route('app.recon.config.copy', $area['key']) }}">
             @csrf
-            <p class="field-help" style="margin-top:0">
-                It takes what is IN FORCE at the source — the customer's rules, Agora's overrides,
-                whichever is actually resolving there — so a site whose configuration is entirely the
-                customer's own is a perfectly good source, and usually is.
-            </p>
 
             <div class="field-row">
                 <x-field name="from_branch_id" label="Copy from"
                          :choices="$branches->pluck('Name', 'BranchId')->all()"
-                         :value="$branchId ?: ''" />
+                         :value="$branchId ?: ''"
+                         info="Copies what is in force at the source — the customer's rules or Agora's overrides, whichever resolves there." />
                 <x-field name="to_branch_id" label="Copy to"
                          :choices="$branches->pluck('Name', 'BranchId')->all()" />
             </div>
 
             <x-field name="reason" label="Why" required
-                     help="Kept on every override the copy makes." />
+                     info="Kept on every override the copy makes." />
 
             <div class="field-row">
                 <x-field name="all_areas" label="All five areas" type="checkbox"
                          help="Off copies this area only." />
                 <x-field name="overwrite" label="Replace overrides the target already has" type="checkbox"
-                         help="Off leaves them alone — a rule somebody set deliberately outranks one copied in bulk." />
+                         info="Off leaves them alone — a rule somebody set deliberately outranks one copied in bulk." />
             </div>
 
             <div class="form-actions">

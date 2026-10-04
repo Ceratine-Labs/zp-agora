@@ -14,6 +14,11 @@
     Each tab is a link, so a tab is a place you can send somebody. Every table
     arrived whole — 21 groups, 431 types — so it carries the browser-side sort
     and filter (`tools`); nothing here is paged by the server.
+
+    What the lists are, the provisional basis and each tab's note sit behind
+    the info button beside the title (4 Oct 2026). That the periods ARE
+    provisional stays on the groups tab as the blurb. The owners and movement
+    notes were card subs on untitled cards, which <x-card> never rendered.
 --}}
 @php
     use App\Support\Format;
@@ -34,7 +39,21 @@
 
 <x-app-shell title="Asset groups and types">
     <x-page-head eyebrow="People and assets" title="Asset groups and types"
-                 blurb="The customer's own asset lists, read from PumpIT, with the depreciation period Agora applies to each group.">
+                 :blurb="$tab === 'groups' && $provisional ? 'Provisional rates: one stand-in period per group until ZP confirm their own.' : null">
+        <x-slot:info>
+            <p>The customer's own asset lists, read from PumpIT — a new group or type is added there. The
+               depreciation period beside each group is Agora's.</p>
+            @if ($tab === 'groups' && $provisional)
+                <p><strong>The periods are provisional.</strong> {{ $basis }}</p>
+                <p>Most groups mix kinds of asset, so the last column says what the period covers badly. Changing a
+                   period restates every asset in the group; nothing is posted.</p>
+            @elseif ($tab === 'owners')
+                <p>Owners are branches and third parties — an oil company's pump, a brewery's fridge.</p>
+            @elseif ($tab === 'movements')
+                <p>Five types are the customer's. The return from repair is Agora's own: the legacy list has a way
+                   out to repair and no way back.</p>
+            @endif
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn" href="{{ route('app.assets.register') }}">Back to the register</a>
         </x-slot:actions>
@@ -43,16 +62,6 @@
     <x-tabs :items="$items" :active="$tab" label="Asset masters" />
 
     @if ($tab === 'groups')
-        @if ($provisional)
-            <x-notice tone="warn" title="Provisional rates">
-                <p>{{ $basis }}</p>
-                <p>Nothing in the customer's estate records a useful life or a rate. Each group gets ONE period, and
-                   most groups mix kinds of asset — the note says what the period covers badly, so it can be argued
-                   with. Change one in <code>Modules/Assets/Config/config.php</code> and every asset in the group
-                   is restated; nothing is posted.</p>
-            </x-notice>
-        @endif
-
         <x-card flush>
             <x-table procedure="agora.usp_Assets_Masters" :count="$counts['groups']" tools dense>
                 <x-slot:head>
@@ -100,7 +109,7 @@
             </x-table>
         </x-card>
     @elseif ($tab === 'owners')
-        <x-card flush sub="Branches and third parties — an oil company's pump, a brewery's fridge.">
+        <x-card flush>
             <x-table procedure="agora.usp_Assets_Masters" :count="$counts['owners']" tools dense>
                 <x-slot:head>
                     <tr><th>Owner</th><th class="num">Assets</th></tr>
@@ -114,7 +123,7 @@
             </x-table>
         </x-card>
     @else
-        <x-card flush sub="Five are the customer's. Returned from repair is Agora's: the legacy list has a way out to repair and no way back.">
+        <x-card flush>
             <x-table procedure="agora.usp_Assets_Masters" :count="$counts['movements']" dense>
                 <x-slot:head>
                     <tr><th>Code</th><th>Movement</th><th>What it does</th><th>From</th></tr>

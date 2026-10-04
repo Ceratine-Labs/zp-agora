@@ -9,13 +9,29 @@
 
     The register is Agora's own table. Nothing here writes the customer's
     databases; the groups, types and owners are theirs, read-only.
+
+    The explanation — what the register shows, how the as-at date is read, and
+    the provisional basis — sits behind the info button beside the title (4 Oct
+    2026). That the rates ARE provisional stays on the page as the blurb: it
+    changes how every figure underneath reads.
 --}}
 @php
     use App\Support\Format;
 @endphp
 <x-app-shell title="Asset register">
     <x-page-head eyebrow="People and assets" title="Asset register"
-                 blurb="Every asset by site and group: what it cost, what it has depreciated by, what it is worth, and whether it is where its own site thinks it is.">
+                 :blurb="$provisional ? 'Provisional rates: depreciation and NBV use stand-in periods until ZP confirm their own.' : null">
+        <x-slot:info>
+            <p>Every asset by site and group: what it cost, what it has depreciated by, what it is worth, and
+               whether it is where its own site thinks it is.</p>
+            <p>A month is charged at its month end, so the register is valued to the last month end on or before
+               the <strong>Valued as at</strong> date. The totals by group cover the sites the grid is showing.</p>
+            @if ($provisional)
+                <p><strong>The periods are provisional.</strong> {{ $basis }} Changing one restates every asset in
+                   its group; nothing is posted. Each group's period, and what it covers badly, is on
+                   <a href="{{ route('app.assets.masters') }}">Groups and types</a>.</p>
+            @endif
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn" href="{{ route('app.assets.movement') }}">Movements</a>
             <a class="btn" href="{{ route('app.assets.repairs') }}">Repairs</a>
@@ -44,16 +60,6 @@
         </x-notice>
     @endif
 
-    @if ($provisional)
-        <x-notice tone="warn" title="Provisional rates" collapsible>
-            <p>Depreciation and NBV on this screen use <strong>provisional rates</strong>: {{ $basis }}</p>
-            <p>Nothing in the customer's estate records a useful life, a rate or a residual value, so these are a
-               stand-in until ZP confirm their own policy. Changing a period restates every asset in that group —
-               nothing is posted anywhere. The period for each group, and what it covers badly, is on
-               <a href="{{ route('app.assets.masters') }}">Groups and types</a>.</p>
-        </x-notice>
-    @endif
-
     <form method="GET" action="{{ route('app.assets.register') }}">
         {{-- The grid's own scope travels through, so valuing at another date
              does not throw away the sites and filters being looked at. --}}
@@ -62,8 +68,7 @@
             <input type="hidden" name="{{ $name }}" value="{{ $value }}">
         @endforeach
         <x-params legend="Valued as at">
-            <x-param name="as_at" label="Valued as at" type="date" :value="$asAt"
-                     help="A month is charged at its month end, so the register is valued to the last month end on or before this date." />
+            <x-param name="as_at" label="Valued as at" type="date" :value="$asAt" />
         </x-params>
         <div class="form-actions">
             <button type="submit" class="btn">Value the register</button>
@@ -73,7 +78,7 @@
     <x-data-grid :grid="$grid" :branches="$gridBranches" surface />
 
     <x-card title="Depreciation by group"
-            sub="As at the last month end on or before {{ \Illuminate\Support\Carbon::parse($asAt)->format('j M Y') }}, for the sites the grid is showing"
+            sub="As at the last month end on or before {{ \Illuminate\Support\Carbon::parse($asAt)->format('j M Y') }}"
             collapsible remember="assets.register.bygroup">
         <x-table procedure="agora.usp_Assets_Depreciate" :count="$byGroup->count()" dense
                  empty="No assets on the register for these sites yet.">

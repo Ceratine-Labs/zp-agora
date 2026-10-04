@@ -1,10 +1,20 @@
 <x-app-shell :title="$area['label'].' — every site'">
+    {{-- Facts in the blurb; how the group runs and posts is behind the info
+         button (4 Oct 2026). --}}
     <x-page-head
         eyebrow="Auto reconciliation"
         :title="($group->Note ?: $area['label']).' — every site'"
-        :blurb="'One press across '.$group->BranchCount.' trading '.Str::plural('site', $group->BranchCount)
-                .', '.$group->FromDate->toDateString().' to '.$group->ToDate->toDateString()
-                .'. Each site is previewed on its own and recorded as its own run, so a site that refuses is a row rather than a group that half happened.'">
+        :blurb="$group->BranchCount.' trading '.Str::plural('site', $group->BranchCount)
+                .' · '.$group->FromDate->format('j M Y').' to '.$group->ToDate->format('j M Y')">
+        <x-slot:info>
+            <p>Each site is previewed on its own through <code>agora.{{ $area['procedure'] }}</code>, with the
+               same arguments, and recorded as its own run: a site that refuses is a row, not a group that half
+               happened.</p>
+            <p>One site at a time, about two seconds each. You can leave and come back — the group remembers what
+               it has done.</p>
+            <p>A site that <strong>refused</strong> has no usable <code>BRN_AutoReconCriteria</code> row: a
+               configuration answer, and re-running will not change it.</p>
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.recon.all', $group->ReconArea) }}">Run another</a>
         </x-slot:actions>
@@ -21,9 +31,6 @@
         <x-notice :tone="$posted->every(fn ($r) => $r['Ok']) ? 'info' : 'warn'"
                   :title="$posted->where('Ok', true)->count().' of '.$posted->count().' '.Str::plural('site', $posted->count()).' posted'"
                   style="margin-bottom:16px">
-            <p>Each site was committed on its own, through the same procedure a single run uses — every
-               row re-read and re-checked against the estate as it stands now, not as it stood at
-               preview time.</p>
             <ul>
                 @foreach ($posted as $row)
                     <li>
@@ -36,18 +43,16 @@
         </x-notice>
     @endif
 
-    <x-card :title="'Group '.Str::limit($group->GroupRef, 8, '')"
-            :sub="'Previewed through '.$area['procedure'].' — the same procedure, the same arguments, once per site'"
-            flush>
+    <x-card :title="'Group '.Str::limit($group->GroupRef, 8, '')" flush>
         <x-statstrip :stats="[
-            ['label' => 'Sites', 'value' => \App\Support\Format::n($group->BranchCount), 'note' => 'in this group'],
-            ['label' => 'Previewed', 'value' => \App\Support\Format::n($group->CompletedCount), 'note' => 'answered', 'tone' => 'good'],
+            ['label' => 'Sites', 'value' => \App\Support\Format::n($group->BranchCount)],
+            ['label' => 'Previewed', 'value' => \App\Support\Format::n($group->CompletedCount), 'tone' => 'good'],
             ['label' => 'Refused', 'value' => \App\Support\Format::n($group->FailedCount),
-             'note' => 'no usable rule', 'tone' => $group->FailedCount > 0 ? 'serious' : 'neutral'],
+             'tone' => $group->FailedCount > 0 ? 'serious' : 'neutral'],
             ['label' => 'Would reconcile', 'value' => \App\Support\Format::n($runs->sum('MatchedRows')),
              'note' => \App\Support\Format::r($runs->sum(fn ($r) => (float) $r->MatchedTotal)), 'tone' => 'good'],
             ['label' => 'Bank only', 'value' => \App\Support\Format::n($runs->sum('BankOnlyRows')),
-             'note' => 'no deposit behind them', 'tone' => 'serious'],
+             'tone' => 'serious'],
             ['label' => 'Posted', 'value' => \App\Support\Format::n($group->CommittedRows),
              'note' => \App\Support\Format::r($group->CommittedTotal)],
         ]" />
@@ -83,8 +88,6 @@
                 <button type="button" class="btn-primary" data-group-start>
                     {{ $group->CompletedCount + $group->FailedCount === 0 ? 'Start again' : 'Preview the remaining sites' }}
                 </button>
-                <span class="field-help">One site at a time, about two seconds each. You can leave this page
-                      and come back — the group remembers what it has done.</span>
             </div>
         @endif
 
@@ -113,17 +116,16 @@
                     {{ $postable->count() }} {{ Str::plural('site', $postable->count()) }}
                 </button>
 
-                <x-slot:note>
-                    It posts the sites you ticked and no others — there is no "post everything" here on
-                    purpose. Each site commits in its own transaction, so one refusal does not take the
-                    others with it, and each one is reversed from its own run page.
-                    @if ($group->FailedCount > 0)
-                        <br><strong>{{ $group->FailedCount }} {{ Str::plural('site', $group->FailedCount) }}
-                        could not run at all.</strong> That is a configuration answer, not an empty one —
-                        the site has no usable <code>BRN_AutoReconCriteria</code> row, and no amount of
-                        re-running will change it.
+                <x-info label="What this press does">
+                    <p>Posts the ticked sites and no others. Each site commits in its own transaction, through the
+                       same procedure a single run uses, so one refusal does not take the others with it.</p>
+                    @if ($stampMode === 'live')
+                        <p>Every row is re-checked against PumpIT first and anything that has moved since the preview
+                           is skipped. Each site is reversed from its own run page.</p>
+                    @else
+                        <p><strong>Journal mode:</strong> recorded in Agora only; nothing in PumpIT changes.</p>
                     @endif
-                </x-slot:note>
+                </x-info>
             </x-action-bar>
 
             <x-table :count="$sites->count()" :procedure="'agora.'.$area['procedure']"

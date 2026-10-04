@@ -65,37 +65,33 @@
 
                 <div data-bulk-items></div>
 
-                <p class="field-help" style="margin-top:0">
-                    <strong><span data-bulk-count>0</span> lines</strong> are ticked. Only the rows ticked on
-                    the page you are looking at are included — the boxes cannot reach past it.
-                </p>
+                {{-- What a press writes sits behind the "i" on this line (4 Oct
+                     2026), at the top so its panel opens over the form rather
+                     than past the dialog's bottom edge. It never touches
+                     PumpIT, so there is no live-write warning to keep. --}}
+                <div class="field-help" style="margin:0 0 1em">
+                    <strong><span data-bulk-count>0</span> lines</strong> ticked, on this page only.
+                    <x-info label="What this writes">
+                        <p>An <strong>Agora override</strong> per line; <code>PumpIT.dbo.STK_StockMaster</code> is never
+                           touched. A line Agora does not hold yet is seeded from what is in force now, and from then on
+                           <em>Held by</em> reads <code>agora</code> and the customer's own master no longer reaches it.</p>
+                        <p>A line whose override is <strong>parked</strong> stops the whole batch. Restore those one at a
+                           time first.</p>
+                    </x-info>
+                </div>
 
                 <div class="field-row">
                     <x-field name="flag" label="Flag"
                              :choices="$flags"
                              :value="old('flag')"
-                             help="One flag per press. A form that sent seven at once could not tell 'off' from 'not sent', and would clear six nobody mentioned." />
+                             info="One flag per press, so a batch never clears a flag nobody mentioned." />
                     <x-field name="value" label="Set it to"
                              :choices="['1' => 'Active', '0' => 'Inactive']"
                              :value="old('value', '1')" />
                 </div>
 
                 <x-field name="reason" label="Why" :value="old('reason')"
-                         help="Kept against every line the batch touches. Required, because a master change nobody can explain later is what the override table exists to end." />
-
-                <x-notice tone="info" title="What this writes">
-                    <p>
-                        It writes an <strong>Agora override</strong> per line and never touches
-                        <code>PumpIT.dbo.STK_StockMaster</code>. Lines Agora does not already hold gain one,
-                        seeded from whatever is in force right now — from that moment the <em>Held by</em>
-                        column reads <code>agora</code> and a later change to the customer's own master no
-                        longer reaches them.
-                    </p>
-                    <p>
-                        A line whose override is <strong>parked</strong> stops the whole batch rather than
-                        being quietly put back in force. Restore those one at a time first.
-                    </p>
-                </x-notice>
+                         info="Required. Kept against every line the batch touches." />
 
                 <div class="btn-row">
                     <button type="submit" class="btn-primary">Set it on the selected lines</button>

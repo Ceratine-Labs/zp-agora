@@ -24,18 +24,17 @@
             <div class="field">
                 <label>Site</label>
                 <p class="field-fixed">{{ $branches->firstWhere('BranchId', $branchId)?->Name ?? 'Not set' }}</p>
-                <p class="field-help">Your workspace is pinned to this site.</p>
             </div>
             <input type="hidden" name="branch_id" value="{{ $branchId }}">
         @else
             <x-field name="branch_id" label="Site"
                      :choices="$branches->pluck('Name', 'BranchId')->all()"
                      :value="old('branch_id', $branchId)"
-                     help="The site whose bank statement is being reconciled. Trading sites only — the administrative entities keep no banking." />
+                     info="Trading sites only — the administrative entities keep no banking." />
         @endif
 
         <x-field name="from" label="From" type="date" :value="old('from', $from)"
-                 help="Bank line date and deposit date, inclusive." />
+                 info="Bank line date and deposit date, inclusive." />
 
         <x-field name="to" label="To" type="date" :value="old('to', $to)" />
 
@@ -43,22 +42,19 @@
              while narrowing the dates, and "August ABSA, second attempt" is
              how they find the one they meant an hour later. --}}
         <x-field name="note" label="Name this run" :value="old('note')"
-                 help="Optional. Yours to find it by — it appears on the Runs tab and on the run itself." />
+                 info="Optional. Yours to find it by on the Runs tab." />
     </div>
 
     @if ($options)
         <details class="params-extra" @if (old('options')) open @endif>
             <summary>Rules and readings ({{ count($options) }})</summary>
-            <p class="field-help" style="margin:8px 0 12px">
-                Each of these exists because something in
-                <code>BRN_AutoReconCriteria</code> or in the data is ambiguous and we would not
-                guess on the customer's behalf. The defaults are the reading the live system uses.
-            </p>
-            <div class="field-row">
+            {{-- Why the readings exist is on the "What to reconcile" card's
+                 info button; each reading's own meaning is on its label. --}}
+            <div class="field-row" style="margin-top:12px">
                 @foreach ($options as $name => $option)
                     <x-field :name="'options['.$name.']'"
                              :label="$option['label']"
-                             :help="$option['help']"
+                             :info="$option['help']"
                              :type="$option['type'] ?? 'text'"
                              :choices="$option['choices'] ?? null"
                              :min="$option['min'] ?? null"
@@ -71,7 +67,6 @@
 
     <div class="form-actions">
         <button type="submit" class="btn-primary">Reconcile</button>
-        <span class="field-help">Runs the automatic balancing as a preview — nothing in PumpIT changes until
-            you execute. Suggestions and the manual match open beside it, over the same site and dates.</span>
+        <span class="field-help">A preview — nothing in PumpIT changes until you execute.</span>
     </div>
 </form>

@@ -51,7 +51,7 @@
     <x-params legend="{{ $isEdit ? 'Bag '.$editing->BagNo : 'The bag' }}">
         @if ($isEdit)
             <x-param name="new_bag_no" label="Bag number" :value="old('new_bag_no', $editing->BagNo)"
-                     help="Correct a mistyped number here. It must not be used at this site already." />
+                     help="Must be unused at this site." />
         @else
             <x-param name="bag_no" label="Bag number" :value="old('bag_no')" placeholder="The number printed on the bag" />
         @endif
@@ -66,7 +66,7 @@
                  :value="$val('reason', $editing?->ReasonForManualBagId)" />
         <x-param name="ref_no" label="Fault reference" :value="$val('ref_no', $editing?->RefNoFaultReported)"
                  :help="$needsRef !== '' ? 'Needed for: '.$needsRef.'.' : null" />
-        <x-param name="limit_reason" label="Reason over the limit" help="Needed for a bag over {{ $limit }} — pick one, or type your own.">
+        <x-param name="limit_reason" label="Reason over the limit" help="Pick one, or type your own.">
             <input type="text" id="p-limit_reason" name="limit_reason" maxlength="50" list="{{ $listId }}"
                    value="{{ $val('limit_reason', $editing?->LimitReason) }}" placeholder="Only over {{ $limit }}">
             <datalist id="{{ $listId }}">
@@ -79,7 +79,7 @@
                  :value="$val('cashier', $editing?->CashierCode)" />
         <x-param name="manager" label="Manager" searchable :choices="['' => 'Choose the manager'] + $people"
                  :value="$val('manager', $editing?->ManagerCode)"
-                 help="The manager who witnessed the drop — every bag needs one." />
+                 help="Who witnessed the drop." />
         <x-param name="note" label="Note" :value="old('note')" placeholder="Optional — kept in Agora" />
     </x-params>
 

@@ -139,8 +139,10 @@ test.describe('Critical lines', () => {
         await expect(page.getByText('usp_Product_GridCriticalLines')).toBeVisible();
 
         // The screen has to say what the list IS — keyed to the POS file, not
-        // the stock master — or a third of it looks like missing data.
-        await expect(page.getByText('What this list is, and what it is not')).toBeVisible();
+        // the stock master — or a third of it looks like missing data. Since
+        // 4 Oct 2026 that is behind the info button beside the title.
+        await page.locator('.page-head details.info summary').click();
+        await expect(page.getByText('Keyed to the POS file, not the stock master.')).toBeVisible();
     });
 
     test('the branch selector is there, because the list differs at every site', async ({ page }) => {

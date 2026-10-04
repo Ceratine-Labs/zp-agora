@@ -12,6 +12,11 @@
     its own `can:` and its own confirmation — a formaction on a shared form
     would lose the confirmation, because confirm-form.js re-submits the form
     itself and a submitter's formaction does not survive that.
+
+    The standing explanation — what allocating means, how the system
+    proposes, and what Update ZREAD writes to PumpIT — sits behind the info
+    button beside the title (ZRP, 4 Oct 2026). Every press that writes PumpIT
+    says so in its own confirmation.
 --}}
 @php
     $canAllocate = (bool) auth()->user()?->can('cash.zread.allocate');
@@ -22,10 +27,33 @@
 @endphp
 
 <x-app-shell title="ZREAD Allocation">
-    <x-page-head
-        eyebrow="Branch functions · Cash"
-        title="ZREAD Allocation"
-        blurb="A Z-read arrives from the till with a number and an operator ID, and nothing else. Allocating it means saying which till, which shift and who was on it. The system already knows what this site normally does — let it propose, and only touch the ones it cannot call.">
+    <x-page-head eyebrow="Branch functions · Cash" title="ZREAD Allocation">
+        <x-slot:info>
+            <p>A Z-read arrives from the till with a number and an operator ID, nothing else. Allocating it says which
+               till, which shift and who was on it. The system proposes from the site's last
+               {{ config('cash.zread.history_days') }} days of allocations, made here and on PumpIT's ZREAD Update
+               screen — let it propose, and only touch the ones it cannot call.</p>
+            <p><strong>Certain</strong>: this terminal and operator ID carried the same till, shift and person on at
+               least {{ (int) round(config('cash.zread.certain_share') * 100) }}% of prior Z-reads.
+               <strong>Likely</strong>: the operator ID was the same person on at least
+               {{ (int) round(config('cash.zread.likely_share') * 100) }}%, and the shift only when that operator ID runs
+               one shift at least {{ (int) round(config('cash.zread.shift_share') * 100) }}% of the time.
+               <strong>Review</strong>: no settled person, but somebody usually works this terminal on that shift.
+               <strong>Needs a person</strong>: nothing to go on, usually an operator ID the site has never
+               allocated.</p>
+            <p>Auto-allocate and the row buttons only <em>stage</em>; Update ZREAD saves the staged rows in Agora,
+               keeping what each carried before.
+               @if ($live)
+                   <strong>Update ZREAD writes to PumpIT</strong>: TillNo, ShiftNo and EmployeeCode on each Z-read's own
+                   row (<code>DBF_P3TRANS_ZREAD</code>), nothing else, recording what the row held first. Reverse puts
+                   both sides back. A Z-read allocated again on the PumpIT screen afterwards shows that allocation,
+                   marked "changed in PumpIT", and its press can no longer be reversed.
+               @else
+                   <strong>The PumpIT stamp is off</strong>: PumpIT's Z-read rows are not written, so its ZREAD Update
+                   screen still shows its own allocations. Reverse undoes a press here.
+               @endif
+            </p>
+        </x-slot:info>
         @if ($scope->isChosen())
             <x-slot:actions>
                 <a class="btn-ghost" href="{{ route('app.cash.zread.confirm', $scope->query()) }}">On a phone: confirm only</a>
@@ -43,7 +71,7 @@
         </x-notice>
     @endif
 
-    <x-card title="Which Z-reads" sub="One site at a time — a Z-read is proposed from what that site has done before.">
+    <x-card title="Which Z-reads">
         <form method="GET" action="{{ route('app.cash.zread') }}">
             <x-params legend="Scope">
                 @if ($pinned)
@@ -70,25 +98,9 @@
         </form>
     </x-card>
 
-    {{-- What Update ZREAD does to the customer's database, said before the
-         press rather than found out after it. Open, not folded: it is about
-         every press on this screen, not standing explanation. --}}
-    @if ($live)
-        <x-notice tone="warn" title="Update ZREAD writes to PumpIT" style="margin-bottom:16px">
-            <p>Saving a Z-read also writes its till, shift and person onto the Z-read's own row in PumpIT
-               (<code>DBF_P3TRANS_ZREAD</code>: TillNo, ShiftNo, EmployeeCode — nothing else), so the PumpIT cashup
-               and stock screens see it. What the row held before is recorded first, and Reverse on a saved press
-               puts it back.</p>
-            <p>If somebody allocates the same Z-read again on the PumpIT screen afterwards, theirs is the later
-               decision and it is the one shown here, marked "changed in PumpIT". That press can then no longer be
-               reversed, because reversing it would write over their allocation.</p>
-        </x-notice>
-    @else
-        <x-notice tone="info" title="The PumpIT stamp is off" style="margin-bottom:16px">
-            <p>Update ZREAD saves allocations in Agora only. PumpIT's Z-read rows are not written, so the PumpIT
-               ZREAD Update screen still shows its own allocations.</p>
-        </x-notice>
-    @endif
+    {{-- What Update ZREAD writes to PumpIT is in the page's info panel (ZRP,
+         4 Oct 2026); before that it stood open here. The press still says it
+         in its own confirmation, before anything is written. --}}
 
     @if (! $scope->isChosen())
         <x-empty-state title="Choose a site" text="Pick the site and the days, and the Z-reads waiting to be allocated appear here with what the system proposes for each." />
@@ -142,11 +154,10 @@
                  'note' => \App\Support\Format::r($summary['waitingSales']).' unclaimed',
                  'tone' => $summary['waiting'] > 0 ? 'warn' : 'good'],
                 ['label' => 'Staged, not saved', 'value' => \App\Support\Format::n($summary['staged']),
-                 'note' => $summary['staged'] > 0 ? 'press Update ZREAD' : 'run Auto-allocate'],
+                 'note' => $summary['staged'] > 0 ? 'press Update ZREAD' : null],
                 ['label' => 'Proposals waiting', 'value' => \App\Support\Format::n($summary['certain'] + $summary['likely'] + $summary['review']),
                  'note' => $summary['certain'].' certain · '.$summary['likely'].' likely · '.$summary['review'].' review'],
                 ['label' => 'Needs a person', 'value' => \App\Support\Format::n($summary['manual']),
-                 'note' => 'no history to go on',
                  'tone' => $summary['manual'] > 0 ? 'serious' : 'neutral'],
             ]" />
         </x-card>
@@ -159,7 +170,12 @@
                  timestamp and shown relative, as the recon screens show theirs,
                  so nobody has to know the server's offset; the exact UTC instant
                  is on hover. --}}
-            <x-card title="Saved presses" sub="Every Update ZREAD that saved a Z-read in these days, newest first." flush style="margin-top:16px">
+            <x-card title="Saved presses" flush style="margin-top:16px">
+                <x-slot:info>
+                    <p>Every Update ZREAD that saved a Z-read in these days, newest first. This is the only place a
+                       press can be undone: Reverse puts back what it replaced, and is refused if any of its Z-reads
+                       has been allocated again since.</p>
+                </x-slot:info>
                 {{-- Three narrow columns, and what a press SAYS or lets you DO on a
                      full-width line beneath it. On a phone the table then fits
                      the screen, so the state and the Reverse form are never
@@ -223,36 +239,5 @@
             </x-card>
         @endif
 
-        <x-explainer summary="How the system proposes, and what Update ZREAD writes" remember="cash-zread">
-            <x-notice tone="info" title="The proposal">
-                <p><strong>Certain</strong> — this terminal and this operator ID have carried the same till, shift
-                   and person on at least {{ (int) round(config('cash.zread.certain_share') * 100) }}% of the site's
-                   prior Z-reads. <strong>Likely</strong> — the operator ID has been the same person on at least
-                   {{ (int) round(config('cash.zread.likely_share') * 100) }}%; the shift is proposed only when the
-                   operator ID runs one shift at least {{ (int) round(config('cash.zread.shift_share') * 100) }}% of
-                   the time, and is otherwise left to you. <strong>Review</strong> — no settled person, but somebody
-                   usually works this terminal on that shift. <strong>Needs a person</strong> — nothing to go on,
-                   which usually means an operator ID the site has never allocated.</p>
-                <p>The history is the last {{ config('cash.zread.history_days') }} days at this site, from the
-                   allocations made here and on the PumpIT ZREAD Update screen.</p>
-            </x-notice>
-            <x-notice tone="info" title="What is written">
-                <p>Auto-allocate and the row buttons only <em>stage</em>. Update ZREAD saves the staged rows as the
-                   Z-reads' allocations in Agora's own ledger, keeping what each carried before.
-                   @if ($live)
-                       It also writes TillNo, ShiftNo and EmployeeCode onto each Z-read's PumpIT row, recording what the
-                       row held first, and nothing else — unlike the PumpIT screen it does not touch the stock recon
-                       lines or the computer quantities. Reverse, on a saved press, puts both sides back. A Z-read
-                       somebody allocates again on the PumpIT screen afterwards shows their allocation, marked
-                       "changed in PumpIT", and its press can no longer be reversed.
-                   @else
-                       The PumpIT stamp is off, so PumpIT's rows are not written and its ZREAD Update screen still shows
-                       its own allocations. Reverse, on a saved press, undoes it here.
-                   @endif
-                </p>
-                <p>The legacy screen colours its rows cyan, yellow and magenta with no key anywhere on the form, and
-                   every allocation is typed by hand. Here the only colour left is the one that carries a decision.</p>
-            </x-notice>
-        </x-explainer>
     @endif
 </x-app-shell>

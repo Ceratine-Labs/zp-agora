@@ -20,6 +20,11 @@
     the forecourt (every capture of 2026 on the customer's instance was by a
     site's office login or head office).
 
+    The standing explanation — what a till balance does, what the columns
+    mean, and what Capture writes to PumpIT — sits behind the info button
+    beside the title (ZRP, 4 Oct 2026). Keep the words "Capture in PumpIT" out
+    of it: TillBalanceTest proves the press is absent by that string.
+
     Props: $scope, $branches, $pinned, $refusal, $cashups, $balances, $summary,
            $writeMode, $floor
 --}}
@@ -35,10 +40,25 @@
 @endphp
 
 <x-app-shell title="Till balance">
-    <x-page-head
-        eyebrow="Branch functions · Cash"
-        title="Till balance"
-        blurb="Set a short on one cashup against an over on another — the same person on the wrong till or shift, usually. The amount moves once PumpIT's approver passes it.">
+    <x-page-head eyebrow="Branch functions · Cash" title="Till balance">
+        <x-slot:info>
+            <p>Set a short on one cashup against an over on another at the same site — usually the same person on the
+               wrong till or shift. A till balance takes an amount <strong>off</strong> one cashup (its variance goes
+               down) and puts it <strong>onto</strong> another (its variance goes up). To clear a short, put the amount
+               onto the short cashup and take it off the one that is over.</p>
+            <p><strong>Variance</strong> is actual less Z read, as on Daily Banking. <strong>Waiting</strong> is what
+               till balances not yet approved will move it by; <strong>Once posted</strong> is where that leaves it.
+               Approving and posting are done in PumpIT, which picks up a till balance captured here like its own.
+               A till balance is not a pump shortage.</p>
+            @if ($live)
+                <p><strong>Capturing writes to PumpIT:</strong> two rows in <code>BRN_TillBalance</code> under the next
+                   number, one off and one onto. Neither cashup moves until PumpIT's approver passes it. Nothing is
+                   deleted; a wrong one is declined in PumpIT and captured again.</p>
+            @else
+                <p><strong>Capturing to PumpIT is off.</strong> This screen shows the site's cashups and their till
+                   balances; nothing is written to PumpIT.</p>
+            @endif
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.cash.banking', $scope->isChosen() ? ['branch_id' => $scope->branchId, 'date' => $scope->to] : []) }}">Daily Banking</a>
             @can('cash.pumpshortages.view')
@@ -65,7 +85,11 @@
         </x-notice>
     @endif
 
-    <x-card title="Which cashups" sub="One site, a few days. Cashups whose variance is at least R{{ \App\Support\Format::n($floor, 2) }} either way are listed, and any a till balance is already waiting on.">
+    <x-card title="Which cashups">
+        <x-slot:info>
+            <p>One site, a few days. Cashups whose variance is at least R{{ \App\Support\Format::n($floor, 2) }}
+               either way are listed, and any a till balance is already waiting on.</p>
+        </x-slot:info>
         <form method="GET" action="{{ route('app.cash.tillbalance') }}">
             <x-params legend="Scope">
                 @if ($pinned)
@@ -88,22 +112,6 @@
             </div>
         </form>
     </x-card>
-
-    @if ($live)
-        <x-notice tone="warn" title="Capturing writes to PumpIT" style="margin-bottom:16px">
-            <p>Capture writes the till balance into PumpIT exactly as its own till-balance screen does: two rows in
-               <code>BRN_TillBalance</code> under the next till balance number — one taking the amount off a cashup, one
-               putting it on another — each with the cashup's variance now and what it becomes. Nothing on either
-               cashup moves yet: the till balance waits for approval in PumpIT, and approving it there posts it to
-               both cashups' expenses as <em>Till Balance Expense</em>.</p>
-            <p>Nothing is ever deleted. A till balance captured wrongly is declined by the approver in PumpIT and
-               captured again.</p>
-        </x-notice>
-    @else
-        <x-notice tone="info" title="Capturing to PumpIT is off" style="margin-bottom:16px">
-            <p>This screen shows the site's cashups and the till balances on them. Nothing is written to PumpIT.</p>
-        </x-notice>
-    @endif
 
     @if (! $scope->isChosen())
         <x-empty-state title="Choose a site" text="Pick the site and the days, and its cashups with a short or an over appear here — each with what the till balances already waiting will do to it." />
@@ -198,7 +206,7 @@
             @endif
         </x-card>
 
-        <x-card title="Till balances" sub="Every till balance with a side in these days, newest first — captured here or in PumpIT, and where it stands." flush style="margin-top:16px">
+        <x-card title="Till balances" flush style="margin-top:16px">
             <x-table :count="$balances->count()" procedure="agora.usp_Cash_GetTillBalance" dense tools
                      empty="No till balance has a side in these days.">
                 <x-slot:head>
@@ -239,21 +247,5 @@
             </x-table>
         </x-card>
 
-        <x-explainer summary="What a till balance is, and what capturing one does" remember="cash-tillbalance">
-            <x-notice tone="info" title="The figures">
-                <p><strong>Variance</strong> is the cashup's actual total less its Z read — the figure PumpIT's own Daily
-                   Banking grid shows. <strong>Waiting</strong> is what the till balances not yet approved will move it
-                   by, and <strong>Once posted</strong> is where that leaves it.</p>
-                <p>A till balance takes an amount <strong>off</strong> one cashup (its variance goes down by the amount)
-                   and puts it <strong>onto</strong> another (its variance goes up by the same). To clear a short, put
-                   the amount onto the short cashup and take it off the one that is over.</p>
-            </x-notice>
-            <x-notice tone="info" title="Approval and pump shortages">
-                <p>Approving a till balance, and posting it to the two cashups, is done in PumpIT for now: its approver
-                   list picks up a till balance captured here exactly as it picks up its own.</p>
-                <p>A till balance is not a pump shortage. What a pump attendant is short reaches a cashup as an approved
-                   staff short — see <a href="{{ route('app.cash.pumpshortages') }}">Pump shortages</a>.</p>
-            </x-notice>
-        </x-explainer>
     @endif
 </x-app-shell>

@@ -30,12 +30,22 @@
     'max' => null,
     'step' => null,
     'help' => null,
+    'info' => null,
 ])
 
 @php($id = $name ? 'p-'.str_replace(['[', ']', '.'], '-', $name) : null)
 
 <div {{ $attributes->merge(['class' => 'f'.($disabled ? ' dis' : '')]) }}>
-    <label @if ($id) for="{{ $id }}" @endif>{{ $label }}</label>
+    @if ($info)
+        {{-- `info`: `help` behind an <x-info> button beside the label, for an
+             explanation people read once (4 Oct 2026). --}}
+        <div class="field-label">
+            <label @if ($id) for="{{ $id }}" @endif>{{ $label }}</label>
+            <x-info :label="'About '.Str::lower($label)">{{ $info }}</x-info>
+        </div>
+    @else
+        <label @if ($id) for="{{ $id }}" @endif>{{ $label }}</label>
+    @endif
 
     @if ($slot->isNotEmpty())
         {{ $slot }}

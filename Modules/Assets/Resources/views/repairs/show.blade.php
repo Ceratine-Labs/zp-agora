@@ -51,15 +51,14 @@
 
     @if ($repair->IsCancelled)
         <x-notice tone="info" title="Cancelled {{ $date($repair->CancelledAt) }}">
-            {{ $repair->CancelledByName ?? 'Somebody' }}: {{ $repair->CancelReason }}. It stays on the record and no longer
-            counts as a call.
+            {{ $repair->CancelledByName ?? 'Somebody' }}: {{ $repair->CancelReason }}. It no longer counts as a call.
         </x-notice>
     @elseif ($repair->IsComeback)
         <x-notice tone="warn" title="A comeback — {{ $repair->DaysSincePrevious }} days after the last call">
-            This asset was called in on {{ $date($repair->PrevCallDate) }}
+            Previously called in on {{ $date($repair->PrevCallDate) }}
             (<a href="{{ route('app.assets.repairs.show', ['branch' => $repair->BranchId, 'repair' => $repair->PrevRepairId]) }}">{{ $repair->PrevJobCardNo }}</a>)
-            to {{ $repair->PrevSupplierName ?? $repair->PrevSupplierCode ?? 'an unrecorded supplier' }}, and again within
-            {{ $repair->WindowDays }} days. It counts against the supplier of that earlier call, whose repair did not hold.
+            to {{ $repair->PrevSupplierName ?? $repair->PrevSupplierCode ?? 'an unrecorded supplier' }}; this call is within
+            {{ $repair->WindowDays }} days, so it counts against that supplier.
         </x-notice>
     @endif
 
@@ -91,16 +90,18 @@
 
     <x-card title="The purchase request"
             :sub="$repair->TransactionNo ? $repair->TransactionNo.' at '.$repair->SiteName.' · '.$repair->RequestState.($repair->SharedBy > 1 ? ' · pays for '.$repair->SharedBy.' job cards' : '') : 'None attached yet'">
+        {{-- How a shared request is counted is behind the card's info button;
+             the share itself is in the sub. --}}
+        @if ($repair->TransactionNo && $repair->SharedBy > 1)
+            <x-slot:info>
+                <p>One call-out, several assets. Each job card shows the request's full amount; totals count it
+                   once.</p>
+            </x-slot:info>
+        @endif
         @if (! $repair->TransactionNo)
             <x-empty-state title="No purchase request yet"
                            text="The cost of a repair is its approved purchase request. Attach the request number when it is raised, and the cost appears here." />
         @else
-            @if ($repair->SharedBy > 1)
-                <x-notice tone="info">
-                    This request pays for {{ $repair->SharedBy }} job cards — one call-out, several assets. Each card shows
-                    the request's amount; totals count it once.
-                </x-notice>
-            @endif
             <x-table procedure="agora.usp_Assets_GetRepair" :count="$lines->count()" dense
                      empty="The request has no lines.">
                 <x-slot:head>
@@ -137,11 +138,8 @@
                       data-confirm-text="It stays on the record and stops counting as a call."
                       data-confirm-action="Cancel it" data-confirm-danger>
                     @csrf
-                    <p class="field-help" style="margin-top:0">
-                        For a card raised in error — twice for one call, or on the wrong asset. A repair that did
-                        happen is never cancelled.
-                    </p>
-                    <x-field name="reason" label="Why" help="Required. Kept on the card." />
+                    <x-field name="reason" label="Why" help="Required. Kept on the card."
+                             info="For a card raised in error — twice for one call, or on the wrong asset. A repair that did happen is never cancelled." />
                     <div class="btn-row">
                         <button type="submit" class="btn-primary">Cancel the job card</button>
                     </div>

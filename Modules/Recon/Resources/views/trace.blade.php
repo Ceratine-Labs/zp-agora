@@ -1,23 +1,30 @@
 <x-app-shell title="Trace a reference">
-    <x-page-head
-        eyebrow="Banking and reconciliation"
-        title="Trace"
-        blurb="One value — a batch number, a bank reference, a bag, a slip, a terminal or a run number —
-               and everything that touched it. Read-only on both sides: nothing here writes anywhere.">
+    <x-page-head eyebrow="Banking and reconciliation" title="Trace">
+        <x-slot:info>
+            <p>One value — a batch number, a bank reference, a bag, a slip, a terminal or a run number — and
+               everything that touched it.</p>
+            <p>The answers follow a reconciliation in order: the runs, proposals, batches, rows touched, cashier
+               split and stamps from Agora's ledger, then the bank statement and deposits as they stand now —
+               the check on everything above them.</p>
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.recon.index') }}">All areas</a>
         </x-slot:actions>
     </x-page-head>
 
-    <x-card title="What are you looking for?"
-            :sub="'Answered by '.$procedure.' — eight questions of the same value, in one call'">
+    <x-card title="What are you looking for?">
+        <x-slot:info>
+            <p>Answered by <code>{{ $procedure }}</code>: eight questions of the same value, in one call. It reads
+               Agora's ledger and the customer's statement and deposit tables, and writes to neither.</p>
+        </x-slot:info>
         <form method="GET" action="{{ route('app.recon.trace') }}">
             <div class="field-row">
                 <x-field name="q" label="Reference or number" :value="$term"
-                         help="At least three characters. A batch, a bag, a slip, a terminal, a device, part of a bank narrative, a cashier, or a run number." />
+                         help="At least three characters."
+                         info="A batch, a bag, a slip, a terminal, a device, part of a bank narrative, a cashier, or a run number." />
 
                 <x-field name="from" label="From" type="date" :value="$from"
-                         help="The statement table is inside a 249 GB live database, so the window is not optional. Ninety days by default." />
+                         info="The window is required: the statement table is large and live. Ninety days by default." />
 
                 <x-field name="to" label="To" type="date" :value="$to" />
 
@@ -25,14 +32,13 @@
                     <x-field name="branch_id" label="Site"
                              :choices="['' => 'Every site you may see'] + $branches->pluck('Name', 'BranchId')->all()"
                              :value="$branchId ?: ''"
-                             help="Leave it on every site when you do not yet know where the reference lives." />
+                             info="Leave it on every site when you do not yet know where the reference lives." />
                 @endif
             </div>
 
             <div class="form-actions">
                 <button type="submit" class="btn-primary">Trace</button>
-                <span class="field-help">Reads only. It looks in Agora's ledger and in the customer's
-                      statement and deposit tables, and writes to neither.</span>
+                <span class="field-help">Read-only. Nothing is written anywhere.</span>
             </div>
         </form>
     </x-card>

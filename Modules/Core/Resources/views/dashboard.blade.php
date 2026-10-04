@@ -1,22 +1,20 @@
 <x-app-shell title="Today">
-    <x-page-head
-        eyebrow="Head office"
-        title="Today"
-        blurb="The work that has to happen before this day can be closed." />
+    {{-- What the page is for, and what is not on it yet, sit behind the info
+         button (Ryan, 4 Oct 2026: users skip standing explanation). The counts
+         stay on the page. --}}
+    <x-page-head eyebrow="Head office" title="Today">
+        <x-slot:info>
+            <p>The work that has to happen before this day can be closed.</p>
+            <p>Trading figures are not here yet — the branch console and the group trading position will
+               supply them. Every count on this page is real, read from the database.</p>
+            <p>Administrative entities are branches for accounting only: they have no trading day to close.</p>
+        </x-slot:info>
+    </x-page-head>
 
     <x-kpi-strip>
-        <x-kpi label="Trading sites" :value="$branchCount" note="from your branch list" />
-        <x-kpi label="Administrative entities" :value="$entityCount" note="no trading day to close" />
+        <x-kpi label="Trading sites" :value="$branchCount" />
+        <x-kpi label="Administrative entities" :value="$entityCount" />
         <x-kpi label="Workspace" :value="$context->workspace() === 'branch' ? 'Branch' : 'Head office'"
                :note="$context->id() ? 'branch '.$context->id() : 'all sites in scope'" />
     </x-kpi-strip>
-
-    <x-card title="The shell is up" sub="What this page proves, and what it does not">
-        <p>The menu above is read from <code>agora.MenuSection</code> and <code>agora.MenuItem</code> — no
-           blade file lists a link. Items nest through <code>ParentId</code> to any depth, and the panel
-           renders whatever depth the data has.</p>
-        <p>What is <em>not</em> here yet: trading figures. The branch console (T030) and the group trading
-           position (T068) supply those. Everything on this page is a real count from the customer's
-           database, not a placeholder.</p>
-    </x-card>
 </x-app-shell>

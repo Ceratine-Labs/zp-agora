@@ -42,26 +42,27 @@
     </x-notice>
 @endif
 
-<x-card title="What to suggest for"
-        sub="The site and the period. Both sides are read live, and nothing is written until a suggestion is accepted.">
+<x-card title="What to suggest for">
+    <x-slot:info>
+        <p>Suggestions pair one site's outstanding bank lines with its deposits by value. Both sides are read
+           live, and nothing is written until a suggestion is accepted.</p>
+    </x-slot:info>
     <form method="GET" action="{{ route('app.recon.suggest', $area['key']) }}" data-loader="Working out suggestions…">
         <div class="field-row">
             @if ($pinned)
                 <div class="field">
                     <label>Site</label>
                     <p class="field-fixed">{{ $branches->firstWhere('BranchId', $branchId)?->Name ?? 'Not set' }}</p>
-                    <p class="field-help">Your workspace is pinned to this site.</p>
                 </div>
                 <input type="hidden" name="branch_id" value="{{ $branchId }}">
             @else
                 <x-field name="branch_id" label="Site"
                          :choices="['' => 'Choose a site'] + $branches->pluck('Name', 'BranchId')->all()"
-                         :value="$branchId ?: ''"
-                         help="Suggestions are always within one site." />
+                         :value="$branchId ?: ''" />
             @endif
 
             <x-field name="from" label="From" type="date" :value="$from"
-                     help="Bank line dates. Deposits are read from a few days earlier, because a line settles takings from before it." />
+                     info="Bank line dates. Deposits are read from a few days earlier, because a line settles takings from before it." />
             <x-field name="to" label="To" type="date" :value="$to" />
         </div>
 

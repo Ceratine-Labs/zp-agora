@@ -11,10 +11,23 @@
     one back, not fill in a page.
 --}}
 <x-app-shell title="Critical lines">
-    <x-page-head
-        eyebrow="Setup · Trading rules"
-        title="Critical lines"
-        blurb="The lines that must never be out of stock, and whether they are. Keyed to the site's POS file rather than to the stock master — a third of this list is not counted, which is a fact about the list rather than a gap in it." />
+    {{-- What the list is and how it behaves sits behind the info button
+         beside the title (Ryan, 4 Oct 2026: nobody read the panel). The
+         out-of-stock count and the grid stay on the page. --}}
+    <x-page-head eyebrow="Setup · Trading rules" title="Critical lines">
+        <x-slot:info>
+            <p>The lines that must never be out of stock, and whether they are. The count at the top is the
+               active lines at or below zero on hand.</p>
+            <p><strong>Keyed to the POS file, not the stock master.</strong> <em>On hand</em> and <em>Last sold</em>
+               come from the site's cost file. About a third of the lines have no stock master row: they are sold
+               but not counted, so <em>Counted</em> is information rather than a problem, and those lines have no
+               stock master page to open.</p>
+            <p><strong>Low</strong> means one pack or less, by the POS file's pack size (one where it has none).
+               <strong>Taking a line off the list</strong> writes an Agora override with the line switched off; the
+               customer's own list is untouched and the line can be put back. <em>Held by</em> says which list a
+               row came from.</p>
+        </x-slot:info>
+    </x-page-head>
 
     @if (session('status'))
         <x-notice tone="info" title="Saved">{{ session('status') }}</x-notice>
@@ -28,28 +41,8 @@
         <x-kpi
             label="Out of stock now"
             :value="\App\Support\Format::n($outOfStock, 0)"
-            note="active critical lines at or below zero on hand"
             :tone="$outOfStock > 0 ? 'crit' : 'good'" />
     </x-kpi-strip>
-
-    <x-notice tone="info" title="What this list is, and what it is not" collapsible>
-        <p>
-            <strong>It is keyed to the POS file, not to the stock master.</strong> Every line here has a row in
-            that site's cost file — that is what <em>On hand</em> and <em>Last sold</em> come from — but roughly a
-            third have no stock master row at all. Those are real products the site sells that nobody counts, so
-            the <em>Counted</em> column is information rather than a problem, and a line without one does not open
-            a stock master page because there is none to open.
-        </p>
-        <p>
-            <strong>Low means one pack or less</strong>, using the POS file's own pack size. Where that is missing
-            it falls back to one, so Low still means something.
-        </p>
-        <p>
-            <strong>Taking a line off the list is not deleting it.</strong> It writes an Agora override with the
-            line switched off; the customer's own list is untouched and the line can be put back. <em>Held by</em>
-            says which list a row came from.
-        </p>
-    </x-notice>
 
     <x-data-grid :grid="$grid" surface />
 </x-app-shell>

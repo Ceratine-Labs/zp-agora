@@ -52,11 +52,8 @@
     <p class="drill-claimed-note">
         <strong>This proposal is from a run previewed before the Smart ATM matching fix, so the two
         panels below cannot be filled in.</strong>
-        The run recorded the terminal but not the trading date in the bank narrative, and it takes both
-        to find the statement lines again. The figures on the row above are what the preview found and
-        they still stand — what is missing is the ability to re-read them now.
-        <strong>Preview this site again</strong> and the proposal comes back drillable and
-        committable; executing this one is refused rather than allowed to stamp nothing.
+        The figures on the row above still stand. <strong>Preview this site again</strong> to drill and
+        commit it; executing this one is refused.
     </p>
 @endif
 
@@ -73,11 +70,10 @@
             ({{ \App\Support\Format::r($mopsGone->sum('Amount')) }})
         @endif
         carrying this reference {{ ($bankGone->count() + $mopsGone->count()) === 1 ? 'is' : 'are' }}
-        no longer outstanding. They are listed below under the batch that claimed them.
-        Execute acts only on what is still open, so this proposal will stamp
-        {{ $bankOpen->count() }} bank {{ Str::plural('line', $bankOpen->count()) }}
-        against {{ $mopsOpen->count() }} {{ Str::plural('deposit', $mopsOpen->count()) }}, not the
-        figures the run recorded when it was previewed.
+        no longer outstanding — listed below under the batch that claimed them.
+        Execute will stamp only what is still open: {{ $bankOpen->count() }} bank
+        {{ Str::plural('line', $bankOpen->count()) }} against {{ $mopsOpen->count() }}
+        {{ Str::plural('deposit', $mopsOpen->count()) }}.
     </p>
 @endif
 
@@ -99,12 +95,10 @@
 
         @if ($bankOpen->isEmpty() && $bankGone->isNotEmpty())
             <p class="drill-none">Every bank line carrying this reference has already been
-               reconciled — see the list below. The statement did settle this; something got to it
-               before this preview was executed.</p>
+               reconciled — see the list below.</p>
         @elseif ($bank->isEmpty() && $line->isCommitted())
             <p class="drill-none">This batch was stamped, but no bank lines were recorded against it
-               in <code>agora.ReconMatch</code>. That should not happen — the commit writes both
-               sides together — so it is worth reporting rather than reading as "nothing settled".</p>
+               in <code>agora.ReconMatch</code>. That should not happen — please report it.</p>
         @elseif ($bank->isEmpty() && $staleSmartAtm)
             <p class="drill-none">Not re-read, because this run predates the matching fix — see above.
                This is not a statement about the bank.</p>
@@ -190,19 +184,15 @@
 
         @if ($mopsOpen->isEmpty() && $mopsGone->isNotEmpty())
             <p class="drill-none">Every deposit carrying this reference has already been
-               reconciled — see the list below. They were declared; they are simply not outstanding
-               any more.</p>
+               reconciled — see the list below.</p>
         @elseif ($mops->isEmpty() && $line->isCommitted())
             <p class="drill-none">This batch was stamped, but no deposit rows were recorded against
-               it in <code>agora.ReconMatch</code>. That should not happen — the commit writes both
-               sides together — so it is worth reporting rather than reading as "nothing was
-               declared".</p>
+               it in <code>agora.ReconMatch</code>. That should not happen — please report it.</p>
         @elseif ($mops->isEmpty())
             <p class="drill-none">
                 <strong>Nothing was declared against this reference.</strong>
-                The live procedure reaches its matched branch here — its comparison against a
-                missing deposit is neither true nor false — and under Execute it would stamp the
-                bank {{ Str::plural('line', $bank->count()) }} above reconciled against nothing.
+                The live procedure would stamp the bank {{ Str::plural('line', $bank->count()) }} above
+                reconciled against nothing.
             </p>
         @elseif ($mopsOpen->isNotEmpty())
             <table class="dt dense">

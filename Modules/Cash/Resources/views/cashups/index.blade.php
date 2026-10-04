@@ -11,10 +11,15 @@
     Props: $show, $grid
 --}}
 <x-app-shell title="Cashups">
-    <x-page-head
-        eyebrow="Cash"
-        title="Cashups"
-        blurb="Every cashup with its Z read, what was actually declared and the variance — and whether anybody has agreed to it yet.">
+    <x-page-head eyebrow="Cash" title="Cashups">
+        <x-slot:info>
+            <p>Every cashup with its <strong>Z read</strong> (what the till took), its <strong>actual total</strong>
+               (the legs, added the way PumpIT's Daily Banking adds them) and the <strong>variance</strong>, actual
+               less Z read.</p>
+            <p><strong>Z-read</strong> says whether the Z-read allocated to the till and shift agrees.
+               <strong>Cashup</strong> is Open (nobody has confirmed it), Confirmed (waiting on a manager's close),
+               Closed, or Day balanced (closed off in PumpIT). Open a row to confirm or close it.</p>
+        </x-slot:info>
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.cash.banking') }}">Daily Banking</a>
         </x-slot:actions>

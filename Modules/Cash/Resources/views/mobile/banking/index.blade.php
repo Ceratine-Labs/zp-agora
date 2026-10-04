@@ -22,8 +22,13 @@
 @endphp
 
 <x-app-shell title="Confirm cashups">
-    <x-page-head eyebrow="Cash" title="Confirm cashups"
-                 blurb="The day's cashups, one card each. Confirm the ones whose figures you agree with; the rest wait for a desk." />
+    <x-page-head eyebrow="Cash" title="Confirm cashups">
+        <x-slot:info>
+            <p>The day's cashups, one card each. Confirm the ones whose figures you agree with; legs, card loads and
+               closing are done at a desk. A variance beyond R{{ \App\Support\Format::n($tolerance) }} either way,
+               or a Z-read that does not agree, needs a reason. Confirming is recorded in Agora only.</p>
+        </x-slot:info>
+    </x-page-head>
 
     @if (session('cashupRefusal'))
         <x-notice tone="stop" title="That was not confirmed"><p>{{ session('cashupRefusal') }}</p></x-notice>

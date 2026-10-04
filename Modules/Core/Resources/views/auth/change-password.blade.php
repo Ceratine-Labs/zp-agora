@@ -6,6 +6,9 @@
     routine change feel like a lockout. When RequirePasswordChange has sent
     them here, the notice at the top says so; the menu above is still theirs,
     it just will not take them anywhere yet.
+
+    The blurb is the password rule, needed every time, so it stays on the page;
+    the reassurance and the why sit behind info buttons (Ryan, 4 Oct 2026).
 --}}
 <x-app-shell title="Change your password">
     <x-page-head
@@ -19,7 +22,11 @@
         </x-notice>
     @endif
 
-    <x-card title="New password" sub="Nobody at head office can see what you choose">
+    <x-card title="New password">
+        <x-slot:info>
+            <p>Nobody at head office can see the password you choose.</p>
+        </x-slot:info>
+
         @if ($errors->any())
             <div class="signin-error" role="alert">{{ $errors->first() }}</div>
         @endif
@@ -30,7 +37,7 @@
 
             <div class="field-row">
                 <x-field name="current_password" :label="__('core::core.password.current')" type="password"
-                         help="Being signed in is not proof of being you — an unlocked laptop is the usual way an account changes hands." />
+                         info="Being signed in is not proof of being you — an unlocked laptop is the usual way an account changes hands." />
                 <x-field name="password" :label="__('core::core.password.new')" type="password" />
                 <x-field name="password_confirmation" :label="__('core::core.password.confirm')" type="password" />
             </div>

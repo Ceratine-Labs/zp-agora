@@ -58,9 +58,7 @@
     </x-table>
 
     @if (! $live)
-        <x-notice tone="info" style="margin:12px">
-            <p>Saving card amounts to PumpIT is switched off, so this is read-only.</p>
-        </x-notice>
+        <p class="muted" style="margin:12px">Saving card amounts to PumpIT is off: read-only.</p>
     @elseif ($refused > 0)
         {{-- A save would be refused whole, so it is not offered: the line has
              to be put right on the Recon side first. --}}

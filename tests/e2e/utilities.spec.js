@@ -80,6 +80,9 @@ test.describe('utility meters', () => {
         await expect(page.getByRole('heading', { name: 'Meters standing still' })).toBeVisible();
         // The rule is on the screen, from the same map the procedure is handed:
         // generators (L, M) stand still whenever there is no load-shedding.
+        // Behind the card's info button since 4 Oct 2026.
+        await page.locator('section.card', { has: page.getByRole('heading', { name: 'Meters standing still' }) })
+            .locator('details.info summary').click();
         await expect(page.getByText(/never for meter types L and M/).first()).toBeVisible();
         await expect(page.getByRole('heading', { name: / by meter$/ })).toBeVisible();
 

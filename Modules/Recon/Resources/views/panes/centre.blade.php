@@ -58,16 +58,18 @@
 @if (! $scoped)
     @include('recon::partials.open-run')
 
-    <x-card title="What to reconcile"
-            sub="Choose the site and the period once. The automatic balancing runs, and the suggestions and the manual match open beside it over the same scope.">
+    <x-card title="What to reconcile">
+        <x-slot:info>
+            <p>Choose the site and the period once. The automatic balancing runs as a preview, and the
+               suggestions and the manual match open beside it over the same site and dates.</p>
+            <p><strong>Rules and readings</strong> settle what the customer's configuration leaves ambiguous;
+               the defaults are the reading the live system uses.</p>
+            <p>Everything previewed in this area is on
+               <a href="{{ route('app.recon.runs', [$area['key']] + $scope) }}">the Runs tab</a>, with filters
+               and an extract.</p>
+        </x-slot:info>
         @include('recon::partials.centre-scope-form')
     </x-card>
-
-    <p class="muted" style="margin-top:16px">
-        Everything previewed in this area is on
-        <a href="{{ route('app.recon.runs', [$area['key']] + $scope) }}">the Runs tab</a> — yours by default,
-        everyone's on request, with filters and an extract.
-    </p>
 @else
     <x-scope-line style="margin-bottom:16px"
                   :parts="[$site, $period, $run ? 'Run #'.$run->Id : 'Not previewed yet']">
@@ -87,9 +89,7 @@
                 @else
                     <div class="tabpane-pad">
                         <x-empty-state title="Not balanced yet">
-                            <p>This site and period have no open preview of yours. Balancing records a run —
-                               reproducible, and reversible once executed — so it is a press, not something
-                               this page does on its own every time it is opened.</p>
+                            <p>This site and period have no open preview of yours.</p>
                             <form method="POST" action="{{ route('app.recon.preview') }}" style="margin-top:12px"
                                   data-loader="Balancing {{ $area['label'] }}…">
                                 @csrf

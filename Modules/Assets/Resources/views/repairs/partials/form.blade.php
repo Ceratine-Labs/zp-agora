@@ -29,8 +29,7 @@
                 <x-params legend="Which asset">
                     <x-param name="asset" label="Asset" searchable
                              :choices="['' => 'Choose the asset'] + $assets->pluck('Label', 'PickKey')->all()"
-                             :value="old('asset')"
-                             help="Assets still on a register at the sites you can see." />
+                             :value="old('asset')" />
                 </x-params>
             @endif
         @endif
@@ -38,16 +37,16 @@
         <div class="field-row">
             <x-field name="CallDate" label="Called in" type="date"
                      :value="old('CallDate', $editing ? $d($repair->CallDate) : now()->toDateString())"
-                     help="The day the repair was called in. The comeback rule measures between these." />
+                     info="The day the repair was called in. The comeback rule measures between these." />
             <x-field name="TransactionNo" label="Purchase request" :value="old('TransactionNo', $repair?->TransactionNo)"
-                     placeholder="CR000550"
-                     help="The request that pays for it, at the site the asset stands at. Can be added later." />
+                     placeholder="CR000550" help="Optional — can be added later."
+                     info="The request that pays for the repair, at the site the asset stands at." />
         </div>
 
         <div class="field-row">
             <x-field name="SupplierCode" label="Supplier code" :value="old('SupplierCode', $repair?->SupplierCode)"
                      placeholder="APE-0211"
-                     help="Leave it empty and the purchase request's supplier is used." />
+                     info="Leave it empty and the request's supplier is used." />
             <x-field name="SupplierReference" label="Supplier's reference" :value="old('SupplierReference', $repair?->SupplierReference)" />
         </div>
 
@@ -56,10 +55,10 @@
         <div class="field-row">
             <x-field name="DateExpectedReturn" label="Expected back" type="date"
                      :value="old('DateExpectedReturn', $editing ? $d($repair->DateExpectedReturn) : null)"
-                     help="Only when it leaves the site, or a date was promised." />
+                     info="Only when it leaves the site, or a date was promised." />
             <x-field name="DateActualReturn" label="Back / done" type="date"
                      :value="old('DateActualReturn', $editing ? $d($repair->DateActualReturn) : null)"
-                     help="When it came back or the repair was finished." />
+                     info="When it came back or the repair was finished." />
         </div>
 
         <div class="btn-row">

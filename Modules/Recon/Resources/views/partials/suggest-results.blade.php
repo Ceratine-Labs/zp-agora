@@ -24,20 +24,18 @@
 @endphp
 
 @if (! $chosen)
-    <x-card title="Suggestions" sub="Pick a site above">
+    <x-card title="Suggestions">
         <x-empty-state title="Choose a site first">
-            <p>Suggestions pair one site's bank lines with that site's deposits. An empty list before a site
-               is chosen would read as “nothing to suggest”, which is a different answer.</p>
+            <p>Suggestions pair one site's bank lines with that site's deposits.</p>
         </x-empty-state>
     </x-card>
 @else
     @if (($summary->BatchBankRows ?? 0) > 0)
         <x-notice tone="info" style="margin-bottom:16px"
                   :title="\App\Support\Format::n($summary->BatchBankRows).' '.Str::plural('bank line', (int) $summary->BatchBankRows).' settle by batch number and are left out here'">
-            <p>{{ \App\Support\Format::r($summary->BatchBankTotal) }} on the statement matches its deposits on the
-               batch number and the amount. Reconcile those on
-               <a href="{{ route('app.recon.area', [$area['key'], 'branch_id' => $branchId, 'from' => $from, 'to' => $to, 'tab' => 'auto']) }}">Auto reconciliation</a>
-               — the suggestions below are only for what the batch number cannot pair.</p>
+            <p>{{ \App\Support\Format::r($summary->BatchBankTotal) }} matches its deposits on batch number and
+               amount — reconcile those on
+               <a href="{{ route('app.recon.area', [$area['key'], 'branch_id' => $branchId, 'from' => $from, 'to' => $to, 'tab' => 'auto']) }}">Auto reconciliation</a>.</p>
         </x-notice>
     @elseif (($summary->BatchPassRan ?? 1) == 0)
         <x-notice tone="info" style="margin-bottom:16px" title="This site has no FNB extraction rule">
@@ -45,9 +43,15 @@
         </x-notice>
     @endif
 
-    <x-card :title="'Suggested matches — '.$area['label']"
-            sub="Strong and possible are exact to the cent. Close ones are within 1% of the bank side, at most R500, and need a reason. Every deposit is dated on or up to four days before its bank line. Click a row to see the lines and deposits behind it."
-            flush>
+    <x-card :title="'Suggested matches — '.$area['label']" flush info-wide>
+        <x-slot:info>
+            <p><strong>Strong</strong> and <strong>possible</strong> are exact to the cent. Strong means nothing else
+               wants any of its rows; possible means something does, or the batch number disagrees — the row
+               says which. <strong>Close</strong> ones are within 1% of the bank side, at most R500, and need a
+               reason.</p>
+            <p>Every deposit is dated on or up to four days before its bank line. Click a row to see the lines and
+               deposits behind it.</p>
+        </x-slot:info>
         <x-statstrip :stats="[
             ['label' => 'Outstanding on the statement', 'value' => \App\Support\Format::n($summary->BankRows ?? 0),
              'note' => \App\Support\Format::r($summary->BankTotal ?? 0)],
@@ -93,18 +97,18 @@
                 @endif
                 <span class="field-help" data-suggest-status role="status"></span>
 
-                <x-slot:note>
+                <x-info label="What these presses do" class="info-wide">
                     @if ($live)
-                        Each suggestion is matched on its own, exactly as if it had been accepted by hand: its
-                        rows are re-read first, anything reconciled since this list was drawn is refused rather
-                        than stamped over, and each gets its own batch number and its own run, reversible from
-                        that run. A column filter narrows what is matched. The possible press asks separately,
-                        and each run it writes says the suggestion was a possible one and why. Close ones are
-                        forced matches: their press asks for one reason, and a row with its own keeps it.
+                        <p>Each suggestion is matched on its own, as if accepted by hand: its rows are re-read
+                           first, anything reconciled since this list was drawn is refused, and each gets its own
+                           batch number and run, reversible from that run. A column filter narrows what is
+                           matched.</p>
+                        <p>Each run a possible press writes records that it was possible, and why. Close ones are
+                           forced: the press asks for one reason, and a row with its own keeps it.</p>
                     @else
-                        <strong>Journal mode.</strong> Matches are recorded here and nothing in PumpIT changes.
+                        <p><strong>Journal mode:</strong> recorded in Agora only; nothing in PumpIT changes.</p>
                     @endif
-                </x-slot:note>
+                </x-info>
             </x-action-bar>
         @endif
 

@@ -23,8 +23,16 @@
 @endphp
 
 <x-app-shell title="Staff shorts">
-    <x-page-head eyebrow="Cash" title="Staff shorts"
-                 blurb="Raise a short against a person, and see what is waiting at the site." />
+    <x-page-head eyebrow="Cash" title="Staff shorts">
+        <x-slot:info>
+            <p>Raise a short against a person, and see what is waiting at the site. Approving, declining and posting
+               are done at a desk.</p>
+            @unless ($live)
+                <p><strong>Writing to PumpIT is off.</strong> This shows the site's shorts; nothing is written to
+                   PumpIT.</p>
+            @endunless
+        </x-slot:info>
+    </x-page-head>
 
     @include('cash::staffshorts.partials.outcome')
 
@@ -45,11 +53,13 @@
         <x-notice tone="stop" title="The staff shorts could not be read"><p>{{ $refusal }}</p></x-notice>
     @else
         @if ($canRaise)
-            <x-card title="Raise a staff short" sub="A pump attendant's short for a shift is a pump short." style="margin-bottom:12px">
+            <x-card title="Raise a staff short" style="margin-bottom:12px">
+                <x-slot:info>
+                    <p>A pump attendant's short for a shift is a pump short. Nothing is charged until it is approved and
+                       posted to a cashup.</p>
+                </x-slot:info>
                 @include('cash::staffshorts.partials.raise-form', ['from' => 'phone'])
             </x-card>
-        @elseif (! $live)
-            <x-notice tone="info" title="Writing to PumpIT is off"><p>This shows the site's shorts; nothing is written to PumpIT.</p></x-notice>
         @endif
 
         @forelse ($open as $s)

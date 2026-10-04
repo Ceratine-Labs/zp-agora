@@ -44,12 +44,17 @@
             $at = (int) ($context->search(fn ($s) => (bool) $s->IsThis) ?: 0);
             $shown = $context->values()->slice(max(0, $at - 3), 7);
         @endphp
-        <p class="audit-change-note">
-            This shift, highlighted, with the shifts either side of it. A crossed-out figure is what PumpIT held
-            before the commit; the figure beside it is what Agora wrote. Variance is sold − (open + issued − counted):
-            negative is short. The commit wrote {{ $context->where('Written', true)->count() }} of this item's
+        {{-- How to read the table sits behind the "i" (4 Oct 2026); the count
+             stays on the line. A <div>, because a <details> cannot sit in a <p>. --}}
+        <div class="audit-change-note">
+            The commit wrote {{ $context->where('Written', true)->count() }} of this item's
             {{ $context->count() }} shifts in the run.
-        </p>
+            <x-info label="How to read this table">
+                <p>This shift, highlighted, with the shifts either side of it. A crossed-out figure is what PumpIT
+                   held before the commit; the figure beside it is what Agora wrote.</p>
+                <p>Variance is sold − (open + issued − counted): negative is short.</p>
+            </x-info>
+        </div>
         <x-table procedure="agora.usp_Reports_GetAuditChange" :count="$shown->count()" :total="$context->count()" dense fit>
             <x-slot:head>
                 <tr>

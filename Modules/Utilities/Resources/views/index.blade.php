@@ -39,10 +39,15 @@
     $savedAt = $lastSave?->CreatedAt ? \Illuminate\Support\Carbon::parse($lastSave->CreatedAt, 'UTC') : null;
 @endphp
 <x-app-shell :title="__('utilities::utilities.title')">
-    <x-page-head
-        eyebrow="Capture"
-        :title="__('utilities::utilities.title')"
-        :blurb="__('utilities::utilities.blurb')" />
+    {{-- The standing explanation on this screen — what it is for, how usage
+         is worked out, what gets flagged — sits behind info buttons beside the
+         titles (Ryan, 4 Oct 2026). Figures, the day, and anything about THIS
+         save stay on the page. --}}
+    <x-page-head eyebrow="Capture" :title="__('utilities::utilities.title')">
+        <x-slot:info>
+            <p>{{ __('utilities::utilities.blurb') }}</p>
+        </x-slot:info>
+    </x-page-head>
 
     @if (session('status'))
         <x-notice tone="info" title="Saved">{{ session('status') }}</x-notice>
@@ -56,8 +61,7 @@
                     <li>{{ $flag }}</li>
                 @endforeach
             </ul>
-            <p>A meter that has not moved for a while is faulty, not really being read, or switched off.
-               {{ $zeroRunRule }} It is listed under <em>Meters standing still</em> below.</p>
+            <p>Listed under <em>Meters standing still</em> below.</p>
         </x-notice>
     @endif
 
@@ -77,17 +81,15 @@
                     <div class="field">
                         <label>Site</label>
                         <p class="field-fixed">{{ $branchName }}</p>
-                        <p class="field-help">Your workspace is pinned to this site.</p>
                     </div>
                 @else
                     <x-field name="branch_id" label="Site"
                              :choices="['' => 'Choose a site'] + $branches->pluck('Name', 'BranchId')->all()"
-                             :value="$branchId"
-                             help="Trading sites you are granted." />
+                             :value="$branchId" />
                 @endif
                 <x-field name="date" label="Day to capture" type="date"
                          :value="$day->toDateString()" :max="now()->toDateString()"
-                         help="Today unless you are catching up. The month shown is this day's month." />
+                         info="Today, unless you are catching up. The month shown is this day's month." />
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn-primary">Show</button>
@@ -106,13 +108,16 @@
                    :note="$costed > 0 ? 'at tariff, '.$costed.' of '.$meters->count().' meters costed' : 'no tariff is set for these meter types yet'" />
             <x-kpi label="Meters standing still"
                    :value="Format::n($ongoing)"
-                   note="not moving, or not read, and still that way at the latest reading"
                    :tone="$ongoing > 0 ? 'warn' : 'good'" />
         </x-kpi-strip>
 
         {{-- ---- 1. Capture ------------------------------------------------ --}}
-        <x-card :title="'Readings for '.$day->format('l j F')"
-                sub="agora.usp_Utilities_PrepareReadings · saved by agora.usp_Utilities_Save into PumpIT.dbo.BRN_UtilityTransaction">
+        <x-card :title="'Readings for '.$day->format('l j F')" sub="agora.usp_Utilities_PrepareReadings">
+            <x-slot:info>
+                <p>Saved by <code>agora.usp_Utilities_Save</code> into PumpIT's <code>BRN_UtilityTransaction</code>.</p>
+                <p><strong>Prepaid units</strong> bought on the day are taken off the usage, so a purchase is not
+                   counted as consumption.</p>
+            </x-slot:info>
             @if ($lines->isEmpty())
                 <x-empty-state title="No meters at this site"
                                text="PumpIT holds no utility meters for {{ $branchName }}. Meters are set up in PumpIT's BRN_UtilityMeter until the meter master screen exists." />
@@ -177,11 +182,6 @@
                              have ever had a prepaid purchase recorded. --}}
                         <details class="params-extra" @if ($open->contains(fn ($l) => (float) $l->PrepaidUnitsPurchased != 0)) open @endif>
                             <summary>Prepaid units bought on this day</summary>
-                            <p class="field-help">
-                                Units bought for a prepaid meter on this day. They are taken off the usage, so the
-                                purchase is not counted as consumption — usage is closing, less the last reading,
-                                less prepaid units.
-                            </p>
                             <div class="field-row">
                                 @foreach ($open as $i => $line)
                                     <x-field :name="'lines['.$i.'][PrepaidUnitsPurchased]'"
@@ -195,7 +195,7 @@
                         @if ($anyCaptured && $mayEdit)
                             <x-field name="reason" label="Why, if you are changing a reading already recorded"
                                      :value="old('reason')"
-                                     help="Required only when a reading that was already captured changes. It is kept with the change, beside the value it replaced." />
+                                     info="Kept with the change, beside the value it replaced." />
                         @endif
 
                         <div class="form-actions">
@@ -209,7 +209,13 @@
 
         {{-- ---- 2. What is wrong -------------------------------------------- --}}
         <x-card title="Meters standing still"
-                :sub="'agora.usp_Utilities_ZeroUsage · '.$zeroRunRule.' Runs reaching into '.$monthFrom->format('F').'.'">
+                :sub="'agora.usp_Utilities_ZeroUsage · runs reaching into '.$monthFrom->format('F')">
+            <x-slot:info>
+                <p>A meter that has not moved for a while is faulty, not really being read, or switched off.
+                   {{ $zeroRunRule }}</p>
+                <p>The count at the top is the runs still going at the latest reading; this list also shows the
+                   ones that have ended since.</p>
+            </x-slot:info>
             <x-exception-list empty="Every meter at this site that is flagged at all moved, and was read, this month.">
                 @foreach ($zero as $run)
                     <x-exception-row severity="warning"
@@ -230,8 +236,17 @@
              01a0e312-07a0). It has no usage and is never an opening, so the
              month starts from the last real reading before it and ends at the
              last real reading in it; unread days show only in "Days read". --}}
-        <x-card :title="$monthFrom->format('F Y').' by meter'"
-                sub="Usage is the last reading, less the reading before the month, less prepaid units (closing − opening − prepaid, the customer's own formula). A day PumpIT holds as 0 / 0 has not been read: it is not counted, and the next reading is measured from the last real one." flush>
+        <x-card :title="$monthFrom->format('F Y').' by meter'" flush>
+            <x-slot:info>
+                <p>Usage is closing − opening − prepaid, the customer's own formula: the last reading, less the
+                   reading before the month, less prepaid units.</p>
+                <p>A day PumpIT holds as 0 / 0 has not been read: it is not counted, and the next reading is measured
+                   from the last real one.</p>
+                @if ($untariffed !== [])
+                    <p>PumpIT stores no tariff; for now tariffs are set in <code>utilities.tariffs</code> in Agora's
+                       configuration.</p>
+                @endif
+            </x-slot:info>
             <x-table procedure="agora.usp_Utilities_PrepareReadings" :count="$meters->count()"
                      empty="No meters at this site." fit>
                 <x-slot:head>
@@ -267,8 +282,6 @@
                         <p class="field-help">
                             No tariff is set for meter type{{ count($untariffed) === 1 ? '' : 's' }}
                             <code>{{ implode(', ', $untariffed) }}</code>, so cost shows as a dash rather than R0.00.
-                            PumpIT stores no tariff; until the Settings screen exists they are
-                            <code>utilities.tariffs</code> in the module's configuration.
                         </p>
                     </div>
                 </x-slot:foot>
@@ -284,7 +297,10 @@
          Every site this person may see, not just the one above: head office
          reads it for the meter nobody is reading. Its own scope, because it
          answers a different question from the capture card. --}}
-    <x-card :title="$grid->definition->title()" :sub="$grid->definition->blurb()" flush>
+    <x-card :title="$grid->definition->title()" flush>
+        <x-slot:info>
+            <p>{{ $grid->definition->blurb() }}</p>
+        </x-slot:info>
         <x-data-grid :grid="$grid" :branches="$gridBranches" />
     </x-card>
 </x-app-shell>

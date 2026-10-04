@@ -427,6 +427,7 @@ class ComponentCatalogue
                     ['name', 'string', '—', 'Field name, and the id it derives'],
                     ['label', 'string', "''", 'Above the control'],
                     ['help', '?string', 'null', 'The line under it'],
+                    ['info', '?string', 'null', 'An explanation behind an <x-info> button beside the label'],
                     ['type', 'string', "'text'", 'Any input type, or bool'],
                     ['choices', '?array', 'null', 'Renders a select'],
                     ['value', 'mixed', 'null', 'Current value'],
@@ -434,6 +435,7 @@ class ComponentCatalogue
                     ['max', 'mixed', 'null', 'Input max'],
                     ['step', 'mixed', 'null', 'Input step — required on a decimal, or 1 is assumed'],
                     ['linked', '?string', 'null', 'Name of the select this one follows; needs `when` on the choices'],
+                    ['notBefore', '?string', 'null', 'Name of a control whose value this one\'s options may not sort below'],
                 ],
             ],
             [
@@ -470,6 +472,7 @@ class ComponentCatalogue
                     ['max', 'mixed', 'null', 'Input max'],
                     ['step', 'mixed', 'null', 'Input step'],
                     ['help', '?string', 'null', 'The line under it'],
+                    ['info', '?string', 'null', 'An explanation behind an <x-info> button beside the label'],
                 ],
             ],
             [

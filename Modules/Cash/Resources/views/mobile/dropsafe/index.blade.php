@@ -26,8 +26,15 @@
 @endphp
 
 <x-app-shell title="Drop safe">
-    <x-page-head eyebrow="Cash" title="Drop safe"
-                 blurb="Drop a bag into the manual safe, and see what is waiting for the security company." />
+    <x-page-head eyebrow="Cash" title="Drop safe">
+        <x-slot:info>
+            <p>Drop a bag into the manual safe, and see what is waiting for the security company. Collecting is done
+               at a desk.</p>
+            @unless ($live)
+                <p><strong>Writing to PumpIT is off.</strong> This shows the safe; nothing is written to PumpIT.</p>
+            @endunless
+        </x-slot:info>
+    </x-page-head>
 
     @include('cash::dropsafe.partials.outcome')
 
@@ -52,13 +59,13 @@
         </p>
 
         @if ($live && ($canDrop || ($editing && $canEdit)))
-            <x-card :title="$editing ? 'Correct bag '.$editing->BagNo : 'Drop a bag'"
-                    sub="Every bag needs the manager who witnessed it; one over {{ \App\Support\Format::r($threshold) }} needs a reason too."
-                    style="margin-bottom:12px">
+            <x-card :title="$editing ? 'Correct bag '.$editing->BagNo : 'Drop a bag'" style="margin-bottom:12px">
+                <x-slot:info>
+                    <p>Every bag needs the manager who witnessed it; one over {{ \App\Support\Format::r($threshold) }}
+                       needs a reason too.</p>
+                </x-slot:info>
                 @include('cash::dropsafe.partials.drop-form', ['from' => 'phone'])
             </x-card>
-        @elseif (! $live)
-            <x-notice tone="info" title="Writing to PumpIT is off"><p>This shows the safe; nothing is written to PumpIT.</p></x-notice>
         @endif
 
         @forelse ($bags as $b)
