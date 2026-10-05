@@ -13,8 +13,12 @@
        stock recon  every shift of that item in that run, in order, with the
                     figures PumpIT held before the commit and after it. A shift
                     the commit wrote carries its ledger's prior and new pair; a
-                    shift it did not write is the same both sides. Variance =
-                    sold − (open + issued − close): negative is short.
+                    shift it did not write is the same both sides. The issue
+                    too: a clear duplicate the commit set to 0 (D1, 1 Oct 2026)
+                    reads its PriorQtyIssued → NewQtyIssued, so the shift's
+                    variance after the correction is the nil it was written to
+                    be. Variance = sold − (open + issued − close): negative is
+                    short.
        bank recon   every row the same batch stamped, the bank side and the
                     deposit side, so the match reads as one thing.
        the rest     nothing; result set 1 says it all (a capture's own detail
@@ -85,7 +89,9 @@ BEGIN
                rl.SellPrice,
                CONVERT(decimal(18,3), ISNULL(a.PriorQtyOpen,  ISNULL(rl.QtyOpenNow,  rl.QtyOpen)))  AS OpenBefore,
                CONVERT(decimal(18,3), ISNULL(a.NewQtyOpen,    ISNULL(rl.QtyOpenNow,  rl.QtyOpen)))  AS OpenAfter,
-               CONVERT(decimal(18,3), ISNULL(rl.QtyIssued, 0))                                       AS Issued,
+               /* The issue as the run read it, unless the commit wrote it. */
+               CONVERT(decimal(18,3), ISNULL(a.PriorQtyIssued, ISNULL(rl.QtyIssued, 0)))             AS IssuedBefore,
+               CONVERT(decimal(18,3), ISNULL(a.NewQtyIssued,   ISNULL(rl.QtyIssued, 0)))             AS IssuedAfter,
                CONVERT(decimal(18,3), ISNULL(rl.QtyPOS, 0))                                          AS Sold,
                CONVERT(decimal(18,3), ISNULL(a.PriorQtyClose, ISNULL(rl.QtyCloseNow, rl.QtyClose))) AS CloseBefore,
                CONVERT(decimal(18,3), ISNULL(a.NewQtyClose,   ISNULL(rl.QtyCloseNow, rl.QtyClose))) AS CloseAfter,
@@ -100,10 +106,10 @@ BEGIN
         WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId AND rl.AreaNo = @AreaNo AND rl.StockItemNo = @Item;
 
         SELECT s.*,
-               s.OpenBefore + s.Issued - s.Sold                         AS ExpectedBefore,
-               s.OpenAfter  + s.Issued - s.Sold                         AS ExpectedAfter,
-               s.Sold - (s.OpenBefore + s.Issued - s.CloseBefore)       AS VarBefore,
-               s.Sold - (s.OpenAfter  + s.Issued - s.CloseAfter)        AS VarAfter
+               s.OpenBefore + s.IssuedBefore - s.Sold                   AS ExpectedBefore,
+               s.OpenAfter  + s.IssuedAfter  - s.Sold                   AS ExpectedAfter,
+               s.Sold - (s.OpenBefore + s.IssuedBefore - s.CloseBefore) AS VarBefore,
+               s.Sold - (s.OpenAfter  + s.IssuedAfter  - s.CloseAfter)  AS VarAfter
         FROM #Shifts s
         ORDER BY s.TransactionDate, s.ShiftNo;
         RETURN;

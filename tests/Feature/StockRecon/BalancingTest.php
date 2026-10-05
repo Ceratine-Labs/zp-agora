@@ -1205,6 +1205,29 @@ class BalancingTest extends TestCase
         $this->assertSame('Duplicate issue removed', $trail->Action);
         $this->assertStringContainsString('(D1)', $trail->Reason);
 
+        // Opened, the change reads the issue from the ledger on both sides —
+        // 20 → 0 — so the shift's variance after the correction is nil, not
+        // the run line's 20 twice (usp_Reports_GetAuditChange, v1__22pf).
+        $shifts = app(ProcedureService::class)->callSets('usp_Reports_GetAuditChange', [
+            'Ledger' => 'StockReconAmendment', 'LedgerId' => $amendment->Id,
+        ])[1];
+        $opened = $shifts->first(fn ($s) => (bool) $s->IsThis);
+        $this->assertEqualsWithDelta(20.0, (float) $opened->IssuedBefore, 0.005);
+        $this->assertEqualsWithDelta(0.0, (float) $opened->IssuedAfter, 0.005);
+        $this->assertEqualsWithDelta(-20.0, (float) $opened->VarBefore, 0.005, 'Before: 20 short.');
+        $this->assertEqualsWithDelta(0.0, (float) $opened->VarAfter, 0.005, 'After the correction: nil.');
+        $twinShift = $shifts->first(fn ($s) => (int) $s->ShiftNo === 1 && str_starts_with((string) $s->TransactionDate, '2026-07-17'));
+        $this->assertEqualsWithDelta((float) $twinShift->IssuedBefore, (float) $twinShift->IssuedAfter, 0.005,
+            'A shift the commit did not write reads the same issue both sides.');
+
+        $admin = User::query()->acrossBranches()->where('EmailAddress', config('agora.admin.email'))->first();
+        if ($admin) {
+            $this->actingAs($admin)
+                ->get(route('app.reports.audit.change', ['StockReconAmendment', $amendment->Id]), ['X-Requested-With' => 'XMLHttpRequest'])
+                ->assertOk()
+                ->assertSee('<span class="ba-old ">20</span><span class="ba-new ">0</span>', false);
+        }
+
         $again = $this->previewArea(self::SHELF_AREA);
         $line = $this->lineAt($again, '2026-07-17', 3);
         $this->assertNull($line->DupTier, 'PumpIT already holds the answer: nothing is found twice.');

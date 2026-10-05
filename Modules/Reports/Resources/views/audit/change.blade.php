@@ -69,7 +69,15 @@
                     <td class="fit-min">{{ Carbon::parse($s->TransactionDate)->format('d M') }}</td>
                     <td class="fit-min">{{ $s->ShiftName }}</td>
                     <td class="num"><x-reports::before-after :before="$s->OpenBefore" :after="$s->OpenAfter" /></td>
-                    <td class="num">{{ (float) $s->Issued === 0.0 ? '—' : \App\Support\Format::n($s->Issued, (float) $s->Issued == round((float) $s->Issued) ? 0 : 3) }}</td>
+                    {{-- Before → after like the counts: a duplicate issue the commit
+                         set to 0 (D1) reads 20 → 0; any other shift, the issue alone. --}}
+                    <td class="num">
+                        @if (abs((float) $s->IssuedBefore - (float) $s->IssuedAfter) > 0.0005)
+                            <x-reports::before-after :before="$s->IssuedBefore" :after="$s->IssuedAfter" />
+                        @else
+                            {{ (float) $s->IssuedAfter === 0.0 ? '—' : \App\Support\Format::n($s->IssuedAfter, (float) $s->IssuedAfter == round((float) $s->IssuedAfter) ? 0 : 3) }}
+                        @endif
+                    </td>
                     <td class="num">{{ (float) $s->Sold === 0.0 ? '—' : \App\Support\Format::n($s->Sold, (float) $s->Sold == round((float) $s->Sold) ? 0 : 3) }}</td>
                     <td class="num"><x-reports::before-after :before="$s->ExpectedBefore" :after="$s->ExpectedAfter" /></td>
                     <td class="num"><x-reports::before-after :before="$s->CloseBefore" :after="$s->CloseAfter" /></td>
