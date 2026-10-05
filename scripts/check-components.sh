@@ -43,6 +43,7 @@ delta|<x-delta>
 statstrip|<x-statstrip>
 tabs|<x-tabs>
 tabpane|<x-tab-panel>
+case|<x-case>
 params|<x-params>
 runbar|<x-runbar>
 checklist|<x-checklist>
