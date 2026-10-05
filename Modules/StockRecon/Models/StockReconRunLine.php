@@ -161,6 +161,18 @@ class StockReconRunLine extends BaseModel
     public function outcomeKey(): string
     {
         return match (true) {
+            /*
+             * A duplicate issue has its own state, ahead of everything else.
+             * A clear one (D1) the commit takes out is 'duplicate': with the
+             * issue gone, a shift that sold nothing IS dormant, and the dormant
+             * pill is where it was hiding — out of the press, which opens on
+             * Balanced, so the rest of its chain was skipped as "write that
+             * shift with it". A clear one NOT taken out (DupReason says why)
+             * falls through to whatever its chain is. A possible one (D2) is
+             * 'possible' whatever it holds back, released or not.
+             */
+            $this->removesDuplicate() => 'duplicate',
+            $this->isPossibleDuplicate() => 'possible',
             $this->IsDormant => 'dormant',
             // The classes that say stock arrived with no paperwork — see
             // config('stockrecon.exceptions').
@@ -210,6 +222,9 @@ class StockReconRunLine extends BaseModel
     {
         return match ($this->outcomeKey()) {
             'balanced' => 'good',
+            // The tones config('stockrecon.exceptions') gives D1 and D2.
+            'duplicate' => 'good',
+            'possible' => 'serious',
             'short' => 'warn',
             'unrecorded' => 'crit',
             'blocked' => 'serious',

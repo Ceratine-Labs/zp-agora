@@ -50,6 +50,9 @@ trait GrantsAccess
             'master.stock.view', 'master.stock.edit',
             'stockrecon.runs.view', 'stockrecon.runs.create', 'stockrecon.runs.execute',
             'stockrecon.runs.reverse', 'stockrecon.runs.delete', 'stockrecon.exceptions.view',
+            // StockReconDuplicateReleasePermissionSeeder: holders of
+            // runs.execute get release, holders of release get withdraw.
+            'stockrecon.duplicates.release', 'stockrecon.duplicates.withdraw',
         ],
 
         'operations' => [

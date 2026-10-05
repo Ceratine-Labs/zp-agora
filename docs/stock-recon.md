@@ -336,6 +336,43 @@ office had moved counts to hide (S7 on the shift after). Held, 0 rows. Every
 chain without a D2 proposed exactly the same rows either way (Sep 15 → 15, Aug
 591 → 591).
 
+### On screen: the duplicate-issues panel (5 Oct 2026)
+
+Ryan, 1 Oct 2026: *"show a view like the customer report on the stock recon
+itself, identifying what is what and what is being corrected."* Every run —
+the proposals and the exceptions alike — carries a **Duplicate issues** panel
+above its two tabs, powered by `agora.usp_StockRecon_GetDuplicates` (named under
+each case's table):
+
+* **One tab per candidate**, grouped *Clear* then *Possible* (`<x-tabs chips>`),
+  each a case (`<x-case>`): what kind, where it stands, what happened, why it is
+  or is not clear, the result in rand at the run's sell price — and the shifts
+  that prove it, in date and shift order, each labelled by its role: the
+  **twin** where the issue arrived, the shift **as keyed**, and for a D1 being
+  or already taken out the same shift **corrected** (issue struck through to 0,
+  nil, not charged). When the first issue is the duplicate — the charcoal — the
+  corrected row comes first and the twin after it.
+* **The figures are the basis the duplicate was judged on**: the opening is
+  the previous closing where the chain carried one (a counted opening that
+  missed it is shown beside it), so a D1's keyed row is short by exactly the
+  issue, as the rule saw it. Everything is the run's own record; PumpIT is not
+  read.
+* **The state is the procedure's.** D1: *will be set to 0* when committed, *set
+  to 0* (or *recorded as 0* in journal mode) by whom and when, *reversed*,
+  *skipped* at the commit, *not written*, or *not corrected* with the preview's
+  reason. D2: *holding the chain back*, *released* (by whom, when, why),
+  *released since this preview* (preview again), *release withdrawn*, or
+  *listed* when holding was switched off. A D2's case mounts the release — or
+  the withdraw — from `partials/duplicate-release`, behind its permissions.
+* `?dup=` in the address is the case left open, so a release (which redirects
+  back) lands on the case it was pressed on.
+* **On the proposals**, a D1 being taken out and a D2 have their own outcome
+  pills (*Duplicate issue removed*, *Possible duplicate*) and the strip opens on
+  **Balanced and Duplicate issue removed** together. Until this, a D1 that sold
+  nothing read as *Dormant* and sat outside the press, so the commit skipped the
+  rest of its chain ("write that shift with it").
+* **The chain panel** names a D1 on its chain and links to its case.
+
 ### Measured
 
 The investigation (local copy of live, 17 sites, 25 Jul – 7 Sep; Bethlehem to
@@ -379,6 +416,7 @@ the same size) without any duplicate rule.
 | `agora.usp_StockRecon_DrillChain` | The whole chain behind one clicked shift. |
 | `agora.usp_StockRecon_ReleaseDuplicate` | Releases possible duplicates (D2) with a reason, so the next preview lets their chain commit. Agora's ledger only. |
 | `agora.usp_StockRecon_WithdrawRelease` | Takes a release back; the D2 holds its chain again. |
+| `agora.usp_StockRecon_GetDuplicates` | The duplicate-issues panel: each D1 and D2 on a run with its state, the shifts that prove it (twin, as keyed, corrected), and the totals. Reads Agora only. |
 | `agora.StockReconRun` | One press of Preview: window, caps, procedure, and the before/after shape. |
 | `agora.StockReconRunLine` | One shift of one item: counted, balanced, every flag, the tick. |
 | `agora.StockReconAmendment` | What a commit did, with the PRIOR counts. This is what makes a reversal exact. |

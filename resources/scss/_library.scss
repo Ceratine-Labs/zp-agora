@@ -96,6 +96,41 @@
   }
   .ct { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .on .ct { color: var(--brand-ink); }
+
+  /* A label before a run of tabs that belong together (`group` on the items).
+     Not a tab: hidden from assistive technology, named by each tab instead. */
+  .tab-group {
+    align-self: center; padding: 0 4px 0 2px;
+    font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tab-group:not(:first-child) { margin-left: 10px; }
+}
+
+/* <x-tabs chips>: the strip as pills that wrap, for a strip of CASES — the
+   stock recon duplicate issues, after the customer report's tabs (5 Oct 2026).
+   It wraps on a phone as well: the narrow rule further down turns a plain
+   strip into a sideways scroll with the scrollbar hidden, which is right for
+   three sections and wrong for a dozen cases, the last of which nobody would
+   know was there. Two classes, so it outranks that rule wherever it sits. */
+.tabs.tabs-chips {
+  gap: 6px; padding: 10px 12px; align-items: center;
+  flex-wrap: wrap; overflow-x: visible;
+
+  button, a {
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 5px 11px; background: var(--surface);
+    max-width: 100%; text-align: left;
+
+    &:hover { border-color: var(--muted); }
+    &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+    &.on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-ink); }
+    &.on.tab-tone-good    { border-color: var(--good);    background: var(--good-bg);    color: var(--good-ink); }
+    &.on.tab-tone-warn    { border-color: var(--warn);    background: var(--warn-bg);    color: var(--warn-ink); }
+    &.on.tab-tone-serious { border-color: var(--serious); background: var(--serious-bg); color: var(--serious-ink); }
+    &.on.tab-tone-crit    { border-color: var(--crit);    background: var(--crit-bg);    color: var(--crit-ink); }
+    &.on .ct { color: inherit; }
+  }
 }
 
 /* The panes themselves are unstyled: a tab is a container, and what goes in it

@@ -27,22 +27,30 @@
 --}}
 @php
     $tones = [
-        'balanced' => 'is-matched', 'short' => 'is-warn', 'blocked' => 'is-serious',
+        'balanced' => 'is-matched', 'duplicate' => 'is-matched', 'short' => 'is-warn',
+        'possible' => 'is-serious', 'blocked' => 'is-serious',
         'restored' => 'is-warn', 'unrecorded' => 'is-crit', 'dormant' => '', 'clean' => '',
     ];
 
     /*
      * The STATE a row is in, which is not the same as its outcome sentence.
-     * The procedure writes fifteen sentences; they collapse onto the six states
-     * StockReconRunLine::outcomeKey() already names and tone() already colours,
-     * and six is a strip of pills somebody reads at a glance where fifteen is
-     * another list. The label is what the pill says, what the column sorts on
+     * The procedure writes some twenty sentences; they collapse onto the nine
+     * states StockReconRunLine::outcomeKey() already names and tone() already
+     * colours, and nine is a strip of pills somebody reads at a glance where
+     * twenty is another list. The label is what the pill says, what the column sorts on
      * and what the filter matches — all three, because `data-sort` is the one
      * value table-tools reads for a cell.
      */
     $states = [
         'balanced' => 'Balanced',
+        /* A duplicate issue is its own state (5 Oct 2026). A clear one the
+           commit takes out OPENS IN THE PRESS beside Balanced: its chain is
+           written with it or not at all (usp_StockRecon_Commit skips the rest
+           as "write that shift with it"), and it used to sit in Dormant, out
+           of the press, whenever the shift sold nothing. */
+        'duplicate' => 'Duplicate issue removed',
         'short' => 'Short',
+        'possible' => 'Possible duplicate',
         'blocked' => 'Blocked',
         'restored' => 'Hand amendment reversed',
         'unrecorded' => 'Unrecorded issue',
@@ -212,10 +220,12 @@
                     @endif
                     {{-- Filtered by the pill strip above the table, not by a
                          tick list in the filter row. `data-tt-pills` is the
-                         pill it opens scoped to; the order is declared so a run
+                         pills it opens scoped to — Balanced, and a duplicate
+                         issue taken out, which is written with its chain or
+                         the chain is not written; the order is declared so a run
                          with no blocked chains still shows "Blocked 0" in the
                          same place rather than reshuffling the strip. --}}
-                    <th data-tt-pills="{{ $states['balanced'] }}"
+                    <th data-tt-pills="{{ $states['balanced'] }}|{{ $states['duplicate'] }}"
                         data-tt-pill-order="{{ $stateOrder }}">Outcome</th>
                     <th>Item</th>
                     {{-- `fit-min`: a date is short and must never wrap. Under

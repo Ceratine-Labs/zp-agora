@@ -25,7 +25,21 @@
         parameter to decide `active`. Use it instead of `persist` when the tab
         belongs to the thing on screen rather than to the person.
 
-    `items` is a list of ['key' =>, 'label' =>, 'href' =>, 'count' =>].
+    `items` is a list of ['key' =>, 'label' =>, 'href' =>, 'count' =>], and
+    two optional keys for a strip of CASES rather than of sections (the stock
+    recon duplicate issues, 5 Oct 2026, after the customer report's tabs):
+
+      * `group` — a small label before the first item of each run of items
+        that share it ("Clear", "Possible"). It is not a tab, so it is hidden
+        from assistive technology and each tab names it instead through
+        aria-describedby: a tablist owns tabs and nothing else, and the arrow
+        keys in tabs.js walk the tabs and skip the labels.
+      * `tone` — the colour the tab takes when it is on: good, warn, serious,
+        crit or neutral, checked against that list like every other tone.
+
+    `chips` draws the strip as pills that WRAP — on a phone too, where a plain
+    strip scrolls sideways with its scrollbar hidden. Right for a dozen cases
+    whose names are the content; a section strip of three stays a strip.
 --}}
 @props([
     'items' => [],
@@ -33,6 +47,7 @@
     'persist' => null,
     'query' => null,
     'label' => 'Sections',
+    'chips' => false,
 ])
 
 @php
@@ -40,6 +55,9 @@
     $active ??= data_get($items, '0.key');
     $linked = (bool) data_get($items, '0.href');
     $id = 'tabs-'.\Illuminate\Support\Str::random(6);
+    $tones = ['good', 'warn', 'serious', 'crit', 'neutral'];
+    $group = null;
+    $groupId = null;
 @endphp
 
 <div {{ $attributes->merge(['class' => 'tabset']) }}
@@ -47,23 +65,32 @@
      @if ($persist) data-tabs-persist="{{ $persist }}" @endif
      @if ($query) data-tabs-query="{{ $query }}" @endif>
 
-    <div class="tabs" role="{{ $linked ? 'group' : 'tablist' }}" aria-label="{{ $label }}">
+    <div class="tabs{{ $chips ? ' tabs-chips' : '' }}" role="{{ $linked ? 'group' : 'tablist' }}" aria-label="{{ $label }}">
         @foreach ($items as $item)
             @php($key = $item['key'])
             @php($on = (string) $key === (string) $active)
+            @php($tabClass = trim(($on ? 'on' : '').(in_array($item['tone'] ?? null, $tones, true) ? ' tab-tone-'.$item['tone'] : '')))
+
+            @if (($item['group'] ?? null) !== null && $item['group'] !== $group)
+                @php($group = $item['group'])
+                @php($groupId = $id.'-g'.$loop->index)
+                <span class="tab-group" id="{{ $groupId }}" aria-hidden="true">{{ $group }}</span>
+            @endif
 
             @if ($linked)
-                <a href="{{ $item['href'] }}" class="{{ $on ? 'on' : '' }}"
-                   @if ($on) aria-current="page" @endif>
+                <a href="{{ $item['href'] }}" class="{{ $tabClass }}"
+                   @if ($on) aria-current="page" @endif
+                   @if (isset($item['group'])) aria-describedby="{{ $groupId }}" @endif>
                     {{ $item['label'] }}
                     @isset($item['count'])<span class="ct">{{ $item['count'] }}</span>@endisset
                 </a>
             @else
-                <button type="button" role="tab" class="{{ $on ? 'on' : '' }}"
+                <button type="button" role="tab" class="{{ $tabClass }}"
                         id="{{ $id }}-{{ $loop->index }}"
                         data-tab="{{ $key }}"
                         aria-selected="{{ $on ? 'true' : 'false' }}"
-                        tabindex="{{ $on ? '0' : '-1' }}">
+                        tabindex="{{ $on ? '0' : '-1' }}"
+                        @if (isset($item['group'])) aria-describedby="{{ $groupId }}" @endif>
                     {{ $item['label'] }}
                     @isset($item['count'])<span class="ct">{{ $item['count'] }}</span>@endisset
                 </button>

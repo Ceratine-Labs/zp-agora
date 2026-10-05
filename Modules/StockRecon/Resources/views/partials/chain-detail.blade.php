@@ -26,6 +26,14 @@
 @php($unreleased = $possible->filter(fn ($s) => $s->ReleaseId === null))
 @php($releasedSince = $possible->filter(fn ($s) => $s->ReleaseId !== null && (int) $s->ReleaseId !== (int) $s->DupReleaseId))
 
+{{-- The clear duplicates on this chain (D1). The procedure has returned them
+     since 1 Oct 2026 and the panel never said so: a removed one read as an
+     ordinary balanced or dormant shift. Each links to its case on the run's
+     duplicate-issues panel, which says where it stands. --}}
+@php($clearDups = $shifts->filter(fn ($s) => $s->DupTier === 'D1'))
+@php($caseUrl = fn ($s) => route('app.stockrecon.run', [$run, 'dup' => 'dup-'.$s->Id]).'#duplicates')
+@php($twinOf = fn ($s) => $s->DupTwinDate ? \Illuminate\Support\Carbon::parse($s->DupTwinDate)->format('d M').' shift '.$s->DupTwinShift : 'a neighbouring shift')
+
 <div class="drill-chain">
     <header>
         <div class="card-t">
@@ -98,6 +106,23 @@
             @if ($releasedSince->isNotEmpty())
                 <p>{{ $releasedSince->count() }} released since this preview — preview again to let the chain commit.</p>
             @endif
+        </x-notice>
+    @endif
+
+    @if ($clearDups->isNotEmpty())
+        <x-notice tone="info"
+                  :title="$clearDups->count() === 1 ? 'A duplicate issue on this chain' : $clearDups->count().' duplicate issues on this chain'">
+            @foreach ($clearDups as $dup)
+                <p>{{ \Illuminate\Support\Carbon::parse($dup->TransactionDate)->format('d M') }} shift {{ $dup->ShiftNo }}:
+                   the issue of {{ \App\Support\Format::n($dup->QtyIssued, 3) }} was keyed twice — the identical issue on
+                   {{ $twinOf($dup) }} arrived.
+                   @if ($dup->QtyIssuedNew !== null)
+                       It is taken out of the balancing and set to 0 by the commit, and the chain is written with it.
+                   @else
+                       Not taken out: {{ (\Illuminate\Support\Str::after((string) ($dup->DupReason ?: 'Not removed: the run did not take it out'), 'Not removed: ')) }}.
+                   @endif
+                   <a href="{{ $caseUrl($dup) }}">See the case</a>.</p>
+            @endforeach
         </x-notice>
     @endif
 
@@ -202,6 +227,17 @@
                                 :title="config('stockrecon.audit.'.$shift->AuditCode.'.label').' — PumpIT holds '.\App\Support\Format::n($shift->QtyOpenNow, 3).' / '.\App\Support\Format::n($shift->QtyCloseNow, 3)">
                             {{ $shift->AuditCode }}
                         </x-chip>
+                    @endif
+                    {{-- A clear duplicate: the issue it takes out, or why it
+                         does not — and its case on the run's panel. --}}
+                    @if ($shift->DupTier === 'D1')
+                        <x-chip :tone="$shift->QtyIssuedNew !== null ? 'good' : 'warn'" :dot="false"
+                                :title="'Clear duplicate issue: the identical issue on '.$twinOf($shift).' arrived. '.($shift->DupReason ?? '')">
+                            D1 {{ $shift->QtyIssuedNew !== null
+                                ? 'issue '.\App\Support\Format::n($shift->QtyIssued, 3).' → '.\App\Support\Format::n($shift->QtyIssuedNew, 3)
+                                : 'not removed' }}
+                        </x-chip>
+                        <a href="{{ $caseUrl($shift) }}">case</a>
                     @endif
                     {{-- A possible duplicate: its twin, why it is not clear, and
                          the release it has now — or the press that makes one. --}}

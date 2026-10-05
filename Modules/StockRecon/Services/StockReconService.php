@@ -28,7 +28,7 @@ use Modules\StockRecon\Models\StockReconRunLine;
  *  3. **Replays a run's own arguments when committing.** @UseOriginalCounts
  *     decides which pair of columns the commit re-checks against, so it comes
  *     off the stored run rather than off today's config.
- *  4. **Answers the drill.**
+ *  4. **Answers the drill**, and the duplicate issues a run found.
  *
  * What it does NOT do is decide anything. Every figure on the screen comes out
  * of a procedure; nothing is recomputed here. If a rule ever exists in both
@@ -467,6 +467,37 @@ class StockReconService
         return [
             'item' => ($sets[0] ?? collect())->first(),
             'shifts' => $sets[1] ?? collect(),
+        ];
+    }
+
+    /**
+     * The duplicate issues a run found — the "Duplicate issues" panel on the
+     * run and on its exceptions (Ryan, 1 Oct 2026).
+     *
+     * One call, three result sets, and nothing recomputed here: each candidate
+     * with its state, the shifts that prove it (the twin, the shift as keyed,
+     * and for a clear one the shift corrected), and the totals. The shifts are
+     * hung on their candidate so the view loops once.
+     *
+     * @return array{procedure: string, cases: Collection<int, object>, totals: ?object}
+     */
+    public function duplicates(StockReconRun $run): array
+    {
+        $sets = $this->procedures->callSets('usp_StockRecon_GetDuplicates', [
+            'BranchId' => $run->BranchId,
+            'RunId' => $run->Id,
+        ]);
+
+        $shifts = ($sets[1] ?? collect())->groupBy(fn (object $row) => (int) $row->LineId);
+
+        return [
+            'procedure' => config('agora.schema').'.usp_StockRecon_GetDuplicates',
+            'cases' => ($sets[0] ?? collect())->map(function (object $case) use ($shifts) {
+                $case->shifts = $shifts->get((int) $case->LineId, collect())->values();
+
+                return $case;
+            })->values(),
+            'totals' => ($sets[2] ?? collect())->first(),
         ];
     }
 

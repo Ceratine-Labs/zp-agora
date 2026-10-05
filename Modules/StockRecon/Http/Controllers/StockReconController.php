@@ -450,6 +450,15 @@ class StockReconController extends Controller
             'branch' => Branch::query()->where('BranchId', $run->BranchId)->first(),
             'classes' => $this->service->exceptionClasses(),
             'audit' => $this->service->auditChecks(),
+            /*
+             * The duplicate issues on this run, on both faces of it (Ryan,
+             * 1 Oct 2026): what is clear, what is possible, and what is being
+             * done about each. `dup` is the case left open — the panel's tabs
+             * write it into the address, so a release, which redirects back,
+             * lands on the same case.
+             */
+            'duplicates' => $this->service->duplicates($run),
+            'dupCase' => is_scalar($dup = request()->query('dup')) ? (string) $dup : null,
         ];
     }
 

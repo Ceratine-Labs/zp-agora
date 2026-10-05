@@ -41,5 +41,11 @@ use App\Support\Database\ProcedureMigration;
  *   usp_StockRecon_DrillChain        the hold and the release, per shift.
  *
  * No new write to PumpIT: a release writes Agora's ledger only.
+ *
+ * And the screen for both (Ryan, 1 Oct 2026, the duplicate-issues panel):
+ *
+ *   usp_StockRecon_GetDuplicates     NEW. Read-only. Every D1 and D2 on a run
+ *                                    with its state, the shifts that prove it
+ *                                    (twin, as keyed, corrected) and totals.
  */
 return new class extends ProcedureMigration {};

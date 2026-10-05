@@ -222,6 +222,36 @@
             </div>
         </x-core::gallery-entry>
 
+        <x-core::gallery-entry name="x-case">
+            <div class="gal-variant">
+                <p class="eyebrow">One worked case — kind, state, what happened, why, result — and its evidence</p>
+                <x-case tone="good" badge="✓ Clear duplicate (D1)" state="Will be set to 0" state-tone="good"
+                        title="Nyala One Stop · Tobacco · Dunhill 10s · 23 Aug 2026"
+                        meta="Item 10234 · R35.00 each · issue 20"
+                        :terms="[
+                            'What happened' => 'The issue of 20 on 23 Aug shift 3 was keyed twice; the identical issue on 23 Aug shift 1 arrived and was counted.',
+                            'Why it is clear' => 'Short by exactly the issue, and the identical issue beside it arrived.',
+                            'Result' => 'The issue is set to 0 when the run is committed — R700.00 not charged.',
+                        ]">
+                    <x-slot:actions><a class="btn-ghost btn-row" href="#c-x-case">Open the chain</a></x-slot:actions>
+                    <x-table dense :count="2">
+                        <x-slot:head>
+                            <tr><th class="l">Shift</th><th class="num">Open</th><th class="num">+ Issued</th>
+                                <th class="num">− Sold</th><th class="num">= Expected</th><th class="num">Counted</th>
+                                <th class="l">Result</th></tr>
+                        </x-slot:head>
+                        <tr><td class="l">23 Aug shift 3, as keyed</td><td class="num">26</td><td class="num">20</td>
+                            <td class="num">2</td><td class="num">44</td><td class="num">24</td>
+                            <td class="l"><x-chip tone="crit" :dot="false">✕ short 20 · R700.00</x-chip></td></tr>
+                        <tr class="is-matched"><td class="l">23 Aug shift 3, corrected</td><td class="num">26</td>
+                            <td class="num"><x-reports::before-after :before="20" :after="0" /></td>
+                            <td class="num">2</td><td class="num">24</td><td class="num">24</td>
+                            <td class="l"><x-chip tone="good" :dot="false">✓ nil · not charged</x-chip></td></tr>
+                    </x-table>
+                </x-case>
+            </div>
+        </x-core::gallery-entry>
+
         <x-core::gallery-entry name="x-tabs">
             <div class="gal-variant">
                 <p class="eyebrow">Panel mode — remembered between visits, and walkable on the arrow keys</p>
@@ -250,6 +280,20 @@
                         ['key' => 'g-structure', 'label' => 'Structure', 'href' => '#g-structure'],
                         ['key' => 'g-data', 'label' => 'Data', 'href' => '#g-data'],
                     ]" />
+                </x-card>
+            </div>
+            <div class="gal-variant">
+                <p class="eyebrow">Chips — a strip of cases, grouped, that wraps on a phone</p>
+                <x-card flush>
+                    <x-tabs chips active="c-nyala" label="Cases" :items="[
+                        ['key' => 'c-nyala', 'label' => 'Dunhill 10s · 23 Aug', 'group' => 'Clear', 'tone' => 'good', 'count' => 'to 0'],
+                        ['key' => 'c-charcoal', 'label' => 'Blaze charcoal · 23 Aug', 'group' => 'Clear', 'tone' => 'good', 'count' => 'set to 0'],
+                        ['key' => 'c-marlboro', 'label' => 'Marlboro 20s · 2 Sep', 'group' => 'Possible', 'tone' => 'serious', 'count' => 'held'],
+                    ]">
+                        <x-tab-panel key="c-nyala"><x-empty-state text="The first case." /></x-tab-panel>
+                        <x-tab-panel key="c-charcoal"><x-empty-state text="The second case." /></x-tab-panel>
+                        <x-tab-panel key="c-marlboro"><x-empty-state text="A possible one, in its own group." /></x-tab-panel>
+                    </x-tabs>
                 </x-card>
             </div>
         </x-core::gallery-entry>

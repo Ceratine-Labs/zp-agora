@@ -83,6 +83,11 @@
         </x-table>
     </x-card>
 
+    {{-- Above the two faces, because it is about the run rather than either
+         list: a clear duplicate is a row the commit writes, a possible one a
+         chain it will not. --}}
+    @include('stockrecon::partials.duplicates')
+
     <x-tabs :items="$tabs" :active="$tab" label="Run" style="margin:16px 0" />
 
     @include('stockrecon::panes.'.$tab)

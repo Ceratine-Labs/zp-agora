@@ -154,6 +154,43 @@ a.kpi:hover { border-color: var(--brand); }
   &.tone-crit .fact-value    { color: var(--crit-ink); }
 }
 
+/* ============================================================ case */
+/* <x-case>: one worked case — badge, heading, what happened / why / result,
+   then the evidence. The customer report's case card (stock recon duplicate
+   issues, 5 Oct 2026). The rail carries the kind of case; the state has its
+   own chip, because a rail colour cannot be read out. */
+
+.case { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.case-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-left: 4px solid var(--line); border-radius: var(--r);
+  padding: 14px 16px;
+}
+.case-good    .case-card { border-left-color: var(--good); }
+.case-warn    .case-card { border-left-color: var(--warn); }
+.case-serious .case-card { border-left-color: var(--serious); }
+.case-crit    .case-card { border-left-color: var(--crit); }
+
+.case-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.case-title {
+  font-family: var(--font-display); font-size: 18px; line-height: 1.3;
+  margin: 8px 0 2px; text-wrap: balance; overflow-wrap: anywhere;
+}
+.case-meta { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
+.case-terms {
+  display: grid; grid-template-columns: minmax(110px, 150px) minmax(0, 1fr);
+  gap: 7px 16px; margin: 0; font-size: 13.5px; line-height: 1.5;
+  dt { color: var(--muted); font-size: 12.5px; }
+  dd { margin: 0; min-width: 0; }
+}
+.case-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.case-evidence { min-width: 0; }
+
+@media (max-width: 720px) {
+  .case-card { padding: 12px 13px; }
+  .case-terms { grid-template-columns: minmax(0, 1fr); gap: 1px; dd { margin-bottom: 8px; } }
+}
+
 /* ============================================================ small parts */
 
 .chip {
@@ -1105,6 +1142,10 @@ tr.is-expandable > td.pick { position: relative; }
    of one item in order, counted beside balanced — so it wants the full width of
    the grid rather than the two halves `.drill` divides it into. Same padding,
    same rules, one column. */
+/* A case on the stock recon duplicate-issues panel: the card and its table
+   sit inside the panel with the chain panel's padding. */
+.dup-pane { padding: 4px 14px 14px; min-width: 0; }
+
 .drill-chain {
   padding: 12px 14px; min-width: 0;
 

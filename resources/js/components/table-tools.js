@@ -35,7 +35,7 @@
  *   <th data-no-tools>                            — no sort, no filter
  *   <th data-tt-pills="Balanced"                  — this column as a pill strip
  *       data-tt-pill-order="A|B|C">                 above the table, opening on
- *                                                   that value
+ *                                                   that value (`A|B`: on both)
  *   <td data-sort="2026-09-08">8 Sep</td>         — sort and filter on this
  *                                                   instead of the rendered text
  *   <td data-sort="Balanced" data-tone="good">    — and the chip tone its pill
@@ -188,7 +188,11 @@ class TableTools {
                 // A pilled column is filtered ABOVE the table rather than in
                 // the filter row — same filter, different control.
                 pills: th.dataset.ttPills !== undefined,
-                pillDefault: (th.dataset.ttPills || '').trim(),
+                // `A|B` opens scoped to both — the stock recon proposals open
+                // on Balanced AND a removed duplicate issue, which is written
+                // with its chain or the chain is not written at all.
+                pillDefault: (th.dataset.ttPills || '').split('|')
+                    .map((value) => value.trim()).filter(Boolean),
                 pillOrder: (th.dataset.ttPillOrder || '').split('|')
                     .map((value) => value.trim()).filter(Boolean),
                 pillButtons: [],
@@ -710,8 +714,10 @@ class TableTools {
          * rows for would open the table empty, which reads as a broken screen
          * rather than as a scope — so it quietly falls back to All.
          */
-        if (column.pillDefault && (counts.get(column.pillDefault) || 0) > 0) {
-            column.chosen = new Set([column.pillDefault]);
+        const opening = column.pillDefault.filter((value) => (counts.get(value) || 0) > 0);
+
+        if (opening.length > 0) {
+            column.chosen = new Set(opening);
         }
 
         this.markColumn(column);
@@ -731,9 +737,11 @@ class TableTools {
 
     markPills(column) {
         column.pillButtons.forEach(({ button, value }) => {
+            // Every pill in the scope is lit: a default can name two, and a
+            // strip lighting neither while it filters would read as "All".
             const on = value === null
                 ? column.chosen === null
-                : column.chosen !== null && column.chosen.size === 1 && column.chosen.has(value);
+                : column.chosen !== null && column.chosen.has(value);
 
             button.classList.toggle('is-on', on);
             button.setAttribute('aria-pressed', String(on));
