@@ -7,6 +7,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\User;
+use Modules\Recon\Models\ReconRun;
 use Modules\Recon\Services\ReconService;
 use Tests\TestCase;
 
@@ -81,7 +82,8 @@ class CommitStampsEveryAreaTest extends TestCase
             'Amount' => 5200.00, 'ReconBatchNoPumpIT' => 0,
         ]);
 
-        $this->assertStamps('FNB', 'PumpIT.dbo.BRN_DailyBankingFNB');
+        $run = $this->assertStamps('FNB', 'PumpIT.dbo.BRN_DailyBankingFNB');
+        $this->assertReversalClearsOnlyItsOwnRows($run, 'PumpIT.dbo.BRN_DailyBankingFNB', 'BatchNo', '999');
     }
 
     /** CashMachine — the one area whose two sides are named differently. */
@@ -105,7 +107,8 @@ class CommitStampsEveryAreaTest extends TestCase
             'SlipNo' => 'D831041234', 'DepositaAmount' => 3100.00, 'ReconBatchNoPumpIT' => 0,
         ]);
 
-        $this->assertStamps('CashMachine', 'PumpIT.dbo.BRN_DailyBankingDeposita');
+        $run = $this->assertStamps('CashMachine', 'PumpIT.dbo.BRN_DailyBankingDeposita');
+        $this->assertReversalClearsOnlyItsOwnRows($run, 'PumpIT.dbo.BRN_DailyBankingDeposita', 'SlipNo', 'ZP99999999');
     }
 
     /** CashBags — stamped by its own id, the tightest of the five. */
@@ -132,7 +135,8 @@ class CommitStampsEveryAreaTest extends TestCase
             'CashBagNo' => '10000044170', 'CashBagAmount' => 7400.00, 'ReconBatchNoPumpIT' => 0,
         ]);
 
-        $this->assertStamps('CashBags', 'PumpIT.dbo.BRN_DailyBankingCashBags');
+        $run = $this->assertStamps('CashBags', 'PumpIT.dbo.BRN_DailyBankingCashBags');
+        $this->assertReversalClearsOnlyItsOwnRows($run, 'PumpIT.dbo.BRN_DailyBankingCashBags', 'CashBagNo', '10000099999');
     }
 
     /**
@@ -140,7 +144,7 @@ class CommitStampsEveryAreaTest extends TestCase
      * procedure's own account of itself. The Smart ATM defect was invisible
      * precisely because the status said COMMITTED either way.
      */
-    private function assertStamps(string $area, string $depositTable): void
+    private function assertStamps(string $area, string $depositTable): ReconRun
     {
         $run = $this->service->preview(
             $area, self::BRANCH, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-31'),
@@ -170,6 +174,43 @@ class CommitStampsEveryAreaTest extends TestCase
         $this->assertSame(0, (int) $this->db()->table($depositTable)
             ->where('SSBranchId', self::BRANCH)->where('ReconBatchNoPumpIT', 0)->count(),
             "{$area}: the deposit was not stamped with the batch number.");
+
+        return $run;
+    }
+
+    /**
+     * A reversal clears the rows THIS batch recorded and nothing else.
+     *
+     * PumpIT's own batch counter is read and then written without a lock, so
+     * the executable can stamp its own deposits with a number Agora also took.
+     * A row like that is planted here — same batch number, another key — and
+     * must keep its stamp through the reversal (task 01a0d308-a387).
+     */
+    private function assertReversalClearsOnlyItsOwnRows(ReconRun $run, string $table, string $keyColumn, string $foreignKey): void
+    {
+        $batchNo = (int) $this->db()->table('agora.ReconBatch')->where('BranchId', self::BRANCH)->value('BatchNo');
+
+        $ours = (array) $this->db()->table($table)
+            ->where('SSBranchId', self::BRANCH)->where('ReconBatchNoPumpIT', $batchNo)->first();
+
+        $foreign = $ours;
+        unset($foreign['DailyBankingCashBagID']);
+        $foreign[$keyColumn] = $foreignKey;
+        $this->db()->table($table)->insert($foreign);
+
+        $this->service->reverse($run->fresh(), 'TEST-reversal clears only its own rows');
+
+        $this->assertSame(0, (int) $this->db()->table($table)->where('SSBranchId', self::BRANCH)
+            ->where($keyColumn, $ours[$keyColumn])->value('ReconBatchNoPumpIT'),
+            'The reconciled deposit is cleared.');
+
+        $this->assertSame($batchNo, (int) $this->db()->table($table)->where('SSBranchId', self::BRANCH)
+            ->where($keyColumn, $foreignKey)->value('ReconBatchNoPumpIT'),
+            'A deposit the executable stamped with the same number keeps its stamp.');
+
+        $this->assertSame(0, (int) $this->db()->table('PumpIT.dbo.RCN_BankStatementLinesPumpIT')
+            ->where('SSBranchId', self::BRANCH)->where('ReconState', 2)->count(),
+            'The bank line is back to outstanding.');
     }
 
     private function criteria(string $area, int $bankStart, int $bankLen, int $bankStart2,

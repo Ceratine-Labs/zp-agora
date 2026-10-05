@@ -62,13 +62,19 @@ A row whose bank lines are no longer `ReconState = 1`, whose deposits are no
 longer `ReconBatchNoPumpIT = 0`, or whose sides no longer balance to the cent
 is skipped and marked `blocked` with the reason, never stamped over. The rest
 take batch numbers from `SS_UniqueNumber` in one `UPDATE … OUTPUT` — the
-executable's counter, so the two cannot collide — and the counter, the stamps
-and the ledger rows are one transaction.
+executable's counter, so Agora never hands out the same number twice — and the
+counter, the stamps and the ledger rows are one transaction. The executable
+reads that counter and then writes it without a lock, so IT can still issue a
+number Agora took; the reversal below is written so that does not matter.
 
 **Reverse.** `usp_Recon_Reverse` needs a reason. Bank lines go back to the
 ReconState and ReconBatchNo recorded in `agora.ReconMatch` (the executable's
 batch number, if that is what was there), deposits go back to 0, and only rows
-still carrying Agora's batch number are touched. The counter is never wound
+still carrying Agora's batch number AND matching a row the ledger recorded for
+the batch — its id, slip or batch reference — are touched, so a deposit the
+executable stamped with the same number keeps its stamp (5 Oct 2026). A forced
+FNB match's `Amount`, `AdjustedBy` and `Adjusted` go back to their recorded
+priors, and the reversal is refused if one has changed since. The counter is never wound
 back; the proposals return to pending. A cash-bag match's split by cashier is
 marked reversed in the same transaction and never deleted. A staff short the
 match raised that is still waiting for approval is declined in the same

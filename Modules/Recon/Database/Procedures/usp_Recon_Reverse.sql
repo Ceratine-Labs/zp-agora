@@ -214,13 +214,43 @@ BEGIN
           AND l.ReconBatchNo = m.BatchNo;
         SET @Bank = @@ROWCOUNT;
 
-        /* Deposit side. One statement per area, each addressing the row the
-           way the commit addressed it, and each guarded on the batch number
-           so nothing else's reconciliation is unpicked. */
+        /*
+         * Deposit side. One statement per area, each guarded on the batch
+         * number AND on the rows agora.ReconMatch recorded for the batch — its
+         * id (cash bags, Smart ATM), its slip (Deposita), its batch (ABSA, FNB:
+         * a commit records key "batch|merchant" and ref "batch", a manual match
+         * the batch as both; compared as text and as a number, as the commits
+         * compare it).
+         * The batch number alone is not enough: PumpIT's own counter is read
+         * and then written without a lock, so it can hand out a number Agora
+         * also took, and a reversal must not clear the executable's stamp on
+         * its own deposits (task 01a0d308-a387, 5 Oct 2026). A batch whose
+         * ledger recorded no id or key — none since 13c, but the guard costs
+         * nothing — is cleared by its number, as before.
+         */
+        DECLARE @Recorded TABLE (BatchId bigint, SourceId bigint NULL, KeyText nvarchar(100) NULL,
+                                 RefText nvarchar(100) NULL, RefNum bigint NULL);
+
+        INSERT INTO @Recorded (BatchId, SourceId, KeyText, RefText, RefNum)
+        SELECT m.BatchId, m.SourceId,
+               LTRIM(RTRIM(JSON_VALUE(m.SourceKeyJson, '$.key'))),
+               LTRIM(RTRIM(JSON_VALUE(m.SourceKeyJson, '$.ref'))),
+               TRY_CONVERT(bigint, LTRIM(RTRIM(JSON_VALUE(m.SourceKeyJson, '$.ref'))))
+        FROM agora.ReconMatch m
+        JOIN @Targets t ON t.BatchId = m.BatchId
+        WHERE m.BranchId = @BranchId AND m.Side = 'mops'
+          AND (m.SourceId IS NOT NULL OR JSON_VALUE(m.SourceKeyJson, '$.key') IS NOT NULL);
+
         UPDATE d SET d.ReconBatchNoPumpIT = 0
         FROM [PumpIT].dbo.BRN_DailyBankingABSA d
         JOIN @Targets t ON t.ReconArea = 'ABSA' AND t.StampMode = 'live'
-        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo;
+        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo
+          AND (NOT EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId)
+               OR EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId
+                            AND (r.RefNum = TRY_CONVERT(bigint, CONVERT(nvarchar(50), d.BatchNumber))
+                              OR r.RefText = LTRIM(RTRIM(CONVERT(nvarchar(50), d.BatchNumber)))
+                              OR r.KeyText = LTRIM(RTRIM(CONVERT(nvarchar(50), d.BatchNumber)))
+                                             + '|' + LTRIM(RTRIM(d.MerchantNumber)))));
         SET @Mops = @Mops + @@ROWCOUNT;
 
         /* FNB rows a forced match adjusted: the prior values back, by key, in
@@ -242,25 +272,41 @@ BEGIN
         UPDATE d SET d.ReconBatchNoPumpIT = 0
         FROM [PumpIT].dbo.BRN_DailyBankingFNB d
         JOIN @Targets t ON t.ReconArea = 'FNB' AND t.StampMode = 'live'
-        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo;
+        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo
+          AND (NOT EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId)
+               OR EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId
+                            AND (r.RefText = LTRIM(RTRIM(d.BatchNo))
+                              OR r.RefNum = TRY_CONVERT(bigint, LTRIM(RTRIM(d.BatchNo)))
+                              OR r.KeyText = LTRIM(RTRIM(d.BatchNo)) + '|' + LTRIM(RTRIM(d.MerchantNo)))));
         SET @Mops = @Mops + @@ROWCOUNT;
 
         UPDATE d SET d.ReconBatchNoPumpIT = 0
         FROM [PumpIT].dbo.BRN_DailyBankingDeposita d
         JOIN @Targets t ON t.ReconArea = 'CashMachine' AND t.StampMode = 'live'
-        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo;
+        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo
+          AND (NOT EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId)
+               OR EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId
+                            AND r.KeyText = LTRIM(RTRIM(d.SlipNo))));
         SET @Mops = @Mops + @@ROWCOUNT;
 
         UPDATE d SET d.ReconBatchNoPumpIT = 0
         FROM [PumpIT].dbo.BRN_DailyBankingCashBags d
         JOIN @Targets t ON t.ReconArea = 'CashBags' AND t.StampMode = 'live'
-        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo;
+        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo
+          AND (NOT EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId)
+               OR EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId
+                            AND (r.SourceId = d.DailyBankingCashBagID
+                              OR (r.SourceId IS NULL AND r.KeyText = LTRIM(RTRIM(d.CashBagNo))))));
         SET @Mops = @Mops + @@ROWCOUNT;
 
         UPDATE d SET d.ReconBatchNoPumpIT = 0
         FROM [PumpIT].dbo.BRN_DailyBankingSmartATM d
         JOIN @Targets t ON t.ReconArea = 'SmartATM' AND t.StampMode = 'live'
-        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo;
+        WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo
+          AND (NOT EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId)
+               OR EXISTS (SELECT 1 FROM @Recorded r WHERE r.BatchId = t.BatchId
+                            AND (r.SourceId = d.DailyBankingSmartATMID
+                              OR (r.SourceId IS NULL AND r.KeyText = LTRIM(RTRIM(CONVERT(nvarchar(100), d.TerminalId)))))));
         SET @Mops = @Mops + @@ROWCOUNT;
     END
 
