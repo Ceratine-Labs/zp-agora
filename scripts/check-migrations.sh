@@ -30,8 +30,12 @@ for file in $files; do
     # v1__13pa, v1__13pb. The same lettered rule the tables obey, one level
     # down. Without the second letter the convention had no way to say "another
     # procedure", which is a thing every module does for the life of the project.
-    if ! echo "$name" | grep -qE '^v[0-9]+__[0-9]{2}[a-z]{0,2}_[a-z0-9_]+\.php$'; then
-        say "$file: name does not match v{N}__{NN}[letter][letter]_{module}_{what}.php"
+    #
+    # And a third, for the module that uses all 26: Recon reached v1__13pz on
+    # 5 Oct 2026, so its next is v1__13pza ("pz_" sorts before "pza", so the
+    # order holds). Only ever after the two-letter run is spent.
+    if ! echo "$name" | grep -qE '^v[0-9]+__[0-9]{2}[a-z]{0,3}_[a-z0-9_]+\.php$'; then
+        say "$file: name does not match v{N}__{NN}[letter][letter][letter]_{module}_{what}.php"
     fi
 
     # A create must go through MigrationHelper, which is what refuses to build

@@ -215,13 +215,17 @@
                         {{-- The deposit family mostly has no id of its own, so
                              the row is named by the triple that identifies it,
                              packed into one field: a half-submitted row cannot
-                             become a different row. --}}
+                             become a different row. `ref2` is the second
+                             reference — the merchant number on ABSA and FNB,
+                             which two settlements sharing a batch, date and
+                             amount differ by (5 Oct 2026). --}}
                         <input type="checkbox" name="mops[]" data-pane-pick="mops"
                                value="{{ json_encode([
                                    'id' => $row->SourceId,
                                    'key' => $row->SourceKey,
                                    'dt' => substr((string) $row->SourceDate, 0, 10),
                                    'amt' => (float) $row->Amount,
+                                   'ref2' => $row->SourceRef2 ?? null,
                                ]) }}"
                                aria-label="Deposit {{ $row->SourceKey }}">
                     </td>

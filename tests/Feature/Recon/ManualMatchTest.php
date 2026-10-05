@@ -426,6 +426,67 @@ class ManualMatchTest extends TestCase
         }
     }
 
+    /**
+     * Two settlements can share batch, date and amount and differ only by
+     * merchant. The clerk ticked merchant B's: B's row is stamped, A's is not
+     * (task 01a0ce85, 5 Oct 2026). FNB and ABSA, rolled back.
+     */
+    public function test_a_deposit_is_claimed_by_its_merchant_not_just_its_batch_date_and_amount(): void
+    {
+        $db = DB::connection(config('agora.connections.app'));
+
+        foreach (['FNB', 'ABSA'] as $area) {
+            $sides = $this->procedures->callSets('usp_Recon_GetSides', [
+                'ReconArea' => $area, 'BranchId' => $this->branchId(),
+                'FromDate' => '2026-07-01', 'ToDate' => '2026-07-31 23:59:59', 'State' => 'outstanding', 'MaxRows' => 200,
+            ]);
+            $bankLine = $sides[0]->first();
+
+            if ($bankLine === null) {
+                $this->markTestSkipped("The stub holds no outstanding {$area} bank line in July 2026.");
+            }
+
+            $db->beginTransaction();
+
+            try {
+                [$table, $merchantCol] = $area === 'FNB'
+                    ? ['PumpIT.dbo.BRN_DailyBankingFNB', 'MerchantNo']
+                    : ['PumpIT.dbo.BRN_DailyBankingABSA', 'MerchantNumber'];
+
+                foreach (['TSTA01', 'TSTB01'] as $i => $merchant) {
+                    $db->table($table)->insert($area === 'FNB'
+                        ? ['SSBranchId' => $this->branchId(), 'TillNo' => 91 + $i, 'ShiftNo' => 1,
+                            'TransactionDate' => '2026-07-15 00:00:00', 'BatchNo' => 'TST0599', 'MerchantNo' => $merchant,
+                            'Amount' => 123.45, 'ReconBatchNo' => 0, 'ReconBatchNoPumpIT' => 0, 'Adjusted' => 0, 'AdjustedBy' => 0]
+                        : ['SSBranchId' => $this->branchId(), 'TillNo' => 91 + $i, 'ShiftNo' => 1,
+                            'TransactionDate' => '2026-07-15 00:00:00', 'RetrievalRefNumber' => 'TST'.$i, 'TransactionAuthCode' => 'TST',
+                            'ABSA_TransactionDate' => '2026-07-15 00:00:00', 'ABSA_TransactionTime' => '2026-07-15 10:00:00',
+                            'TransactionAmount' => 123.45, 'BatchNumber' => 9905099, 'MerchantNumber' => $merchant,
+                            'ReconBatchNo' => 0, 'ReconBatchNoPumpIT' => 0]);
+                }
+
+                $status = $this->procedures->write('usp_Recon_ManualMatch', [
+                    'BranchId' => $this->branchId(), 'ReconArea' => $area,
+                    'FromDate' => '2026-07-01', 'ToDate' => '2026-07-31 23:59:59',
+                    'BankLineIds' => (string) $bankLine->BankStatementLineID,
+                    'MopsJson' => json_encode([[
+                        'id' => null, 'key' => $area === 'FNB' ? 'TST0599' : '9905099', 'dt' => '2026-07-15',
+                        'amt' => 123.45, 'ref2' => 'TSTB01',
+                    ]]),
+                    'Reason' => 'TEST-merchant', 'StampMode' => 'live', 'UserId' => 1, 'AdjustMode' => 'off',
+                ]);
+
+                $stamped = $db->table($table)->where('SSBranchId', $this->branchId())
+                    ->whereIn($merchantCol, ['TSTA01', 'TSTB01'])->pluck('ReconBatchNoPumpIT', $merchantCol);
+
+                $this->assertSame((int) $status->BatchNo, (int) $stamped['TSTB01'], "{$area}: the ticked merchant's row is stamped.");
+                $this->assertSame(0, (int) $stamped['TSTA01'], "{$area}: the other merchant's row is left alone.");
+            } finally {
+                $db->rollBack();
+            }
+        }
+    }
+
     /** With the switch off a forced FNB match stamps both sides and moves no amount — as before 5 Oct 2026. */
     public function test_with_the_fnb_adjustment_off_a_forced_match_moves_no_amount(): void
     {

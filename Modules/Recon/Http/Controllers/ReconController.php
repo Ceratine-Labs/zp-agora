@@ -308,6 +308,10 @@ class ReconController extends Controller
                 'key' => (string) $row['key'],
                 'dt' => (string) $row['dt'],
                 'amt' => (float) $row['amt'],
+                // The merchant number on ABSA and FNB: two settlements can
+                // share batch, date and amount (5 Oct 2026).
+                'ref2' => isset($row['ref2']) && is_scalar($row['ref2']) && trim((string) $row['ref2']) !== ''
+                    ? trim((string) $row['ref2']) : null,
             ])
             ->values()
             ->all();

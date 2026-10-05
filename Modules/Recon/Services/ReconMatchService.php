@@ -113,7 +113,7 @@ class ReconMatchService
      * not theirs or does not add up (ALLOCATION_INCOMPLETE). Null sends none.
      *
      * @param  array<int, int>  $bankLineIds
-     * @param  array<int, array{id: int|null, key: string, dt: string, amt: float}>  $deposits
+     * @param  array<int, array{id: int|null, key: string, dt: string, amt: float, ref2?: string|null}>  $deposits
      * @param  array<int, array{code: string|null, banked: string|null, share: string|null}>|null  $allocation
      */
     public function match(

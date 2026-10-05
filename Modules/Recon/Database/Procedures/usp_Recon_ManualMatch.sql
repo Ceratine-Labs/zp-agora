@@ -169,16 +169,23 @@ BEGIN
     FROM STRING_SPLIT(ISNULL(@BankLineIds, ''), ',') s
     WHERE LTRIM(RTRIM(s.value)) <> '' AND TRY_CONVERT(bigint, LTRIM(RTRIM(s.value))) IS NOT NULL;
 
+    /* ref2 is the deposit's merchant number on ABSA and FNB (GetSides'
+       SourceRef2). Two settlements can share batch, date and amount under
+       different merchants; without it the procedure could stamp the other
+       merchant's row. Absent (an older screen), the row is named by the
+       triple as before. */
     DECLARE @WantMops TABLE (
         Seq int IDENTITY(1,1) PRIMARY KEY,
-        SourceId bigint NULL, SourceKey nvarchar(100), SourceDate date, Amount money
+        SourceId bigint NULL, SourceKey nvarchar(100), SourceDate date, Amount money,
+        Ref2 nvarchar(50) NULL
     );
 
-    INSERT INTO @WantMops (SourceId, SourceKey, SourceDate, Amount)
+    INSERT INTO @WantMops (SourceId, SourceKey, SourceDate, Amount, Ref2)
     SELECT TRY_CONVERT(bigint, JSON_VALUE(j.value, '$.id')),
            LTRIM(RTRIM(JSON_VALUE(j.value, '$.key'))),
            TRY_CONVERT(date, JSON_VALUE(j.value, '$.dt')),
-           TRY_CONVERT(money, JSON_VALUE(j.value, '$.amt'))
+           TRY_CONVERT(money, JSON_VALUE(j.value, '$.amt')),
+           CASE WHEN @ReconArea IN ('ABSA', 'FNB') THEN NULLIF(LTRIM(RTRIM(JSON_VALUE(j.value, '$.ref2'))), '') END
     FROM OPENJSON(ISNULL(@MopsJson, '[]')) j;
 
     IF NOT EXISTS (SELECT 1 FROM @Want) OR NOT EXISTS (SELECT 1 FROM @WantMops)
@@ -218,6 +225,9 @@ BEGIN
     DECLARE @Avail TABLE (
         Seq int IDENTITY(1,1) PRIMARY KEY,
         SourceId bigint NULL, SourceKey nvarchar(100), SourceDate date, Amount money, Rn int,
+        /* ABSA and FNB: the merchant number, and the row's place among those
+           sharing key, date, amount AND merchant. */
+        Ref2 nvarchar(50) NULL, Rn2 int NULL,
         /* Cash bags only: who dropped the bag and what they declared at the
            safe, read off agora.vw_DailyBankingCashBags (one row per bag). */
         CashierCode nvarchar(50) NULL, CashierName nvarchar(200) NULL, DropSafeAmount money NULL,
@@ -228,21 +238,29 @@ BEGIN
     );
 
     IF @ReconArea = 'ABSA'
-        INSERT INTO @Avail (SourceId, SourceKey, SourceDate, Amount, Rn)
+        INSERT INTO @Avail (SourceId, SourceKey, SourceDate, Amount, Rn, Ref2, Rn2)
         SELECT NULL, LTRIM(RTRIM(CONVERT(nvarchar(100), d.BatchNumber))), CONVERT(date, d.TransactionDate), d.TransactionAmount,
-               ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(CONVERT(nvarchar(100), d.BatchNumber))), CONVERT(date, d.TransactionDate), d.TransactionAmount ORDER BY (SELECT NULL))
+               ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(CONVERT(nvarchar(100), d.BatchNumber))), CONVERT(date, d.TransactionDate), d.TransactionAmount
+                                  ORDER BY LTRIM(RTRIM(d.MerchantNumber))),
+               LTRIM(RTRIM(d.MerchantNumber)),
+               ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(CONVERT(nvarchar(100), d.BatchNumber))), CONVERT(date, d.TransactionDate), d.TransactionAmount,
+                                               LTRIM(RTRIM(d.MerchantNumber)) ORDER BY (SELECT NULL))
         FROM agora.vw_DailyBankingABSA d
         WHERE d.BranchId = @BranchId AND d.ReconBatchNoPumpIT = 0
           AND d.TransactionDate >= @FromDate AND d.TransactionDate <= @ToDate;
 
     ELSE IF @ReconArea = 'FNB'
-        INSERT INTO @Avail (SourceId, SourceKey, SourceDate, Amount, Rn,
+        INSERT INTO @Avail (SourceId, SourceKey, SourceDate, Amount, Rn, Ref2, Rn2,
                             TillNo, ShiftNo, TxnAt, BatchNoRaw, MerchantNo, Adjusted, AdjustedBy)
         SELECT NULL, LTRIM(RTRIM(d.BatchNo)), CONVERT(date, d.TransactionDate), d.Amount,
                /* Ordered by the rest of the key, so which of two rows the
                   screen cannot tell apart is claimed is the same every time. */
                ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(d.BatchNo)), CONVERT(date, d.TransactionDate), d.Amount
                                   ORDER BY d.TillNo, d.ShiftNo, d.MerchantNo, d.TransactionDate),
+               LTRIM(RTRIM(d.MerchantNo)),
+               ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(d.BatchNo)), CONVERT(date, d.TransactionDate), d.Amount,
+                                               LTRIM(RTRIM(d.MerchantNo))
+                                  ORDER BY d.TillNo, d.ShiftNo, d.TransactionDate),
                d.TillNo, d.ShiftNo, d.TransactionDate, d.BatchNo, d.MerchantNo, d.Adjusted, d.AdjustedBy
         FROM agora.vw_DailyBankingFNB d
         WHERE d.BranchId = @BranchId AND d.ReconBatchNoPumpIT = 0
@@ -279,25 +297,29 @@ BEGIN
         CashierCode nvarchar(50) NULL, CashierName nvarchar(200) NULL, DropSafeAmount money NULL,
         TillNo int NULL, ShiftNo int NULL, TxnAt datetime NULL, BatchNoRaw nvarchar(20) NULL,
         MerchantNo nvarchar(20) NULL, Adjusted bit NULL, AdjustedBy money NULL,
-        Cents bigint NULL, Adjustment money NULL
+        Cents bigint NULL, Adjustment money NULL, Ref2 nvarchar(50) NULL
     );
 
     /* The two areas that HAVE an id are matched by it — exact, and it cannot
        reach a row the screen did not show. The other three are matched on the
-       triple, with the nth want taking the nth available row. */
+       triple, with the nth want taking the nth available row — and on ABSA
+       and FNB on the merchant too, where the screen sent it (ref2), the nth
+       want of that merchant taking the nth row of that merchant. */
     INSERT INTO @Mops (SourceId, SourceKey, SourceDate, Amount, CashierCode, CashierName, DropSafeAmount,
-                       TillNo, ShiftNo, TxnAt, BatchNoRaw, MerchantNo, Adjusted, AdjustedBy)
+                       TillNo, ShiftNo, TxnAt, BatchNoRaw, MerchantNo, Adjusted, AdjustedBy, Ref2)
     SELECT a.SourceId, a.SourceKey, a.SourceDate, a.Amount, a.CashierCode, a.CashierName, a.DropSafeAmount,
-           a.TillNo, a.ShiftNo, a.TxnAt, a.BatchNoRaw, a.MerchantNo, a.Adjusted, a.AdjustedBy
+           a.TillNo, a.ShiftNo, a.TxnAt, a.BatchNoRaw, a.MerchantNo, a.Adjusted, a.AdjustedBy, a.Ref2
     FROM @Avail a
     JOIN (
-        SELECT w.SourceId, w.SourceKey, w.SourceDate, w.Amount,
-               ROW_NUMBER() OVER (PARTITION BY w.SourceKey, w.SourceDate, w.Amount ORDER BY w.Seq) AS Rn
+        SELECT w.SourceId, w.SourceKey, w.SourceDate, w.Amount, w.Ref2,
+               ROW_NUMBER() OVER (PARTITION BY w.SourceKey, w.SourceDate, w.Amount, w.Ref2 ORDER BY w.Seq) AS Rn
         FROM @WantMops w
     ) w
       ON ((w.SourceId IS NOT NULL AND a.SourceId = w.SourceId)
        OR (w.SourceId IS NULL AND a.SourceId IS NULL
-           AND a.SourceKey = w.SourceKey AND a.SourceDate = w.SourceDate AND a.Amount = w.Amount AND a.Rn = w.Rn));
+           AND a.SourceKey = w.SourceKey AND a.SourceDate = w.SourceDate AND a.Amount = w.Amount
+           AND ((w.Ref2 IS NULL AND a.Rn = w.Rn)
+             OR (w.Ref2 IS NOT NULL AND a.Ref2 = w.Ref2 AND a.Rn2 = w.Rn))));
 
     IF (SELECT COUNT(*) FROM @Mops) <> (SELECT COUNT(*) FROM @WantMops)
         THROW 51000, 'AGORA:MOPS_ROW_MOVED:One of the deposits is no longer outstanding — something reconciled it since this screen was drawn. Reload and pick again. Nothing was written.', 1;
@@ -778,13 +800,15 @@ BEGIN
              * nobody selected — which is the manual equivalent of the defect
              * this whole module exists to fix.
              */
-            DECLARE @K nvarchar(100), @D date, @A money, @N int;
+            DECLARE @K nvarchar(100), @D date, @A money, @R nvarchar(50), @N int;
 
+            /* Grouped by the merchant as well on ABSA and FNB (Ref2, the
+               claimed row's own), so the stamp lands on that merchant's row. */
             DECLARE grp CURSOR LOCAL FAST_FORWARD FOR
-                SELECT SourceKey, SourceDate, Amount, COUNT(*)
-                FROM @Mops GROUP BY SourceKey, SourceDate, Amount;
+                SELECT SourceKey, SourceDate, Amount, Ref2, COUNT(*)
+                FROM @Mops GROUP BY SourceKey, SourceDate, Amount, Ref2;
             OPEN grp;
-            FETCH NEXT FROM grp INTO @K, @D, @A, @N;
+            FETCH NEXT FROM grp INTO @K, @D, @A, @R, @N;
 
             WHILE @@FETCH_STATUS = 0
             BEGIN
@@ -794,7 +818,8 @@ BEGIN
                     WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = 0
                       AND LTRIM(RTRIM(CONVERT(nvarchar(100), d.BatchNumber))) = @K
                       AND CONVERT(date, d.TransactionDate) = @D
-                      AND d.TransactionAmount = @A;
+                      AND d.TransactionAmount = @A
+                      AND (@R IS NULL OR LTRIM(RTRIM(d.MerchantNumber)) = @R);
 
                 ELSE IF @ReconArea = 'FNB' AND @Adjust = 0
                     UPDATE TOP (@N) d SET d.ReconBatchNoPumpIT = @No
@@ -802,13 +827,13 @@ BEGIN
                     WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = 0
                       AND LTRIM(RTRIM(d.BatchNo)) = @K
                       AND CONVERT(date, d.TransactionDate) = @D
-                      AND d.Amount = @A;
+                      AND d.Amount = @A
+                      AND (@R IS NULL OR LTRIM(RTRIM(d.MerchantNo)) = @R);
 
                 ELSE IF @ReconArea = 'FNB'
                     /* Adjusting: stamped after this loop, by primary key,
                        with the adjustment — see THE FNB ADJUSTMENT. */
                     SET @N = @N;
-
 
                 ELSE
                     UPDATE TOP (@N) d SET d.ReconBatchNoPumpIT = @No
@@ -818,7 +843,7 @@ BEGIN
                       AND CONVERT(date, d.TransactionDate) = @D
                       AND d.DepositaAmount = @A;
 
-                FETCH NEXT FROM grp INTO @K, @D, @A, @N;
+                FETCH NEXT FROM grp INTO @K, @D, @A, @R, @N;
             END
             CLOSE grp; DEALLOCATE grp;
 

@@ -221,6 +221,7 @@
                                         'key' => $row->SourceKey,
                                         'dt' => substr((string) $row->SourceDate, 0, 10),
                                         'amt' => (float) $row->Amount,
+                                        'ref2' => $row->Merchant ?? null,
                                     ]) }}">
                                 @endforeach
                                 @if ($isClose)
