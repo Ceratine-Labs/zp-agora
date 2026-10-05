@@ -251,19 +251,9 @@ class StockReconController extends Controller
      */
     public function commit(Request $request, StockReconRun $run): RedirectResponse
     {
-        /*
-         * The checkbox names are `lines[]`, so this is an array of strings —
-         * but request input is mixed, and mapping over mixed is how a nested
-         * array becomes an "Array to string conversion" 500.
-         *
-         * @var array<int, scalar> $submitted
-         */
-        $submitted = is_array($request->input('lines')) ? $request->input('lines') : [];
-
-        $lineIds = array_values(array_filter(array_map(
-            fn (mixed $id) => is_scalar($id) ? (int) $id : 0,
-            $submitted,
-        )));
+        // The checkbox names are `lines[]` — see lineIds() for why the parse
+        // is careful.
+        $lineIds = $this->lineIds($request->input('lines'));
 
         /*
          * ONE SHIFT, FROM ITS OWN ROW.
@@ -336,6 +326,61 @@ class StockReconController extends Controller
         }
 
         return redirect()->route('app.stockrecon.run', $run)->with('committed', $status->Message);
+    }
+
+    /**
+     * Release possible duplicate issues (D2) so their chains may commit, with
+     * one reason for the lot (Ryan, 5 Oct 2026, PM decision 01a10b21).
+     *
+     * Thin on purpose: the line ids and the reason go straight to the
+     * procedure, which refuses anything that is not a D2 on this run, a reason
+     * too short to be checked later, or an issue re-keyed since the preview.
+     * Back to wherever the press was made — the chain page or the run — with
+     * the procedure's own sentence, which says to preview again.
+     */
+    public function releaseDuplicates(Request $request, StockReconRun $run): RedirectResponse
+    {
+        try {
+            $status = $this->service->releaseDuplicates(
+                $run,
+                $this->lineIds($request->input('lines')),
+                trim((string) $request->input('reason')),
+            );
+        } catch (AgoraProcException $e) {
+            return back()->with('refusal', $e->getMessage());
+        }
+
+        return back()->with('released', $status->Message);
+    }
+
+    /** Withdraw a release: the possible duplicate holds its chain back again from the next preview. */
+    public function withdrawRelease(Request $request, StockReconRun $run, int $release): RedirectResponse
+    {
+        $note = trim((string) $request->input('note'));
+
+        try {
+            $status = $this->service->withdrawRelease($run, $release, $note === '' ? null : $note);
+        } catch (AgoraProcException $e) {
+            return back()->with('refusal', $e->getMessage());
+        }
+
+        return back()->with('released', $status->Message);
+    }
+
+    /**
+     * Run line ids out of request input, which is mixed: mapping over a nested
+     * array is how one becomes an "Array to string conversion" 500.
+     *
+     * @return array<int, int>
+     */
+    protected function lineIds(mixed $input): array
+    {
+        $submitted = is_array($input) ? $input : [];
+
+        return array_values(array_filter(array_map(
+            fn (mixed $id) => is_scalar($id) ? (int) $id : 0,
+            $submitted,
+        )));
     }
 
     /**

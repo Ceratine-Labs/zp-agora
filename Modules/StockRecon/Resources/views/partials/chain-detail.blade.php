@@ -12,11 +12,19 @@
     rebuilding them in JavaScript is how the two drift apart.
 --}}
 @php($blocks = collect([
+    $item?->BlockPossibleDuplicate,
     $item?->BlockPackOver, $item?->BlockNoPosLink,
     $item?->BlockSoldMore, $item?->BlockCloseExceeds, $item?->BlockNetOver,
     $item?->BlockIssueNowhere, $item?->BlockAuditConflict, $item?->BlockBigAmendment, $item?->BlockPctAmendment,
     $item?->BlockNegativeClose, $item?->BlockShortChain, $item?->BlockDormantMoved,
 ])->filter()->values())
+
+{{-- The possible duplicates on this chain (PM decision 01a10b21): those with
+     no release standing NOW, which the panel offers to release, and those
+     released since this run was made, which only a new preview lets through. --}}
+@php($possible = $shifts->filter(fn ($s) => $s->DupTier === 'D2'))
+@php($unreleased = $possible->filter(fn ($s) => $s->ReleaseId === null))
+@php($releasedSince = $possible->filter(fn ($s) => $s->ReleaseId !== null && (int) $s->ReleaseId !== (int) $s->DupReleaseId))
 
 <div class="drill-chain">
     <header>
@@ -64,6 +72,31 @@
             @if ($item?->BlockNoPosLink)
                 <p><strong>Not a loss:</strong> the selling PLU or recipe is not reducing this item. Link it and
                    re-run; nobody is charged.</p>
+            @endif
+        </x-notice>
+    @endif
+
+    @if ($item?->BlockPossibleDuplicate)
+        <x-notice tone="warn" title="Held back: a possible duplicate issue">
+            <p>The same issue was keyed on a neighbouring shift and this item is short by about that much, but
+               the count cannot say which issue was real. Nothing on this chain is written to PumpIT — not the
+               balancing, and not a hand amendment put back — because that could return a short somebody hid by
+               moving counts to staff pay.</p>
+            <p><strong>Two ways out.</strong> The site corrects the issue in PumpIT against the issue book, the
+               storeroom count or the delivery note, and the next preview no longer finds it. Or somebody who has
+               checked releases it here with a reason, and the next preview lets the chain commit.</p>
+            @if ($unreleased->isNotEmpty())
+                @include('stockrecon::partials.duplicate-release', [
+                    'run' => $run,
+                    'lines' => $unreleased->pluck('Id')->map(fn ($id) => (int) $id)->all(),
+                    'label' => $unreleased->count() > 1 ? 'Release all '.$unreleased->count().'…' : 'Release…',
+                    'summary' => ($item->StockItemDescription ?? $line->StockItemNo).': '
+                        .$unreleased->map(fn ($s) => \Illuminate\Support\Carbon::parse($s->TransactionDate)->format('d M').' shift '.$s->ShiftNo
+                            .', issue '.\App\Support\Format::n($s->QtyIssued, 3))->implode('; ').'.',
+                ])
+            @endif
+            @if ($releasedSince->isNotEmpty())
+                <p>{{ $releasedSince->count() }} released since this preview — preview again to let the chain commit.</p>
             @endif
         </x-notice>
     @endif
@@ -169,6 +202,31 @@
                                 :title="config('stockrecon.audit.'.$shift->AuditCode.'.label').' — PumpIT holds '.\App\Support\Format::n($shift->QtyOpenNow, 3).' / '.\App\Support\Format::n($shift->QtyCloseNow, 3)">
                             {{ $shift->AuditCode }}
                         </x-chip>
+                    @endif
+                    {{-- A possible duplicate: its twin, why it is not clear, and
+                         the release it has now — or the press that makes one. --}}
+                    @if ($shift->DupTier === 'D2')
+                        @php($twin = $shift->DupTwinDate ? \Illuminate\Support\Carbon::parse($shift->DupTwinDate)->format('d M').' shift '.$shift->DupTwinShift : 'not found')
+                        @php($what = ($item->StockItemDescription ?? $line->StockItemNo).', '
+                            .\Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M').' shift '.$shift->ShiftNo
+                            .', issue '.\App\Support\Format::n($shift->QtyIssued, 3).' — the same issue on '.$twin.'.')
+                        <x-chip :tone="$shift->ReleaseId ? 'neutral' : 'serious'" :dot="false"
+                                :title="'Possible duplicate issue: the same issue on '.$twin.'. '.($shift->DupReason ?? '')">
+                            D2{{ $shift->ReleaseId ? ' released' : '' }}
+                        </x-chip>
+                        @if ($shift->ReleaseId)
+                            <br>Released by {{ $shift->ReleasedBy ?? 'somebody' }},
+                            {{ \Illuminate\Support\Carbon::parse($shift->ReleasedAt)->format('d M H:i') }}: {{ $shift->ReleaseReason }}
+                            @if ((int) $shift->ReleaseId !== (int) $shift->DupReleaseId) — since this preview; preview again. @endif
+                            @include('stockrecon::partials.duplicate-release', [
+                                'run' => $run, 'withdraw' => (int) $shift->ReleaseId, 'summary' => $what,
+                            ])
+                        @else
+                            @if ($shift->DupReleaseId)<br>Its release was withdrawn after this preview. @endif
+                            @include('stockrecon::partials.duplicate-release', [
+                                'run' => $run, 'lines' => [(int) $shift->Id], 'summary' => $what,
+                            ])
+                        @endif
                     @endif
                 </td>
             </tr>

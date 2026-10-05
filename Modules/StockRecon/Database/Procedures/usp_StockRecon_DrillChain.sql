@@ -3,7 +3,8 @@
  *
  * Read by:  Stock recon centre -> a run -> click a row (the detail panel).
  * Reads:    agora.StockReconRunLine, agora.vw_StockMaster, agora.vw_StockArea,
- *           agora.StockReconAmendment, agora.vw_StockReconShiftEmployee
+ *           agora.StockReconAmendment, agora.vw_StockReconShiftEmployee,
+ *           agora.StockReconDuplicateRelease, agora.[User]
  *
  * WHO WAS ON THE SHIFT travels with each row. dbo.STK_StockReconEmployees is
  * keyed on the same grain a recon line is, so the panel can say who was signed
@@ -104,7 +105,13 @@ BEGIN
         MAX(CASE WHEN rl.FlagPctAmendment       = 1 THEN 'A correction exceeds the share cap'           END) AS BlockPctAmendment,
         MAX(CASE WHEN rl.FlagNegativeClose      = 1 THEN 'Balancing would drive a closing below zero'   END) AS BlockNegativeClose,
         MAX(CASE WHEN rl.FlagShortChain         = 1 THEN 'Too few active shifts to balance'             END) AS BlockShortChain,
-        MAX(CASE WHEN rl.FlagDormantMoved       = 1 THEN 'A dormant shift would have been moved'        END) AS BlockDormantMoved
+        MAX(CASE WHEN rl.FlagDormantMoved       = 1 THEN 'A dormant shift would have been moved'        END) AS BlockDormantMoved,
+        /* Held back by a possible duplicate issue (PM decision 01a10b21), and
+           how many of them stand unreleased — the panel offers to release
+           them, one reason for the lot. */
+        MAX(CASE WHEN rl.DupHold = 1
+                 THEN 'A possible duplicate issue (D2) is not released: nothing on this chain is written' END) AS BlockPossibleDuplicate,
+        SUM(CASE WHEN rl.DupTier = 'D2' THEN 1 ELSE 0 END)                                     AS PossibleDuplicates
     FROM agora.StockReconRunLine rl
     /* OUTER APPLY: the master is keyed by branch AND Location, so a join on
        (BranchId, StockItemNo) alone multiplies every row of the chain — and
@@ -165,6 +172,18 @@ BEGIN
         rl.DupQty,
         rl.DupReason,
         rl.QtyIssuedNew,
+        /* Held back by a possible duplicate (5 Oct 2026), and the release
+           that stood when the run was made. */
+        rl.DupHold,
+        rl.DupReleaseId,
+        /* The release a D2 has NOW — standing, at the issue the run read. It
+           can differ from the one above: released or withdrawn since the
+           preview, which is what decides whether the panel offers Release or
+           Withdraw, and whether it says "preview again". */
+        cur.Id                                                              AS ReleaseId,
+        cur.Reason                                                          AS ReleaseReason,
+        cur.CreatedAt                                                       AS ReleasedAt,
+        cu.UserName                                                         AS ReleasedBy,
         /* THE BUG RYAN SAW, 9 September 2026: the header above resolves the
            item by joining the master, and these rows resolved nothing — so a
            run made before v1__14a named the product at the top and showed an
@@ -187,6 +206,15 @@ BEGIN
     FROM agora.StockReconRunLine rl
     LEFT JOIN agora.StockReconAmendment am
            ON am.BranchId = rl.BranchId AND am.RunId = rl.RunId AND am.RunLineId = rl.Id
+    OUTER APPLY (SELECT TOP 1 x.Id, x.Reason, x.CreatedAt, x.CreatedBy
+                   FROM agora.StockReconDuplicateRelease x
+                  WHERE rl.DupTier = 'D2'
+                    AND x.BranchId = rl.BranchId AND x.AreaNo = rl.AreaNo AND x.StockItemNo = rl.StockItemNo
+                    AND x.TransactionDate = rl.TransactionDate AND x.ShiftNo = rl.ShiftNo
+                    AND x.WithdrawnAt IS NULL
+                    AND ABS(x.QtyIssued - rl.QtyIssued) <= 0.0005
+                  ORDER BY x.Id DESC) cur
+    LEFT JOIN agora.[User] cu ON cu.Id = cur.CreatedBy
     LEFT JOIN agora.vw_StockReconShiftEmployee se
            ON se.BranchId        = rl.BranchId
           AND se.TransactionDate = rl.TransactionDate

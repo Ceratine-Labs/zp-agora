@@ -76,6 +76,8 @@ use Illuminate\Support\Carbon;
  * @property string|null $DupReason
  * @property string|null $QtyIssuedNew
  * @property bool $CountsMove
+ * @property bool $DupHold
+ * @property int|null $DupReleaseId
  * @property-read StockReconRun $run
  */
 class StockReconRunLine extends BaseModel
@@ -134,6 +136,8 @@ class StockReconRunLine extends BaseModel
         'FlagAuditConflict' => 'boolean',
         'BreakKept' => 'boolean',
         'CountsMove' => 'boolean',
+        'DupHold' => 'boolean',
+        'DupReleaseId' => 'integer',
         'DupTwinDate' => 'date',
         'DupTwinShift' => 'integer',
         'ChainBlocked' => 'boolean',
@@ -234,12 +238,25 @@ class StockReconRunLine extends BaseModel
      * the staff counts because a hand amendment broke the client's rules, or
      * where a clear duplicate issue is taken out on its own, the counts
      * untouched (QtyIssuedNew is set — usp_StockRecon_PreviewBalancing, 7f).
+     * Never on a chain a possible duplicate holds back (DupHold).
      */
     public function isWritable(): bool
     {
         return $this->WouldAmend
             && $this->CommitState === 'pending'
+            && ! $this->DupHold
             && (! $this->ChainBlocked || $this->RestoresHand || $this->removesDuplicate());
+    }
+
+    /**
+     * A possible duplicate issue (D2) on this shift. Since 5 Oct 2026 one with
+     * no release standing holds its whole chain back (DupHold): nothing on the
+     * chain is written until the site corrects the issue in PumpIT or somebody
+     * releases it with a reason (usp_StockRecon_ReleaseDuplicate).
+     */
+    public function isPossibleDuplicate(): bool
+    {
+        return $this->DupTier === 'D2';
     }
 
     /**

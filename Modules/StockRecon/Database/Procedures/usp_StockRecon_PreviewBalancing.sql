@@ -8,6 +8,8 @@
  *           definition of that in Agora; readers use it too, see v1__14b)
  *           agora.vw_StockAreaFood  (prepared food per area: never a clear
  *           duplicate issue)
+ *           agora.StockReconDuplicateRelease  (a possible duplicate released
+ *           with a reason no longer holds its chain back)
  * Writes:   agora.StockReconRunLine, agora.StockReconRun — Agora's own ledger.
  *           NOTHING in the customer's estate. The commit is a separate
  *           procedure and even that only writes to PumpIT in 'live' stamp mode.
@@ -69,6 +71,17 @@
  * commit writes QtyIssued = 0 with the prior kept. A possible one (D2) is
  * listed with its twin and never changed. Stage 2b has the rule.
  *
+ * A POSSIBLE DUPLICATE HOLDS ITS CHAIN BACK (Ryan, 5 Oct 2026, PM decision
+ * 01a10b21). Since 30 Sep a commit reverses the count moves the pack forbids,
+ * and 59 of 134 duplicate candidates had been hidden by exactly such moves —
+ * writing those chains would put the short back on staff pay. So a chain with
+ * an unreleased D2 is DupHold: blocked, and written NOTHING — not balanced,
+ * not put back to the staff counts (7d), not a clear duplicate on its own (7f)
+ * — until the site corrects the issue in PumpIT (the next preview no longer
+ * finds it) or somebody releases it with a reason
+ * (agora.usp_StockRecon_ReleaseDuplicate). A released D2 is still listed as
+ * D2; it just no longer holds anything back.
+ *
  * RULE 3 OF OURS, THE DORMANT SHIFT, is structural rather than a special case.
  * A shift whose (repaired) opening equals its closing, with nothing issued and
  * nothing sold, did not trade. SegSeq numbers only the active shifts, so a
@@ -98,10 +111,12 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_PreviewBalancing]
        duplicate (D1) but leaves it in the basis, so nothing proposes to write
        the issue. */
     @RemoveDuplicates     BIT             = 0,
-    /* config('stockrecon.exceptions.D2.blocks'). THE ONE PLACE a possible
-       duplicate (D2) would hold its chain back from the commit; off, it is
-       listed and the chain balances as usual (task 01a0f610-5ac0 decides). */
-    @BlockPossibleDuplicates BIT          = 0,
+    /* config('stockrecon.exceptions.D2.blocks'), ON since 5 Oct 2026 (PM
+       decision 01a10b21). A possible duplicate (D2) with no standing release
+       holds its whole chain back: nothing on it is written. Off, it is listed
+       and the chain balances as usual. Defaults ON, so a call that forgets it
+       errs towards writing nothing. */
+    @BlockPossibleDuplicates BIT          = 1,
     @UserId               INT             = NULL
 AS
 BEGIN
@@ -404,7 +419,9 @@ BEGIN
            CONVERT(decimal(18,4), NULL)                                          AS DupTwinVar,
            CONVERT(decimal(18,4), NULL)                                          AS DupQty,
            CONVERT(decimal(18,4), NULL)                                          AS DupTol,
-           CONVERT(nvarchar(80),  NULL)                                          AS DupReason
+           CONVERT(nvarchar(80),  NULL)                                          AS DupReason,
+           /* The standing release of a D2 on this shift, at this issue. */
+           CONVERT(bigint,        NULL)                                          AS DupReleaseId
     INTO #rep
     FROM rep;
 
@@ -649,6 +666,30 @@ BEGIN
 
     DROP TABLE #dup;
 
+    /* A RELEASED POSSIBLE DUPLICATE (5 Oct 2026, PM decision 01a10b21).
+       Somebody checked the issue book, the storeroom count or the delivery
+       note and released this D2 with a reason, so it no longer holds its
+       chain back (stage 7). Matched on the shift AND the issue as PumpIT holds
+       it now: an issue re-keyed since the release is a different candidate,
+       and the hold returns until somebody looks at it again. A withdrawn
+       release matches nothing. It stays a D2 either way — listed, never
+       changed. */
+    UPDATE r SET r.DupReleaseId = x.Id
+    FROM #rep r
+    CROSS APPLY (
+        SELECT TOP 1 x.Id
+        FROM agora.StockReconDuplicateRelease x
+        WHERE x.BranchId        = @BranchId
+          AND x.AreaNo          = r.AreaNo
+          AND x.StockItemNo     = r.StockItemNo
+          AND x.TransactionDate = r.TransactionDate
+          AND x.ShiftNo         = r.ShiftNo
+          AND x.WithdrawnAt IS NULL
+          AND ABS(x.QtyIssued - r.QtyIssued) <= @tol
+        ORDER BY x.Id DESC
+    ) x
+    WHERE r.DupTier = 'D2';
+
     /* Removed from the basis: the issue reads 0, and the variance and the
        dormant test follow. QtyVar — as the staff counted it — is left alone;
        it is the "before" every screen shows. */
@@ -857,15 +898,22 @@ BEGIN
     blocked AS
     (
         SELECT s.*,
+               /* HELD BACK BY A POSSIBLE DUPLICATE (PM decision 01a10b21): a
+                  D2 on the chain with no standing release, while config says
+                  D2 blocks. Kept apart from ChainBlocked because it means more
+                  than "not balanced" — 7d and 7f, which write parts of a
+                  blocked chain, write nothing on one of these. */
+               CONVERT(bit, MAX(CASE WHEN @BlockPossibleDuplicates = 1 AND s.DupTier = 'D2'
+                                      AND s.DupReleaseId IS NULL THEN 1 ELSE 0 END)
+                   OVER (PARTITION BY s.AreaNo, s.StockItemNo))            AS DupHold,
                CONVERT(bit, MAX(CONVERT(int, s.FlagNetOver) + CONVERT(int, s.FlagSoldMoreThanOnHand)
                               + CONVERT(int, s.FlagCloseExceedsOnHand) + CONVERT(int, s.FlagIssueWentNowhere)
                               + CONVERT(int, s.FlagBigAmendment) + CONVERT(int, s.FlagPctAmendment)
                               + CONVERT(int, s.FlagNegativeClose) + CONVERT(int, s.FlagShortChain)
                               + CONVERT(int, s.FlagDormantMoved) + CONVERT(int, s.FlagPackOver)
                               + CONVERT(int, s.FlagNoPosLink)
-                              /* A possible duplicate holds its chain back only
-                                 when config says D2 blocks — see the parameter. */
-                              + CASE WHEN @BlockPossibleDuplicates = 1 AND s.DupTier = 'D2' THEN 1 ELSE 0 END)
+                              + CASE WHEN @BlockPossibleDuplicates = 1 AND s.DupTier = 'D2'
+                                      AND s.DupReleaseId IS NULL THEN 1 ELSE 0 END)
                    OVER (PARTITION BY s.AreaNo, s.StockItemNo))            AS ChainBlocked
         FROM scored s
     ),
@@ -974,7 +1022,12 @@ BEGIN
        pack's own staff basis, which by construction trips none of its checks —
        and is NOT balanced: the reason it is blocked still stands and it stays
        on the report. S4, S4a and S4b are not here: an issue captured at
-       balancing is a missing issue captured, which the pack accepts. */
+       balancing is a missing issue captured, which the pack accepts.
+
+       NOT ON A CHAIN A POSSIBLE DUPLICATE HOLDS BACK (DupHold, 5 Oct 2026),
+       whatever else blocks it. Putting the staff counts back is exactly what
+       returns a short head office hid by moving counts — the duplicate's short
+       — to staff pay, which is the thing the hold is for. */
     ;WITH breached AS (
         SELECT AreaNo, StockItemNo
         FROM #apply
@@ -991,7 +1044,8 @@ BEGIN
                                 OR ABS(a.QtyClose - a.QtyCloseNow) > @tol THEN 1 ELSE 0 END
     FROM #apply a
     JOIN breached b ON b.AreaNo = a.AreaNo AND b.StockItemNo = a.StockItemNo
-    WHERE a.ChainBlocked = 1;
+    WHERE a.ChainBlocked = 1
+      AND a.DupHold = 0;
 
     /* ------------------------------------------------------------- stage 7e
        AGORA NEVER HANDS THE CLIENT A NEW AUDIT FLAG.
@@ -1084,13 +1138,19 @@ BEGIN
        short by exactly the issue TODAY, so the write leaves it at nil and
        nothing else moves. Where somebody has already moved the counts to hide
        the short, taking the issue out alone would turn the shift into an over;
-       that one is reported, not written. */
+       that one is reported, not written.
+
+       AND NEVER ON A CHAIN A POSSIBLE DUPLICATE HOLDS BACK (DupHold). The
+       chain waits as a whole: a D2 beside a D1 can be the other half of the
+       same keying, and which issue was real is what the site is being asked to
+       settle. */
     UPDATE a SET
         a.IssueWrite = 1,
         a.EffVarNew  = CASE WHEN a.ChainBlocked = 1 AND a.RestoresHand = 0
                             THEN a.QtyVar + a.IssueCut ELSE a.EffVarNew END
     FROM #apply a
     WHERE a.IssueCut > @eps
+      AND a.DupHold = 0
       AND (   a.ChainBlocked = 0
            OR a.RestoresHand = 1
            OR ABS(a.HandVar + a.IssueCut) <= a.DupTol);
@@ -1098,7 +1158,9 @@ BEGIN
     /* Not written, so the row stands as keyed: its issue is there, and a
        shift with an issue is not dormant whatever the basis said. */
     UPDATE #apply
-       SET DupReason = N'Not removed: PumpIT no longer holds this short and the chain is blocked',
+       SET DupReason = CASE WHEN DupHold = 1
+                            THEN N'Not removed: a possible duplicate (D2) holds this chain back'
+                            ELSE N'Not removed: PumpIT no longer holds this short and the chain is blocked' END,
            IsDormant = 0
     WHERE IssueCut > @eps AND IssueWrite = 0;
 
@@ -1147,7 +1209,8 @@ BEGIN
        counts (stage 7d) — and writing it trips no audit check that is not
        tripped today (7e); or where a clear duplicate issue is written (7f).
        CountsMove says which of the two moves the counts; there is no other
-       path from "blocked" to "written". */
+       path from "blocked" to "written" — and on a chain a possible duplicate
+       holds back (DupHold) neither 7d nor 7f applies, so nothing on it is. */
     INSERT INTO agora.StockReconRunLine (
         BranchId, RunId, [LineNo], AreaNo, StockItemNo, TransactionDate, ShiftNo, SellPrice,
         QtyOpen, QtyIssued, QtyClose, QtyPOS, QtyVar,
@@ -1159,6 +1222,7 @@ BEGIN
         PrevClose, ChainBreak, QtyOpenNow, QtyCloseNow, QtyIssuedOrig, IssueMultiple,
         FlagPackOver, FlagNoPosLink, RestoresHand, FlagAuditConflict, AuditCode, BreakKept,
         DupTier, DupTwinDate, DupTwinShift, DupTwinVar, DupQty, DupReason, QtyIssuedNew, CountsMove,
+        DupHold, DupReleaseId,
         ExceptionCode, Outcome, WouldAmend, Selected, CommitState,
         ItemDescription, POSCode, StockLocation, AreaDescription,
         EmployeeCodes, EmployeeNames, EmployeeCount,
@@ -1181,6 +1245,7 @@ BEGIN
         a.DupTier, a.DupTwinDate, a.DupTwinShift, a.DupTwinVar, a.DupQty, a.DupReason,
         CASE WHEN a.IssueWrite = 1 THEN CONVERT(decimal(18,4), 0) END,
         a.RowMoves,
+        a.DupHold, a.DupReleaseId,
 
         /* The class, ranked most serious first; a line is reported under the
            first test it trips. Codes are the pack's where the pack defines the
@@ -1222,6 +1287,16 @@ BEGIN
             WHEN a.IssueWrite = 1             THEN 'Duplicate issue removed (D1): captured twice, the issue goes to nil'
             WHEN a.RestoresHand = 1 AND a.RowMoves = 1
                                               THEN 'Hand amendment reversed: back to the count, the chain is not balanced'
+            /* A possible duplicate holding its chain back (PM decision
+               01a10b21): the shift with the identical issue, and the two ways
+               out — the site corrects the issue in PumpIT, or somebody
+               releases it with a reason. At most 79 characters against the
+               column's 80; the culture is pinned so September stays "Sep". */
+            WHEN a.DupHold = 1 AND a.DupTier = 'D2'
+                                              THEN N'Held back, possible duplicate (D2): twin '
+                                                   + ISNULL(FORMAT(a.DupTwinDate, 'd MMM', 'en-US') + N' shift '
+                                                            + CONVERT(nvarchar(4), a.DupTwinShift), N'unknown')
+                                                   + N'; fix PumpIT or release'
             WHEN a.FlagPackOver = 1           THEN 'Missed issue sheet: an over of a whole pack, captured not balanced'
             WHEN a.FlagNoPosLink = 1          THEN 'No till sales linked: stock falls, the till shows nothing, charge nobody'
             WHEN a.FlagSoldMoreThanOnHand = 1 THEN 'Unrecorded issue, proven: the till sold more than the shift held'
@@ -1235,12 +1310,17 @@ BEGIN
             WHEN a.FlagBigAmendment = 1 OR a.FlagPctAmendment = 1
                                               THEN 'Implausible amendment: the correction is too large to be a miscount'
             /* Before F2: a possible duplicate IS an issue that went nowhere,
-               and this says what to do about it. */
+               and this says what to do about it. Released, it no longer holds
+               the chain back, and the row says so — who and why are on the
+               release, which the chain panel reads. */
+            WHEN a.DupTier = 'D2' AND a.DupReleaseId IS NOT NULL
+                                              THEN 'Possible duplicate (D2), released: chain not held; reason kept on the release'
             WHEN a.DupTier = 'D2' AND a.EffVarNew < -@eps
                                               THEN 'Possible duplicate issue (D2): check the issue book before charging'
             WHEN a.FlagIssueWentNowhere = 1   THEN 'Issue went nowhere: issued, nothing sold, count unchanged'
             WHEN a.FlagAuditConflict = 1      THEN 'Audit conflict: an issue changed at balancing, counts cannot fix it'
             WHEN a.FlagShortChain = 1         THEN 'Chain too short: not enough active shifts in the window'
+            WHEN a.DupHold = 1                THEN 'Held back: a possible duplicate issue (D2) on this item holds the chain'
             WHEN a.ChainBlocked = 1           THEN 'Held back: another shift on this item blocks the chain'
             /* The qty leads, so it is on the pill and in the extract. At most
                74 characters against the column's 80. */

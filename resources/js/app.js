@@ -20,6 +20,7 @@ import tableTools from './components/table-tools';
 import linkedSelect from './components/linked-select';
 import bulkSelection from './components/bulk-selection';
 import postLink from './components/post-link';
+import duplicateRelease from './components/duplicate-release';
 import loader from './components/loader';
 import * as format from './format';
 
@@ -77,6 +78,11 @@ confirmForm();
 
 // Same reason: a row action that POSTs asks in the same dialog as a form does.
 postLink();
+
+// Same reason: releasing a possible duplicate issue asks for its reason in the
+// shared dialog. Delegated, so the chain panel fetched after load needs no
+// hydrate. Nothing on any page but the stock recon centre's.
+duplicateRelease();
 
 // Same reason: "match all strong" on the recon Suggestions tab asks in the
 // same dialog before it posts each one. Nothing on any other page.

@@ -84,10 +84,12 @@ export async function confirm(title, { text = '', action = 'Continue', danger = 
  * on the recon Suggestions tab (23 Sep 2026), where a month of forced matches
  * is one decision and the reason is the only record of why. Resolves to the
  * trimmed text, or null when the person backs out. An empty answer is refused
- * in the dialog, not after it.
+ * in the dialog, not after it — and so is one shorter than `minlength`, where a
+ * caller's procedure would refuse it anyway (a stock recon release, 5 Oct
+ * 2026: retyping a reason after a round trip is the worse way to learn that).
  */
 export async function ask(title, {
-    text = '', action = 'Continue', danger = false, placeholder = '', maxlength = 200,
+    text = '', action = 'Continue', danger = false, placeholder = '', maxlength = 200, minlength = 1,
 } = {}) {
     const s = await sweet();
 
@@ -98,7 +100,13 @@ export async function ask(title, {
         input: 'text',
         inputPlaceholder: placeholder,
         inputAttributes: { maxlength: String(maxlength), 'aria-label': placeholder || title },
-        inputValidator: (value) => (value && value.trim() ? null : 'A reason is required.'),
+        inputValidator: (value) => {
+            const typed = value ? value.trim() : '';
+
+            if (!typed) return 'A reason is required.';
+
+            return typed.length < minlength ? `Say a little more: at least ${minlength} characters.` : null;
+        },
         showCancelButton: true,
         confirmButtonText: action,
         cancelButtonText: 'Cancel',

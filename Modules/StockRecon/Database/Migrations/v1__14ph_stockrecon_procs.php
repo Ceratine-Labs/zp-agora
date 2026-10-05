@@ -25,5 +25,21 @@ use App\Support\Database\ProcedureMigration;
  * New named write (STK_StockReconLine.QtyIssued, D1 only): Ryan's go-ahead,
  * 1 Oct 2026, PM decision 01a0f60b-0459. Needs v1__14h (the columns,
  * agora.StockAreaSetting and agora.vw_StockAreaFood).
+ *
+ * And, before it left this machine, a possible duplicate (D2) HOLDS ITS CHAIN
+ * BACK (Ryan, 5 Oct 2026, PM decision 01a10b21). Needs v1__14i (DupHold,
+ * DupReleaseId, agora.StockReconDuplicateRelease), which sorts before this.
+ *
+ *   usp_StockRecon_PreviewBalancing  a chain with an unreleased D2 is DupHold:
+ *                                    blocked, and written nothing — not
+ *                                    balanced, not put back to the staff
+ *                                    counts (7d), no D1 on its own (7f).
+ *   usp_StockRecon_Commit            skips a chain whose D2 has no release
+ *                                    standing at the press.
+ *   usp_StockRecon_ReleaseDuplicate  NEW. Releases a D2 with a reason.
+ *   usp_StockRecon_WithdrawRelease   NEW. Takes a release back.
+ *   usp_StockRecon_DrillChain        the hold and the release, per shift.
+ *
+ * No new write to PumpIT: a release writes Agora's ledger only.
  */
 return new class extends ProcedureMigration {};

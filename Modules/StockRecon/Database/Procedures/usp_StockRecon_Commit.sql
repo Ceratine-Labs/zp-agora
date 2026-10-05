@@ -2,7 +2,8 @@
  * agora.usp_StockRecon_Commit — apply what the operator ticked on one run.
  *
  * Read by:  Stock recon centre -> a run -> the Balance press.
- * Reads:    agora.StockReconRun, agora.StockReconRunLine, agora.vw_StockReconLine
+ * Reads:    agora.StockReconRun, agora.StockReconRunLine, agora.vw_StockReconLine,
+ *           agora.StockReconDuplicateRelease
  * Writes:   agora.StockReconAmendment, agora.StockReconRunLine, agora.StockReconRun
  *           and — in 'live' stamp mode ONLY — QtyOpen / QtyClose on
  *           [PumpIT].dbo.STK_StockReconLine, and QtyIssued = 0 on a CLEAR
@@ -51,6 +52,15 @@
  * differs from PumpIT — a hand amendment the rules do not produce put back.
  * Every write keeps the row's PRIOR pair, so a reversal restores it exactly.
  *
+ * A POSSIBLE DUPLICATE HOLDS ITS CHAIN BACK (Ryan, 5 Oct 2026, PM decision
+ * 01a10b21). The preview writes no proposal on a chain an unreleased D2 holds
+ * (DupHold), and this checks it AGAIN at the press, against the release
+ * ledger and PumpIT as they stand now: a candidate whose chain carries a D2
+ * with no standing release for the issue PumpIT holds today is skipped. That
+ * covers a release withdrawn since the preview, an issue re-keyed since, and a
+ * run previewed while D2 did not block. @BlockPossibleDuplicates is
+ * config('stockrecon.exceptions.D2.blocks'), passed in like the modes.
+ *
  * @UseOriginalCounts must be the value the PREVIEW ran with, because it decides
  * which pair of columns the re-check compares against. It is replayed from the
  * run's stored parameters by the service, never defaulted at the call site.
@@ -65,6 +75,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_Commit]
     @StampMode         NVARCHAR(20)  = 'journal',
     @UseOriginalCounts BIT           = 1,
     @IssueMode         NVARCHAR(20)  = 'off',
+    /* Defaults ON, so a call that forgets it errs towards writing nothing. */
+    @BlockPossibleDuplicates BIT     = 1,
     @UserId            INT           = NULL
 AS
 BEGIN
@@ -129,6 +141,9 @@ BEGIN
          (usp_StockRecon_PreviewBalancing, stage 7d) — or to take out a clear
          duplicate issue on its own, the counts untouched (stage 7f). */
       AND (rl.ChainBlocked = 0 OR rl.RestoresHand = 1 OR rl.QtyIssuedNew IS NOT NULL)
+      /* And never on a chain a possible duplicate holds back: the preview
+         proposes nothing there, and this says so again. */
+      AND rl.DupHold = 0
       AND rl.CommitState = 'pending';
 
     IF NOT EXISTS (SELECT 1 FROM #cand)
@@ -208,6 +223,37 @@ BEGIN
           AND CONVERT(date, l.TransactionDate) = c.TransactionDate
           AND l.ShiftNo = c.ShiftNo AND l.AreaNo = c.AreaNo AND l.StockItemNo = c.StockItemNo
           AND ABS(CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0)) - c.QtyIssued) > @eps);
+
+    /* A POSSIBLE DUPLICATE STILL HOLDS ITS CHAIN BACK. Every D2 the run found
+       on the candidate's chain must have a release standing NOW, at the issue
+       the run read and the issue PumpIT holds today. A release withdrawn since
+       the preview, an issue re-keyed since, or a run previewed while D2 did
+       not block: the whole chain is skipped, and preview again. Before the
+       chain-wide skip below, so a duplicate this leaves unwritten makes the
+       rest of its chain wait. */
+    IF @BlockPossibleDuplicates = 1
+        UPDATE c SET SkipReason = N'This item carries a possible duplicate issue (D2) with no release standing for it. '
+                                + N'Correct it in PumpIT or release it with a reason, then preview again.'
+        FROM #cand c
+        WHERE c.SkipReason IS NULL
+          AND EXISTS (
+            SELECT 1 FROM agora.StockReconRunLine d
+            WHERE d.BranchId = @BranchId AND d.RunId = @RunId
+              AND d.AreaNo = c.AreaNo AND d.StockItemNo = c.StockItemNo
+              AND d.DupTier = 'D2'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM agora.StockReconDuplicateRelease x
+                  JOIN agora.vw_StockReconLine l
+                    ON l.BranchId = x.BranchId
+                   AND CONVERT(date, l.TransactionDate) = x.TransactionDate
+                   AND l.ShiftNo = x.ShiftNo AND l.AreaNo = x.AreaNo AND l.StockItemNo = x.StockItemNo
+                  WHERE x.BranchId = @BranchId
+                    AND x.AreaNo = d.AreaNo AND x.StockItemNo = d.StockItemNo
+                    AND x.TransactionDate = d.TransactionDate AND x.ShiftNo = d.ShiftNo
+                    AND x.WithdrawnAt IS NULL
+                    AND ABS(x.QtyIssued - d.QtyIssued) <= 0.0005
+                    AND ABS(CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0)) - x.QtyIssued) <= 0.0005));
 
     /* A CHAIN BALANCED WITH A DUPLICATE TAKEN OUT IS WRITTEN WITH IT. Its
        counts were worked out with that issue gone; writing them while the
@@ -388,7 +434,10 @@ BEGIN
                             THEN ' (' + CONVERT(nvarchar(20), @Issues) + ' duplicate issue(s) set to 0)'
                             ELSE '' END
                      + CASE WHEN @Skipped > 0
-                            THEN ', ' + CONVERT(nvarchar(20), @Skipped) + ' skipped because they had moved'
+                            /* Not "because they had moved": a skip is also a
+                               chain a possible duplicate holds, or one waiting
+                               for its duplicate. Each row says which. */
+                            THEN ', ' + CONVERT(nvarchar(20), @Skipped) + ' skipped (each says why)'
                             ELSE '' END
                      + CASE WHEN @StampMode = 'live'
                             THEN ', written to PumpIT.'

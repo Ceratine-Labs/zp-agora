@@ -27,7 +27,7 @@
                     <br><span class="muted">{{ $class['blurb'] }}</span>
                 </td>
                 <td class="l mono muted">{{ $class['test'] }}</td>
-                <td class="l muted">{{ ($class['blocks'] ?? false) ? 'No — reported' : 'Yes' }}</td>
+                <td class="l muted">{{ $class['balanced'] ?? (($class['blocks'] ?? false) ? 'No — reported' : 'Yes') }}</td>
             </tr>
         @endforeach
     </x-table>

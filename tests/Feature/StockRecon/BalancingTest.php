@@ -5,13 +5,19 @@ namespace Tests\Feature\StockRecon;
 use App\Exceptions\AgoraProcException;
 use App\Support\ProcedureService;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
+use Modules\Core\Models\UserPermission;
+use Modules\Core\Services\PermissionService;
 use Modules\StockRecon\Models\StockReconAmendment;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
 use Modules\StockRecon\Services\StockReconService;
+use Tests\Fixtures\GrantsAccess;
 use Tests\TestCase;
 
 /**
@@ -36,6 +42,8 @@ use Tests\TestCase;
  */
 class BalancingTest extends TestCase
 {
+    use GrantsAccess;
+
     /** The E2E fixture branch: inactive, non-trading, and nobody's real site. */
     private const BRANCH = 999;
 
@@ -65,6 +73,9 @@ class BalancingTest extends TestCase
 
     private StockReconService $service;
 
+    /** @var array<int, User> people a test made, removed in tearDown */
+    private array $made = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -79,6 +90,16 @@ class BalancingTest extends TestCase
     {
         if ($this->app !== null) {
             $this->cleanUp();
+
+            foreach ($this->made as $user) {
+                UserPermission::query()->acrossBranches()->where('UserId', $user->Id)->delete();
+                $this->db()->table('agora.UserGridColumn')->where('UserId', $user->Id)->delete();
+                User::query()->acrossBranches()->where('Id', $user->Id)->forceDelete();
+            }
+
+            if ($this->made !== []) {
+                app(PermissionService::class)->forgetAll();
+            }
         }
 
         parent::tearDown();
@@ -1325,21 +1346,13 @@ class BalancingTest extends TestCase
     /**
      * Both shifts short by the issue: nothing says which issue was real, or
      * whether either was. D2 — listed with its twin and the reason, never
-     * changed, and (until Ryan decides otherwise) not holding the chain back.
-     * config('stockrecon.exceptions.D2.blocks') is the one switch that would.
+     * changed, and (since 5 Oct 2026, PM decision 01a10b21) holding its whole
+     * chain back. config('stockrecon.exceptions.D2.blocks') is the one switch.
      */
     public function test_a_possible_duplicate_is_listed_and_never_changed(): void
     {
         config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
-        // Day 9 + 20 − 1 sold = 28, counted 8; night 8 + 20 − 2 = 26, counted 6:
-        // both 20 short. The rest of the chain balances.
-        $this->seedShelfChain([
-            '2026-07-17' => [1 => [9, 20, 8, 1], 3 => [8, 20, 6, 2]],
-            '2026-07-18' => [1 => [6, 0, 4, 2],  3 => [4, 0, 3, 1]],
-            '2026-07-19' => [1 => [3, 0, 2, 1],  3 => [2, 0, 2, 0]],
-            '2026-07-20' => [1 => [2, 0, 1, 1],  3 => [1, 0, 1, 0]],
-            '2026-07-21' => [1 => [1, 0, 1, 0],  3 => [1, 0, 0, 1]],
-        ]);
+        $this->seedShelfChain($this->possibleChain());
 
         $run = $this->previewArea(self::SHELF_AREA);
         $day = $this->lineAt($run, '2026-07-17', 1);
@@ -1352,18 +1365,376 @@ class BalancingTest extends TestCase
             $this->assertNull($line->QtyIssuedNew, 'A possible duplicate is never written.');
             $this->assertFalse($line->WouldAmend);
             $this->assertEqualsWithDelta(-20.0, (float) $line->QtyVarNew, 0.005, 'Its short stands, for the site to check.');
-            $this->assertStringStartsWith('Possible duplicate issue (D2)', $line->Outcome);
+            $this->assertNull($line->DupReleaseId);
         }
 
         $this->assertSame(1, $night->DupTwinShift, 'Each names the other as its twin.');
         $this->assertSame(3, $day->DupTwinShift);
-        $this->assertFalse($night->ChainBlocked, 'D2 does not block today.');
+        $this->assertSame('Held back, possible duplicate (D2): twin 17 Jul shift 1; fix PumpIT or release', $night->Outcome,
+            'The row says it is held, names the twin, and says the two ways out.');
+        $this->assertSame('Held back, possible duplicate (D2)', $night->outcomeLabel());
+        $this->assertTrue($run->lines->every(fn ($l) => $l->ChainBlocked && $l->DupHold), 'The whole chain is held back.');
+        $this->assertSame('Held back: a possible duplicate issue (D2) on this item holds the chain',
+            $this->lineAt($run, '2026-07-18', 1)->Outcome, 'And every other shift on it says why.');
         $this->assertSame(2, (int) $run->fresh()->DuplicatesPossible);
+        $this->assertSame(1, $run->params()['BlockPossibleDuplicates'], 'The run records the switch it was made under.');
+
+        config(['stockrecon.exceptions.D2.blocks' => false]);
+        $listed = $this->previewArea(self::SHELF_AREA);
+        $this->assertTrue($listed->lines->every(fn ($l) => ! $l->ChainBlocked && ! $l->DupHold),
+            'Switched off, a possible duplicate is listed and holds nothing back.');
+        $this->assertStringStartsWith('Possible duplicate issue (D2)', $this->lineAt($listed, '2026-07-17', 3)->Outcome);
+    }
+
+    /**
+     * THE CASE THE HOLD EXISTS FOR (PM decision 01a10b21). Head office hid the
+     * night's 20 short by moving every count after it up 20 — the short is
+     * gone from PumpIT, and the latest closing is amended (the pack's S11).
+     * Since 30 Sep a commit puts such moves back, which on a possible
+     * duplicate puts the 20 back on the shift: on staff pay.
+     *
+     * With D2 not blocking, the chain balances and every hand figure is
+     * proposed back to the count. With it blocking, the chain is held: no
+     * proposal, the commit refuses, PumpIT does not move.
+     */
+    public function test_a_possible_duplicate_holds_back_a_chain_whose_short_was_hidden_and_the_commit_writes_nothing(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain($this->possibleChain());
+        $this->hideTheNightShortByMovingCounts();
+
+        config(['stockrecon.exceptions.D2.blocks' => false]);
+        $unheld = $this->previewArea(self::SHELF_AREA);
+        $this->assertSame('S11', $this->lineAt($unheld, '2026-07-21', 3)->AuditCode, 'The hidden short shows as the latest count amended.');
+        $this->assertTrue($this->lineAt($unheld, '2026-07-17', 3)->WouldAmend,
+            'Not held, the commit would put the night\'s closing back to its count — and the 20 back on the shift.');
 
         config(['stockrecon.exceptions.D2.blocks' => true]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $lines = $run->lines;
+
+        $this->assertSame('D2', $this->lineAt($run, '2026-07-17', 3)->DupTier, 'Still a possible duplicate on the staff\'s own count.');
+        $this->assertTrue($lines->every(fn ($l) => $l->DupHold && $l->ChainBlocked), 'Held back, whole.');
+        $this->assertTrue($lines->every(fn ($l) => ! $l->WouldAmend && ! $l->RestoresHand && ! $l->isWritable()),
+            'Nothing on a held chain is proposed.');
+        $this->assertTrue($lines->every(fn ($l) => $l->QtyIssuedNew === null));
+        $this->assertSame(0, (int) $run->fresh()->AmendedRows);
+
+        $before = $this->countsInSource();
+        $this->service->selectAllAmendable($run);
+
+        try {
+            $this->service->commit($run->fresh());
+            $this->fail('A held chain has nothing to commit.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('NOTHING_SELECTED', $e->code());
+        }
+
+        $this->assertSame($before, $this->countsInSource(), 'PumpIT did not move.');
+        $this->assertSame(0, StockReconAmendment::query()->acrossBranches()->where('RunId', $run->Id)->count());
+    }
+
+    /**
+     * Stage 7d puts a blocked chain back to the staff counts where somebody's
+     * hand balancing broke the client's rules. On a chain a possible duplicate
+     * holds back it does not — even when something else blocks the chain too —
+     * because the staff counts are exactly what puts the hidden short back.
+     */
+    public function test_a_held_chain_is_not_put_back_to_the_staff_counts_even_when_blocked_for_another_reason(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $chain = $this->possibleChain();
+        $chain['2026-07-20'] = [1 => [2, 0, 3, 0], 3 => [3, 0, 1, 2]];   // closed holding more than it had: U2
+        $this->seedShelfChain($chain);
+        $this->hideTheNightShortByMovingCounts();
+
+        config(['stockrecon.exceptions.D2.blocks' => false]);
+        $unheld = $this->previewArea(self::SHELF_AREA);
+        $this->assertTrue($this->lineAt($unheld, '2026-07-20', 1)->FlagCloseExceedsOnHand);
+        $this->assertTrue($unheld->lines->every(fn ($l) => $l->ChainBlocked), 'U2 blocks the chain.');
+        $this->assertTrue($unheld->lines->contains(fn ($l) => $l->RestoresHand && $l->WouldAmend),
+            'Without the hold, 7d would put the staff counts back.');
+
+        config(['stockrecon.exceptions.D2.blocks' => true]);
+        $run = $this->previewArea(self::SHELF_AREA);
+
+        $this->assertTrue($run->lines->every(fn ($l) => $l->DupHold && ! $l->RestoresHand && ! $l->WouldAmend),
+            'With it, nothing — the hold outranks the reason the chain was blocked for.');
+
+        $before = $this->countsInSource();
+
+        try {
+            $this->service->commit($run);
+            $this->fail('A held chain has nothing to commit.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('NOTHING_SELECTED', $e->code());
+        }
+
+        $this->assertSame($before, $this->countsInSource());
+    }
+
+    /**
+     * A D1 beside a D2 on the same chain waits with it. The chain is held as a
+     * whole: the two can be halves of the same keying, and which issue was real
+     * is what the site is being asked to settle.
+     */
+    public function test_a_clear_duplicate_waits_with_its_chain_while_a_possible_one_holds_it(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $chain = $this->duplicateChain();
+        // Both 20 Jul shifts given 5 and both short exactly 5: a possible pair.
+        $chain['2026-07-20'] = [1 => [15, 5, 12, 3], 3 => [12, 5, 10, 2]];
+        $this->seedShelfChain($chain);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $clear = $this->lineAt($run, '2026-07-17', 3);
+
+        $this->assertSame('D1', $clear->DupTier);
+        $this->assertSame('D2', $this->lineAt($run, '2026-07-20', 1)->DupTier);
+        $this->assertTrue($clear->DupHold);
+        $this->assertNull($clear->QtyIssuedNew, 'The clear one is not taken out on its own.');
+        $this->assertSame('Not removed: a possible duplicate (D2) holds this chain back', $clear->DupReason);
+        $this->assertTrue($run->lines->every(fn ($l) => ! $l->WouldAmend));
+
+        config(['stockrecon.exceptions.D2.blocks' => false]);
+        $this->assertNotNull($this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-17', 3)->QtyIssuedNew,
+            'Without the hold it would be.');
+    }
+
+    /**
+     * RELEASED WITH A REASON (PM decision 01a10b21). Somebody checked the issue
+     * book and released both possible duplicates, one reason for the lot. The
+     * run they pressed on still holds the chain; the next preview lists them as
+     * D2 still, released, and lets the chain commit — which puts the hand
+     * figures back to the count, because that is now the agreed answer.
+     */
+    public function test_a_released_possible_duplicate_is_still_listed_and_its_chain_commits(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain($this->possibleChain());
+        $this->hideTheNightShortByMovingCounts();
+        $this->actingAs($admin = $this->person('admin'));
+
         $held = $this->previewArea(self::SHELF_AREA);
-        $this->assertTrue($held->lines->every(fn ($l) => $l->ChainBlocked),
-            'One switch makes a possible duplicate hold its chain back.');
+        $pair = [$this->lineAt($held, '2026-07-17', 1)->Id, $this->lineAt($held, '2026-07-17', 3)->Id];
+
+        $status = $this->service->releaseDuplicates($held, $pair, 'TEST-issue book shows both issues were delivered');
+        $this->assertSame('RELEASED', $status->Code);
+        $this->assertStringStartsWith('2 possible duplicate issues released', $status->Message);
+
+        $release = $this->releases()->where('ShiftNo', 3)->sole();
+        $this->assertEqualsWithDelta(20.0, (float) $release->QtyIssued, 0.005, 'Released at the issue as keyed.');
+        $this->assertSame((int) $admin->Id, (int) $release->CreatedBy, 'By name.');
+        $this->assertSame('TEST-issue book shows both issues were delivered', $release->Reason);
+        $this->assertSame('2026-07-17', substr((string) $release->TwinDate, 0, 10));
+        $this->assertSame(1, (int) $release->TwinShift);
+        $this->assertSame((int) $held->Id, (int) $release->RunId);
+        $this->assertNull($release->WithdrawnAt);
+
+        $again = $this->service->releaseDuplicates($held, $pair, 'TEST-pressed a second time by mistake');
+        $this->assertSame('ALREADY_RELEASED', $again->Code, 'A second press stacks nothing.');
+        $this->assertSame(2, $this->releases()->count());
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $night = $this->lineAt($run, '2026-07-17', 3);
+
+        $this->assertSame('D2', $night->DupTier, 'Still listed as a possible duplicate.');
+        $this->assertSame((int) $release->Id, $night->DupReleaseId);
+        $this->assertStringStartsWith('Possible duplicate (D2), released', $night->Outcome);
+        $this->assertTrue($run->lines->every(fn ($l) => ! $l->DupHold && ! $l->ChainBlocked), 'No longer held back.');
+        $this->assertTrue($night->WouldAmend && $night->isWritable(), 'The hand figure goes back to the count.');
+
+        // The chain panel says who released it and why, and offers the undo.
+        $this->actingAs($admin)
+            ->get(route('app.stockrecon.line', [$run, $night]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()
+            ->assertSee('TEST-issue book shows both issues were delivered')
+            ->assertSee('data-dup-withdraw=', false)
+            ->assertDontSee('Held back: a possible duplicate issue');
+
+        $result = $this->service->commit($run);
+        $this->assertSame('COMMITTED', $result['status']->Code);
+        $this->assertEqualsWithDelta(6.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyClose, 0.005,
+            'Released, the chain is written: the night\'s closing is its count again.');
+    }
+
+    /**
+     * A release is of the issue as keyed. Re-key it and the release no longer
+     * matches: the hold returns until somebody looks again. Here both 17 Jul
+     * issues become 22, and both shifts are short exactly 22 — still a
+     * possible pair, but not the one that was released.
+     */
+    public function test_a_release_no_longer_matches_once_the_issue_is_re_keyed(): void
+    {
+        config(['stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain($this->possibleChain());
+        $this->actingAs($this->person('admin'));
+
+        $held = $this->previewArea(self::SHELF_AREA);
+        $pair = [$this->lineAt($held, '2026-07-17', 1)->Id, $this->lineAt($held, '2026-07-17', 3)->Id];
+        $this->service->releaseDuplicates($held, $pair, 'TEST-checked against the issue book');
+
+        $released = $this->previewArea(self::SHELF_AREA);
+        $this->assertTrue($released->lines->every(fn ($l) => ! $l->DupHold));
+
+        $this->setRow(self::DUP_ITEM, '2026-07-17', 1, ['QtyIssued' => 22]);
+        $this->setRow(self::DUP_ITEM, '2026-07-17', 3, ['QtyIssued' => 22]);
+
+        $rekeyed = $this->previewArea(self::SHELF_AREA);
+        $night = $this->lineAt($rekeyed, '2026-07-17', 3);
+
+        $this->assertSame('D2', $night->DupTier);
+        $this->assertEqualsWithDelta(22.0, (float) $night->DupQty, 0.005);
+        $this->assertNull($night->DupReleaseId, 'The release was of 20.');
+        $this->assertTrue($rekeyed->lines->every(fn ($l) => $l->DupHold && $l->ChainBlocked), 'Held back again.');
+
+        // And the run that was released against cannot release the old issue
+        // any more: PumpIT no longer holds it.
+        try {
+            $this->service->releaseDuplicates($released, [$this->lineAt($released, '2026-07-17', 3)->Id], 'TEST-from a stale preview');
+            $this->fail('A release of an issue PumpIT no longer holds should be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('ISSUE_MOVED', $e->code());
+            $this->assertStringContainsString('now holds issue 22', $e->getMessage());
+        }
+    }
+
+    /**
+     * A withdrawn release holds the chain back again: from the next preview,
+     * and — for a run previewed while it stood — at the press, where the commit
+     * re-checks every possible duplicate against the ledger. The release stays
+     * on the ledger, withdrawn, never deleted.
+     */
+    public function test_a_withdrawn_release_holds_the_chain_back_again(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain($this->possibleChain());
+        $this->hideTheNightShortByMovingCounts();
+        $this->actingAs($admin = $this->person('admin'));
+
+        $held = $this->previewArea(self::SHELF_AREA);
+        $this->service->releaseDuplicates($held,
+            [$this->lineAt($held, '2026-07-17', 1)->Id, $this->lineAt($held, '2026-07-17', 3)->Id],
+            'TEST-delivery notes show both');
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $this->assertTrue($this->lineAt($run, '2026-07-17', 3)->isWritable(), 'Released: the chain would commit.');
+
+        $release = $this->releases()->where('ShiftNo', 1)->sole();
+        $status = $this->service->withdrawRelease($run, (int) $release->Id, 'TEST-released against the wrong day');
+        $this->assertSame('WITHDRAWN', $status->Code);
+
+        $before = $this->countsInSource();
+
+        try {
+            $this->service->commit($run->fresh());
+            $this->fail('The press should skip a chain whose release was withdrawn since the preview.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('ALL_SKIPPED', $e->code());
+            $this->assertStringContainsString('possible duplicate issue (D2) with no release standing', $e->getMessage());
+        }
+
+        $this->assertSame($before, $this->countsInSource(), 'Nothing was written.');
+
+        $withdrawn = $this->releases()->where('Id', $release->Id)->sole();
+        $this->assertNotNull($withdrawn->WithdrawnAt, 'Withdrawn, and still on the ledger.');
+        $this->assertSame((int) $admin->Id, (int) $withdrawn->WithdrawnBy);
+        $this->assertSame('TEST-released against the wrong day', $withdrawn->WithdrawNote);
+
+        $again = $this->previewArea(self::SHELF_AREA);
+        $this->assertNull($this->lineAt($again, '2026-07-17', 1)->DupReleaseId);
+        $this->assertNotNull($this->lineAt($again, '2026-07-17', 3)->DupReleaseId, 'The other release still stands.');
+        $this->assertTrue($again->lines->every(fn ($l) => $l->DupHold && ! $l->WouldAmend), 'One unreleased D2 holds the chain.');
+
+        try {
+            $this->service->withdrawRelease($again, (int) $release->Id);
+            $this->fail('A release is withdrawn once.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('RELEASE_WITHDRAWN', $e->code());
+        }
+    }
+
+    /**
+     * A release says why, is only ever of a possible duplicate, and is pressed
+     * only by somebody holding the grant — the route refuses anybody else, and
+     * the chain panel does not offer them the button.
+     */
+    public function test_a_release_is_refused_without_a_reason_or_the_grant(): void
+    {
+        if (! Permission::query()->acrossBranches()->where('Code', 'stockrecon.duplicates.release')->exists()) {
+            $this->markTestSkipped('Run: php artisan seed:master --only=StockReconDuplicateReleasePermissionSeeder');
+        }
+
+        config(['stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain($this->possibleChain());
+        $admin = $this->person('admin');
+        $operations = $this->person('operations');
+        $this->actingAs($admin);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $night = $this->lineAt($run, '2026-07-17', 3);
+
+        foreach (['', '   ', 'ok fine'] as $reason) {
+            try {
+                $this->service->releaseDuplicates($run, [$night->Id], $reason);
+                $this->fail("A release with the reason [{$reason}] should be refused.");
+            } catch (AgoraProcException $e) {
+                $this->assertSame('REASON_REQUIRED', $e->code());
+            }
+        }
+
+        try {
+            $this->service->releaseDuplicates($run, [$this->lineAt($run, '2026-07-18', 1)->Id], 'TEST-not a duplicate at all');
+            $this->fail('Only a D2 is released.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('NOT_POSSIBLE_DUPLICATE', $e->code());
+        }
+
+        $this->assertSame(0, $this->releases()->count(), 'Nothing was released.');
+
+        // The panel offers the press to somebody who may make it, and not to
+        // somebody who may only look.
+        $panel = fn ($who) => $this->actingAs($who)
+            ->get(route('app.stockrecon.line', [$run, $night]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()
+            ->assertSee('Held back: a possible duplicate issue');
+
+        $panel($admin)->assertSee('data-dup-release=', false);
+        $panel($operations)->assertDontSee('data-dup-release=', false);
+
+        $this->actingAs($operations)
+            ->post(route('app.stockrecon.duplicates.release', $run), ['lines' => [$night->Id], 'reason' => 'TEST-not my call to make'])
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->from(route('app.stockrecon.line', [$run, $night]))
+            ->post(route('app.stockrecon.duplicates.release', $run), ['lines' => [$night->Id], 'reason' => ''])
+            ->assertRedirect(route('app.stockrecon.line', [$run, $night]))
+            ->assertSessionHas('refusal');
+
+        $this->actingAs($admin)
+            ->from(route('app.stockrecon.line', [$run, $night]))
+            ->post(route('app.stockrecon.duplicates.release', $run), [
+                'lines' => [$night->Id, $this->lineAt($run, '2026-07-17', 1)->Id],
+                'reason' => 'TEST-issue book shows one delivery each',
+            ])
+            ->assertRedirect(route('app.stockrecon.line', [$run, $night]))
+            ->assertSessionHas('released');
+
+        $this->assertSame(2, $this->releases()->whereNull('WithdrawnAt')->count(), 'One reason for the lot.');
+
+        $release = $this->releases()->where('ShiftNo', 3)->sole();
+
+        $this->actingAs($operations)
+            ->post(route('app.stockrecon.duplicates.withdraw', [$run, $release->Id]))
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->from(route('app.stockrecon.line', [$run, $night]))
+            ->post(route('app.stockrecon.duplicates.withdraw', [$run, $release->Id]))
+            ->assertSessionHas('released');
+
+        $this->assertNotNull($this->releases()->where('Id', $release->Id)->value('WithdrawnAt'));
     }
 
     /**
@@ -1528,6 +1899,65 @@ class BalancingTest extends TestCase
             '2026-07-20' => [1 => [15, 0, 12, 3],  3 => [12, 0, 10, 2]],
             '2026-07-21' => [1 => [10, 0, 8, 2],   3 => [8, 0, 7, 1]],
         ];
+    }
+
+    /**
+     * A possible pair: day 9 + 20 − 1 sold = 28, counted 8; night 8 + 20 − 2 =
+     * 26, counted 6 — both 20 short, so nothing says which issue was real. The
+     * rest of the chain balances.
+     *
+     * @return array<string, array<int, array{0: float|int, 1: float|int, 2: float|int, 3: float|int}>>
+     */
+    private function possibleChain(): array
+    {
+        return [
+            '2026-07-17' => [1 => [9, 20, 8, 1], 3 => [8, 20, 6, 2]],
+            '2026-07-18' => [1 => [6, 0, 4, 2],  3 => [4, 0, 3, 1]],
+            '2026-07-19' => [1 => [3, 0, 2, 1],  3 => [2, 0, 2, 0]],
+            '2026-07-20' => [1 => [2, 0, 1, 1],  3 => [1, 0, 1, 0]],
+            '2026-07-21' => [1 => [1, 0, 1, 0],  3 => [1, 0, 0, 1]],
+        ];
+    }
+
+    /**
+     * Head office hides the 17 Jul night's short by moving counts, the way the
+     * investigation found 59 of 134 candidates hidden: the night's closing up
+     * 20, and every count after it up 20 so the chain in PumpIT stays intact.
+     * The live columns only — the _Original pair is what staff counted.
+     */
+    private function hideTheNightShortByMovingCounts(): void
+    {
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)->where('StockItemNo', self::DUP_ITEM)
+            ->where('TransactionDate', '>', '2026-07-17')
+            ->update(['QtyOpen' => DB::raw('QtyOpen + 20'), 'QtyClose' => DB::raw('QtyClose + 20')]);
+
+        $this->setRow(self::DUP_ITEM, '2026-07-17', 3, ['QtyClose' => 26]);
+    }
+
+    /** The release ledger for the fixture branch. */
+    private function releases(): Builder
+    {
+        return $this->db()->table(config('agora.schema').'.StockReconDuplicateRelease')->where('BranchId', self::BRANCH);
+    }
+
+    /** A test person holding one access profile (tests/Fixtures/GrantsAccess). */
+    private function person(string $profile): User
+    {
+        $user = User::query()->acrossBranches()->create([
+            'BranchId' => (int) config('agora.group_branch_id', 2),
+            'EmailAddress' => 'TEST-dup-'.$profile.'-'.uniqid().'@agora.invalid',
+            'UserName' => 'TEST-'.$profile,
+            'IsActive' => true,
+            'IsLocked' => false,
+            'Workspace' => 'ho',
+            'PasswordHash' => 'TEST-only-'.Str::random(24),
+        ]);
+
+        $this->grantProfile($user, $profile);
+        $this->made[] = $user;
+
+        return $user;
     }
 
     /**
@@ -1746,7 +2176,8 @@ class BalancingTest extends TestCase
 
         $schema = config('agora.schema');
 
-        foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun', 'StockIssueMultiple', 'StockAreaSetting'] as $table) {
+        foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun', 'StockIssueMultiple', 'StockAreaSetting',
+            'StockReconDuplicateRelease'] as $table) {
             $db->table("{$schema}.{$table}")->where('BranchId', self::BRANCH)->delete();
         }
     }

@@ -294,17 +294,31 @@ return [
         |
         | D2's 'blocks' is THE switch for whether a possible duplicate holds its
         | chain back from the commit — StockReconService passes it to the
-        | preview as @BlockPossibleDuplicates. Off until Ryan decides (task
-        | 01a0f610-5ac0).
+        | preview and to the commit as @BlockPossibleDuplicates.
+        |
+        | ON SINCE 5 OCTOBER 2026 (Ryan, PM decision 01a10b21, task
+        | 01a0f610-5ac0). Since 30 Sep a commit reverses the count moves the
+        | client's pack forbids, and 59 of 134 duplicate candidates had been
+        | hidden by exactly such moves — committing those chains would put the
+        | short back on staff pay. A chain with a D2 is held back, and NOTHING on
+        | it is written, until the site corrects the issue in PumpIT (the next
+        | preview no longer finds it) or somebody releases it with a reason
+        | (agora.StockReconDuplicateRelease, permission
+        | stockrecon.duplicates.release). A released D2 is still listed.
         */
         'D2' => ['tone' => 'serious', 'label' => 'Possible duplicate issue',
             'test' => 'short within 10% of the issue, an identical issue on a neighbouring shift, not clear',
-            'blocks' => false,
+            'blocks' => true,
+            'balanced' => 'No — held back until corrected or released',
             'blurb' => 'The same issue was keyed on a neighbouring shift and this one is short by about that much — '
                 .'but the count cannot prove which issue was real: both shifts are short, the short is near the '
                 .'issue rather than equal to it, it is the item\'s usual delivery a day apart, or it is prepared '
-                .'food, where a batch thrown away looks the same. Check the issue book, the storeroom count or the '
-                .'delivery note before anybody is charged. Agora never changes these; the site corrects them in PumpIT.'],
+                .'food, where a batch thrown away looks the same. Its whole chain is HELD BACK: nothing on it is '
+                .'written to PumpIT, not the balancing and not a hand amendment put back, because that could put '
+                .'a short somebody hid by moving counts back on staff pay. Two ways out: the site corrects the issue '
+                .'in PumpIT against the issue book, the storeroom count or the delivery note, and the next preview no '
+                .'longer finds it; or somebody who has checked releases it here with a reason, and the next preview '
+                .'lets the chain commit. Agora never changes the issue itself.'],
         'D1' => ['tone' => 'good', 'label' => 'Duplicate issue removed',
             'test' => 'short = the issue exactly, an identical issue on a neighbouring shift that arrived, same day '
                 .'(or a day apart and not the usual size), one candidate per pair, shelf goods',

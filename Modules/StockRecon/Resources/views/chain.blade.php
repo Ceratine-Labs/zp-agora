@@ -22,6 +22,16 @@
         </x-slot:actions>
     </x-page-head>
 
+    {{-- A release of a possible duplicate is pressed here too, and lands back
+         here — so its answer, or its refusal, has to be said here. --}}
+    @if (session('refusal'))
+        <x-notice tone="stop" title="That could not be done" style="margin-bottom:16px">
+            <p>{{ session('refusal') }}</p>
+        </x-notice>
+    @endif
+
+    @include('stockrecon::partials.released-notice')
+
     <x-card flush>
         @include('stockrecon::partials.chain-detail')
     </x-card>

@@ -45,7 +45,7 @@
                 <p>Every ticked shift went through.</p>
             @else
                 <p>{{ $skipped->count() }} {{ Str::plural('shift', $skipped->count()) }} skipped rather
-                   than written over — the counts have moved since the preview:</p>
+                   than written — each says why:</p>
                 <ul>
                     @foreach ($skipped->take(12) as $row)
                         <li><code>{{ $row['StockItemNo'] ?? '—' }}</code>
@@ -63,6 +63,8 @@
             <p>{{ session('refusal') }}</p>
         </x-notice>
     @endif
+
+    @include('stockrecon::partials.released-notice')
 
     {{-- Provenance, not the answer: it has to be on the page and it should not
          be the first thing between the reader and the run. --}}

@@ -251,7 +251,7 @@ approximation errs the same way: a clear one missed, never a false one.
 | | Preview | Commit | Reverse |
 |---|---|---|---|
 | **D1** | Issue reads 0 in the basis — as the pack reads a fat-finger issue as its correction — so the shift balances and nobody is charged. Outcome *Duplicate issue removed (D1)*; `QtyIssuedNew` = 0. | `QtyIssued` = 0 on the PumpIT row, the prior in `agora.StockReconAmendment` (`PriorQtyIssued`, `NewQtyIssued`), inside the same transaction as the counts. | Puts the prior back; refuses (**ISSUE_MOVED**) if the issue or either count changed since. |
-| **D2** | Listed with the twin (`DupTwinDate`, `DupTwinShift`, `DupTwinVar`), the issue (`DupQty`) and the reason. Never changed. | Nothing. The site corrects it in PumpIT, against the issue book, the storeroom count or the delivery note. | — |
+| **D2** | Listed with the twin (`DupTwinDate`, `DupTwinShift`, `DupTwinVar`), the issue (`DupQty`) and the reason. Never changed. **Holds its whole chain back** (`DupHold`) until released — below. | Nothing on the chain. The site corrects it in PumpIT, against the issue book, the storeroom count or the delivery note — or somebody releases it with a reason. | — |
 
 * **On a chain the commit writes** — balanced, or put back to the staff counts —
   the D1 is always written with it: those counts were worked out with the issue
@@ -265,10 +265,9 @@ approximation errs the same way: a clear one missed, never a false one.
   nil. Where somebody already moved the counts to hide the short, taking the
   issue out alone would make an over: reported (`DupReason` *Not removed: …*),
   not written.
-* **D2 does not hold its chain back**, today. Whether it should is task
-  01a0f610-5ac0, Ryan's decision. The switch is **one place**:
-  `config('stockrecon.exceptions.D2.blocks')`, which the service passes to the
-  preview as `@BlockPossibleDuplicates`.
+* **D2 holds its chain back** — see the next section. The switch is **one
+  place**: `config('stockrecon.exceptions.D2.blocks')`, which the service passes
+  to the preview and to the commit as `@BlockPossibleDuplicates`.
 * **The write is switched by `config('stockrecon.issue_mode')`**, a literal like
   `stamp_mode`: `'live'` (set 1 Oct 2026 on Ryan's go-ahead) removes and writes;
   `'off'` still finds a D1 and reports it, but leaves it in the basis and never
@@ -281,6 +280,61 @@ approximation errs the same way: a clear one missed, never a false one.
   balancing" — its own label for an issue captured twice. That is correct, but
   it is a flag they will see: **tell the customer before the first commit.**
   Agora's own audit of the next preview reads it the same way.
+
+### A possible duplicate holds its chain back (5 Oct 2026)
+
+Ryan's decision (PM decision 01a10b21, task 01a0f610-5ac0): since 30 Sep a
+commit reverses the count moves the pack forbids, and **59 of 134 candidates
+had been hidden by exactly such moves** — head office moved counts until the
+short was gone. Committing those chains puts the short back on the shift, and
+stock loss goes to payroll. So:
+
+* **A chain with a D2 is held back** (`DupHold` on every line of it, and
+  `ChainBlocked`). **Nothing on it is written** — not the balancing, not a hand
+  amendment put back to the staff counts (stage 7d, which until now ran on
+  blocked chains too and is exactly what returns the hidden short), and not a
+  clear D1 on the same chain on its own (7f): the chain waits as a whole,
+  because a D2 beside a D1 can be the other half of the same keying. This holds
+  whatever else blocks the chain.
+* The D2 row reads *Held back, possible duplicate (D2): twin 21 Sep shift 1;
+  fix PumpIT or release*; every other row on the chain *Held back: a possible
+  duplicate issue (D2) on this item holds the chain*; the chain panel says why
+  and offers the release.
+* **Two ways out.** (a) The site corrects the issue in PumpIT, and the next
+  preview no longer finds the candidate. (b) Somebody who has checked the issue
+  book, the storeroom count or the delivery note **releases** it with a reason
+  (`agora.usp_StockRecon_ReleaseDuplicate`, permission
+  `stockrecon.duplicates.release`, granted on day one to everyone who may
+  commit). One reason may cover every D2 on a chain.
+* **A release is keyed on the shift and the issue as keyed**, not on a run
+  (`agora.StockReconDuplicateRelease`). Every later preview reads it, but only
+  while PumpIT still holds that issue: re-key it and the release no longer
+  matches, and the hold returns. A released D2 is **still listed as D2** — its
+  row reads *Possible duplicate (D2), released*, and the panel names who and why
+  — it just no longer holds anything back. One standing release per shift;
+  releasing again at a new issue supersedes the old one.
+* **Withdrawn, never deleted** (`usp_StockRecon_WithdrawRelease`, permission
+  `stockrecon.duplicates.withdraw`): the row keeps who released it and why
+  beside who withdrew it and when. From the next preview the hold is back.
+* **The commit checks it again at the press.** A candidate whose chain carries a
+  D2 with no release standing now — at the issue the run read and the issue
+  PumpIT holds today — is skipped, so a release withdrawn after the preview, an
+  issue re-keyed since, or a run previewed while D2 did not block cannot write.
+* A release is pressed on a run, but the run it was pressed on still holds the
+  chain: **preview again** to let it commit. The screen says so.
+* **No new write to PumpIT.** A release writes Agora's ledger; it only lets the
+  commit do what it did before D2 held anything back.
+
+Measured on the local copy, Engen Bethlehem (branch 23), preview with D2 not
+blocking against blocking: **September 1–29**, 4 D2 on 3 chains (BAM burger
+bun, French loaf ×2, Trust hanging), all three already blocked for other
+reasons (U1/U2/U4/F1/F2, and F3 on the bun), none writing anything before —
+held, 174 lines, 0 writable. **August 1–31**, 5 D2 on 4 chains; one of them,
+Goosebumps cocktail ring D (Bakery), was blocked and **put back to the staff
+counts by 7d — 18 rows**, returning the 10 short on 11 Aug shift 1 that head
+office had moved counts to hide (S7 on the shift after). Held, 0 rows. Every
+chain without a D2 proposed exactly the same rows either way (Sep 15 → 15, Aug
+591 → 591).
 
 ### Measured
 
@@ -323,12 +377,15 @@ the same size) without any duplicate rule.
 | `agora.usp_StockRecon_GridRuns` | The runs grid. |
 | `agora.usp_StockRecon_GridExceptions` | The exception report. |
 | `agora.usp_StockRecon_DrillChain` | The whole chain behind one clicked shift. |
+| `agora.usp_StockRecon_ReleaseDuplicate` | Releases possible duplicates (D2) with a reason, so the next preview lets their chain commit. Agora's ledger only. |
+| `agora.usp_StockRecon_WithdrawRelease` | Takes a release back; the D2 holds its chain again. |
 | `agora.StockReconRun` | One press of Preview: window, caps, procedure, and the before/after shape. |
 | `agora.StockReconRunLine` | One shift of one item: counted, balanced, every flag, the tick. |
 | `agora.StockReconAmendment` | What a commit did, with the PRIOR counts. This is what makes a reversal exact. |
 | `agora.StockIssueMultiple` | Head office's pack size per (branch, area, item). Rule 5 reads it. |
 | `agora.StockAreaSetting` | Per area: is it prepared food — never a clear duplicate issue. Proposed by `AreaFoodSeeder`, confirmed by head office (`ConfirmedAt`). |
 | `agora.vw_StockAreaFood` | Every area with that flag: head office's row, else the proposal from the area group and name. The one place the proposal is written. |
+| `agora.StockReconDuplicateRelease` | A release of one D2 shift at one issue: who, when, why, the twin it had; withdrawn, never deleted. One standing release per shift. |
 
 **The preview WRITES, unlike every other preview in Agora.** A branch-month is
 fifteen thousand shift lines, which as a chunked multi-row INSERT from PHP is
@@ -449,7 +506,7 @@ same list with the wording the screen uses.
 | **S1** | Over of a whole pack | over within 10% of k × multiple | blocks |
 | **U1** | Unrecorded issue, proven | `POS > Open + Issued` | blocks |
 | **U2** | Closing exceeds what was on hand | `Close > Open + Issued` | blocks |
-| **D2** | Possible duplicate issue | short within 10% of the issue, an identical issue on a neighbouring shift, not clear | — (the `blocks` switch) |
+| **D2** | Possible duplicate issue | short within 10% of the issue, an identical issue on a neighbouring shift, not clear | holds the chain back, nothing written, until corrected or released |
 | **D1** | Duplicate issue removed | short = the issue exactly, the twin arrived, same day or not the usual size, one per pair, shelf goods | removed |
 | **U3** | Selling with no issues captured at all | `Σ Issued = 0 and Σ POS > 0` and a segment over | blocks |
 | **U4** | Net over | a segment's `T > 0` | blocks |

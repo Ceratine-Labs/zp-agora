@@ -45,6 +45,19 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
         ->middleware('can:stockrecon.runs.execute')->name('commit');
     Route::post('runs/{run}/reverse', [StockReconController::class, 'reverse'])
         ->middleware('can:stockrecon.runs.reverse')->name('reverse');
+
+    /*
+     | A possible duplicate issue (D2) holds its chain back from the commit
+     | (PM decision 01a10b21). Releasing one, with a reason, lets the next
+     | preview commit the chain; withdrawing the release puts the hold back.
+     | Each its own grant (feature-rules §4). The run in the URL scopes the
+     | branch; the release itself belongs to the shift, not to the run.
+     */
+    Route::post('runs/{run}/duplicates/release', [StockReconController::class, 'releaseDuplicates'])
+        ->middleware('can:stockrecon.duplicates.release')->name('duplicates.release');
+    Route::post('runs/{run}/duplicates/releases/{release}/withdraw', [StockReconController::class, 'withdrawRelease'])
+        ->whereNumber('release')
+        ->middleware('can:stockrecon.duplicates.withdraw')->name('duplicates.withdraw');
     Route::delete('runs/{run}', [StockReconController::class, 'discard'])
         ->middleware('can:stockrecon.runs.delete')->name('discard');
 

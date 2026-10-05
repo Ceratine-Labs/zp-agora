@@ -232,6 +232,10 @@ class StockReconService
             // may be written. The procedure refuses a run that removed one if
             // this has been switched off since.
             'IssueMode' => (string) config('stockrecon.issue_mode', 'off'),
+            // And whether a possible duplicate (D2) still holds its chain back:
+            // the procedure re-checks every D2 against the release ledger at
+            // the press, so a release withdrawn since the preview is caught.
+            'BlockPossibleDuplicates' => $this->duplicateSwitches()['BlockPossibleDuplicates'],
             // Replayed off the run, never defaulted here — see the model.
             'UseOriginalCounts' => (int) $run->usedOriginalCounts(),
             'UserId' => auth()->id(),
@@ -256,6 +260,43 @@ class StockReconService
         }
 
         return ['status' => $status, 'lines' => $sets[1] ?? collect()];
+    }
+
+    /**
+     * Release possible duplicate issues (D2) from holding their chains back,
+     * with one reason for the lot.
+     *
+     * The rules — a D2 on this run, the issue PumpIT still holds, a reason that
+     * says something — are the procedure's. A release is keyed on the shift and
+     * the issue, not on this run, so it takes effect on the NEXT preview; the
+     * run it was pressed on still holds the chain back.
+     *
+     * @param  array<int, int>  $lineIds  run line ids on this run
+     */
+    public function releaseDuplicates(StockReconRun $run, array $lineIds, string $reason): object
+    {
+        return $this->procedures->write('usp_StockRecon_ReleaseDuplicate', [
+            'BranchId' => $run->BranchId,
+            'RunId' => $run->Id,
+            'LineIds' => implode(',', array_map('intval', $lineIds)),
+            'Reason' => $reason,
+            'UserId' => auth()->id(),
+        ]);
+    }
+
+    /**
+     * Withdraw a release: from the next preview the possible duplicate holds
+     * its chain back again. Never a delete — the release and its withdrawal
+     * both stay on the ledger.
+     */
+    public function withdrawRelease(StockReconRun $run, int $releaseId, ?string $note = null): object
+    {
+        return $this->procedures->write('usp_StockRecon_WithdrawRelease', [
+            'BranchId' => $run->BranchId,
+            'ReleaseId' => $releaseId,
+            'Note' => $note,
+            'UserId' => auth()->id(),
+        ]);
     }
 
     /** Undo a commit — exactly what it wrote, and nothing else. */
@@ -370,13 +411,15 @@ class StockReconService
      * The chain half of "a row the commit could honour" — the same predicate
      * usp_StockRecon_Commit and StockReconRunLine::isWritable() apply: a clear
      * chain; a blocked one being put back to the staff counts; or a clear
-     * duplicate issue taken out on its own (QtyIssuedNew is set).
+     * duplicate issue taken out on its own (QtyIssuedNew is set). Never a
+     * chain a possible duplicate holds back (DupHold).
      */
     private function writableOnBlockedChain(Builder $query): Builder
     {
-        return $query->where('ChainBlocked', false)
-            ->orWhere('RestoresHand', true)
-            ->orWhereNotNull('QtyIssuedNew');
+        return $query->where('DupHold', false)
+            ->where(fn (Builder $q) => $q->where('ChainBlocked', false)
+                ->orWhere('RestoresHand', true)
+                ->orWhereNotNull('QtyIssuedNew'));
     }
 
     /**
@@ -388,7 +431,10 @@ class StockReconService
      *                            clear duplicate (D1) is taken out of the basis
      *                            and proposed for the commit.
      *   BlockPossibleDuplicates  config('stockrecon.exceptions.D2.blocks'): a
-     *                            possible one (D2) holds its chain back.
+     *                            possible one (D2) with no release standing
+     *                            holds its chain back — nothing on it is
+     *                            written. On since 5 Oct 2026 (PM decision
+     *                            01a10b21). The commit takes it too.
      *
      * @return array{RemoveDuplicates: int, BlockPossibleDuplicates: int}
      */
