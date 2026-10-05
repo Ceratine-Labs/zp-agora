@@ -139,6 +139,9 @@ class ReconMatchService
             'UserId' => auth()->id(),
             'Basis' => $basis,
             'AllocationJson' => $allocation === null ? null : json_encode(array_values($allocation)),
+            // A forced FNB match writes its variance to the deposits only when
+            // this literal says so — see config('recon.fnb_adjust_mode').
+            'AdjustMode' => (string) config('recon.fnb_adjust_mode', 'off'),
         ]);
 
         if ($area === 'CashBags') {

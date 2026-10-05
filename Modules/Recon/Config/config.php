@@ -72,6 +72,21 @@ return [
     */
     'stamp_mode' => 'live',
 
+    /*
+    | A forced FNB match writes its variance to the deposits, as PumpIT's own
+    | forced batch does (Chantal Peens, ZP, 1 Oct 2026): each ticked
+    | BRN_DailyBankingFNB row's Amount and AdjustedBy move by its pro-rata
+    | share and Adjusted is set; the bank never moves. A named write, so a
+    | literal like stamp_mode: 'live' or 'off'. Only takes effect in live stamp
+    | mode. See usp_Recon_ManualMatch → THE FNB ADJUSTMENT; usp_Recon_Reverse
+    | puts the prior values back.
+    |
+    | SET TO 'live' ON 5 OCTOBER 2026, on Ryan's answer to the PM question
+    | "Switch on the FNB forced-match adjustment?" — "Yes - switch it on and
+    | deploy".
+    */
+    'fnb_adjust_mode' => 'live',
+
     'areas' => [
 
         'ABSA' => [

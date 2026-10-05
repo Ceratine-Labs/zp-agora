@@ -8,7 +8,10 @@
  * **   PumpIT.dbo.BRN_DailyBanking{Area}       ReconBatchNoPumpIT
  * ** and, on a cash-bag match with a short due, through
  * ** agora.usp_Cash_RaiseStaffShort (whose header lists it): one
- * ** BRN_StaffShorts row per short and SS_UniqueNumber section 2.
+ * ** BRN_StaffShorts row per short and SS_UniqueNumber section 2;
+ * ** and, on a FORCED FNB match with @AdjustMode 'live', on each ticked
+ * **   PumpIT.dbo.BRN_DailyBankingFNB row: Amount, AdjustedBy, Adjusted
+ * ** (see THE FNB ADJUSTMENT below).
  * ** Read this header before changing a line of it.
  *
  * WHY A PERSON IS ALLOWED TO DO THIS AT ALL. The previews can only propose
@@ -113,7 +116,21 @@
  *            A short that cannot be raised fails the whole match. The status
  *            row's message names the shorts raised. See the T040 CALL SITE.
  *
- * Refusals: NOTHING_SELECTED · BANK_ROW_MOVED · MOPS_ROW_MOVED ·
+ * THE FNB ADJUSTMENT (Chantal Peens, ZP, 1 Oct 2026). A forced FNB match
+ * writes its variance to the DEPOSIT side, as PumpIT's own forced batch does:
+ * each ticked BRN_DailyBankingFNB row's Amount moves by its share, the same
+ * share is added to AdjustedBy and Adjusted is set, so the deposits meet the
+ * bank to the cent and the bank line never moves. On live every FNB batch
+ * with an AdjustedBy has SUM(Amount) = the bank (40 of 40, 5 Oct 2026), which
+ * is what this reproduces. The share is pro rata by Amount in whole cents,
+ * the remainder on the largest row (ties: till, shift, merchant) — the cash
+ * bags rule (Ryan, 9 Sep 2026, q2). Rows are addressed by the table's primary
+ * key (site, till, shift, date, batch, merchant), and each row's prior Amount,
+ * Adjusted and AdjustedBy are kept on agora.ReconMatch so usp_Recon_Reverse
+ * puts them back exactly. Switched by config('recon.fnb_adjust_mode'), a
+ * literal, passed in as @AdjustMode; only in live stamp mode.
+ *
+ * Refusals: NOTHING_SELECTED · BANK_ROW_MOVED · MOPS_ROW_MOVED · ADJUST_NEGATIVE ·
  *           FORCE_REASON_REQUIRED · ALLOCATION_INCOMPLETE ·
  *           ALLOCATION_NOT_APPLICABLE · UNKNOWN_AREA · NO_COUNTER — and, while
  *           raising a short, agora.usp_Cash_RaiseStaffShort's own (CASH_SHORT_*,
@@ -130,7 +147,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_ManualMatch]
     @StampMode   varchar(10)   = 'journal',
     @UserId      int           = NULL,
     @Basis       nvarchar(200) = NULL,
-    @AllocationJson nvarchar(max) = NULL
+    @AllocationJson nvarchar(max) = NULL,
+    @AdjustMode  varchar(10)   = 'off'
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -202,7 +220,11 @@ BEGIN
         SourceId bigint NULL, SourceKey nvarchar(100), SourceDate date, Amount money, Rn int,
         /* Cash bags only: who dropped the bag and what they declared at the
            safe, read off agora.vw_DailyBankingCashBags (one row per bag). */
-        CashierCode nvarchar(50) NULL, CashierName nvarchar(200) NULL, DropSafeAmount money NULL
+        CashierCode nvarchar(50) NULL, CashierName nvarchar(200) NULL, DropSafeAmount money NULL,
+        /* FNB only: the rest of the row's primary key, raw, and what it
+           already carries in AdjustedBy — see THE FNB ADJUSTMENT. */
+        TillNo int NULL, ShiftNo int NULL, TxnAt datetime NULL, BatchNoRaw nvarchar(20) NULL,
+        MerchantNo nvarchar(20) NULL, Adjusted bit NULL, AdjustedBy money NULL
     );
 
     IF @ReconArea = 'ABSA'
@@ -214,9 +236,14 @@ BEGIN
           AND d.TransactionDate >= @FromDate AND d.TransactionDate <= @ToDate;
 
     ELSE IF @ReconArea = 'FNB'
-        INSERT INTO @Avail (SourceId, SourceKey, SourceDate, Amount, Rn)
+        INSERT INTO @Avail (SourceId, SourceKey, SourceDate, Amount, Rn,
+                            TillNo, ShiftNo, TxnAt, BatchNoRaw, MerchantNo, Adjusted, AdjustedBy)
         SELECT NULL, LTRIM(RTRIM(d.BatchNo)), CONVERT(date, d.TransactionDate), d.Amount,
-               ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(d.BatchNo)), CONVERT(date, d.TransactionDate), d.Amount ORDER BY (SELECT NULL))
+               /* Ordered by the rest of the key, so which of two rows the
+                  screen cannot tell apart is claimed is the same every time. */
+               ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(d.BatchNo)), CONVERT(date, d.TransactionDate), d.Amount
+                                  ORDER BY d.TillNo, d.ShiftNo, d.MerchantNo, d.TransactionDate),
+               d.TillNo, d.ShiftNo, d.TransactionDate, d.BatchNo, d.MerchantNo, d.Adjusted, d.AdjustedBy
         FROM agora.vw_DailyBankingFNB d
         WHERE d.BranchId = @BranchId AND d.ReconBatchNoPumpIT = 0
           AND d.TransactionDate >= @FromDate AND d.TransactionDate <= @ToDate;
@@ -247,15 +274,21 @@ BEGIN
           AND d.DepositDateTime >= @FromDate AND d.DepositDateTime <= @ToDate;
 
     DECLARE @Mops TABLE (
+        Seq int IDENTITY(1,1) PRIMARY KEY,
         SourceId bigint NULL, SourceKey nvarchar(100), SourceDate date, Amount money,
-        CashierCode nvarchar(50) NULL, CashierName nvarchar(200) NULL, DropSafeAmount money NULL
+        CashierCode nvarchar(50) NULL, CashierName nvarchar(200) NULL, DropSafeAmount money NULL,
+        TillNo int NULL, ShiftNo int NULL, TxnAt datetime NULL, BatchNoRaw nvarchar(20) NULL,
+        MerchantNo nvarchar(20) NULL, Adjusted bit NULL, AdjustedBy money NULL,
+        Cents bigint NULL, Adjustment money NULL
     );
 
     /* The two areas that HAVE an id are matched by it — exact, and it cannot
        reach a row the screen did not show. The other three are matched on the
        triple, with the nth want taking the nth available row. */
-    INSERT INTO @Mops (SourceId, SourceKey, SourceDate, Amount, CashierCode, CashierName, DropSafeAmount)
-    SELECT a.SourceId, a.SourceKey, a.SourceDate, a.Amount, a.CashierCode, a.CashierName, a.DropSafeAmount
+    INSERT INTO @Mops (SourceId, SourceKey, SourceDate, Amount, CashierCode, CashierName, DropSafeAmount,
+                       TillNo, ShiftNo, TxnAt, BatchNoRaw, MerchantNo, Adjusted, AdjustedBy)
+    SELECT a.SourceId, a.SourceKey, a.SourceDate, a.Amount, a.CashierCode, a.CashierName, a.DropSafeAmount,
+           a.TillNo, a.ShiftNo, a.TxnAt, a.BatchNoRaw, a.MerchantNo, a.Adjusted, a.AdjustedBy
     FROM @Avail a
     JOIN (
         SELECT w.SourceId, w.SourceKey, w.SourceDate, w.Amount,
@@ -282,6 +315,48 @@ BEGIN
     DECLARE @Forced bit = CASE WHEN @Diff <> 0 THEN 1 ELSE 0 END;
 
     SET @Basis = NULLIF(LTRIM(RTRIM(@Basis)), '');
+
+    /* ---- 4a. The FNB adjustment — a forced FNB match, live only ---------- */
+
+    /*
+     * Bank less deposits, shared pro rata by Amount in whole cents, half away
+     * from zero, the remainder on the largest row — the same arithmetic as the
+     * cash-bag split in 4b. Every ticked row is written, a zero share
+     * included, so the whole batch says Adjusted the way PumpIT's own does.
+     */
+    DECLARE @Adjust bit = CASE WHEN @ReconArea = 'FNB' AND @Forced = 1
+                                AND @StampMode = 'live' AND @AdjustMode = 'live' THEN 1 ELSE 0 END;
+
+    IF @Adjust = 1
+    BEGIN
+        DECLARE @MopsCents bigint, @GapCents bigint;
+
+        UPDATE @Mops SET Cents = CONVERT(bigint, ROUND(Amount * 100, 0));
+
+        SELECT @MopsCents = SUM(Cents) FROM @Mops;
+        SET @GapCents = (SELECT SUM(CONVERT(bigint, ROUND(Amount * 100, 0))) FROM @Bank) - @MopsCents;
+
+        UPDATE @Mops
+        SET Adjustment = CONVERT(money,
+                CASE WHEN @MopsCents = 0 THEN 0
+                     ELSE SIGN(@GapCents * Cents) * SIGN(@MopsCents)
+                          * ((2 * ABS(@GapCents * Cents) + ABS(@MopsCents)) / (2 * ABS(@MopsCents)))
+                END) / 100;
+
+        DECLARE @Left money = CONVERT(money, @GapCents) / 100 - (SELECT SUM(Adjustment) FROM @Mops);
+
+        WITH largest AS (
+            SELECT TOP 1 Adjustment FROM @Mops
+            ORDER BY Cents DESC, TillNo, ShiftNo, MerchantNo, Seq
+        )
+        UPDATE largest SET Adjustment = Adjustment + @Left;
+
+        /* A deposit cannot be adjusted below nothing. Bank less deposits never
+           takes a positive row there pro rata; a refund row can, and that is
+           for a person to split, not this procedure. */
+        IF EXISTS (SELECT 1 FROM @Mops WHERE Amount + Adjustment < 0)
+            THROW 51000, 'AGORA:ADJUST_NEGATIVE:Writing this variance to the deposits would take one below zero. Match the rows in smaller groups, or adjust it in PumpIT. Nothing was written.', 1;
+    END
 
     /* ---- 4b. Who the cash is accounted to — cash bags only --------------- */
 
@@ -530,14 +605,24 @@ BEGIN
 
     INSERT INTO agora.ReconMatch
         (BranchId, RunId, RunLineId, BatchId, BatchNo, Side, SourceTable,
-         SourceId, SourceKeyJson, SourceDate, Amount, PriorReconState, PriorBatchNo, CreatedAt, CreatedBy)
+         SourceId, SourceKeyJson, SourceDate, Amount, PriorReconState, PriorBatchNo,
+         Adjustment, PriorAmount, PriorAdjusted, PriorAdjustedBy, CreatedAt, CreatedBy)
     SELECT @BranchId, @RunId, @LineId, @BatchId, @No, 'mops',
            CASE @ReconArea WHEN 'CashMachine' THEN 'BRN_DailyBankingDeposita'
                            ELSE 'BRN_DailyBanking' + @ReconArea END,
            m.SourceId,
-           (SELECT m.SourceKey AS [key], m.SourceKey AS ref, m.SourceDate AS dt, m.Amount AS amt
+           /* FNB carries the rest of its primary key, raw, so a reversal can
+              name the exact row it puts the prior values back on. */
+           (SELECT m.SourceKey AS [key], m.SourceKey AS ref, m.SourceDate AS dt, m.Amount AS amt,
+                   m.TillNo AS till, m.ShiftNo AS shift, m.MerchantNo AS merchant,
+                   m.BatchNoRaw AS batch, CONVERT(nvarchar(23), m.TxnAt, 126) AS txn
             FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
-           m.SourceDate, m.Amount, NULL, 0, @Now, @UserId
+           m.SourceDate, m.Amount, NULL, 0,
+           CASE WHEN @Adjust = 1 THEN m.Adjustment END,
+           CASE WHEN @Adjust = 1 THEN m.Amount END,
+           CASE WHEN @Adjust = 1 THEN m.Adjusted END,
+           CASE WHEN @Adjust = 1 THEN m.AdjustedBy END,
+           @Now, @UserId
     FROM @Mops m;
 
     /* ---- 5b. The split by cashier, kept with the batch --------------------- */
@@ -711,13 +796,19 @@ BEGIN
                       AND CONVERT(date, d.TransactionDate) = @D
                       AND d.TransactionAmount = @A;
 
-                ELSE IF @ReconArea = 'FNB'
+                ELSE IF @ReconArea = 'FNB' AND @Adjust = 0
                     UPDATE TOP (@N) d SET d.ReconBatchNoPumpIT = @No
                     FROM [PumpIT].dbo.BRN_DailyBankingFNB d
                     WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = 0
                       AND LTRIM(RTRIM(d.BatchNo)) = @K
                       AND CONVERT(date, d.TransactionDate) = @D
                       AND d.Amount = @A;
+
+                ELSE IF @ReconArea = 'FNB'
+                    /* Adjusting: stamped after this loop, by primary key,
+                       with the adjustment — see THE FNB ADJUSTMENT. */
+                    SET @N = @N;
+
 
                 ELSE
                     UPDATE TOP (@N) d SET d.ReconBatchNoPumpIT = @No
@@ -730,15 +821,51 @@ BEGIN
                 FETCH NEXT FROM grp INTO @K, @D, @A, @N;
             END
             CLOSE grp; DEALLOCATE grp;
+
+            /*
+             * FNB with the adjustment, by primary key: exactly the rows step 3
+             * claimed. The variance goes with the stamp — Amount and AdjustedBy
+             * move by the row's share and Adjusted is set — in the same
+             * statement, still guarded on the row being unreconciled at the
+             * amount it was read at. Without the adjustment FNB is stamped in
+             * the loop above, exactly as before 5 Oct 2026.
+             */
+            IF @ReconArea = 'FNB' AND @Adjust = 1
+            BEGIN
+                UPDATE d
+                SET d.ReconBatchNoPumpIT = @No,
+                    d.Amount     = d.Amount + m.Adjustment,
+                    d.AdjustedBy = ISNULL(d.AdjustedBy, 0) + m.Adjustment,
+                    d.Adjusted   = 1
+                FROM [PumpIT].dbo.BRN_DailyBankingFNB d
+                JOIN @Mops m
+                  ON d.TillNo = m.TillNo AND d.ShiftNo = m.ShiftNo AND d.TransactionDate = m.TxnAt
+                 AND d.BatchNo = m.BatchNoRaw AND d.MerchantNo = m.MerchantNo
+                WHERE d.SSBranchId = @BranchId
+                  AND d.ReconBatchNoPumpIT = 0
+                  AND d.Amount = m.Amount;
+
+                IF @@ROWCOUNT <> (SELECT COUNT(*) FROM @Mops)
+                    THROW 51000, 'AGORA:MOPS_ROW_MOVED:One of the deposits changed while it was being matched. Reload and pick again. Nothing was written.', 1;
+            END
         END
     END
 
     INSERT INTO agora.ReconStamp
         (BranchId, RunId, MatchId, BatchNo, TargetDatabase, TargetTable,
-         TargetKeyJson, SetColumns, State, AppliedAt, AppliedBy, CreatedAt, CreatedBy)
+         TargetKeyJson, SetColumns, Detail, State, AppliedAt, AppliedBy, CreatedAt, CreatedBy)
     SELECT @BranchId, @RunId, m.Id, @No, 'PumpIT', m.SourceTable,
            ISNULL(m.SourceKeyJson, '{"BankStatementLineID":' + CONVERT(nvarchar(20), m.SourceId) + '}'),
-           CASE m.Side WHEN 'bank' THEN 'ReconBatchNo, ReconState' ELSE 'ReconBatchNoPumpIT' END,
+           CASE WHEN m.Side = 'bank' THEN 'ReconBatchNo, ReconState'
+                WHEN m.Adjustment IS NOT NULL THEN 'ReconBatchNoPumpIT, Amount, AdjustedBy, Adjusted'
+                ELSE 'ReconBatchNoPumpIT' END,
+           /* The adjustment in words, for the audit trail. */
+           CASE WHEN m.Adjustment IS NOT NULL
+                THEN CONCAT(N'Amount ', CONVERT(nvarchar(30), CONVERT(decimal(18,2), m.PriorAmount)),
+                            N' → ', CONVERT(nvarchar(30), CONVERT(decimal(18,2), m.PriorAmount + m.Adjustment)),
+                            N'; AdjustedBy ', CONVERT(nvarchar(30), CONVERT(decimal(18,2), ISNULL(m.PriorAdjustedBy, 0))),
+                            N' → ', CONVERT(nvarchar(30), CONVERT(decimal(18,2), ISNULL(m.PriorAdjustedBy, 0) + m.Adjustment)),
+                            N'; Adjusted ', ISNULL(CONVERT(nvarchar(1), m.PriorAdjusted), N'0'), N' → 1') END,
            CASE WHEN @StampMode = 'live' THEN 'applied' ELSE 'journal' END,
            CASE WHEN @StampMode = 'live' THEN @Now END,
            CASE WHEN @StampMode = 'live' THEN @UserId END,
@@ -774,6 +901,13 @@ BEGIN
                ELSE N' Staff short' + CASE WHEN (SELECT COUNT(*) FROM @Shorts) = 1 THEN N' ' ELSE N's ' END
                     + (SELECT STRING_AGG(CONVERT(nvarchar(12), StaffShortsNo), N', ') WITHIN GROUP (ORDER BY StaffShortsNo) FROM @Shorts)
                     + N' raised for approval under Cash.' END;
+
+    /* On a forced FNB match, where the variance went. */
+    IF @Adjust = 1
+        SET @Accounted = CONCAT(N' The variance is written to the deposits in PumpIT (Amount and Adjusted By, ',
+                                (SELECT COUNT(*) FROM @Mops), N' row',
+                                CASE WHEN (SELECT COUNT(*) FROM @Mops) = 1 THEN N'' ELSE N's' END,
+                                N'); the bank is unchanged.');
 
     /* The variance as the split states it: BANK LESS BAGS (bank less
        deposits, on the other four areas), so negative is money the bank did

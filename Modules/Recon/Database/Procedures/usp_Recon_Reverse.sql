@@ -18,6 +18,11 @@
    WRITES, in live mode only:
      PumpIT.dbo.RCN_BankStatementLinesPumpIT ReconBatchNo, ReconState
      PumpIT.dbo.BRN_DailyBanking{Area}       ReconBatchNoPumpIT = 0
+     PumpIT.dbo.BRN_DailyBankingFNB          Amount, AdjustedBy, Adjusted back to
+                                             their prior values, on the rows a
+                                             forced FNB match adjusted (5 Oct
+                                             2026) — refused (ADJUST_MOVED) if
+                                             any has changed since
 
    The batch number is NOT returned to SS_UniqueNumber. Gaps in a counter are
    harmless; handing the same number out twice is not.
@@ -50,7 +55,7 @@
    BRN_StaffShorts IsDeclined, DeclinedReason, DeclinedByUserId, DeclinedDate).
 
    Refusals: BATCH_NOT_FOUND · ALREADY_REVERSED · REASON_REQUIRED ·
-             SHORT_RAISED — and agora.usp_Cash_DeclineStaffShort's own, which
+             SHORT_RAISED · ADJUST_MOVED — and agora.usp_Cash_DeclineStaffShort's own, which
              roll the whole reversal back
    ============================================================================ */
 
@@ -131,6 +136,61 @@ BEGIN
         THROW 51000, @Held, 1;
     END
 
+    /*
+     * THE FNB ADJUSTMENT — what a forced FNB match wrote to the deposits
+     * (Amount, AdjustedBy, Adjusted; see usp_Recon_ManualMatch). Each row goes
+     * back to the values it held before, by its primary key — but only if it
+     * still holds exactly what the match left there. A deposit somebody has
+     * edited since is not written over: the reversal stops, before anything
+     * moves, and says which. Ryan's go-ahead, 5 Oct 2026.
+     */
+    DECLARE @Adjusted TABLE (
+        MatchId bigint PRIMARY KEY, BatchNo int, TillNo int, ShiftNo int, TxnAt datetime,
+        BatchNoRaw nvarchar(20), MerchantNo nvarchar(20),
+        Adjustment money, PriorAmount money, PriorAdjusted bit, PriorAdjustedBy money,
+        NowAmount money NULL, NowAdjustedBy money NULL, NowBatchNo int NULL
+    );
+
+    INSERT INTO @Adjusted (MatchId, BatchNo, TillNo, ShiftNo, TxnAt, BatchNoRaw, MerchantNo,
+                           Adjustment, PriorAmount, PriorAdjusted, PriorAdjustedBy)
+    SELECT m.Id, m.BatchNo,
+           TRY_CONVERT(int, JSON_VALUE(m.SourceKeyJson, '$.till')),
+           TRY_CONVERT(int, JSON_VALUE(m.SourceKeyJson, '$.shift')),
+           TRY_CONVERT(datetime, JSON_VALUE(m.SourceKeyJson, '$.txn'), 126),
+           JSON_VALUE(m.SourceKeyJson, '$.batch'),
+           JSON_VALUE(m.SourceKeyJson, '$.merchant'),
+           m.Adjustment, m.PriorAmount, m.PriorAdjusted, m.PriorAdjustedBy
+    FROM agora.ReconMatch m
+    JOIN @Targets t ON t.BatchId = m.BatchId AND t.ReconArea = 'FNB' AND t.StampMode = 'live'
+    WHERE m.BranchId = @BranchId AND m.Side = 'mops' AND m.Adjustment IS NOT NULL;
+
+    UPDATE a SET a.NowAmount = d.Amount, a.NowAdjustedBy = ISNULL(d.AdjustedBy, 0), a.NowBatchNo = d.ReconBatchNoPumpIT
+    FROM @Adjusted a
+    JOIN [PumpIT].dbo.BRN_DailyBankingFNB d
+      ON d.SSBranchId = @BranchId AND d.TillNo = a.TillNo AND d.ShiftNo = a.ShiftNo
+     AND d.TransactionDate = a.TxnAt AND d.BatchNo = a.BatchNoRaw AND d.MerchantNo = a.MerchantNo;
+
+    IF EXISTS (SELECT 1 FROM @Adjusted
+               WHERE NowBatchNo IS NULL OR NowBatchNo <> BatchNo
+                  OR NowAmount <> PriorAmount + Adjustment
+                  OR NowAdjustedBy <> ISNULL(PriorAdjustedBy, 0) + Adjustment)
+    BEGIN
+        DECLARE @Moved nvarchar(2048) = (
+            SELECT TOP 1 CONCAT(N'AGORA:ADJUST_MOVED:The FNB deposit on till ', TillNo, N' shift ', ShiftNo,
+                                N', batch ', LTRIM(RTRIM(BatchNoRaw)), N' has changed since this match adjusted it',
+                                CASE WHEN NowAmount IS NOT NULL
+                                     THEN CONCAT(N' (it now holds R', CONVERT(nvarchar(30), CONVERT(decimal(18,2), NowAmount)),
+                                                 N', the match left R', CONVERT(nvarchar(30), CONVERT(decimal(18,2), PriorAmount + Adjustment)), N')')
+                                     ELSE N' (it is no longer there)' END,
+                                N'. Putting the old amount back would write over that change, so nothing was reversed. Correct it in PumpIT first.')
+            FROM @Adjusted
+            WHERE NowBatchNo IS NULL OR NowBatchNo <> BatchNo
+               OR NowAmount <> PriorAmount + Adjustment
+               OR NowAdjustedBy <> ISNULL(PriorAdjustedBy, 0) + Adjustment
+            ORDER BY TillNo, ShiftNo);
+        THROW 51000, @Moved, 1;
+    END
+
     /* UTC, the application's clock — see usp_Recon_Commit. */
     DECLARE @Now datetime2(0) = SYSUTCDATETIME(), @Bank int = 0, @Mops int = 0, @Lines int = 0;
 
@@ -161,6 +221,22 @@ BEGIN
         FROM [PumpIT].dbo.BRN_DailyBankingABSA d
         JOIN @Targets t ON t.ReconArea = 'ABSA' AND t.StampMode = 'live'
         WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = t.BatchNo;
+        SET @Mops = @Mops + @@ROWCOUNT;
+
+        /* FNB rows a forced match adjusted: the prior values back, by key, in
+           the same statement as the stamp (checked above, before the
+           transaction). The rest of the batch follows in the next one. */
+        UPDATE d
+        SET d.ReconBatchNoPumpIT = 0,
+            d.Amount     = a.PriorAmount,
+            d.AdjustedBy = a.PriorAdjustedBy,
+            d.Adjusted   = a.PriorAdjusted
+        FROM [PumpIT].dbo.BRN_DailyBankingFNB d
+        JOIN @Adjusted a
+          ON d.SSBranchId = @BranchId AND d.TillNo = a.TillNo AND d.ShiftNo = a.ShiftNo
+         AND d.TransactionDate = a.TxnAt AND d.BatchNo = a.BatchNoRaw AND d.MerchantNo = a.MerchantNo
+        WHERE d.ReconBatchNoPumpIT = a.BatchNo
+          AND d.Amount = a.PriorAmount + a.Adjustment;
         SET @Mops = @Mops + @@ROWCOUNT;
 
         UPDATE d SET d.ReconBatchNoPumpIT = 0

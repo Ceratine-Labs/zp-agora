@@ -88,6 +88,12 @@
                         <x-info label="About the reason">
                             <p>Required whenever the two sides do not agree. It is the only record of the
                                decision, and the variance travels with the batch wherever it is shown.</p>
+                            @if ($area['key'] === 'FNB' && $stampMode === 'live' && config('recon.fnb_adjust_mode') === 'live')
+                                {{-- usp_Recon_ManualMatch → THE FNB ADJUSTMENT (5 Oct 2026). --}}
+                                <p><strong>On FNB the difference is written to the deposits</strong>, as PumpIT's
+                                   own forced batch does: each ticked deposit's amount moves by its share (shared by
+                                   amount) and Adjusted By records it. The bank stays as it is.</p>
+                            @endif
                         </x-info>
                     </div>
                     {{-- 200: agora.ReconRunLine.BlockReason, where a forced match's reason

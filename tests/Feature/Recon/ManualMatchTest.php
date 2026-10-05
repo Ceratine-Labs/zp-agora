@@ -276,6 +276,269 @@ class ManualMatchTest extends TestCase
         }
     }
 
+    /**
+     * Chantal Peens (ZP), 1 Oct 2026: a forced FNB match must write its
+     * variance to the DEPOSIT side, as PumpIT's own forced batch does — the
+     * deposits' Amount moves to meet the bank, the change is recorded in
+     * AdjustedBy, Adjusted is set, and the bank line never moves.
+     *
+     * Two deposit rows of its own (TST batch numbers, full primary key, as
+     * every live row has) R26.00 over a real outstanding bank line, all inside
+     * a transaction that is rolled back: the procedure joins it, so nothing it
+     * writes to the stub survives the test.
+     */
+    public function test_a_forced_fnb_match_writes_its_variance_to_the_deposits_and_not_the_bank(): void
+    {
+        $bankLine = $this->fnbBankLine();
+        $db = DB::connection(config('agora.connections.app'));
+        $bankTotal = round((float) $bankLine->Amount, 2);
+
+        $db->beginTransaction();
+
+        try {
+            $rows = $this->insertFnbDeposits([round($bankTotal * 0.6, 2), round($bankTotal - round($bankTotal * 0.6, 2) + 26.00, 2)]);
+            $before = $this->fnbRows($rows);
+
+            $status = $this->forceFnb($bankLine, $rows, 'live');
+
+            $this->assertSame('MATCHED_FORCED', $status->Code);
+            $this->assertStringContainsString('written to the deposits', $status->Message);
+
+            $after = $this->fnbRows($rows);
+
+            // The deposits now meet the bank to the cent, and the bank did not move.
+            $this->assertEqualsWithDelta($bankTotal, array_sum(array_map(fn ($r) => (float) $r->Amount, $after)), 0.001);
+            $this->assertEqualsWithDelta($bankTotal, (float) $this->bankState([$bankLine->BankStatementLineID])[$bankLine->BankStatementLineID]->Amount, 0.001);
+
+            $moved = 0.0;
+
+            foreach ($after as $key => $row) {
+                $share = round((float) $row->Amount - (float) $before[$key]->Amount, 2);
+                $moved += $share;
+
+                $this->assertSame((int) $status->BatchNo, (int) $row->ReconBatchNoPumpIT);
+                $this->assertTrue((bool) $row->Adjusted, 'Every adjusted row says so.');
+                $this->assertEqualsWithDelta((float) $before[$key]->AdjustedBy + $share, (float) $row->AdjustedBy, 0.001,
+                    'AdjustedBy carries exactly what Amount moved by.');
+            }
+
+            $this->assertEqualsWithDelta(-26.00, $moved, 0.001, 'Every cent of the variance went to the deposits.');
+
+            // Pro rata by what each row carried: share = variance x row / deposits.
+            $amounts = array_values(array_map(fn ($r) => (float) $r->Amount, $before));
+            $shares = array_values(array_map(fn ($k) => round((float) $after[$k]->Amount - (float) $before[$k]->Amount, 2), array_keys($after)));
+            $this->assertEqualsWithDelta(-26.00 * $amounts[0] / array_sum($amounts), $shares[0], 0.011);
+
+            // The ledger keeps what each row held, which is what a reversal puts back.
+            $matches = $db->table(config('agora.schema').'.ReconMatch')
+                ->where('RunId', $status->Id)->where('Side', 'mops')->get();
+
+            $this->assertCount(2, $matches);
+            $this->assertTrue($matches->every(fn ($m) => $m->Adjustment !== null && $m->PriorAmount !== null));
+
+            $detail = $db->table(config('agora.schema').'.ReconStamp')
+                ->where('RunId', $status->Id)->whereNotNull('Detail')->value('Detail');
+
+            $this->assertStringContainsString('AdjustedBy', (string) $detail, 'The audit trail can say what changed.');
+
+            // And it does: the trail's line for each deposit names the amounts (v1__22c).
+            $trail = $db->table(config('agora.schema').'.vw_PumpItChange')
+                ->where('Ledger', 'ReconStamp')
+                ->whereIn('LedgerId', $db->table(config('agora.schema').'.ReconStamp')->where('RunId', $status->Id)->pluck('Id'))
+                ->where('PumpItTable', 'BRN_DailyBankingFNB')
+                ->pluck('Change');
+
+            $this->assertCount(2, $trail);
+            $this->assertTrue($trail->every(fn ($c) => str_contains($c, 'Amount ') && str_contains($c, 'AdjustedBy')));
+        } finally {
+            $db->rollBack();
+        }
+
+        $this->assertSame(0, $db->table('PumpIT.dbo.BRN_DailyBankingFNB')->where('BatchNo', 'like', 'TST%')->count(),
+            'Rolled back: the stub is as it was.');
+    }
+
+    /** A reversal puts every adjusted deposit back to what it held, and leaves the bank as it was. */
+    public function test_reversing_a_forced_fnb_match_puts_the_deposits_back(): void
+    {
+        $bankLine = $this->fnbBankLine();
+        $db = DB::connection(config('agora.connections.app'));
+        $bankTotal = round((float) $bankLine->Amount, 2);
+
+        $db->beginTransaction();
+
+        try {
+            $rows = $this->insertFnbDeposits([round($bankTotal * 0.6, 2), round($bankTotal - round($bankTotal * 0.6, 2) + 26.00, 2)]);
+            $before = $this->fnbRows($rows);
+            $bankBefore = $this->bankState([$bankLine->BankStatementLineID])[$bankLine->BankStatementLineID];
+
+            $status = $this->forceFnb($bankLine, $rows, 'live');
+
+            $this->procedures->write('usp_Recon_Reverse', [
+                'BranchId' => $this->branchId(), 'BatchId' => null, 'RunId' => $status->Id,
+                'Reason' => 'TEST-reverse the FNB adjustment', 'UserId' => 1,
+            ]);
+
+            $this->assertEquals($before, $this->fnbRows($rows), 'Amount, AdjustedBy, Adjusted and the stamp are exactly as they were.');
+
+            $bankAfter = $this->bankState([$bankLine->BankStatementLineID])[$bankLine->BankStatementLineID];
+            $this->assertSame((int) $bankBefore->ReconState, (int) $bankAfter->ReconState);
+            $this->assertEqualsWithDelta((float) $bankBefore->Amount, (float) $bankAfter->Amount, 0.001);
+        } finally {
+            $db->rollBack();
+        }
+    }
+
+    /** A deposit edited after the match is not written over: the reversal is refused whole. */
+    public function test_a_reversal_refuses_when_an_adjusted_deposit_has_changed_since(): void
+    {
+        $bankLine = $this->fnbBankLine();
+        $db = DB::connection(config('agora.connections.app'));
+        $bankTotal = round((float) $bankLine->Amount, 2);
+
+        $db->beginTransaction();
+
+        try {
+            $rows = $this->insertFnbDeposits([round($bankTotal * 0.6, 2), round($bankTotal - round($bankTotal * 0.6, 2) + 26.00, 2)]);
+            $status = $this->forceFnb($bankLine, $rows, 'live');
+
+            // Somebody corrects one of the rows in PumpIT afterwards.
+            $db->table('PumpIT.dbo.BRN_DailyBankingFNB')->where('SSBranchId', $this->branchId())
+                ->where('BatchNo', $rows[0]->SourceKey)->update(['Amount' => DB::raw('Amount + 1')]);
+
+            $refused = null;
+
+            try {
+                $this->procedures->write('usp_Recon_Reverse', [
+                    'BranchId' => $this->branchId(), 'BatchId' => null, 'RunId' => $status->Id,
+                    'Reason' => 'TEST-should be refused', 'UserId' => 1,
+                ]);
+            } catch (AgoraProcException $e) {
+                $refused = $e;
+            }
+
+            $this->assertNotNull($refused, 'The reversal must not write over a deposit changed since the match.');
+            $this->assertSame('ADJUST_MOVED', $refused->code());
+        } finally {
+            if ($db->transactionLevel() > 0) {
+                $db->rollBack();
+            }
+        }
+    }
+
+    /** With the switch off a forced FNB match stamps both sides and moves no amount — as before 5 Oct 2026. */
+    public function test_with_the_fnb_adjustment_off_a_forced_match_moves_no_amount(): void
+    {
+        $bankLine = $this->fnbBankLine();
+        $db = DB::connection(config('agora.connections.app'));
+        $bankTotal = round((float) $bankLine->Amount, 2);
+
+        $db->beginTransaction();
+
+        try {
+            $rows = $this->insertFnbDeposits([round($bankTotal * 0.6, 2), round($bankTotal - round($bankTotal * 0.6, 2) + 26.00, 2)]);
+            $before = $this->fnbRows($rows);
+
+            $status = $this->forceFnb($bankLine, $rows, 'off');
+
+            $this->assertSame('MATCHED_FORCED', $status->Code);
+            $this->assertStringNotContainsString('written to the deposits', $status->Message);
+
+            foreach ($this->fnbRows($rows) as $key => $row) {
+                $this->assertSame((int) $status->BatchNo, (int) $row->ReconBatchNoPumpIT, 'Still stamped.');
+                $this->assertEqualsWithDelta((float) $before[$key]->Amount, (float) $row->Amount, 0.001, 'No amount moved.');
+                $this->assertEqualsWithDelta(0.0, (float) $row->AdjustedBy, 0.001);
+            }
+        } finally {
+            $db->rollBack();
+        }
+    }
+
+    /** An outstanding FNB bank line on the branch and month the stub holds them for. */
+    private function fnbBankLine(): object
+    {
+        $sets = $this->procedures->callSets('usp_Recon_GetSides', [
+            'ReconArea' => 'FNB',
+            'BranchId' => $this->branchId(),
+            'FromDate' => '2026-07-01',
+            'ToDate' => '2026-07-31 23:59:59',
+            'State' => 'outstanding',
+            'MaxRows' => 200,
+        ]);
+
+        $bank = $sets[0]->first(fn ($l) => (float) $l->Amount > 1000);
+
+        if ($bank === null) {
+            $this->markTestSkipped('The stub holds no outstanding FNB bank line in July 2026.');
+        }
+
+        return $bank;
+    }
+
+    /**
+     * Deposit rows of the test's own, with a whole primary key. Call inside
+     * the test's transaction: they go when it is rolled back.
+     *
+     * @param  array<int, float>  $amounts
+     * @return array<int, object>
+     */
+    private function insertFnbDeposits(array $amounts): array
+    {
+        $rows = [];
+
+        foreach ($amounts as $i => $amount) {
+            $batch = 'TST05'.str_pad((string) ($i + 1), 4, '0', STR_PAD_LEFT);
+
+            DB::connection(config('agora.connections.app'))->table('PumpIT.dbo.BRN_DailyBankingFNB')->insert([
+                'SSBranchId' => $this->branchId(), 'TillNo' => 91 + $i, 'ShiftNo' => 1,
+                'TransactionDate' => '2026-07-15 00:00:00', 'BatchNo' => $batch, 'MerchantNo' => 'TST001',
+                'Amount' => $amount, 'ReconBatchNo' => 0, 'ReconBatchNoPumpIT' => 0, 'Adjusted' => 0, 'AdjustedBy' => 0,
+            ]);
+
+            $rows[] = (object) ['SourceId' => null, 'SourceKey' => $batch, 'SourceDate' => '2026-07-15', 'Amount' => $amount];
+        }
+
+        return $rows;
+    }
+
+    /** @param  array<int, object>  $rows */
+    private function forceFnb(object $bankLine, array $rows, string $adjust): object
+    {
+        return $this->procedures->write('usp_Recon_ManualMatch', [
+            'BranchId' => $this->branchId(),
+            'ReconArea' => 'FNB',
+            'FromDate' => '2026-07-01',
+            'ToDate' => '2026-07-31 23:59:59',
+            'BankLineIds' => (string) $bankLine->BankStatementLineID,
+            'MopsJson' => json_encode(array_map(fn ($r) => $this->deposit($r), $rows)),
+            'Reason' => 'TEST-forced FNB',
+            'StampMode' => 'live',
+            'UserId' => 1,
+            'AdjustMode' => $adjust,
+        ]);
+    }
+
+    /**
+     * The test's deposit rows as PumpIT holds them, keyed by batch number.
+     *
+     * @param  array<int, object>  $rows
+     * @return array<string, object>
+     */
+    private function fnbRows(array $rows): array
+    {
+        $out = [];
+
+        foreach ($rows as $r) {
+            $out[$r->SourceKey] = DB::connection(config('agora.connections.app'))
+                ->table('PumpIT.dbo.BRN_DailyBankingFNB')
+                ->where('SSBranchId', $this->branchId())
+                ->where('BatchNo', $r->SourceKey)
+                ->first(['Amount', 'AdjustedBy', 'Adjusted', 'ReconBatchNoPumpIT']);
+        }
+
+        return $out;
+    }
+
     /** The screen itself: a site has to be chosen before there are two sides. */
     public function test_the_pane_asks_for_a_site_before_it_shows_anything(): void
     {
