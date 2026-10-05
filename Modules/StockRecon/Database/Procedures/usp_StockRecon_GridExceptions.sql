@@ -142,9 +142,10 @@ BEGIN
                'stockrecon.exceptions'. */
             CASE rl.ExceptionCode
                 WHEN 'S10a' THEN 1  WHEN 'E1' THEN 2   WHEN 'S1' THEN 3   WHEN 'U1' THEN 4
-                WHEN 'U2'   THEN 5  WHEN 'U3' THEN 6   WHEN 'U4' THEN 7   WHEN 'S10b' THEN 8
-                WHEN 'F1'   THEN 9  WHEN 'F2' THEN 10  WHEN 'F3' THEN 11  WHEN 'S3' THEN 12
-                WHEN 'S5'   THEN 13 WHEN 'N1' THEN 14  WHEN 'N2' THEN 15  WHEN 'L1' THEN 16
+                WHEN 'U2'   THEN 5  WHEN 'D2' THEN 6   WHEN 'D1' THEN 7
+                WHEN 'U3'   THEN 8  WHEN 'U4' THEN 9   WHEN 'S10b' THEN 10
+                WHEN 'F1'   THEN 11 WHEN 'F2' THEN 12  WHEN 'F3' THEN 13  WHEN 'S3' THEN 14
+                WHEN 'S5'   THEN 15 WHEN 'N1' THEN 16  WHEN 'N2' THEN 17  WHEN 'L1' THEN 18
                 ELSE 99 END                                                   AS ClassRank,
             rl.Outcome,
             rl.IsDormant,
@@ -166,6 +167,9 @@ BEGIN
                 WHEN rl.ExceptionCode = 'S1'  THEN rl.QtyVar + rl.ChainBreak
                 WHEN rl.ExceptionCode = 'U1'  THEN rl.QtyPOS   - (rl.QtyOpen - rl.ChainBreak + rl.QtyIssued)
                 WHEN rl.ExceptionCode = 'U2'  THEN rl.QtyClose - (rl.QtyOpen - rl.ChainBreak + rl.QtyIssued)
+                /* A duplicate is worth the issue keyed twice: removed (D1), or
+                   at stake on somebody's shift until the site checks it (D2). */
+                WHEN rl.ExceptionCode IN ('D1', 'D2') THEN ISNULL(rl.DupQty, 0)
                 WHEN rl.ExceptionCode IN ('U3', 'U4') AND rl.ChainNetVar > 0 THEN rl.ChainNetVar
                 WHEN rl.ExceptionCode IS NOT NULL AND rl.QtyVarNew < 0 THEN -rl.QtyVarNew
                 /* A line here only for its audit code: what the hand

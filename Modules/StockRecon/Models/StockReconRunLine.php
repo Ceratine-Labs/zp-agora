@@ -68,6 +68,14 @@ use Illuminate\Support\Carbon;
  * @property bool $FlagAuditConflict
  * @property string|null $AuditCode
  * @property bool $BreakKept
+ * @property string|null $DupTier
+ * @property Carbon|null $DupTwinDate
+ * @property int|null $DupTwinShift
+ * @property string|null $DupTwinVar
+ * @property string|null $DupQty
+ * @property string|null $DupReason
+ * @property string|null $QtyIssuedNew
+ * @property bool $CountsMove
  * @property-read StockReconRun $run
  */
 class StockReconRunLine extends BaseModel
@@ -125,6 +133,9 @@ class StockReconRunLine extends BaseModel
         'RestoresHand' => 'boolean',
         'FlagAuditConflict' => 'boolean',
         'BreakKept' => 'boolean',
+        'CountsMove' => 'boolean',
+        'DupTwinDate' => 'date',
+        'DupTwinShift' => 'integer',
         'ChainBlocked' => 'boolean',
         'WouldAmend' => 'boolean',
         'Selected' => 'boolean',
@@ -220,13 +231,25 @@ class StockReconRunLine extends BaseModel
      * Can the commit write this row — the one definition the tick box, the
      * single-row button, StockReconService::select() and usp_StockRecon_Commit
      * all apply. A blocked chain is written only where it is being put back to
-     * the staff counts because a hand amendment broke the client's rules.
+     * the staff counts because a hand amendment broke the client's rules, or
+     * where a clear duplicate issue is taken out on its own, the counts
+     * untouched (QtyIssuedNew is set — usp_StockRecon_PreviewBalancing, 7f).
      */
     public function isWritable(): bool
     {
         return $this->WouldAmend
             && $this->CommitState === 'pending'
-            && (! $this->ChainBlocked || $this->RestoresHand);
+            && (! $this->ChainBlocked || $this->RestoresHand || $this->removesDuplicate());
+    }
+
+    /**
+     * A clear duplicate issue (D1) the commit sets to 0. Not every D1: one on a
+     * chain Agora does not write is removed only where PumpIT still holds the
+     * short, and DupReason says why one was not.
+     */
+    public function removesDuplicate(): bool
+    {
+        return $this->QtyIssuedNew !== null;
     }
 
     public function isCommitted(): bool

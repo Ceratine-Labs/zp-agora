@@ -6,6 +6,8 @@
  *           agora.vw_StockItem, agora.StockIssueMultiple,
  *           agora.vw_StockReconShiftEmployee  (who was on the shift — the ONLY
  *           definition of that in Agora; readers use it too, see v1__14b)
+ *           agora.vw_StockAreaFood  (prepared food per area: never a clear
+ *           duplicate issue)
  * Writes:   agora.StockReconRunLine, agora.StockReconRun — Agora's own ledger.
  *           NOTHING in the customer's estate. The commit is a separate
  *           procedure and even that only writes to PumpIT in 'live' stamp mode.
@@ -58,6 +60,15 @@
  * is in PumpIT and on the check of what Agora is about to write, so a kept
  * break never withdraws its own chain as F3. 0 restores the old split.
  *
+ * A DUPLICATE ISSUE IS TAKEN OUT FIRST (1 Oct 2026, decisions 01a0f60b-0386 and
+ * -0459). Where a shift is short by EXACTLY the issue it was given and an
+ * identical issue on a neighbouring shift arrived, the second issue never
+ * reached the shelf: it was keyed twice. A clear one (D1) is removed from the
+ * balancing basis — the issue reads 0, as the pack reads a fat-finger issue
+ * as its correction — so the shift balances and nobody is charged, and the
+ * commit writes QtyIssued = 0 with the prior kept. A possible one (D2) is
+ * listed with its twin and never changed. Stage 2b has the rule.
+ *
  * RULE 3 OF OURS, THE DORMANT SHIFT, is structural rather than a special case.
  * A shift whose (repaired) opening equals its closing, with nothing issued and
  * nothing sold, did not trade. SegSeq numbers only the active shifts, so a
@@ -83,6 +94,14 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_PreviewBalancing]
     @HoldBackIncomplete   BIT             = 1,
     @ExcludedAreaGroups   NVARCHAR(400)   = NULL,   -- CSV of STK_Area.AreaGroup
     @KeepBreaksUpTo       DECIMAL(18,4)   = 3,      -- a break this small keeps the chain going
+    /* config('stockrecon.issue_mode') = 'live'. 0 detects and reports a clear
+       duplicate (D1) but leaves it in the basis, so nothing proposes to write
+       the issue. */
+    @RemoveDuplicates     BIT             = 0,
+    /* config('stockrecon.exceptions.D2.blocks'). THE ONE PLACE a possible
+       duplicate (D2) would hold its chain back from the commit; off, it is
+       listed and the chain balances as usual (task 01a0f610-5ac0 decides). */
+    @BlockPossibleDuplicates BIT          = 0,
     @UserId               INT             = NULL
 AS
 BEGIN
@@ -372,9 +391,276 @@ BEGIN
            CONVERT(bit, CASE WHEN ABS(rep.OpenRep - rep.QtyClose) < @eps
                               AND ABS(rep.QtyIssued)           < @eps
                               AND ABS(rep.QtyPOS)              < @eps
-                             THEN 1 ELSE 0 END)                                  AS IsDormant
+                             THEN 1 ELSE 0 END)                                  AS IsDormant,
+           /* The issue as PumpIT holds it. QtyIssued itself becomes the
+              BASIS issue below, 0 on a clear duplicate (stage 2b); every
+              reading of PumpIT as it stands — the audit, the hand variance,
+              what the run records as issued — reads this one. */
+           rep.QtyIssued                                                         AS QtyIssuedKeyed,
+           CONVERT(decimal(18,4), 0)                                             AS IssueCut,
+           CONVERT(nvarchar(2),   NULL)                                          AS DupTier,
+           CONVERT(date,          NULL)                                          AS DupTwinDate,
+           CONVERT(int,           NULL)                                          AS DupTwinShift,
+           CONVERT(decimal(18,4), NULL)                                          AS DupTwinVar,
+           CONVERT(decimal(18,4), NULL)                                          AS DupQty,
+           CONVERT(decimal(18,4), NULL)                                          AS DupTol,
+           CONVERT(nvarchar(80),  NULL)                                          AS DupReason
     INTO #rep
     FROM rep;
+
+    /* ------------------------------------------------------------- stage 2b
+       DUPLICATE ISSUES (customer's ask via Ryan; decisions 01a0f60b-0386 and
+       01a0f60b-0459, 1 Oct 2026; docs/stock-recon.md → "Duplicate issues").
+
+       PumpIT's capture SETS QtyIssued per shift line, so a resubmitted capture
+       cannot double it: a duplicate is a person keying the same issue again,
+       typically the night shift re-keying the day's issue sheet. The count is
+       the independent witness. If the issue never arrived, opening less
+       closing is just what the till sold, and the shift is short by exactly
+       the issue.
+
+       CLEAR (D1) — on shift s with issue Q, all five:
+         1. s is short by Q exactly: whole units to the count, weighed items
+            within 2% of Q;
+         2. an identical issue on a neighbouring shift t — same item and area,
+            within two shifts and one day — whose stock DID arrive: t balances
+            (to the same tolerance);
+         3. t is on the same day, or a day apart when Q is not the item's usual
+            delivery (under half its issues over the window and the eight weeks
+            before it are that size);
+         4. one candidate per PAIR: no identical-issue neighbour of s is ALSO
+            short by exactly its issue — then nothing says which of the two was
+            real, and we never guess;
+         5. shelf goods only. In prepared food a same-size batch thrown away
+            unrecorded looks exactly the same (agora.vw_StockAreaFood).
+       POSSIBLE (D2) — s short within 10% of Q, a twin exists, and one of the
+       above fails. Listed with the twin and the reason; never changed.
+
+       The test reads the BASIS variance — repaired opening, the issue as
+       PumpIT holds it — so a duplicate head office already cut by hand is
+       gone from it and is not found twice. The day either side of the window
+       is read too, so a twin just outside it can make a candidate possible or
+       ambiguous; only a twin inside the window can make one clear. Every
+       approximation here errs the same way: a clear one missed, never a false
+       one.
+
+       A D1 is then REMOVED from the basis when @RemoveDuplicates is on: its
+       issue reads 0, exactly as the pack's own staff basis reads a fat-finger
+       issue (S4) as its correction. The shift balances, it is dormant if it
+       sold nothing, and everything downstream — segments, T, every flag, the
+       balancing — sees the issue that should have been there. */
+    IF OBJECT_ID('tempdb..#dn') IS NOT NULL DROP TABLE #dn;
+
+    SELECT r.AreaNo, r.StockItemNo, r.TransactionDate, r.ShiftNo,
+           r.QtyIssued AS Q, r.QtyVarRep AS V, CONVERT(bit, 1) AS InWindow
+    INTO #dn
+    FROM #rep r;
+
+    /* The margin: the day before the window and the day after the last
+       complete one, as counted. Read only to make a candidate possible or
+       ambiguous — so an unrepaired opening, or an unfinished day, can only
+       cost a clear one, never create one. */
+    DECLARE @m INT = 0, @mFrom DATE, @mTo DATE;
+
+    /* Two single-day ranges rather than one OR, so each is a seek on
+       PumpIT's (SSBranchId, TransactionDate, …) key. */
+    WHILE @m < 2
+    BEGIN
+        SET @mFrom = CASE @m WHEN 0 THEN DATEADD(day, -1, @FromDate) ELSE DATEADD(day, 1, @CompleteTo) END;
+        SET @mTo   = DATEADD(day, 1, @mFrom);
+        SET @m     = @m + 1;
+
+        ;WITH items AS (SELECT DISTINCT AreaNo, StockItemNo FROM #rep)
+        INSERT INTO #dn (AreaNo, StockItemNo, TransactionDate, ShiftNo, Q, V, InWindow)
+        SELECT l.AreaNo, l.StockItemNo, CONVERT(date, l.TransactionDate), l.ShiftNo,
+               CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0)),
+               CONVERT(decimal(18,4), ISNULL(l.QtyComputer, 0)
+                   - (ISNULL(CASE WHEN @UseOriginalCounts = 1 THEN l.QtyOpen_Original ELSE l.QtyOpen END, 0)
+                      + ISNULL(l.QtyIssued, 0)
+                      - ISNULL(CASE WHEN @UseOriginalCounts = 1 THEN l.QtyClose_Original ELSE l.QtyClose END, 0))),
+               CONVERT(bit, 0)
+        FROM agora.vw_StockReconLine l
+        JOIN items i ON i.AreaNo = l.AreaNo AND i.StockItemNo = l.StockItemNo
+        WHERE l.BranchId = @BranchId
+          AND l.TransactionDate >= @mFrom AND l.TransactionDate < @mTo;
+    END
+
+    IF OBJECT_ID('tempdb..#dp') IS NOT NULL DROP TABLE #dp;
+
+    SELECT d.AreaNo, d.StockItemNo, d.TransactionDate, d.ShiftNo, d.Q, d.V, d.InWindow,
+           ROW_NUMBER() OVER (PARTITION BY d.AreaNo, d.StockItemNo
+                              ORDER BY d.TransactionDate, d.ShiftNo)                    AS Pos,
+           /* Whole units to the count (the counts are floats, hence @eps);
+              weighed items within 2% of the issue. */
+           CONVERT(decimal(18,4), CASE WHEN i.Weighed = 1 THEN 0.02 * ABS(d.Q) ELSE @eps END) AS Tol,
+           CONVERT(bit, CASE WHEN d.Q > @eps
+                              AND ABS(d.V + d.Q) <= CASE WHEN i.Weighed = 1 THEN 0.02 * d.Q ELSE @eps END
+                             THEN 1 ELSE 0 END)                                     AS Exact,
+           CONVERT(bit, CASE WHEN d.Q > @eps AND ABS(d.V + d.Q) <= 0.10 * d.Q
+                             THEN 1 ELSE 0 END)                                     AS Near
+    INTO #dp
+    FROM #dn d
+    JOIN #item i ON i.AreaNo = d.AreaNo AND i.StockItemNo = d.StockItemNo;
+
+    DROP TABLE #dn;
+
+    /* Every candidate against every twin it could have: an identical issue
+       within two shifts and one day. */
+    IF OBJECT_ID('tempdb..#dpair') IS NOT NULL DROP TABLE #dpair;
+
+    SELECT c.AreaNo, c.StockItemNo, c.TransactionDate, c.ShiftNo, c.Q, c.Tol, c.Exact,
+           t.TransactionDate                                                AS TwinDate,
+           t.ShiftNo                                                        AS TwinShift,
+           t.V                                                              AS TwinVar,
+           t.InWindow                                                       AS TwinInWindow,
+           t.Exact                                                          AS TwinExact,
+           ABS(DATEDIFF(day, c.TransactionDate, t.TransactionDate))         AS DayGap,
+           ABS(t.Pos - c.Pos)                                               AS PosGap,
+           CONVERT(bit, CASE WHEN ABS(t.V) <= c.Tol THEN 1 ELSE 0 END)      AS TwinArrived
+    INTO #dpair
+    FROM #dp c
+    JOIN #dp t
+      ON t.AreaNo = c.AreaNo AND t.StockItemNo = c.StockItemNo
+     AND t.Pos BETWEEN c.Pos - 2 AND c.Pos + 2 AND t.Pos <> c.Pos
+     AND ABS(DATEDIFF(day, c.TransactionDate, t.TransactionDate)) <= 1
+     AND t.Q > @eps AND ABS(t.Q - c.Q) <= c.Tol
+    WHERE c.InWindow = 1 AND c.Near = 1;
+
+    DROP TABLE #dp;
+
+    /* Rule 3's "usual delivery": the share of the item's issues over the
+       window and the eight weeks before it that are this size. Read only for
+       the candidates whose clear twin is a day away — it decides nothing else. */
+    IF OBJECT_ID('tempdb..#dusual') IS NOT NULL DROP TABLE #dusual;
+
+    /* Shaped off #dpair so the item number keeps the source's collation. */
+    SELECT TOP 0 AreaNo, StockItemNo, Q, CONVERT(decimal(9,4), 0) AS UsualShare
+    INTO #dusual
+    FROM #dpair;
+
+    /* Most runs have no such candidate at all, and then the read is skipped. */
+    IF EXISTS (SELECT 1 FROM #dpair WHERE TwinArrived = 1 AND TwinInWindow = 1 AND DayGap = 1)
+    BEGIN
+        ;WITH need AS (
+            SELECT DISTINCT AreaNo, StockItemNo, Q, Tol
+            FROM #dpair
+            WHERE TwinArrived = 1 AND TwinInWindow = 1 AND DayGap = 1
+        ),
+        iss AS (
+            SELECT l.AreaNo, l.StockItemNo, CONVERT(decimal(18,4), l.QtyIssued) AS Q
+            FROM agora.vw_StockReconLine l
+            JOIN (SELECT DISTINCT AreaNo, StockItemNo FROM need) n
+              ON n.AreaNo = l.AreaNo AND n.StockItemNo = l.StockItemNo
+            WHERE l.BranchId = @BranchId
+              AND l.TransactionDate >= DATEADD(day, -56, @FromDate)
+              AND l.TransactionDate <  DATEADD(day, 1, @CompleteTo)
+              AND l.QtyIssued > @eps
+        )
+        INSERT INTO #dusual (AreaNo, StockItemNo, Q, UsualShare)
+        SELECT n.AreaNo, n.StockItemNo, n.Q,
+               CONVERT(decimal(9,4), AVG(CASE WHEN ABS(s.Q - n.Q) <= n.Tol THEN 1.0 ELSE 0.0 END))
+        FROM need n
+        JOIN iss s ON s.AreaNo = n.AreaNo AND s.StockItemNo = n.StockItemNo
+        GROUP BY n.AreaNo, n.StockItemNo, n.Q;
+    END
+
+    /* The verdict, per candidate. */
+    IF OBJECT_ID('tempdb..#dup') IS NOT NULL DROP TABLE #dup;
+
+    ;WITH judged AS (
+        SELECT p.*,
+               CONVERT(bit, CASE WHEN p.TwinArrived = 1 AND p.TwinInWindow = 1
+                                  AND (p.DayGap = 0 OR ISNULL(u.UsualShare, 1) < 0.5)
+                                 THEN 1 ELSE 0 END)                         AS ClearTwin,
+               CONVERT(bit, CASE WHEN p.TwinArrived = 1 AND p.TwinInWindow = 1 AND p.DayGap = 1
+                                  AND ISNULL(u.UsualShare, 1) >= 0.5
+                                 THEN 1 ELSE 0 END)                         AS UsualTwin
+        FROM #dpair p
+        LEFT JOIN #dusual u
+               ON u.AreaNo = p.AreaNo AND u.StockItemNo = p.StockItemNo AND u.Q = p.Q
+    ),
+    cand AS (
+        SELECT j.AreaNo, j.StockItemNo, j.TransactionDate, j.ShiftNo,
+               MAX(j.Q) AS Q, MAX(j.Tol) AS Tol,
+               MAX(CONVERT(int, j.Exact))        AS Exact,
+               MAX(CONVERT(int, j.ClearTwin))    AS ClearTwin,
+               MAX(CONVERT(int, j.UsualTwin))    AS UsualTwin,
+               MAX(CONVERT(int, j.TwinArrived))  AS AnyArrived,
+               MAX(CONVERT(int, j.TwinExact))    AS Ambiguous,
+               MAX(CONVERT(int, f.IsPreparedFood)) AS Food
+        FROM judged j
+        LEFT JOIN agora.vw_StockAreaFood f
+               ON f.BranchId = @BranchId AND f.AreaNo = j.AreaNo
+        GROUP BY j.AreaNo, j.StockItemNo, j.TransactionDate, j.ShiftNo
+    ),
+    tiered AS (
+        SELECT c.*,
+               CASE WHEN c.Exact = 1 AND c.ClearTwin = 1 AND c.Ambiguous = 0 AND ISNULL(c.Food, 0) = 0
+                    THEN 'D1' ELSE 'D2' END                                 AS Tier,
+               /* Why a possible one is not clear — the first test it fails, in
+                  the order the investigation reported them. */
+               CASE WHEN c.Exact = 1 AND c.ClearTwin = 1 AND c.Ambiguous = 0 AND ISNULL(c.Food, 0) = 0
+                        THEN CASE WHEN @RemoveDuplicates = 0
+                                  THEN N'Not removed: removing duplicates is switched off' END
+                    WHEN c.Exact = 1 AND c.ClearTwin = 1 AND c.Ambiguous = 0
+                        THEN N'Prepared food: a batch thrown away looks the same'
+                    WHEN c.AnyArrived = 0
+                        THEN N'Both shifts short: which issue was real is not known'
+                    WHEN c.Exact = 0
+                        THEN N'Short is near the issue, not equal to it'
+                    WHEN c.ClearTwin = 0 AND c.UsualTwin = 1
+                        THEN N'The usual delivery size, a day apart'
+                    WHEN c.ClearTwin = 0
+                        THEN N'The twin that arrived is outside the window'
+                    ELSE N'Both sides of a pair are short by the issue'
+               END                                                          AS Reason
+        FROM cand c
+    )
+    SELECT t.AreaNo, t.StockItemNo, t.TransactionDate, t.ShiftNo, t.Q, t.Tol, t.Tier, t.Reason,
+           tw.TwinDate, tw.TwinShift, tw.TwinVar
+    INTO #dup
+    FROM tiered t
+    /* The twin to show: the one that makes it clear, else one that arrived,
+       else the nearest — same day before a day apart, then the closer shift. */
+    OUTER APPLY (
+        SELECT TOP 1 j.TwinDate, j.TwinShift, j.TwinVar
+        FROM judged j
+        WHERE j.AreaNo = t.AreaNo AND j.StockItemNo = t.StockItemNo
+          AND j.TransactionDate = t.TransactionDate AND j.ShiftNo = t.ShiftNo
+        ORDER BY j.ClearTwin DESC, j.TwinArrived DESC, j.TwinInWindow DESC, j.DayGap, j.PosGap,
+                 j.TwinDate, j.TwinShift
+    ) tw;
+
+    DROP TABLE #dpair;
+    DROP TABLE #dusual;
+
+    UPDATE r SET
+        r.DupTier      = d.Tier,
+        r.DupQty       = d.Q,
+        r.DupTol       = d.Tol,
+        r.DupReason    = d.Reason,
+        r.DupTwinDate  = d.TwinDate,
+        r.DupTwinShift = d.TwinShift,
+        r.DupTwinVar   = d.TwinVar
+    FROM #rep r
+    JOIN #dup d
+      ON d.AreaNo = r.AreaNo AND d.StockItemNo = r.StockItemNo
+     AND d.TransactionDate = r.TransactionDate AND d.ShiftNo = r.ShiftNo;
+
+    DROP TABLE #dup;
+
+    /* Removed from the basis: the issue reads 0, and the variance and the
+       dormant test follow. QtyVar — as the staff counted it — is left alone;
+       it is the "before" every screen shows. */
+    IF @RemoveDuplicates = 1
+        UPDATE #rep SET
+            IssueCut  = QtyIssued,
+            QtyVarRep = QtyVarRep + QtyIssued,
+            QtyIssued = 0,
+            IsDormant = CONVERT(bit, CASE WHEN ABS(OpenRep - QtyClose) < @eps
+                                           AND ABS(QtyPOS)            < @eps
+                                          THEN 1 ELSE 0 END)
+        WHERE DupTier = 'D1';
 
     /* Segments and sequence numbers. A repaired break starts a new segment, so
        the closing before it is the last closing of the segment before — pinned,
@@ -576,7 +862,10 @@ BEGIN
                               + CONVERT(int, s.FlagBigAmendment) + CONVERT(int, s.FlagPctAmendment)
                               + CONVERT(int, s.FlagNegativeClose) + CONVERT(int, s.FlagShortChain)
                               + CONVERT(int, s.FlagDormantMoved) + CONVERT(int, s.FlagPackOver)
-                              + CONVERT(int, s.FlagNoPosLink))
+                              + CONVERT(int, s.FlagNoPosLink)
+                              /* A possible duplicate holds its chain back only
+                                 when config says D2 blocks — see the parameter. */
+                              + CASE WHEN @BlockPossibleDuplicates = 1 AND s.DupTier = 'D2' THEN 1 ELSE 0 END)
                    OVER (PARTITION BY s.AreaNo, s.StockItemNo))            AS ChainBlocked
         FROM scored s
     ),
@@ -626,11 +915,13 @@ BEGIN
                /* What the HAND balancing already in PumpIT did to this shift,
                   as the pack audits it. Staff basis: original counts with the
                   opening repaired to the original previous closing, and a
-                  fat-finger issue (123456) neutralised as the pack does. */
+                  fat-finger issue (123456) neutralised as the pack does.
+                  PumpIT as it stands, so the issue as KEYED there — the pack
+                  knows nothing of a duplicate Agora has not yet removed. */
                CONVERT(decimal(18,4), CASE WHEN e.PrevCloseOrig IS NULL THEN 0
                                            ELSE e.QtyOpenOrig - e.PrevCloseOrig END) AS BreakOrig,
                CONVERT(bit, CASE WHEN e.QtyIssuedOrig > 20
-                                  AND e.QtyIssuedOrig > 5 * CASE WHEN e.QtyIssued > 1 THEN e.QtyIssued ELSE 1 END
+                                  AND e.QtyIssuedOrig > 5 * CASE WHEN e.QtyIssuedKeyed > 1 THEN e.QtyIssuedKeyed ELSE 1 END
                                  THEN 1 ELSE 0 END)                        AS MisKeyed
         FROM effective e
     ),
@@ -639,10 +930,10 @@ BEGIN
         SELECT r.*,
                CONVERT(decimal(18,4),
                    r.QtyPOSOrig - (r.QtyOpenOrig
-                                   + CASE WHEN r.MisKeyed = 1 THEN r.QtyIssued ELSE r.QtyIssuedOrig END
+                                   + CASE WHEN r.MisKeyed = 1 THEN r.QtyIssuedKeyed ELSE r.QtyIssuedOrig END
                                    - r.QtyCloseOrig) + r.BreakOrig)        AS StaffVar,
                CONVERT(decimal(18,4),
-                   r.QtyPOS - (r.QtyOpenNow + r.QtyIssued - r.QtyCloseNow)) AS HandVar
+                   r.QtyPOS - (r.QtyOpenNow + r.QtyIssuedKeyed - r.QtyCloseNow)) AS HandVar
         FROM ranked r
     )
     SELECT a.*,
@@ -655,12 +946,15 @@ BEGIN
                WHEN a.StaffVar < 0   AND a.HandVar < a.StaffVar - 0.5                        THEN 'S8'
                WHEN a.IsLastInWindow = 1 AND @AtDataEnd = 1
                     AND ABS(a.QtyCloseNow - a.QtyCloseOrig) > @tol                           THEN 'S11'
-               WHEN ABS(a.QtyIssued - a.QtyIssuedOrig) > @tol AND a.MisKeyed = 1              THEN 'S4'
-               WHEN a.QtyIssued > a.QtyIssuedOrig + @tol                                     THEN 'S4a'
-               WHEN a.QtyIssued < a.QtyIssuedOrig - @tol                                     THEN 'S4b'
+               WHEN ABS(a.QtyIssuedKeyed - a.QtyIssuedOrig) > @tol AND a.MisKeyed = 1         THEN 'S4'
+               WHEN a.QtyIssuedKeyed > a.QtyIssuedOrig + @tol                                THEN 'S4a'
+               WHEN a.QtyIssuedKeyed < a.QtyIssuedOrig - @tol                                THEN 'S4b'
            END                                                              AS AuditCode,
            CONVERT(bit, 0)                                                  AS RestoresHand,
-           CONVERT(bit, 0)                                                  AS FlagAuditConflict
+           CONVERT(bit, 0)                                                  AS FlagAuditConflict,
+           /* The commit writes this row's issue to 0 — a clear duplicate. Set
+              by stage 7f. */
+           CONVERT(bit, 0)                                                  AS IssueWrite
     INTO #apply
     FROM audited a;
 
@@ -713,9 +1007,14 @@ BEGIN
 
        On real data (Engen Bethlehem, Sep 2026) every such row had an ISSUE
        changed at balancing and a count moved to compensate. Agora writes
-       counts, never issues, and with the issue edit in place no set of counts
-       satisfies every check at once — so the honest answer is to leave it for
-       a person, not to trade one flag for another. */
+       counts — and an issue only where it was keyed twice (D1, stage 2b) —
+       and with the issue edit in place no set of counts satisfies every check
+       at once — so the honest answer is to leave it for a person, not to
+       trade one flag for another.
+
+       "After" reads the BASIS issue, which is 0 on a clear duplicate: a chain
+       written here writes that issue with it (stage 7f). "Now" reads the issue
+       as keyed. */
     ;WITH post AS (
         SELECT a.AreaNo, a.StockItemNo, a.TransactionDate, a.ShiftNo,
                LAG(a.EffCloseNew, 1, a.PrevCloseNow) OVER (
@@ -772,6 +1071,55 @@ BEGIN
     FROM #apply a
     JOIN conflicted c ON c.AreaNo = a.AreaNo AND c.StockItemNo = a.StockItemNo;
 
+    /* ------------------------------------------------------------- stage 7f
+       WHERE A CLEAR DUPLICATE IS WRITTEN.
+
+       On a chain the commit writes — balanced, or put back to the staff counts
+       by 7d — always: those counts were worked out with the issue gone, and
+       7e audited the chain with it gone.
+
+       On a chain it does NOT write, the duplicate is still a duplicate — it is
+       not balancing, it is an issue that was keyed twice — so it is written on
+       its own, the counts untouched. But only where PumpIT holds that shift
+       short by exactly the issue TODAY, so the write leaves it at nil and
+       nothing else moves. Where somebody has already moved the counts to hide
+       the short, taking the issue out alone would turn the shift into an over;
+       that one is reported, not written. */
+    UPDATE a SET
+        a.IssueWrite = 1,
+        a.EffVarNew  = CASE WHEN a.ChainBlocked = 1 AND a.RestoresHand = 0
+                            THEN a.QtyVar + a.IssueCut ELSE a.EffVarNew END
+    FROM #apply a
+    WHERE a.IssueCut > @eps
+      AND (   a.ChainBlocked = 0
+           OR a.RestoresHand = 1
+           OR ABS(a.HandVar + a.IssueCut) <= a.DupTol);
+
+    /* Not written, so the row stands as keyed: its issue is there, and a
+       shift with an issue is not dormant whatever the basis said. */
+    UPDATE #apply
+       SET DupReason = N'Not removed: PumpIT no longer holds this short and the chain is blocked',
+           IsDormant = 0
+    WHERE IssueCut > @eps AND IssueWrite = 0;
+
+    /* And the chain's count of shifts left short (L1) follows what the row
+       now ends as — on a blocked chain only, where 7f is what decided it. */
+    ;WITH touched AS (
+        SELECT DISTINCT AreaNo, StockItemNo
+        FROM #apply
+        WHERE IssueCut > @eps AND ChainBlocked = 1 AND RestoresHand = 0
+    ),
+    shorts AS (
+        SELECT a.AreaNo, a.StockItemNo,
+               SUM(CASE WHEN a.IsDormant = 0 AND a.EffVarNew < -@eps THEN 1 ELSE 0 END) AS n
+        FROM #apply a
+        JOIN touched t ON t.AreaNo = a.AreaNo AND t.StockItemNo = a.StockItemNo
+        GROUP BY a.AreaNo, a.StockItemNo
+    )
+    UPDATE a SET a.ShortShiftsAfter = s.n
+    FROM #apply a
+    JOIN shorts s ON s.AreaNo = a.AreaNo AND s.StockItemNo = a.StockItemNo;
+
     /* ------------------------------------------------------------- stage 7c
        The labels, resolved ONCE. Stored on the line for the reason SellPrice
        is: a run is a record of what was true when it was made. The employee is
@@ -797,7 +1145,9 @@ BEGIN
        WouldAmend is 1 only where the row's answer differs from PumpIT on a
        chain that is clear — or on a blocked one being put back to the staff
        counts (stage 7d) — and writing it trips no audit check that is not
-       tripped today (7e). There is no other path from "blocked" to "written". */
+       tripped today (7e); or where a clear duplicate issue is written (7f).
+       CountsMove says which of the two moves the counts; there is no other
+       path from "blocked" to "written". */
     INSERT INTO agora.StockReconRunLine (
         BranchId, RunId, [LineNo], AreaNo, StockItemNo, TransactionDate, ShiftNo, SellPrice,
         QtyOpen, QtyIssued, QtyClose, QtyPOS, QtyVar,
@@ -808,6 +1158,7 @@ BEGIN
         FlagDormantMoved, FlagChainBroken, ChainBlocked,
         PrevClose, ChainBreak, QtyOpenNow, QtyCloseNow, QtyIssuedOrig, IssueMultiple,
         FlagPackOver, FlagNoPosLink, RestoresHand, FlagAuditConflict, AuditCode, BreakKept,
+        DupTier, DupTwinDate, DupTwinShift, DupTwinVar, DupQty, DupReason, QtyIssuedNew, CountsMove,
         ExceptionCode, Outcome, WouldAmend, Selected, CommitState,
         ItemDescription, POSCode, StockLocation, AreaDescription,
         EmployeeCodes, EmployeeNames, EmployeeCount,
@@ -817,7 +1168,9 @@ BEGIN
         @RunId,
         ROW_NUMBER() OVER (ORDER BY a.AreaNo, a.StockItemNo, a.TransactionDate, a.ShiftNo),
         a.AreaNo, a.StockItemNo, a.TransactionDate, a.ShiftNo, a.SellPrice,
-        a.QtyOpen, a.QtyIssued, a.QtyClose, a.QtyPOS, a.QtyVar,
+        /* The issue as keyed: what the shift was given on paper. A removed
+           duplicate shows in QtyIssuedNew. */
+        a.QtyOpen, a.QtyIssuedKeyed, a.QtyClose, a.QtyPOS, a.QtyVar,
         a.EffOpenNew, a.EffCloseNew, a.EffVarNew, a.EffAmend,
         a.IsDormant, a.ActiveSeq, a.ActiveLen, a.ChainNetVar,
         a.FlagNetOver, a.FlagSoldMoreThanOnHand, a.FlagCloseExceedsOnHand, a.FlagIssueWentNowhere,
@@ -825,17 +1178,25 @@ BEGIN
         a.FlagDormantMoved, a.LinkBroken, a.ChainBlocked,
         a.PrevClose, a.ChainBreak, a.QtyOpenNow, a.QtyCloseNow, a.QtyIssuedOrig, NULLIF(a.Mult, 0),
         a.FlagPackOver, a.FlagNoPosLink, a.RestoresHand, a.FlagAuditConflict, a.AuditCode, a.BreakKept,
+        a.DupTier, a.DupTwinDate, a.DupTwinShift, a.DupTwinVar, a.DupQty, a.DupReason,
+        CASE WHEN a.IssueWrite = 1 THEN CONVERT(decimal(18,4), 0) END,
+        a.RowMoves,
 
         /* The class, ranked most serious first; a line is reported under the
            first test it trips. Codes are the pack's where the pack defines the
            test (S10a, S10b, S1, S3, S5, E1) and letters it does not use where
-           the test is ours (U, F, N, L) — see config('stockrecon.exceptions'). */
+           the test is ours (U, F, N, L, D) — see config('stockrecon.exceptions').
+           D2 and D1 sit under the row-level unrecorded issues and above the
+           chain-wide classes: they are this shift's own explanation of its
+           short, and a chain that ends over would otherwise hide every one. */
         CASE
             WHEN a.ChainBreak < -@tol                                                     THEN 'S10a'
             WHEN a.FlagNoPosLink = 1                                                      THEN 'E1'
             WHEN a.FlagPackOver = 1                                                       THEN 'S1'
             WHEN a.FlagSoldMoreThanOnHand = 1                                             THEN 'U1'
             WHEN a.FlagCloseExceedsOnHand = 1                                             THEN 'U2'
+            WHEN a.DupTier = 'D2'                                                         THEN 'D2'
+            WHEN a.DupTier = 'D1'                                                         THEN 'D1'
             WHEN a.FlagNetOver = 1 AND a.ChainIssues < @eps AND a.ChainPOS > @eps          THEN 'U3'
             WHEN a.FlagNetOver = 1                                                        THEN 'U4'
             WHEN a.ChainBreak > @tol                                                      THEN 'S10b'
@@ -856,6 +1217,9 @@ BEGIN
            hovers the rest (StockReconRunLine::outcomeLabel()). What blocks the
            chain first, then what happens to this row. */
         CASE
+            /* This shift's own news first: the issue goes, whatever else the
+               chain does. "(D1)" is what the audit trail's reason reads. */
+            WHEN a.IssueWrite = 1             THEN 'Duplicate issue removed (D1): captured twice, the issue goes to nil'
             WHEN a.RestoresHand = 1 AND a.RowMoves = 1
                                               THEN 'Hand amendment reversed: back to the count, the chain is not balanced'
             WHEN a.FlagPackOver = 1           THEN 'Missed issue sheet: an over of a whole pack, captured not balanced'
@@ -870,6 +1234,10 @@ BEGIN
             WHEN a.FlagNegativeClose = 1      THEN 'Data fault: balancing would drive the closing below zero'
             WHEN a.FlagBigAmendment = 1 OR a.FlagPctAmendment = 1
                                               THEN 'Implausible amendment: the correction is too large to be a miscount'
+            /* Before F2: a possible duplicate IS an issue that went nowhere,
+               and this says what to do about it. */
+            WHEN a.DupTier = 'D2' AND a.EffVarNew < -@eps
+                                              THEN 'Possible duplicate issue (D2): check the issue book before charging'
             WHEN a.FlagIssueWentNowhere = 1   THEN 'Issue went nowhere: issued, nothing sold, count unchanged'
             WHEN a.FlagAuditConflict = 1      THEN 'Audit conflict: an issue changed at balancing, counts cannot fix it'
             WHEN a.FlagShortChain = 1         THEN 'Chain too short: not enough active shifts in the window'
@@ -893,8 +1261,8 @@ BEGIN
             ELSE 'No change needed'
         END,
 
-        a.RowMoves,
-        a.RowMoves,
+        CONVERT(bit, CASE WHEN a.RowMoves = 1 OR a.IssueWrite = 1 THEN 1 ELSE 0 END),
+        CONVERT(bit, CASE WHEN a.RowMoves = 1 OR a.IssueWrite = 1 THEN 1 ELSE 0 END),
         'pending',
 
         m.StockItemDescription,
@@ -957,6 +1325,8 @@ BEGIN
         r.HeldBackRows      = @HeldBackRows,
         r.RepairedOpenings  = t.RepairedOpenings,
         r.KeptBreaks        = t.KeptBreaks,
+        r.DuplicatesClear   = t.DuplicatesClear,
+        r.DuplicatesPossible = t.DuplicatesPossible,
         r.AuditRows         = t.AuditRows,
         r.UpdatedAt         = SYSDATETIME(),
         r.UpdatedBy         = @UserId
@@ -965,7 +1335,9 @@ BEGIN
         SELECT
             COUNT(*)                                                                    AS TotalRows,
             ISNULL(SUM(CASE WHEN IsDormant = 1 THEN 1 ELSE 0 END), 0)                   AS DormantRows,
-            ISNULL(SUM(CONVERT(int, RowMoves)), 0)                                      AS AmendedRows,
+            ISNULL(SUM(CASE WHEN RowMoves = 1 OR IssueWrite = 1 THEN 1 ELSE 0 END), 0)   AS AmendedRows,
+            ISNULL(SUM(CASE WHEN DupTier = 'D1' THEN 1 ELSE 0 END), 0)                  AS DuplicatesClear,
+            ISNULL(SUM(CASE WHEN DupTier = 'D2' THEN 1 ELSE 0 END), 0)                  AS DuplicatesPossible,
             ISNULL(SUM(CASE WHEN QtyVar    >  @eps THEN 1 ELSE 0 END), 0)               AS OverRowsBefore,
             ISNULL(SUM(CASE WHEN EffVarNew >  @eps THEN 1 ELSE 0 END), 0)               AS OverRowsAfter,
             ISNULL(SUM(CASE WHEN QtyVar    < -@eps THEN 1 ELSE 0 END), 0)               AS ShortRowsBefore,

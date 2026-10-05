@@ -81,10 +81,12 @@ return [
     |   · Every write is recorded in agora.StockReconAmendment with the row's
     |     PRIOR pair, so agora.usp_StockRecon_Reverse puts back precisely what
     |     was changed. dbo.sp_UpdateAUTOStockReconBalancing can undo nothing.
-    |   · QtyIssued and the four _Original columns are never written. The
-    |     _Original pair is what makes a re-preview idempotent, and amending an
-    |     issue would change T itself — that is capturing a missing issue, a
-    |     different act that has to stay visible as one.
+    |   · The four _Original columns are never written, and QtyIssued only
+    |     to take out a clear duplicate issue — the separate switch below,
+    |     issue_mode. The _Original pair is what makes a re-preview
+    |     idempotent, and amending an issue would change T itself — that is
+    |     capturing a missing issue, a different act that has to stay visible
+    |     as one.
     |
     | TWO THINGS ARE NOT SETTLED BY THIS SWITCH, and both were on the report
     | he answered:
@@ -98,6 +100,30 @@ return [
     |     is the loose end: the other flags do the blocking.
     */
     'stamp_mode' => 'live',
+
+    /*
+    | A clear duplicate issue (D1) is removed, and the commit writes it.
+    |
+    | The one place Agora writes an ISSUE: QtyIssued = 0 on
+    | [PumpIT].dbo.STK_StockReconLine, on a shift short by exactly an issue
+    | that was keyed again on a neighbouring shift whose stock did arrive —
+    | docs/stock-recon.md → "Duplicate issues". A literal like stamp_mode, for
+    | the same reason.
+    |
+    | 'live' — the preview removes a D1 from the balancing basis (the shift
+    |          balances, nobody is charged) and the commit records the issue's
+    |          prior in agora.StockReconAmendment and, in live stamp mode,
+    |          writes the 0. usp_StockRecon_Reverse puts it back.
+    | 'off'  — a D1 is still found and reported, but left in the basis and
+    |          never written. A run previewed with it on is refused at commit
+    |          (ISSUE_MODE_OFF), because its counts assumed the issue gone.
+    |
+    | SET TO 'live' ON 1 OCTOBER 2026, on Ryan's answer to the PM question "May
+    | Agora write QtyIssued?" — "Yes: clear duplicates only, priors kept,
+    | reversible" (decision 01a0f60b-0459). Possible ones (D2) are corrected by
+    | the site, never by Agora.
+    */
+    'issue_mode' => 'live',
 
     /*
     | Areas whose AreaGroup is in this list are excluded from every figure.
@@ -261,6 +287,32 @@ return [
             'blocks' => true,
             'blurb' => 'The shift closed holding more than it opened with plus everything issued to it. '
                 .'The surplus arrived without a document.'],
+        /*
+        | Duplicate issues (1 Oct 2026). Above the chain-wide classes: they are
+        | this shift's own explanation of its short, and a chain that ends over
+        | would otherwise hide every one.
+        |
+        | D2's 'blocks' is THE switch for whether a possible duplicate holds its
+        | chain back from the commit — StockReconService passes it to the
+        | preview as @BlockPossibleDuplicates. Off until Ryan decides (task
+        | 01a0f610-5ac0).
+        */
+        'D2' => ['tone' => 'serious', 'label' => 'Possible duplicate issue',
+            'test' => 'short within 10% of the issue, an identical issue on a neighbouring shift, not clear',
+            'blocks' => false,
+            'blurb' => 'The same issue was keyed on a neighbouring shift and this one is short by about that much — '
+                .'but the count cannot prove which issue was real: both shifts are short, the short is near the '
+                .'issue rather than equal to it, it is the item\'s usual delivery a day apart, or it is prepared '
+                .'food, where a batch thrown away looks the same. Check the issue book, the storeroom count or the '
+                .'delivery note before anybody is charged. Agora never changes these; the site corrects them in PumpIT.'],
+        'D1' => ['tone' => 'good', 'label' => 'Duplicate issue removed',
+            'test' => 'short = the issue exactly, an identical issue on a neighbouring shift that arrived, same day '
+                .'(or a day apart and not the usual size), one candidate per pair, shelf goods',
+            'blocks' => false,
+            'blurb' => 'The issue was keyed twice: the count moved only by what the till sold, and the same issue had '
+                .'already arrived on the shift beside it. It is taken out before balancing, so the shift balances '
+                .'and nobody is charged, and the commit sets the issue to 0 in PumpIT with the old value kept for a '
+                .'reversal. The client\'s weekly pack will show the line as S4b, "issue reduced at balancing".'],
         'U3' => ['tone' => 'serious', 'label' => 'Selling with no issues captured at all',
             'test' => 'Σ Issued = 0 and Σ POS > 0 and a segment ends over',
             'blocks' => true,
@@ -291,7 +343,8 @@ return [
             'test' => 'writing the chain would trip S7, S8, S11, S12 or S13 on a shift that trips none today',
             'blocks' => true,
             'blurb' => 'An issue (or POS) quantity was changed at balancing and a count moved to match. Agora '
-                .'writes counts, never issues, and with that edit in place no set of counts passes every one '
+                .'writes counts, and an issue only to take out one keyed twice; with that edit in place no set '
+                .'of counts passes every one '
                 .'of the client\'s checks — so the chain is left for a person rather than given a new flag.'],
         'S3' => ['tone' => 'warn', 'label' => 'Short of a whole pack',
             'test' => 'short after balancing within 10% of k × issue multiple',

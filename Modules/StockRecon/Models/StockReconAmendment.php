@@ -25,6 +25,8 @@ use Illuminate\Support\Carbon;
  * @property string $PriorQtyClose
  * @property string $NewQtyOpen
  * @property string $NewQtyClose
+ * @property string|null $PriorQtyIssued
+ * @property string|null $NewQtyIssued
  * @property string $StampMode
  * @property string $State
  * @property Carbon|null $ReversedAt

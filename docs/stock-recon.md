@@ -157,9 +157,9 @@ parts:
   Every chain about to be written is audited as it would stand afterwards, check
   by check; if any shift would trip a check it does not trip today, the chain is
   withdrawn. On real data every such chain had an **issue** changed at balancing
-  with a count moved to match. Agora writes counts, never issues (`QtyIssued` is
-  not a named write), and with that edit in place no set of counts passes every
-  check — so it is left for the site, and reported.
+  with a count moved to match. Agora writes counts — and an issue only to take
+  out a clear duplicate (below) — and with that edit in place no set of counts
+  passes every check — so it is left for the site, and reported.
 
 Measured, Engen Bethlehem 1–29 Sep on the local copy, preview → commit →
 preview: forbidden hand amendments 141 → 53 (S12 86 → 22, S13 11 → 2, S11
@@ -194,6 +194,124 @@ they received (U2), 16 are whole-pack overs (S1), 16 sold more than they held
 
 ---
 
+## Duplicate issues (1 Oct 2026)
+
+The customer asked, via Ryan, whether Agora can tell when an issue was keyed
+twice, so staff are not charged for stock that never existed — stock loss goes
+to payroll. Ryan decided (PM decisions 01a0f60b-0386 and 01a0f60b-0459): detect
+them, neutralise the clear ones and write them, list the possible ones.
+
+PumpIT's capture **sets** `QtyIssued` per shift line, so a resubmitted capture
+cannot double it: a duplicate is a person keying the same issue again, typically
+the night shift re-keying the day's issue sheet. The count is the independent
+witness. If the issue never arrived, opening less closing is just what the till
+sold, and the shift is short by exactly the issue:
+
+```
+Dunhill 10s, Nyala One Stop, Tobacco, 23 Aug 2026
+Day    9 + 20 issued − 3 sold = 26   counted 26   ✓ arrived
+Night 26 + 20 issued − 2 sold = 44   counted 24   ✕ short exactly 20 — keyed twice
+```
+
+### The rule
+
+**Clear (D1)** — on shift *s* with issue *Q*, all five:
+
+1. *s* is short by *Q* exactly — whole units to the count, weighed items within 2%.
+2. An identical issue on a neighbouring shift *t* — same item and area, within
+   two shifts and one day — whose stock **did** arrive: *t* balances.
+3. *t* is on the same day, or a day apart when *Q* is not the item's usual
+   delivery (under half its issues over the window and the eight weeks before it).
+4. One candidate per **pair**: no identical-issue neighbour of *s* is also short
+   by exactly its issue. Then nothing says which was real, and we never guess.
+5. Shelf goods only. In prepared food — hot food, bakery, a QSR kitchen, grab &
+   go, butchery — a same-size batch thrown away unrecorded looks exactly the
+   same. The flag is per area in `agora.StockAreaSetting`, proposed from the
+   customer's area group (Food / QSR / Butchery Items) and the area's name, and
+   **confirmed by head office** (`ConfirmedAt`); PumpIT's own pre-production
+   flags are 0 on all 7,450 items. `agora.vw_StockAreaFood` is the one place
+   the proposal is written. There is no screen for confirming it yet.
+
+**Possible (D2)** — short within 10% of the issue, a twin exists, and one of the
+five fails. `DupReason` says which, first failure first: prepared food; both
+shifts short; near the issue, not equal; the usual size a day apart; the twin
+that arrived is outside the window; both sides of a pair short.
+
+Whichever twin is short is the one: on the Ngwenya charcoal, keyed on the day
+shift but delivered at night, the **first** issue is the duplicate.
+
+The test reads the balancing basis — repaired opening, the issue as PumpIT
+holds it now — so a duplicate head office already cut by hand is gone and is
+not found twice. The day either side of the window is read too, but a twin
+there can only make a candidate possible or ambiguous, never clear. Every
+approximation errs the same way: a clear one missed, never a false one.
+
+### What happens to each
+
+| | Preview | Commit | Reverse |
+|---|---|---|---|
+| **D1** | Issue reads 0 in the basis — as the pack reads a fat-finger issue as its correction — so the shift balances and nobody is charged. Outcome *Duplicate issue removed (D1)*; `QtyIssuedNew` = 0. | `QtyIssued` = 0 on the PumpIT row, the prior in `agora.StockReconAmendment` (`PriorQtyIssued`, `NewQtyIssued`), inside the same transaction as the counts. | Puts the prior back; refuses (**ISSUE_MOVED**) if the issue or either count changed since. |
+| **D2** | Listed with the twin (`DupTwinDate`, `DupTwinShift`, `DupTwinVar`), the issue (`DupQty`) and the reason. Never changed. | Nothing. The site corrects it in PumpIT, against the issue book, the storeroom count or the delivery note. | — |
+
+* **On a chain the commit writes** — balanced, or put back to the staff counts —
+  the D1 is always written with it: those counts were worked out with the issue
+  gone. A chain that removes a duplicate is therefore written **with** it: a
+  single-row amend of another shift on that chain waits for it (the commit skips
+  it and says why), because writing the counts without the issue would leave the
+  duplicate's shift short again under counts moved on the assumption it was not.
+* **On a chain the commit does not write**, the duplicate is still a duplicate,
+  so it is written **on its own, the counts untouched** — but only where PumpIT
+  holds that shift short by exactly the issue today, so the write leaves it at
+  nil. Where somebody already moved the counts to hide the short, taking the
+  issue out alone would make an over: reported (`DupReason` *Not removed: …*),
+  not written.
+* **D2 does not hold its chain back**, today. Whether it should is task
+  01a0f610-5ac0, Ryan's decision. The switch is **one place**:
+  `config('stockrecon.exceptions.D2.blocks')`, which the service passes to the
+  preview as `@BlockPossibleDuplicates`.
+* **The write is switched by `config('stockrecon.issue_mode')`**, a literal like
+  `stamp_mode`: `'live'` (set 1 Oct 2026 on Ryan's go-ahead) removes and writes;
+  `'off'` still finds a D1 and reports it, but leaves it in the basis and never
+  writes it. A run previewed with it on is refused at commit if it has been
+  switched off since (**ISSUE_MODE_OFF**). In journal stamp mode the issue is
+  recorded with its prior and nothing in PumpIT moves.
+* **The audit trail** (`agora.vw_PumpItChange`, v1__22d) shows it as *Duplicate
+  issue removed*, *Issue 20 → 0*, with the line's outcome as the reason.
+* **The client's pack will show a corrected line as S4b**, "issue reduced at
+  balancing" — its own label for an issue captured twice. That is correct, but
+  it is a flag they will see: **tell the customer before the first commit.**
+  Agora's own audit of the next preview reads it the same way.
+
+### Measured
+
+The investigation (local copy of live, 17 sites, 25 Jul – 7 Sep; Bethlehem to
+28 Sep), on what staff keyed, scored blind against what head office did after:
+6 clear (R2,219, all six treated by head office as not a loss) and 128 possible
+(R40,878, 66% treated as not a loss, 29 left on staff for R6,154).
+
+September 2026 on **live** (read 5 Oct, 1–30 Sep, 17 sites, the rule as built
+replayed on the extract):
+
+| Basis | D1 | D2 | Why D2 |
+|---|---|---|---|
+| As keyed (the investigation's basis) | 2 · R608 | 98 · R52,911 | both shifts short 63, usual size a day apart 14, prepared food 12, near the issue 8, twin outside the window 1 |
+| As the preview reads it (live issue) | 2 · R442 | 108 · R51,706 | both shifts short 75, prepared food 18, usual size a day apart 8, near the issue 7 |
+
+Of September's 98 as keyed, head office later cut the issue on 25, moved counts
+to hide 36, partly balanced 14 and **left 23 on staff (R17,633** — 19 of them in
+food areas, and the last week's perhaps not worked yet); both D1 were
+treated as not a loss (one cut, one hidden by moving counts). Neither of the two
+live D1 is held short in PumpIT today — head office moved the counts on both —
+so on a blocked chain neither would be written on its own.
+
+Most of the investigation's clear six are no longer duplicates in PumpIT: head
+office cut one of the two issues by hand. At Nyala the duplicate's own issue was
+cut; at Ngwenya the **other** one was — the arrived issue — with the counts
+moved to match, which the balancing now does by itself (an over then a short of
+the same size) without any duplicate rule.
+
+---
+
 ## What the module is made of
 
 | | |
@@ -209,6 +327,8 @@ they received (U2), 16 are whole-pack overs (S1), 16 sold more than they held
 | `agora.StockReconRunLine` | One shift of one item: counted, balanced, every flag, the tick. |
 | `agora.StockReconAmendment` | What a commit did, with the PRIOR counts. This is what makes a reversal exact. |
 | `agora.StockIssueMultiple` | Head office's pack size per (branch, area, item). Rule 5 reads it. |
+| `agora.StockAreaSetting` | Per area: is it prepared food — never a clear duplicate issue. Proposed by `AreaFoodSeeder`, confirmed by head office (`ConfirmedAt`). |
+| `agora.vw_StockAreaFood` | Every area with that flag: head office's row, else the proposal from the area group and name. The one place the proposal is written. |
 
 **The preview WRITES, unlike every other preview in Agora.** A branch-month is
 fifteen thousand shift lines, which as a chunked multi-row INSERT from PHP is
@@ -253,11 +373,14 @@ got on 4 September. What it turns on:
   never moved. A reversal would then write those "prior" values over counts
   nobody had touched.
 
-**`QtyIssued` and the four `_Original` columns are never written**, in either
-mode. Amending an issue changes T itself — that is *capturing a missing issue*,
-a different act, and it has to stay visible as one. The `_Original` pair is what
-makes a re-preview propose the same amendment rather than one on top of the
-last, which is precisely how the legacy procedure compounds silently.
+**The four `_Original` columns are never written**, in either mode, and
+**`QtyIssued` only to take out a clear duplicate** (D1, set to 0 — see
+[Duplicate issues](#duplicate-issues-1-oct-2026)). Amending an issue changes T
+itself — that is *capturing a missing issue*, a different act, and it has to
+stay visible as one; an issue keyed twice is the one exception, because the
+count proves the second never arrived. The `_Original` pair is what makes a
+re-preview propose the same amendment rather than one on top of the last, which
+is precisely how the legacy procedure compounds silently.
 
 ### The round trip, proved
 
@@ -324,6 +447,8 @@ same list with the wording the screen uses.
 | **S1** | Over of a whole pack | over within 10% of k × multiple | blocks |
 | **U1** | Unrecorded issue, proven | `POS > Open + Issued` | blocks |
 | **U2** | Closing exceeds what was on hand | `Close > Open + Issued` | blocks |
+| **D2** | Possible duplicate issue | short within 10% of the issue, an identical issue on a neighbouring shift, not clear | — (the `blocks` switch) |
+| **D1** | Duplicate issue removed | short = the issue exactly, the twin arrived, same day or not the usual size, one per pair, shelf goods | removed |
 | **U3** | Selling with no issues captured at all | `Σ Issued = 0 and Σ POS > 0` and a segment over | blocks |
 | **U4** | Net over | a segment's `T > 0` | blocks |
 | **S10b** | Opening above the previous closing | `Open > Close(i−1)` | repaired |

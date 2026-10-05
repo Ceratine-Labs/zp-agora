@@ -5,7 +5,10 @@
  * Reads:    agora.StockReconAmendment, agora.StockReconRun
  * Writes:   agora.StockReconAmendment, agora.StockReconRunLine,
  *           agora.StockReconRun, and in 'live' mode the two counts on
- *           [PumpIT].dbo.STK_StockReconLine.
+ *           [PumpIT].dbo.STK_StockReconLine — and QtyIssued, back to its
+ *           prior, where the commit set a clear duplicate issue to 0 (1 Oct
+ *           2026). That one is refused (ISSUE_MOVED) if the row has changed
+ *           since the commit.
  *
  * It puts back the PRIOR pair the commit recorded — not the _Original columns,
  * and not a recomputation. Those are two different things and only one of them
@@ -46,12 +49,51 @@ BEGIN
                    WHERE BranchId = @BranchId AND RunId = @RunId AND [State] = 'active')
         THROW 51000, 'AGORA:NOTHING_TO_REVERSE:This run has no amendment left standing.', 1;
 
+    /*
+     * A DUPLICATE ISSUE THE COMMIT SET TO 0 goes back to what it was — but
+     * only if the row still holds exactly what the commit left there: the
+     * issue, and the two counts. An issue somebody has re-keyed since, or a
+     * count re-taken, is not written over: the reversal stops before anything
+     * moves, and says which. As usp_Recon_Reverse does for a forced FNB
+     * match (ADJUST_MOVED). Ryan's go-ahead for the write, 1 Oct 2026.
+     */
+    DECLARE @Moved NVARCHAR(2048) = (
+        SELECT TOP 1 CONCAT(N'AGORA:ISSUE_MOVED:', ISNULL(rl.ItemDescription, a.StockItemNo),
+                            N' on ', CONVERT(char(10), a.TransactionDate, 23), N' shift ', a.ShiftNo,
+                            CASE WHEN l.StockItemNo IS NULL
+                                 THEN N' is no longer in PumpIT'
+                                 ELSE CONCAT(N' has changed since this run set its duplicate issue to 0 (it now holds issue ',
+                                             FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyIssued, 0)), '0.###'),
+                                             N', opening ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyOpen, 0)), '0.###'),
+                                             N', closing ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyClose, 0)), '0.###'), N')') END,
+                            N'. Putting the old issue back would write over that change, so nothing was reversed. Correct it in PumpIT first.')
+        FROM agora.StockReconAmendment a
+        LEFT JOIN agora.StockReconRunLine rl
+               ON rl.BranchId = a.BranchId AND rl.Id = a.RunLineId
+        LEFT JOIN [PumpIT].dbo.STK_StockReconLine l
+               ON l.SSBranchId = a.BranchId
+              AND CONVERT(date, l.TransactionDate) = a.TransactionDate
+              AND l.ShiftNo = a.ShiftNo AND l.AreaNo = a.AreaNo AND l.StockItemNo = a.StockItemNo
+        WHERE a.BranchId = @BranchId AND a.RunId = @RunId
+          AND a.[State] = 'active' AND a.StampMode = 'live'
+          AND a.NewQtyIssued IS NOT NULL
+          AND (   l.StockItemNo IS NULL
+               OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0)) - a.NewQtyIssued) > 0.005
+               OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyOpen,   0)) - a.NewQtyOpen)   > 0.005
+               OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyClose,  0)) - a.NewQtyClose)  > 0.005)
+        ORDER BY a.TransactionDate, a.ShiftNo, a.AreaNo, a.StockItemNo);
+
+    IF @Moved IS NOT NULL
+        THROW 51000, @Moved, 1;
+
     /* The live half first, so a failure there leaves the ledger saying the
        amendment is still active — which is true, and is the safe direction to
-       be wrong in. Only amendments the commit actually wrote to PumpIT. */
+       be wrong in. Only amendments the commit actually wrote to PumpIT. The
+       issue only where the commit wrote it. */
     UPDATE l
-       SET l.QtyOpen  = a.PriorQtyOpen,
-           l.QtyClose = a.PriorQtyClose
+       SET l.QtyOpen   = a.PriorQtyOpen,
+           l.QtyClose  = a.PriorQtyClose,
+           l.QtyIssued = CASE WHEN a.NewQtyIssued IS NOT NULL THEN a.PriorQtyIssued ELSE l.QtyIssued END
     FROM [PumpIT].dbo.STK_StockReconLine l
     JOIN agora.StockReconAmendment a
       ON l.SSBranchId = a.BranchId

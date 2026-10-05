@@ -5,16 +5,24 @@
  * Reads:    agora.StockReconRun, agora.StockReconRunLine, agora.vw_StockReconLine
  * Writes:   agora.StockReconAmendment, agora.StockReconRunLine, agora.StockReconRun
  *           and — in 'live' stamp mode ONLY — QtyOpen / QtyClose on
- *           [PumpIT].dbo.STK_StockReconLine.
+ *           [PumpIT].dbo.STK_StockReconLine, and QtyIssued = 0 on a CLEAR
+ *           DUPLICATE ISSUE (D1) only, when @IssueMode is 'live' too (Ryan's
+ *           named go-ahead, 1 Oct 2026, PM decision 01a0f60b-0459).
  *
  * @StampMode  'journal' records every amendment here and writes NOTHING to
  *             PumpIT. The ledger is then the worklist an admin applies, and the
  *             evidence for turning live on. It is the shipped setting.
  *             'live'    additionally writes the two counts back.
+ * @IssueMode  'live' lets a run that removed a clear duplicate (QtyIssuedNew
+ *             on the line) be committed: the issue is recorded with its prior
+ *             beside it and, in live stamp mode, written. 'off' refuses such a
+ *             run (ISSUE_MODE_OFF) — its counts were balanced with the issue
+ *             gone, so they cannot be written without it.
  *
- * The mode is PASSED IN rather than read here, so there is exactly one place in
- * the codebase — config('stockrecon.stamp_mode') — that decides whether Agora
- * writes to the customer's estate.
+ * Both modes are PASSED IN rather than read here, so there is exactly one place
+ * in the codebase — config('stockrecon.stamp_mode') and
+ * config('stockrecon.issue_mode') — that decides whether Agora writes to the
+ * customer's estate.
  *
  * WHAT MAKES THIS DIFFERENT FROM THE LEGACY. dbo.sp_UpdateAUTOStockReconBalancing
  * opens a cursor and calls sp_UpdateStockReconLine_QtyOpen_xQtyClose per row.
@@ -56,6 +64,7 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_Commit]
     @BranchId          INT,
     @StampMode         NVARCHAR(20)  = 'journal',
     @UseOriginalCounts BIT           = 1,
+    @IssueMode         NVARCHAR(20)  = 'off',
     @UserId            INT           = NULL
 AS
 BEGIN
@@ -66,6 +75,9 @@ BEGIN
 
     IF @StampMode NOT IN ('journal', 'live')
         THROW 51000, 'AGORA:BAD_STAMP_MODE:The stamp mode must be journal or live.', 1;
+
+    IF @IssueMode NOT IN ('off', 'live')
+        THROW 51000, 'AGORA:BAD_ISSUE_MODE:The issue mode must be off or live.', 1;
 
     DECLARE @Status NVARCHAR(20) = (
         SELECT [Status] FROM agora.StockReconRun WHERE BranchId = @BranchId AND Id = @RunId);
@@ -101,6 +113,10 @@ BEGIN
         rl.Id, rl.[LineNo], rl.AreaNo, rl.StockItemNo, rl.TransactionDate, rl.ShiftNo,
         rl.QtyOpen, rl.QtyClose, rl.QtyOpenNew, rl.QtyCloseNew,
         rl.QtyOpenNow, rl.QtyCloseNow,
+        /* The issue as the preview read it, and what it becomes: 0 on a clear
+           duplicate (D1), NULL where the issue is not touched. */
+        rl.QtyIssued, rl.QtyIssuedNew,
+        rl.CountsMove,
         CONVERT(nvarchar(200), NULL) AS SkipReason
     INTO #cand
     FROM agora.StockReconRunLine rl
@@ -110,12 +126,19 @@ BEGIN
       AND rl.WouldAmend  = 1
       /* A blocked chain is written only to REVERSE a hand amendment the
          client's rules forbid, back to the staff counts — never balanced
-         (usp_StockRecon_PreviewBalancing, stage 7d). */
-      AND (rl.ChainBlocked = 0 OR rl.RestoresHand = 1)
+         (usp_StockRecon_PreviewBalancing, stage 7d) — or to take out a clear
+         duplicate issue on its own, the counts untouched (stage 7f). */
+      AND (rl.ChainBlocked = 0 OR rl.RestoresHand = 1 OR rl.QtyIssuedNew IS NOT NULL)
       AND rl.CommitState = 'pending';
 
     IF NOT EXISTS (SELECT 1 FROM #cand)
         THROW 51000, 'AGORA:NOTHING_SELECTED:Nothing on this run is ticked and amendable.', 1;
+
+    /* A run that removed a duplicate balanced its counts with the issue gone.
+       With the issue write switched off since, those counts are not the
+       answer any more — re-preview rather than write half of it. */
+    IF @IssueMode <> 'live' AND EXISTS (SELECT 1 FROM #cand WHERE QtyIssuedNew IS NOT NULL)
+        THROW 51000, 'AGORA:ISSUE_MODE_OFF:This run removes a duplicate issue, and writing issues is switched off. Preview again.', 1;
 
     /* ---------------------------------------------------------- the re-check
        The source row still has to be there, and still has to hold the counts
@@ -172,6 +195,40 @@ BEGIN
           AND a.AreaNo = c.AreaNo AND a.StockItemNo = c.StockItemNo
           AND a.TransactionDate = c.TransactionDate AND a.ShiftNo = c.ShiftNo);
 
+    /* A duplicate is written as 0 because the issue the preview read was
+       keyed twice. If the issue has been changed since, that is no longer
+       what is there. */
+    UPDATE c SET SkipReason = 'The issue on this shift has changed since the preview.'
+    FROM #cand c
+    WHERE c.SkipReason IS NULL
+      AND c.QtyIssuedNew IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM agora.vw_StockReconLine l
+        WHERE l.BranchId = @BranchId
+          AND CONVERT(date, l.TransactionDate) = c.TransactionDate
+          AND l.ShiftNo = c.ShiftNo AND l.AreaNo = c.AreaNo AND l.StockItemNo = c.StockItemNo
+          AND ABS(CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0)) - c.QtyIssued) > @eps);
+
+    /* A CHAIN BALANCED WITH A DUPLICATE TAKEN OUT IS WRITTEN WITH IT. Its
+       counts were worked out with that issue gone; writing them while the
+       issue stays turns the duplicate's shift short again under counts that
+       were moved on the assumption it was not — the pack's S8 on a shift that
+       has none today. So when that shift is not being written now (not
+       ticked, or skipped above) and was not written before, the rest of its
+       chain waits for it. */
+    UPDATE c SET SkipReason = 'This item''s chain removes a duplicate issue on another shift. Write that shift with it.'
+    FROM #cand c
+    WHERE c.SkipReason IS NULL
+      AND EXISTS (
+        SELECT 1 FROM agora.StockReconRunLine d
+        WHERE d.BranchId = @BranchId AND d.RunId = @RunId
+          AND d.AreaNo = c.AreaNo AND d.StockItemNo = c.StockItemNo
+          AND d.Id <> c.Id
+          AND d.QtyIssuedNew IS NOT NULL
+          AND (d.ChainBlocked = 0 OR d.RestoresHand = 1)
+          AND d.CommitState <> 'committed'
+          AND NOT EXISTS (SELECT 1 FROM #cand x WHERE x.Id = d.Id AND x.SkipReason IS NULL));
+
     /* ------------------------------------------------------- ONE TRANSACTION
        Everything below writes, and from here on it is all-or-nothing.
 
@@ -194,7 +251,8 @@ BEGIN
        admin works, with the prior pair beside the new one. */
     INSERT INTO agora.StockReconAmendment (
         BranchId, RunId, RunLineId, AreaNo, StockItemNo, TransactionDate, ShiftNo,
-        PriorQtyOpen, PriorQtyClose, NewQtyOpen, NewQtyClose, StampMode, [State],
+        PriorQtyOpen, PriorQtyClose, NewQtyOpen, NewQtyClose,
+        PriorQtyIssued, NewQtyIssued, StampMode, [State],
         CreatedAt, CreatedBy)
     SELECT
         @BranchId, @RunId, c.Id, c.AreaNo, c.StockItemNo, c.TransactionDate, c.ShiftNo,
@@ -203,7 +261,14 @@ BEGIN
            to put back. */
         CONVERT(decimal(18,3), ISNULL(l.QtyOpen, 0)),
         CONVERT(decimal(18,3), ISNULL(l.QtyClose, 0)),
-        c.QtyOpenNew, c.QtyCloseNew, @StampMode, 'active',
+        /* A duplicate taken out on a chain Agora does not otherwise write
+           leaves the counts where they are: new = prior. */
+        CASE WHEN c.CountsMove = 1 THEN c.QtyOpenNew  ELSE CONVERT(decimal(18,3), ISNULL(l.QtyOpen, 0))  END,
+        CASE WHEN c.CountsMove = 1 THEN c.QtyCloseNew ELSE CONVERT(decimal(18,3), ISNULL(l.QtyClose, 0)) END,
+        /* The issue, only where it is written: what is there now, and 0. */
+        CASE WHEN c.QtyIssuedNew IS NOT NULL THEN CONVERT(decimal(18,3), ISNULL(l.QtyIssued, 0)) END,
+        c.QtyIssuedNew,
+        @StampMode, 'active',
         SYSDATETIME(), @UserId
     FROM #cand c
     JOIN agora.vw_StockReconLine l
@@ -213,15 +278,19 @@ BEGIN
     WHERE c.SkipReason IS NULL;
 
     /* ------------------------------------------------------------- the write
-       Live mode only, and both columns of the row are named. QtyIssued is
-       deliberately untouched: balancing amends counts, and amending an issue
-       changes T itself — which is capturing a missing issue, a different act
-       that has to stay visible as one. */
+       Live mode only, and both columns of the row are named. Balancing amends
+       counts; amending an issue changes T itself, which is capturing a missing
+       issue, a different act that has to stay visible as one. So QtyIssued is
+       written in ONE case only: a clear duplicate (D1), set to 0 — the issue
+       was keyed twice and the count proves the second never arrived. Its
+       prior is on the amendment above, so usp_StockRecon_Reverse puts it
+       back. @IssueMode is 'live' here or the run was refused above. */
     IF @StampMode = 'live'
     BEGIN
         UPDATE l
-           SET l.QtyOpen  = c.QtyOpenNew,
-               l.QtyClose = c.QtyCloseNew
+           SET l.QtyOpen   = CASE WHEN c.CountsMove = 1 THEN c.QtyOpenNew  ELSE l.QtyOpen  END,
+               l.QtyClose  = CASE WHEN c.CountsMove = 1 THEN c.QtyCloseNew ELSE l.QtyClose END,
+               l.QtyIssued = CASE WHEN c.QtyIssuedNew IS NOT NULL THEN c.QtyIssuedNew ELSE l.QtyIssued END
         FROM [PumpIT].dbo.STK_StockReconLine l
         JOIN #cand c
           ON l.SSBranchId = @BranchId
@@ -250,7 +319,8 @@ BEGIN
     WHERE rl.BranchId = @BranchId AND c.SkipReason IS NOT NULL;
 
     DECLARE @Written INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NULL),
-            @Skipped INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NOT NULL);
+            @Skipped INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NOT NULL),
+            @Issues  INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NULL AND QtyIssuedNew IS NOT NULL);
 
     DECLARE @Units DECIMAL(18,3) = (
         SELECT ISNULL(SUM(ABS(rl.AmendClose)), 0)
@@ -314,6 +384,9 @@ BEGIN
                 THEN 'Nothing was written. ' + ISNULL(@Why, 'Every ticked shift was skipped.')
                      + ' The run is still open, so it can be pressed again once that is dealt with.'
                 ELSE CONVERT(nvarchar(20), @Written) + ' shift(s) amended'
+                     + CASE WHEN @Issues > 0
+                            THEN ' (' + CONVERT(nvarchar(20), @Issues) + ' duplicate issue(s) set to 0)'
+                            ELSE '' END
                      + CASE WHEN @Skipped > 0
                             THEN ', ' + CONVERT(nvarchar(20), @Skipped) + ' skipped because they had moved'
                             ELSE '' END

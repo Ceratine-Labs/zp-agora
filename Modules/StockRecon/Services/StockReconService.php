@@ -4,6 +4,7 @@ namespace Modules\StockRecon\Services;
 
 use App\Exceptions\AgoraProcException;
 use App\Support\ProcedureService;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -156,7 +157,7 @@ class StockReconService
         ?string $groupRef = null,
         ?string $note = null,
     ): StockReconRun {
-        $params = $this->parameters($options);
+        $params = $this->parameters($options) + $this->duplicateSwitches();
         $procedure = config('agora.schema').'.usp_StockRecon_PreviewBalancing';
 
         $run = StockReconRun::create([
@@ -227,6 +228,10 @@ class StockReconService
             'RunId' => $run->Id,
             'BranchId' => $run->BranchId,
             'StampMode' => (string) config('stockrecon.stamp_mode'),
+            // Read here, like the stamp mode: whether a clear duplicate's issue
+            // may be written. The procedure refuses a run that removed one if
+            // this has been switched off since.
+            'IssueMode' => (string) config('stockrecon.issue_mode', 'off'),
             // Replayed off the run, never defaulted here — see the model.
             'UseOriginalCounts' => (int) $run->usedOriginalCounts(),
             'UserId' => auth()->id(),
@@ -325,9 +330,10 @@ class StockReconService
             // Only a row the commit could actually honour may be ticked. A tick
             // on anything else would be a promise the commit has to break.
             // A blocked chain qualifies only where it is being put back to the
-            // staff counts (StockReconRunLine::isWritable()).
+            // staff counts, or where a clear duplicate issue is taken out on
+            // its own (StockReconRunLine::isWritable()).
             ->where('WouldAmend', true)
-            ->where(fn ($q) => $q->where('ChainBlocked', false)->orWhere('RestoresHand', true))
+            ->where(fn ($q) => $this->writableOnBlockedChain($q))
             ->where('CommitState', 'pending')
             ->whereIn('Id', $lineIds)
             ->update(['Selected' => true]);
@@ -355,9 +361,43 @@ class StockReconService
             ->where('BranchId', $run->BranchId)
             ->where('RunId', $run->Id)
             ->where('WouldAmend', true)
-            ->where(fn ($q) => $q->where('ChainBlocked', false)->orWhere('RestoresHand', true))
+            ->where(fn ($q) => $this->writableOnBlockedChain($q))
             ->where('CommitState', 'pending')
             ->update(['Selected' => true]);
+    }
+
+    /**
+     * The chain half of "a row the commit could honour" — the same predicate
+     * usp_StockRecon_Commit and StockReconRunLine::isWritable() apply: a clear
+     * chain; a blocked one being put back to the staff counts; or a clear
+     * duplicate issue taken out on its own (QtyIssuedNew is set).
+     */
+    private function writableOnBlockedChain(Builder $query): Builder
+    {
+        return $query->where('ChainBlocked', false)
+            ->orWhere('RestoresHand', true)
+            ->orWhereNotNull('QtyIssuedNew');
+    }
+
+    /**
+     * The two config switches the preview takes beyond the run's options.
+     * Recorded with them on the run (ParamsJson), so what a run did can be read
+     * back off it.
+     *
+     *   RemoveDuplicates         config('stockrecon.issue_mode') is 'live': a
+     *                            clear duplicate (D1) is taken out of the basis
+     *                            and proposed for the commit.
+     *   BlockPossibleDuplicates  config('stockrecon.exceptions.D2.blocks'): a
+     *                            possible one (D2) holds its chain back.
+     *
+     * @return array{RemoveDuplicates: int, BlockPossibleDuplicates: int}
+     */
+    protected function duplicateSwitches(): array
+    {
+        return [
+            'RemoveDuplicates' => (int) (config('stockrecon.issue_mode') === 'live'),
+            'BlockPossibleDuplicates' => (int) (bool) config('stockrecon.exceptions.D2.blocks', false),
+        ];
     }
 
     /**

@@ -155,6 +155,16 @@ BEGIN
            commit puts back is visible beside the count it goes back to. */
         rl.QtyOpenNow,
         rl.QtyCloseNow,
+        /* A duplicate issue on this shift (1 Oct 2026): D1 clear — the issue
+           goes to QtyIssuedNew, 0 — or D2 possible, with the shift it twins
+           and why it is not clear. */
+        rl.DupTier,
+        rl.DupTwinDate,
+        rl.DupTwinShift,
+        rl.DupTwinVar,
+        rl.DupQty,
+        rl.DupReason,
+        rl.QtyIssuedNew,
         /* THE BUG RYAN SAW, 9 September 2026: the header above resolves the
            item by joining the master, and these rows resolved nothing — so a
            run made before v1__14a named the product at the top and showed an
@@ -173,7 +183,7 @@ BEGIN
         CONVERT(bit, CASE WHEN rl.Id = @LineId THEN 1 ELSE 0 END)          AS IsClicked,
         SUM(rl.QtyVar) OVER (ORDER BY rl.[LineNo] ROWS UNBOUNDED PRECEDING) AS CumulativeVar,
         am.[State]                                                          AS AmendmentState,
-        am.PriorQtyOpen, am.PriorQtyClose
+        am.PriorQtyOpen, am.PriorQtyClose, am.PriorQtyIssued
     FROM agora.StockReconRunLine rl
     LEFT JOIN agora.StockReconAmendment am
            ON am.BranchId = rl.BranchId AND am.RunId = rl.RunId AND am.RunLineId = rl.Id

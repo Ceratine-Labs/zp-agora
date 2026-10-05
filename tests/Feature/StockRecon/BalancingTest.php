@@ -55,6 +55,14 @@ class BalancingTest extends TestCase
     /** A second item, dormant throughout, to prove rule 3 on its own. */
     private const DORMANT_ITEM = 'TDRM';
 
+    /**
+     * Duplicate issues need SHELF goods — the fixture's own area is hot food,
+     * where rule 5 never lets one be clear — so they get an area of their own.
+     */
+    private const SHELF_AREA = 2;
+
+    private const DUP_ITEM = 'TDUP';
+
     private StockReconService $service;
 
     protected function setUp(): void
@@ -1132,7 +1140,380 @@ class BalancingTest extends TestCase
             'The chain panel listed a shift more than once.');
     }
 
+    // ------------------------------------------------------- duplicate issues
+
+    /**
+     * THE CASE THE CUSTOMER ASKED ABOUT (branch 6, Tobacco, 23 Aug 2026): the
+     * night shift re-keyed the day's issue. Day: 9 + 20 issued − 3 sold = 26,
+     * counted 26 — it arrived. Night: 26 + 20 again − 2 sold = 44, counted 24 —
+     * short exactly 20. The count is the witness that the second 20 never
+     * reached the shelf.
+     *
+     * The preview takes it out of the basis (D1), so the night balances and
+     * nobody is charged; a live commit sets QtyIssued to 0 in PumpIT with the
+     * prior kept, the audit trail says so, the next preview finds nothing left
+     * to do and the pack's own audit reads it as S4b; a reversal puts it back.
+     */
+    public function test_a_clear_duplicate_issue_is_removed_written_and_reversed(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain($this->duplicateChain());
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $dup = $this->lineAt($run, '2026-07-17', 3);
+        $twin = $this->lineAt($run, '2026-07-17', 1);
+
+        $this->assertSame('D1', $dup->DupTier);
+        $this->assertSame('D1', $dup->ExceptionCode);
+        $this->assertSame('2026-07-17', $dup->DupTwinDate?->toDateString());
+        $this->assertSame(1, $dup->DupTwinShift, 'The twin is the day shift, where the stock arrived.');
+        $this->assertEqualsWithDelta(20.0, (float) $dup->DupQty, 0.005);
+        $this->assertEqualsWithDelta(0.0, (float) $dup->DupTwinVar, 0.005);
+        $this->assertNull($dup->DupReason);
+        $this->assertEqualsWithDelta(-20.0, (float) $dup->QtyVar, 0.005, 'As counted, the night was 20 short.');
+        $this->assertEqualsWithDelta(0.0, (float) $dup->QtyVarNew, 0.005, 'With the duplicate out, it balances: nobody is charged.');
+        $this->assertEqualsWithDelta(20.0, (float) $dup->QtyIssued, 0.005, 'The run records the issue as keyed.');
+        $this->assertNotNull($dup->QtyIssuedNew);
+        $this->assertEqualsWithDelta(0.0, (float) $dup->QtyIssuedNew, 0.005, 'The commit will write it as 0.');
+        $this->assertTrue($dup->WouldAmend && $dup->isWritable() && $dup->removesDuplicate());
+        $this->assertFalse($dup->CountsMove, 'Nothing else on the chain needs a count moved.');
+        $this->assertFalse($dup->ChainBlocked);
+        $this->assertStringStartsWith('Duplicate issue removed (D1)', $dup->Outcome);
+        $this->assertNull($twin->DupTier, 'The twin arrived; it is not a duplicate of anything.');
+        $this->assertSame(1, (int) $run->fresh()->DuplicatesClear);
+
+        $before = $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3);
+        $result = $this->service->commit($run);
+        $this->assertSame('COMMITTED', $result['status']->Code);
+        $this->assertStringContainsString('1 duplicate issue(s) set to 0', $result['status']->Message);
+
+        $after = $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3);
+        $this->assertEqualsWithDelta(0.0, (float) $after->QtyIssued, 0.005, 'QtyIssued is set to 0 in PumpIT.');
+        $this->assertEqualsWithDelta(20.0, (float) $after->QtyIssued_Original, 0.005, 'The _Original issue is never written.');
+        $this->assertEqualsWithDelta((float) $before->QtyOpen, (float) $after->QtyOpen, 0.005, 'The counts are not touched.');
+        $this->assertEqualsWithDelta((float) $before->QtyClose, (float) $after->QtyClose, 0.005);
+
+        $amendment = StockReconAmendment::query()->acrossBranches()
+            ->where('RunId', $run->Id)->where('RunLineId', $dup->Id)->firstOrFail();
+        $this->assertEqualsWithDelta(20.0, (float) $amendment->PriorQtyIssued, 0.005, 'The prior is kept, so it can be put back.');
+        $this->assertEqualsWithDelta(0.0, (float) $amendment->NewQtyIssued, 0.005);
+        $this->assertSame($amendment->PriorQtyOpen, $amendment->NewQtyOpen);
+        $this->assertSame($amendment->PriorQtyClose, $amendment->NewQtyClose);
+
+        $trail = $this->db()->selectOne("SELECT * FROM agora.vw_PumpItChange WHERE Ledger = 'StockReconAmendment' AND LedgerId = ?", [$amendment->Id]);
+        $this->assertSame('Issue 20 → 0', $trail->Change, 'The audit trail names the issue, and only the issue.');
+        $this->assertSame('Duplicate issue removed', $trail->Action);
+        $this->assertStringContainsString('(D1)', $trail->Reason);
+
+        $again = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($again, '2026-07-17', 3);
+        $this->assertNull($line->DupTier, 'PumpIT already holds the answer: nothing is found twice.');
+        $this->assertSame('S4b', $line->AuditCode, 'The client\'s pack reads it as "issue reduced at balancing".');
+        $this->assertSame(0, (int) $again->fresh()->AmendedRows);
+
+        $this->service->reverse($run->fresh(), 'TEST-duplicate round trip');
+        $this->assertEqualsWithDelta(20.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyIssued, 0.005,
+            'A reversal puts the issue back.');
+    }
+
+    /** A reversal never writes the old issue over one somebody has re-keyed since. */
+    public function test_a_reversal_refuses_when_the_duplicate_has_changed_since(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain($this->duplicateChain());
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $this->service->commit($run);
+
+        $this->setRow(self::DUP_ITEM, '2026-07-17', 3, ['QtyIssued' => 5]);
+
+        try {
+            $this->service->reverse($run->fresh(), 'TEST-moved');
+            $this->fail('The reversal should have been refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('ISSUE_MOVED', $e->code());
+        }
+
+        $this->assertEqualsWithDelta(5.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyIssued, 0.005,
+            'Nothing was put back.');
+        $this->assertTrue(StockReconAmendment::query()->acrossBranches()->where('RunId', $run->Id)
+            ->get()->every(fn ($a) => $a->State === 'active'), 'The amendments stay active.');
+    }
+
+    /**
+     * Both shifts short by the issue: nothing says which issue was real, or
+     * whether either was. D2 — listed with its twin and the reason, never
+     * changed, and (until Ryan decides otherwise) not holding the chain back.
+     * config('stockrecon.exceptions.D2.blocks') is the one switch that would.
+     */
+    public function test_a_possible_duplicate_is_listed_and_never_changed(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        // Day 9 + 20 − 1 sold = 28, counted 8; night 8 + 20 − 2 = 26, counted 6:
+        // both 20 short. The rest of the chain balances.
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [9, 20, 8, 1], 3 => [8, 20, 6, 2]],
+            '2026-07-18' => [1 => [6, 0, 4, 2],  3 => [4, 0, 3, 1]],
+            '2026-07-19' => [1 => [3, 0, 2, 1],  3 => [2, 0, 2, 0]],
+            '2026-07-20' => [1 => [2, 0, 1, 1],  3 => [1, 0, 1, 0]],
+            '2026-07-21' => [1 => [1, 0, 1, 0],  3 => [1, 0, 0, 1]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $day = $this->lineAt($run, '2026-07-17', 1);
+        $night = $this->lineAt($run, '2026-07-17', 3);
+
+        foreach ([$day, $night] as $line) {
+            $this->assertSame('D2', $line->DupTier);
+            $this->assertSame('D2', $line->ExceptionCode);
+            $this->assertSame('Both shifts short: which issue was real is not known', $line->DupReason);
+            $this->assertNull($line->QtyIssuedNew, 'A possible duplicate is never written.');
+            $this->assertFalse($line->WouldAmend);
+            $this->assertEqualsWithDelta(-20.0, (float) $line->QtyVarNew, 0.005, 'Its short stands, for the site to check.');
+            $this->assertStringStartsWith('Possible duplicate issue (D2)', $line->Outcome);
+        }
+
+        $this->assertSame(1, $night->DupTwinShift, 'Each names the other as its twin.');
+        $this->assertSame(3, $day->DupTwinShift);
+        $this->assertFalse($night->ChainBlocked, 'D2 does not block today.');
+        $this->assertSame(2, (int) $run->fresh()->DuplicatesPossible);
+
+        config(['stockrecon.exceptions.D2.blocks' => true]);
+        $held = $this->previewArea(self::SHELF_AREA);
+        $this->assertTrue($held->lines->every(fn ($l) => $l->ChainBlocked),
+            'One switch makes a possible duplicate hold its chain back.');
+    }
+
+    /**
+     * Rule 5: shelf goods only. In prepared food a same-size batch thrown away
+     * unrecorded looks exactly like a duplicate, so a food area is never D1.
+     * The flag is head office's, per area, in agora.StockAreaSetting — here it
+     * overrides an area the proposal would call shelf goods.
+     */
+    public function test_a_prepared_food_area_is_never_a_clear_duplicate(): void
+    {
+        config(['stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain($this->duplicateChain());
+
+        $food = $this->db()->selectOne('SELECT * FROM agora.vw_StockAreaFood WHERE BranchId = ? AND AreaNo = ?', [self::BRANCH, self::AREA]);
+        $this->assertTrue((bool) $food->IsPreparedFood, 'Area group Food Items is proposed as prepared food.');
+        $this->assertFalse((bool) $food->IsConfirmed);
+
+        $this->db()->table(config('agora.schema').'.StockAreaSetting')->insert([
+            'BranchId' => self::BRANCH, 'AreaNo' => self::SHELF_AREA, 'IsPreparedFood' => 1,
+            'FoodBasis' => 'TEST-head office', 'ConfirmedAt' => now(),
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $dup = $this->lineAt($run, '2026-07-17', 3);
+
+        $this->assertSame('D2', $dup->DupTier);
+        $this->assertSame('Prepared food: a batch thrown away looks the same', $dup->DupReason);
+        $this->assertNull($dup->QtyIssuedNew);
+        $this->assertEqualsWithDelta(-20.0, (float) $dup->QtyVarNew, 0.005, 'Not removed: the short stands for the site to check.');
+    }
+
+    /**
+     * One candidate per PAIR. The night shift's twin on the day arrived — but
+     * its other twin, the next morning, is ALSO short by exactly the issue. Of
+     * those two, nothing says which was the duplicate, so neither is clear.
+     */
+    public function test_when_both_sides_of_a_pair_qualify_neither_is_clear(): void
+    {
+        config(['stockrecon.issue_mode' => 'live']);
+        $chain = $this->duplicateChain();
+        $chain['2026-07-18'][1] = [24, 20, 20, 4];      // 24 + 20 − 4 = 40, counted 20: short 20
+        $this->seedShelfChain($chain);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $night = $this->lineAt($run, '2026-07-17', 3);
+        $morning = $this->lineAt($run, '2026-07-18', 1);
+
+        $this->assertSame('D2', $night->DupTier);
+        $this->assertSame('Both sides of a pair are short by the issue', $night->DupReason);
+        $this->assertSame('D2', $morning->DupTier);
+        $this->assertTrue($run->lines->every(fn ($l) => $l->QtyIssuedNew === null), 'Nothing is removed.');
+        $this->assertSame(0, (int) $run->fresh()->DuplicatesClear);
+    }
+
+    /**
+     * A clear duplicate on a chain Agora will not balance is still a duplicate:
+     * it is written on its own, the counts untouched — but only where PumpIT
+     * holds the shift short by exactly the issue, so the write leaves it at
+     * nil. Where somebody already moved the counts to hide the short, taking
+     * the issue out alone would make an over: reported, not written.
+     */
+    public function test_a_duplicate_on_a_blocked_chain_is_written_alone_only_where_pumpit_still_holds_the_short(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $chain = $this->duplicateChain();
+        $chain['2026-07-20'][1] = [15, 0, 16, 0];       // closed holding more than it had: U2 blocks the chain
+        $chain['2026-07-20'][3] = [16, 0, 10, 6];
+        $this->seedShelfChain($chain);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $dup = $this->lineAt($run, '2026-07-17', 3);
+
+        $this->assertTrue($dup->ChainBlocked);
+        $this->assertSame('D1', $dup->DupTier);
+        $this->assertTrue($dup->removesDuplicate() && $dup->isWritable(), 'The duplicate is written on its own.');
+        $this->assertFalse($dup->CountsMove);
+        $this->assertEqualsWithDelta(0.0, (float) $dup->QtyVarNew, 0.005);
+        $this->assertTrue($run->lines->where('Id', '!=', $dup->Id)->every(fn ($l) => ! $l->WouldAmend),
+            'Nothing else on a blocked chain is written.');
+
+        $result = $this->service->commit($run);
+        $this->assertSame('COMMITTED', $result['status']->Code);
+        $row = $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3);
+        $this->assertEqualsWithDelta(0.0, (float) $row->QtyIssued, 0.005);
+        $this->assertEqualsWithDelta(24.0, (float) $row->QtyClose, 0.005, 'The counts stay where they are.');
+        $this->service->reverse($run->fresh(), 'TEST-blocked duplicate');
+
+        // Head office hid the short by moving the night's closing up 20.
+        $this->setRow(self::DUP_ITEM, '2026-07-17', 3, ['QtyClose' => 44]);
+        $this->setRow(self::DUP_ITEM, '2026-07-18', 1, ['QtyOpen' => 44]);
+
+        $hidden = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-17', 3);
+        $this->assertSame('D1', $hidden->DupTier, 'Still a duplicate on the staff\'s own count.');
+        $this->assertNull($hidden->QtyIssuedNew, 'Taking the issue out alone would leave an over of 20.');
+        $this->assertSame('Not removed: PumpIT no longer holds this short and the chain is blocked', $hidden->DupReason);
+    }
+
+    /**
+     * A chain balanced with a duplicate taken out is written WITH it. Its
+     * counts were worked out with the issue gone; writing one of them alone
+     * would leave the duplicate's shift short again under counts moved on the
+     * assumption it was not. So a single-row amend of another shift waits.
+     */
+    public function test_a_chain_that_removes_a_duplicate_is_not_written_without_it(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $chain = $this->duplicateChain();
+        $chain['2026-07-19'] = [1 => [18, 0, 16, 3], 3 => [16, 0, 15, 0]];   // +1 over, then −1 short
+        $this->seedShelfChain($chain);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $count = $this->lineAt($run, '2026-07-19', 1);
+        $this->assertTrue($count->CountsMove, 'The over is balanced against the short after it.');
+        $this->assertSame('D1', $this->lineAt($run, '2026-07-17', 3)->DupTier);
+
+        $this->service->select($run, [$count->Id]);
+
+        try {
+            $this->service->commit($run->fresh());
+            $this->fail('The count row should have waited for the duplicate.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('ALL_SKIPPED', $e->code());
+            $this->assertStringContainsString('removes a duplicate issue on another shift', $e->getMessage());
+        }
+
+        $this->assertEqualsWithDelta(16.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyClose, 0.005,
+            'Nothing was written.');
+    }
+
+    /** issue_mode 'off': a clear duplicate is still found, but left in the basis and never written. */
+    public function test_with_the_issue_write_off_a_duplicate_is_reported_not_removed(): void
+    {
+        config(['stockrecon.issue_mode' => 'off']);
+        $this->seedShelfChain($this->duplicateChain());
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $dup = $this->lineAt($run, '2026-07-17', 3);
+
+        $this->assertSame('D1', $dup->DupTier);
+        $this->assertNull($dup->QtyIssuedNew);
+        $this->assertSame('Not removed: removing duplicates is switched off', $dup->DupReason);
+        $this->assertEqualsWithDelta(-20.0, (float) $dup->QtyVarNew, 0.005);
+        $this->assertSame(0, $run->params()['RemoveDuplicates'], 'The run records the switch it was made under.');
+    }
+
     // ---------------------------------------------------------------- helpers
+
+    /**
+     * The Dunhill 10s night of 23 Aug, moved onto the fixture's dates: day
+     * shift 9 + 20 − 3 sold = 26 counted (arrived), night 26 + 20 − 2 sold = 44
+     * expected, 24 counted (short exactly 20). Every other shift balances, and
+     * the 19th's night is dormant.
+     *
+     * @return array<string, array<int, array{0: float|int, 1: float|int, 2: float|int, 3: float|int}>>
+     */
+    private function duplicateChain(): array
+    {
+        return [
+            '2026-07-17' => [1 => [9, 20, 26, 3],  3 => [26, 20, 24, 2]],
+            '2026-07-18' => [1 => [24, 0, 20, 4],  3 => [20, 0, 18, 2]],
+            '2026-07-19' => [1 => [18, 0, 15, 3],  3 => [15, 0, 15, 0]],
+            '2026-07-20' => [1 => [15, 0, 12, 3],  3 => [12, 0, 10, 2]],
+            '2026-07-21' => [1 => [10, 0, 8, 2],   3 => [8, 0, 7, 1]],
+        ];
+    }
+
+    /**
+     * A shelf-goods area (the customer's Retail Items group) beside the
+     * fixture's hot-food one, with one item on the given chain.
+     *
+     * @param  array<string, array<int, array{0: float|int, 1: float|int, 2: float|int, 3: float|int}>>  $chain
+     */
+    private function seedShelfChain(array $chain): void
+    {
+        $db = $this->db();
+
+        $db->table('PumpIT.dbo.STK_Area')->insert([
+            'SSBranchId' => self::BRANCH, 'AreaNo' => self::SHELF_AREA,
+            'AreaDescription' => 'TEST-Tobacco', 'AreaGroup' => 'Retail Items',
+            'DayShift' => 1, 'AfternoonShift' => 0, 'NightShift' => 1,
+            'ShowReport' => 1, 'IsCaptureWaste' => 0,
+        ]);
+
+        $db->table('PumpIT.dbo.STK_StockMaster')->insert([
+            'SSBranchId' => self::BRANCH, 'StockItemNo' => self::DUP_ITEM,
+            'StockItemDescription' => 'TEST-Dunhill 10s', 'AreaNo' => self::SHELF_AREA,
+            'Location' => 'TEST', 'UOMCode' => 'EA',
+            'SellingPrice' => 35.00, 'POSCode' => 'TEST'.self::DUP_ITEM,
+            'QtyVarAllowance' => 0, 'isMonitoredItem' => 0,
+        ]);
+
+        foreach ($chain as $date => $shifts) {
+            foreach ($shifts as $shift => [$open, $issued, $close, $pos]) {
+                $db->table('PumpIT.dbo.STK_StockReconLine')->insert(
+                    $this->line(self::DUP_ITEM, $date, $shift, $open, $issued, $close, $pos, self::SHELF_AREA)
+                );
+            }
+        }
+    }
+
+    private function previewArea(int $area): StockReconRun
+    {
+        return $this->service->preview(
+            self::BRANCH,
+            $area,
+            Carbon::parse('2026-07-17'),
+            Carbon::parse('2026-07-21'),
+            note: 'TEST-duplicates',
+        )->load('lines');
+    }
+
+    private function lineAt(StockReconRun $run, string $date, int $shift): StockReconRunLine
+    {
+        return $run->lines->first(fn ($l) => $l->TransactionDate->toDateString() === $date && $l->ShiftNo === $shift)
+            ?? throw new \RuntimeException("No line for {$date} shift {$shift}.");
+    }
+
+    private function sourceRow(string $item, string $date, int $shift): object
+    {
+        return $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)->where('StockItemNo', $item)
+            ->where('TransactionDate', $date)->where('ShiftNo', $shift)->first();
+    }
+
+    /** @param  array<string, float|int>  $values */
+    private function setRow(string $item, string $date, int $shift, array $values): void
+    {
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)->where('StockItemNo', $item)
+            ->where('TransactionDate', $date)->where('ShiftNo', $shift)
+            ->update($values);
+    }
 
     private function preview(): StockReconRun
     {
@@ -1257,13 +1638,13 @@ class BalancingTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function line(string $item, string $date, int $shift, float $open, float $issued, float $close, float $pos): array
+    private function line(string $item, string $date, int $shift, float $open, float $issued, float $close, float $pos, int $area = self::AREA): array
     {
         return [
             'SSBranchId' => self::BRANCH,
             'TransactionDate' => $date,
             'ShiftNo' => $shift,
-            'AreaNo' => self::AREA,
+            'AreaNo' => $area,
             'StockItemNo' => $item,
             'SellPrice' => 21.80,
             'QtyOpen' => $open, 'QtyIssued' => $issued, 'QtyClose' => $close, 'QtyComputer' => $pos,
@@ -1283,7 +1664,7 @@ class BalancingTest extends TestCase
 
         $schema = config('agora.schema');
 
-        foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun', 'StockIssueMultiple'] as $table) {
+        foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun', 'StockIssueMultiple', 'StockAreaSetting'] as $table) {
             $db->table("{$schema}.{$table}")->where('BranchId', self::BRANCH)->delete();
         }
     }
