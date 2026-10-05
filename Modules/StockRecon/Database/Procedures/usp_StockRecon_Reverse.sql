@@ -7,8 +7,16 @@
  *           agora.StockReconRun, and in 'live' mode the two counts on
  *           [PumpIT].dbo.STK_StockReconLine — and QtyIssued, back to its
  *           prior, where the commit set a clear duplicate issue to 0 (1 Oct
- *           2026). That one is refused (ISSUE_MOVED) if the row has changed
- *           since the commit.
+ *           2026).
+ *
+ * NOTHING IS WRITTEN OVER A ROW THAT HAS MOVED SINCE (5 Oct 2026). Every row
+ * the commit wrote to PumpIT must still hold exactly what the commit left
+ * there, or the whole reversal is refused before anything moves, naming the
+ * shift and what it holds now: ISSUE_MOVED for a duplicate issue the commit set
+ * to 0, COUNT_MOVED for a count it amended. Until then a reversal put the prior
+ * counts back over whatever was there — a recount, a hand balancing — and the
+ * change was lost without a trace. Journal-mode amendments wrote nothing and
+ * are not checked.
  *
  * It puts back the PRIOR pair the commit recorded — not the _Original columns,
  * and not a recomputation. Those are two different things and only one of them
@@ -81,6 +89,39 @@ BEGIN
                OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0)) - a.NewQtyIssued) > 0.005
                OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyOpen,   0)) - a.NewQtyOpen)   > 0.005
                OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyClose,  0)) - a.NewQtyClose)  > 0.005)
+        ORDER BY a.TransactionDate, a.ShiftNo, a.AreaNo, a.StockItemNo);
+
+    IF @Moved IS NOT NULL
+        THROW 51000, @Moved, 1;
+
+    /*
+     * AND A COUNT THE COMMIT AMENDED, the same way: the prior pair goes back
+     * only over the pair the commit wrote. A row recounted or balanced by hand
+     * since is not written over; the reversal stops before anything moves.
+     */
+    SET @Moved = (
+        SELECT TOP 1 CONCAT(N'AGORA:COUNT_MOVED:', ISNULL(rl.ItemDescription, a.StockItemNo),
+                            N' on ', CONVERT(char(10), a.TransactionDate, 23), N' shift ', a.ShiftNo,
+                            CASE WHEN l.StockItemNo IS NULL
+                                 THEN N' is no longer in PumpIT'
+                                 ELSE CONCAT(N' has changed since this run amended its counts (it now holds opening ',
+                                             FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyOpen, 0)), '0.###'),
+                                             N', closing ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyClose, 0)), '0.###'),
+                                             N'; the run left opening ', FORMAT(a.NewQtyOpen, '0.###'),
+                                             N', closing ', FORMAT(a.NewQtyClose, '0.###'), N')') END,
+                            N'. Putting the old counts back would write over that change, so nothing was reversed. Correct it in PumpIT first.')
+        FROM agora.StockReconAmendment a
+        LEFT JOIN agora.StockReconRunLine rl
+               ON rl.BranchId = a.BranchId AND rl.Id = a.RunLineId
+        LEFT JOIN [PumpIT].dbo.STK_StockReconLine l
+               ON l.SSBranchId = a.BranchId
+              AND CONVERT(date, l.TransactionDate) = a.TransactionDate
+              AND l.ShiftNo = a.ShiftNo AND l.AreaNo = a.AreaNo AND l.StockItemNo = a.StockItemNo
+        WHERE a.BranchId = @BranchId AND a.RunId = @RunId
+          AND a.[State] = 'active' AND a.StampMode = 'live'
+          AND (   l.StockItemNo IS NULL
+               OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyOpen,  0)) - a.NewQtyOpen)  > 0.005
+               OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyClose, 0)) - a.NewQtyClose) > 0.005)
         ORDER BY a.TransactionDate, a.ShiftNo, a.AreaNo, a.StockItemNo);
 
     IF @Moved IS NOT NULL

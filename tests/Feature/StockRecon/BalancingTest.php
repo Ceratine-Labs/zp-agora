@@ -834,6 +834,65 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * A reversal never writes the old counts over a count somebody has taken
+     * since. Before 5 Oct 2026 it did, and the recount was lost without a
+     * trace. Refused whole, nothing moves; once the row is back to what the
+     * commit left, the same reversal goes through.
+     */
+    public function test_a_reversal_refuses_when_a_count_it_amended_has_changed_since(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live']);
+
+        $before = $this->countsInSource();
+        $run = $this->preview();
+        $this->service->commit($run);
+        $committed = $this->countsInSource();
+
+        $a = StockReconAmendment::query()->acrossBranches()->where('RunId', $run->Id)
+            ->whereColumn('PriorQtyClose', '<>', 'NewQtyClose')->orderBy('Id')->firstOrFail();
+        $date = $a->TransactionDate->toDateString();
+
+        // Somebody recounts that shift's closing in PumpIT.
+        $this->setCounts($date, $a->ShiftNo, ['QtyClose' => (float) $a->NewQtyClose + 1]);
+
+        try {
+            $this->service->reverse($run->fresh(), 'TEST-count moved');
+            $this->fail('The reversal should have been refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('COUNT_MOVED', $e->code());
+            $this->assertStringContainsString("on {$date} shift {$a->ShiftNo} has changed", $e->getMessage());
+            $this->assertStringContainsString('it now holds opening', $e->getMessage());
+        }
+
+        $this->assertEqualsWithDelta((float) $a->NewQtyClose + 1, (float) $this->sourceRow(self::ITEM, $date, $a->ShiftNo)->QtyClose, 0.005,
+            'The recount is not written over.');
+        $this->assertTrue(StockReconAmendment::query()->acrossBranches()->where('RunId', $run->Id)
+            ->get()->every(fn ($x) => $x->State === 'active'), 'Nothing was reversed.');
+        $this->assertSame('committed', $run->fresh()->Status);
+
+        // Put back to what the commit left, the reversal goes through.
+        $this->setCounts($date, $a->ShiftNo, ['QtyClose' => (float) $a->NewQtyClose]);
+        $this->assertSame($committed, $this->countsInSource());
+
+        $this->assertSame('REVERSED', $this->service->reverse($run->fresh(), 'TEST-count back')->Code);
+        $this->assertSame($before, $this->countsInSource(), 'The source is as it was before the commit.');
+    }
+
+    /** A journal commit wrote nothing to PumpIT, so there is nothing to have moved: it reverses whatever PumpIT holds. */
+    public function test_a_journal_reversal_is_not_checked_against_pumpit(): void
+    {
+        config(['stockrecon.stamp_mode' => 'journal']);
+
+        $run = $this->preview();
+        $this->service->commit($run);
+        $this->setCounts('2026-07-17', 1, ['QtyClose' => 61]);
+
+        $this->assertSame('REVERSED', $this->service->reverse($run->fresh(), 'TEST-journal')->Code);
+        $this->assertEqualsWithDelta(61.0, (float) $this->sourceRow(self::ITEM, '2026-07-17', 1)->QtyClose, 0.005,
+            'A journal reversal writes nothing to PumpIT.');
+    }
+
+    /**
      * A live run stays idempotent: re-previewing after a commit proposes the
      * same amendment rather than one on top of the last.
      *

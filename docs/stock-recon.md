@@ -318,7 +318,7 @@ the same size) without any duplicate rule.
 |---|---|
 | `agora.usp_StockRecon_PreviewBalancing` | The whole answer, computed and recorded. Reads PumpIT through `agora.vw_Stock*`; writes only Agora's ledger. |
 | `agora.usp_StockRecon_Commit` | Acts on the ticked rows of a recorded run, re-checks each one, writes the amendment record. Touches PumpIT in `live` mode only. |
-| `agora.usp_StockRecon_Reverse` | Puts back the prior pair the commit stored. The legacy procedure can undo nothing. |
+| `agora.usp_StockRecon_Reverse` | Puts back the prior pair the commit stored — and refuses the whole reversal (**COUNT_MOVED**, **ISSUE_MOVED**) if any row it wrote to PumpIT has changed since, naming the shift and what it holds now (5 Oct 2026). The legacy procedure can undo nothing. |
 | `agora.usp_StockRecon_DiscardRuns` | Throws away previews. Refuses a committed run. |
 | `agora.usp_StockRecon_GridRuns` | The runs grid. |
 | `agora.usp_StockRecon_GridExceptions` | The exception report. |
@@ -365,8 +365,10 @@ got on 4 September. What it turns on:
   chain and an operator ticked, re-checks every one against the source first,
   and skips anything whose counts have moved.
 * Every write is recorded with the row's PRIOR pair, so
-  `agora.usp_StockRecon_Reverse` puts back precisely what was changed. The
-  PumpIT executable can undo nothing.
+  `agora.usp_StockRecon_Reverse` puts back precisely what was changed — and
+  only over what the commit left there: a row recounted or re-balanced since is
+  not written over, the whole reversal is refused (COUNT_MOVED) and says which
+  shift and what it holds. The PumpIT executable can undo nothing.
 * **The whole commit is one transaction.** It now spans two databases — the
   amendment record in Agora and the counts in PumpIT — and without that, a
   failure on the second leaves the ledger claiming a prior pair for counts that
