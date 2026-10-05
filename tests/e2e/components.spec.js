@@ -96,6 +96,9 @@ test.describe('the component gallery', () => {
     });
 
     test('a screenshot of each component, for the eye', async ({ page }, testInfo) => {
+        // One screenshot per component, about 45 of them: more than the
+        // default 30 s allows on a single-threaded dev server.
+        test.setTimeout(180_000);
         // Not a visual-regression assertion — there is no baseline and this
         // lane could not have produced a trustworthy one. It attaches one image
         // per component to the report so a person can scan the set in a minute

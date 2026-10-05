@@ -73,7 +73,7 @@ test.describe('utility meters', () => {
 
         // Chosen once, then folded to one line so the work leads.
         await expect(page.locator('details.scope-line')).toHaveJSProperty('open', false);
-        await expect(page.locator('details.scope-line summary')).toContainText('Month to date');
+        await expect(page.locator('details.scope-line > summary')).toContainText('Month to date');
 
         await expect(page.getByText('Readings this month')).toBeVisible();
         await expect(page.getByRole('heading', { name: /^Readings for / })).toBeVisible();
@@ -106,9 +106,9 @@ test.describe('utility meters', () => {
         const site = await chooseFirstSite(page);
         test.skip(site === null, 'No trading sites in this environment.');
 
-        await page.locator('details.scope-line summary').click();
+        await page.locator('details.scope-line > summary').click();
 
-        const day = page.locator('input[name="date"]');
+        const day = page.locator('input[type="date"][name="date"]');
         await expect(day).toBeVisible();
         // A reading is taken, not forecast: the picker stops at today.
         await expect(day).toHaveAttribute('max', /^\d{4}-\d{2}-\d{2}$/);

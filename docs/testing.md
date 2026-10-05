@@ -60,6 +60,16 @@ php artisan seed:master --only=E2eFixtureSeeder
 Leave `AGORA_E2E_PASSWORD` unset and the seeder skips; the browser specs skip
 with it rather than failing, so a checkout without the variable is not broken.
 
+**A new module's view permissions need the fixture run again.** The seeder grants
+`*.*.view` (and `audit.*.*`) once, and the ledger never runs it twice, so a
+module added afterwards brings screens the auditor cannot open and its specs fail
+with *This screen is not on your menu* (15 of 23 failures on 4 Oct 2026).
+`tests/Feature/Seeding/E2eAuditorGrantsTest` names the gap; this closes it:
+
+```bash
+php artisan seed:master --forget=E2eFixtureSeeder && php artisan seed:master
+```
+
 ## Browser tests
 
 ```bash

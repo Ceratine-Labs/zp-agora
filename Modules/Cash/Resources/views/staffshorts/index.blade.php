@@ -56,7 +56,7 @@
         </x-slot:info>
         <x-slot:actions>
             @if ($scope->isChosen() && $summary)
-                <x-chip :tone="(int) $summary->Waiting > 0 ? 'warn' : 'good'">Waiting: {{ \App\Support\Format::n($summary->Waiting) }}</x-chip>
+                <x-chip :tone="(int) $summary->Waiting > 0 ? 'warn' : 'good'">Waiting: {{ \App\Support\Format::n((int) ($summary->Waiting ?? 0)) }}</x-chip>
             @endif
             <a class="btn-ghost" href="{{ route('app.cash.staffshorts.list') }}">Staff shorts list</a>
             <a class="btn-ghost" href="{{ route('app.cash.staffshorts.phone', $scope->withShort(null)->query()) }}">On a phone</a>

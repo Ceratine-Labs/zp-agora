@@ -41,7 +41,7 @@ test.describe('ZREAD Allocation', () => {
         await page.goto('/app/cash/zread');
 
         await expect(page.getByRole('heading', { name: 'ZREAD Allocation', level: 1 })).toBeVisible();
-        await expect(page.getByText('Choose a site').first()).toBeVisible();
+        await expect(page.getByText('Choose a site').filter({ visible: true }).first()).toBeVisible();
         await expect(page.locator('[data-grid]')).toHaveCount(0);
     });
 

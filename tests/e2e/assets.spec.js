@@ -56,7 +56,9 @@ test.describe('asset register', () => {
     test('the as-at date travels in the URL and keeps the grid scope', async ({ signedIn: page }) => {
         await page.goto('/app/assets/register?q=ZZ');
 
-        const asAt = page.locator('input[name="as_at"]');
+        // The date control, not the grid scope form's hidden copy of the same
+        // parameter, which carries it into the next page of the grid.
+        const asAt = page.locator('input[type="date"][name="as_at"]');
         await asAt.fill('2026-08-31');
         await page.getByRole('button', { name: 'Value the register' }).click();
 

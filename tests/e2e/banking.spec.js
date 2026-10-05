@@ -42,7 +42,7 @@ test.describe('Daily Banking', () => {
         await page.goto('/app/cash/banking');
 
         await expect(page.getByRole('heading', { name: 'Daily Banking', level: 1 })).toBeVisible();
-        await expect(page.getByText('Choose a site').first()).toBeVisible();
+        await expect(page.getByText('Choose a site').filter({ visible: true }).first()).toBeVisible();
     });
 
     test('the day lists its cashups with the procedure that produced them', async ({ signedIn: page }) => {
