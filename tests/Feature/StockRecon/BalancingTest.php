@@ -1315,6 +1315,15 @@ class BalancingTest extends TestCase
             (float) $item->CountedTotal + (float) $item->OpeningsMoved + (float) $item->DuplicatesTaken, 0.001);
         $this->assertTrue((bool) $item->TotalReconciles);
 
+        // The day shift balanced, so the running total starts at nothing: a
+        // dash, like every other figure column — never a column of 0.000
+        // (Ryan, 6 Oct 2026: "should cumulative always show 0?").
+        $this->actingAs($this->person('admin'))
+            ->get(route('app.stockrecon.line', [$run, $dup]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()
+            ->assertSee('<td class="num muted">—</td>', false)
+            ->assertDontSee('<td class="num muted">0.000</td>', false);
+
         $before = $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3);
         $result = $this->service->commit($run);
         $this->assertSame('COMMITTED', $result['status']->Code);

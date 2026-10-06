@@ -211,8 +211,11 @@
                 <td class="num money">{{ (float) $shift->QtyVar === 0.0 ? '—' : \App\Support\Format::r($shift->VarValue) }}</td>
                 {{-- The curve the method is drawn on. The balanced answer is
                      its non-rising envelope, and seeing the running total is
-                     what makes that legible without a chart. --}}
-                <td class="num muted">{{ \App\Support\Format::n($shift->CumulativeVar, 3) }}</td>
+                     what makes that legible without a chart. A zero is a dash,
+                     as in every other figure column: a chain where every shift
+                     balanced read 0.000 all the way down, which looked like a
+                     column that was not working (Ryan, 6 Oct 2026). --}}
+                <td class="num muted">{{ abs((float) $shift->CumulativeVar) < 0.0005 ? '—' : \App\Support\Format::n($shift->CumulativeVar, 3) }}</td>
                 <td class="num grp">{{ \App\Support\Format::n($shift->QtyOpenNew, 3) }}</td>
                 <td class="num">{{ \App\Support\Format::n($shift->QtyCloseNew, 3) }}</td>
                 <td class="num">{{ abs((float) $shift->AmendClose) < 0.0005 ? '—' : \App\Support\Format::n($shift->AmendClose, 3) }}</td>
