@@ -278,12 +278,12 @@ return [
             'blurb' => 'A whole pack reached the counter without an issue sheet (rule 5). Capture the issue '
                 .'on the shift it happened; balancing it away would hide the paperwork failure.'],
         'U1' => ['tone' => 'crit', 'label' => 'Unrecorded issue — proven',
-            'test' => 'POS > Open + Issued (the counted opening on a kept break above the previous closing)',
+            'test' => 'POS > Open + Issued (the counted opening on a kept break above the previous closing), and no short before or after it on the chain covers it',
             'blocks' => true,
             'blurb' => 'The till sold more in one shift than the opening plus every recorded issue could '
                 .'supply. The stock was there; the paperwork was not.'],
         'U2' => ['tone' => 'crit', 'label' => 'Closing exceeds what was on hand',
-            'test' => 'Close > Open + Issued (the counted opening on a kept break above the previous closing)',
+            'test' => 'Close > Open + Issued (the counted opening on a kept break above the previous closing), and no short before or after it on the chain covers it',
             'blocks' => true,
             'blurb' => 'The shift closed holding more than it opened with plus everything issued to it. '
                 .'The surplus arrived without a document.'],

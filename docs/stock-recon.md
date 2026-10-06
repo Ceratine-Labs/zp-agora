@@ -542,10 +542,8 @@ same list with the wording the screen uses.
 | **S10a** | Opening below the previous closing | `Open < Close(i−1)` | repaired |
 | **E1** | No till sales linked | `T < −max(3, pack)`, 2+ days, `Σ POS ≤ 10% of \|T\|` | blocks |
 | **S1** | Over of a whole pack | over within 10% of k × multiple | blocks |
-| **U1** | Unrecorded issue, proven | `POS > Open + Issued` (Open = the repaired opening, or the counted one on a kept break above the previous closing) | blocks |
-| **U2** | Closing exceeds what was on hand | `Close > Open + Issued` (as U1) | blocks |
-
-**A kept break is not stock from nowhere (6 Oct 2026).** Where a shift opens up to 3 above the previous closing, the closing before it is the miscount — staff counted 0, the next shift counted the same 2 again — and the kept break lets that closing move. So U1 and U2 read the opening as counted there, not the repaired one; only the break is excused, and an over beyond it still blocks. Before this, ZAMBUK at branch 17 (11 Sep) was held back at a chain total of nil; on run 45 ten chains were, every one at T = 0, and on branch 23's September six.
+| **U1** | Unrecorded issue, proven | `POS > Open + Issued` (Open = the repaired opening, or the counted one on a kept break above the previous closing), and the shorts on the chain neither before nor after it cover it | blocks |
+| **U2** | Closing exceeds what was on hand | `Close > Open + Issued` (as U1, covered the same way) | blocks |
 | **D2** | Possible duplicate issue | short within 10% of the issue, an identical issue on a neighbouring shift, not clear | holds the chain back, nothing written, until corrected or released |
 | **D1** | Duplicate issue removed | short = the issue exactly, the twin arrived, same day or not the usual size, one per pair, shelf goods | removed |
 | **U3** | Selling with no issues captured at all | `Σ Issued = 0 and Σ POS > 0` and a segment over | blocks |
@@ -559,6 +557,10 @@ same list with the wording the screen uses.
 | **N1** | No physical count taken | `Close = Open and Issued = 0 and POS > 0`, on more than half the active shifts | — |
 | **N2** | Mostly dormant | dormant on more than half of six or more shifts | — |
 | **L1** | Persistent short — accountable | short on more than half of six or more ACTIVE shifts | — |
+
+**A kept break is not stock from nowhere (6 Oct 2026).** Where a shift opens up to 3 above the previous closing, the closing before it is the miscount — staff counted 0, the next shift counted the same 2 again — and the kept break lets that closing move. So U1 and U2 read the opening as counted there, not the repaired one; only the break is excused, and an over beyond it still blocks. Before this, ZAMBUK at branch 17 (11 Sep) was held back at a chain total of nil; on run 45 ten chains were, every one at T = 0, and on branch 23's September six.
+
+**An over a short covers is not stock from nowhere either (6 Oct 2026).** A closing counted low and counted right by the next shift is a short then an over of the same size, with no break between them — the next opening copies the wrong closing. Counted high, it is the over first and the short after. Either way the chain total is nil and balancing moves the one closing. So U1 and U2 block only where the segment's running total is above zero at that shift (no short before covers it) **and** what is left of the segment from that shift on is above zero too (no short after covers it). Before this, MONSTER MARIPO at branch 17 (8 Sep night −6, 9 Sep day +6) and 2LIT COKE (+2, then −1 and −1) were held back at T = 0. Measured: live run 46 (branch 17, 1–13 Sep) 4 of the 5 chains still held back on U1/U2 come free (BIOPLUS stays, U4); local branch 23, 1–29 Sep, 182 → 158 chains blocked, none the other way, 20 of the 24 at T = 0 and four with a real short of 2 to 14 now placed by the balancing; rows a commit would write 32 → 236, every one on a freed chain. An over neither side covers is still U1/U2 and still blocks.
 
 And, separately, the **audit** of what the hand balancing already in PumpIT did
 (`AuditCode`, `config('stockrecon.audit')`): S13 mismatch still open, S12

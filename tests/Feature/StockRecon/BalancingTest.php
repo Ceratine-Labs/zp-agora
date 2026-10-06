@@ -292,12 +292,14 @@ class BalancingTest extends TestCase
 
     /**
      * Ryan, 6 Oct 2026: "how is this chain total 1 when its cumulative ends at
-     * 6?". The Cumulative column runs over the variance as counted; T starts
-     * every shift from the previous closing. The panel says so in one line,
-     * with the figures — and on a run totalled the old way, says that instead
-     * of printing a sum that does not hold.
+     * 6?", and again that afternoon: "balance to 0 but … show a movement of 1
+     * in cumulative". The Cumulative column runs on the balancing basis — each
+     * shift's variance plus where its opening was set to the previous closing
+     * — so it ends ON the chain total, and the line under the table says where
+     * it steps without a variance. On a run totalled the old way it says that
+     * instead of printing a sum that does not hold.
      */
-    public function test_the_chain_panel_says_how_the_cumulative_column_becomes_the_chain_total(): void
+    public function test_the_chain_panel_cumulative_column_ends_on_the_chain_total(): void
     {
         $this->setCounts('2026-07-19', 1, ['QtyOpen_Original' => 999, 'QtyOpen' => 999]);
 
@@ -305,22 +307,24 @@ class BalancingTest extends TestCase
         $broken = $run->lines->where('StockItemNo', self::ITEM)
             ->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-19' && $l->ShiftNo === 1);
 
-        $item = $this->service->chain($run, $broken)['item'];
-        $this->assertEqualsWithDelta(-954.0, (float) $item->CountedTotal, 0.001, 'Where the Cumulative column ends.');
+        ['item' => $item, 'shifts' => $shifts] = $this->service->chain($run, $broken);
+        $this->assertEqualsWithDelta(-954.0, (float) $item->CountedTotal, 0.001, 'The variance as counted.');
         $this->assertEqualsWithDelta(949.0, (float) $item->OpeningsMoved, 0.001);
         $this->assertSame(1, (int) $item->OpeningsCount);
         $this->assertSame(0, (int) $item->DuplicatesCount);
         $this->assertTrue((bool) $item->TotalReconciles);
+        $this->assertEqualsWithDelta(-5.0, (float) $item->ChainNetVar, 0.001);
+        $this->assertEqualsWithDelta(-5.0, (float) $shifts->last()->CumulativeVar, 0.001,
+            'The Cumulative column ends on the chain total.');
 
         $this->actingAs($this->person('admin'));
         $panel = fn () => $this->get(route('app.stockrecon.line', [$run, $broken]), ['X-Requested-With' => 'XMLHttpRequest'])
             ->assertOk();
 
         $panel()
-            ->assertSee('The Cumulative column ends at -954.000', false)
-            ->assertSee('Setting 1 opening to the previous', false)
-            ->assertSee('closing moves +949.000', false)
-            ->assertSee('which makes the chain total -5.000', false);
+            ->assertSee('Cumulative ends on the chain total, -5.000.', false)
+            ->assertSee('+949.000 where 1 opening was', false)
+            ->assertSee('set to the previous closing.', false);
 
         // A run totalled before the method settled: the stored T no longer
         // equals the sum of its parts, and the panel does not pretend it does.
@@ -331,7 +335,7 @@ class BalancingTest extends TestCase
         $this->assertFalse((bool) $this->service->chain($run, $broken)['item']->TotalReconciles);
         $panel()
             ->assertSee('worked out by an earlier version of the balancing', false)
-            ->assertDontSee('which makes the chain total', false);
+            ->assertDontSee('Cumulative ends on the chain total', false);
     }
 
     /**
@@ -425,6 +429,80 @@ class BalancingTest extends TestCase
 
         $over = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-19', 3);
         $this->assertTrue((bool) $over->FlagCloseExceedsOnHand, 'An over beyond the kept break is still an unrecorded issue.');
+        $this->assertTrue((bool) $over->ChainBlocked);
+    }
+
+    /**
+     * MONSTER MARIPO, branch 17, 8–9 Sep 2026 (Ryan, 6 Oct: "if a chain is 0
+     * … what is it held back for"). No break at all: the night counted 1 when
+     * 3 were there, the day's opening copied the 1, and the day counted 3
+     * again with nothing issued. Read alone, the day "closed holding more than
+     * it ever received" (U2); read with the shift before, it is one miscount —
+     * the short before covers the over, the chain total is nil, and the
+     * night's closing goes 1 → 3.
+     */
+    public function test_an_over_covered_by_the_short_before_it_balances_rather_than_blocking(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 1, 0]],
+            '2026-07-19' => [1 => [1, 0, 3, 0], 3 => [3, 0, 2, 1]],
+            '2026-07-20' => [1 => [2, 0, 2, 0], 3 => [2, 0, 1, 1]],
+            '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $miscount = $this->lineAt($run, '2026-07-18', 3);
+        $over = $this->lineAt($run, '2026-07-19', 1);
+
+        $this->assertFalse((bool) $over->FlagCloseExceedsOnHand, 'The short before it covers the over: nothing came from nowhere.');
+        $this->assertFalse((bool) $over->ChainBlocked, 'A chain whose total is nil is not held back by one miscount.');
+        $this->assertEqualsWithDelta(0.0, (float) $over->ChainNetVar, 0.001);
+        $this->assertEqualsWithDelta(3.0, (float) $miscount->QtyCloseNew, 0.005, 'The miscounted closing goes 1 → 3.');
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
+    }
+
+    /**
+     * The mirror: 2LIT COKE, branch 17, 8 Sep 2026. A closing counted HIGH —
+     * the night counted 5 with nothing issued and nothing sold — and the day
+     * counted the 3 that were there. The short after covers the over; the
+     * night's closing goes 5 → 3.
+     */
+    public function test_an_over_covered_by_the_short_after_it_balances_rather_than_blocking(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 5, 0]],
+            '2026-07-19' => [1 => [5, 0, 3, 0], 3 => [3, 0, 2, 1]],
+            '2026-07-20' => [1 => [2, 0, 2, 0], 3 => [2, 0, 1, 1]],
+            '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $over = $this->lineAt($run, '2026-07-18', 3);
+
+        $this->assertFalse((bool) $over->FlagCloseExceedsOnHand, 'The short after it covers the over.');
+        $this->assertFalse((bool) $over->ChainBlocked);
+        $this->assertEqualsWithDelta(3.0, (float) $over->QtyCloseNew, 0.005, 'The closing counted high goes 5 → 3.');
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
+    }
+
+    /**
+     * An over no short covers is still stock from nowhere: the same day
+     * closing on 3 from an opening of 1, with no short before or after it.
+     */
+    public function test_an_over_no_short_covers_is_still_an_unrecorded_issue(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 1, 2]],
+            '2026-07-19' => [1 => [1, 0, 3, 0], 3 => [3, 0, 2, 1]],
+            '2026-07-20' => [1 => [2, 0, 2, 0], 3 => [2, 0, 1, 1]],
+            '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+
+        $over = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-19', 1);
+        $this->assertTrue((bool) $over->FlagCloseExceedsOnHand, 'Two more than the shift ever held, and no short either side to cover it.');
         $this->assertTrue((bool) $over->ChainBlocked);
     }
 
@@ -1361,12 +1439,14 @@ class BalancingTest extends TestCase
 
         // The chain panel's account of its total: the 20 taken out is the
         // term that turns the counted total into T.
-        $item = $this->service->chain($run, $dup)['item'];
+        ['item' => $item, 'shifts' => $shifts] = $this->service->chain($run, $dup);
         $this->assertSame(1, (int) $item->DuplicatesCount);
         $this->assertEqualsWithDelta(20.0, (float) $item->DuplicatesTaken, 0.005);
         $this->assertEqualsWithDelta((float) $item->ChainNetVar,
             (float) $item->CountedTotal + (float) $item->OpeningsMoved + (float) $item->DuplicatesTaken, 0.001);
         $this->assertTrue((bool) $item->TotalReconciles);
+        $this->assertEqualsWithDelta((float) $item->ChainNetVar, (float) $shifts->last()->CumulativeVar, 0.001,
+            'The Cumulative column counts the issue taken out, so it ends on the chain total.');
 
         // The day shift balanced, so the running total starts at nothing: a
         // dash, like every other figure column — never a column of 0.000
@@ -1559,14 +1639,17 @@ class BalancingTest extends TestCase
     {
         config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
         $chain = $this->possibleChain();
-        $chain['2026-07-20'] = [1 => [2, 0, 3, 0], 3 => [3, 0, 1, 2]];   // closed holding more than it had: U2
+        // Issued 5, nothing sold, count unchanged: F2. (Until 6 Oct 2026 this
+        // was a closing 1 over what the shift held — U2 — but the 20 short
+        // before it covers that now, and a covered over does not block.)
+        $chain['2026-07-20'] = [1 => [2, 5, 2, 0], 3 => [2, 0, 1, 1]];
         $this->seedShelfChain($chain);
         $this->hideTheNightShortByMovingCounts();
 
         config(['stockrecon.exceptions.D2.blocks' => false]);
         $unheld = $this->previewArea(self::SHELF_AREA);
-        $this->assertTrue($this->lineAt($unheld, '2026-07-20', 1)->FlagCloseExceedsOnHand);
-        $this->assertTrue($unheld->lines->every(fn ($l) => $l->ChainBlocked), 'U2 blocks the chain.');
+        $this->assertTrue($this->lineAt($unheld, '2026-07-20', 1)->FlagIssueWentNowhere);
+        $this->assertTrue($unheld->lines->every(fn ($l) => $l->ChainBlocked), 'F2 blocks the chain.');
         $this->assertTrue($unheld->lines->contains(fn ($l) => $l->RestoresHand && $l->WouldAmend),
             'Without the hold, 7d would put the staff counts back.');
 

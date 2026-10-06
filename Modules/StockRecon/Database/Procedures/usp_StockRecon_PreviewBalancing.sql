@@ -727,6 +727,14 @@ BEGIN
            SUM(CASE WHEN s.IsDormant = 0 THEN 1 ELSE 0 END) OVER (
                PARTITION BY s.AreaNo, s.StockItemNo, s.SegNo)                 AS SegActiveLen,
            SUM(s.QtyVarRep) OVER (PARTITION BY s.AreaNo, s.StockItemNo, s.SegNo) AS SegT,
+           /* The segment's running total up to and including this shift. At or
+              below zero, an over here is covered by the shorts before it; with
+              SegT, whether the shorts after it cover it (U1 and U2 read both,
+              6 Oct 2026). */
+           SUM(s.QtyVarRep) OVER (
+               PARTITION BY s.AreaNo, s.StockItemNo, s.SegNo
+               ORDER BY s.TransactionDate, s.ShiftNo
+               ROWS UNBOUNDED PRECEDING)                                      AS SegP,
            SUM(CASE WHEN s.IsDormant = 0 THEN 1 ELSE 0 END) OVER (
                PARTITION BY s.AreaNo, s.StockItemNo
                ORDER BY s.TransactionDate, s.ShiftNo
@@ -863,12 +871,29 @@ BEGIN
                   (ZAMBUK, branch 17, 11 Sep; ten such chains on run 45,
                   every one at T = 0; Ryan: "chain total is 0 … but held
                   back"). Only the break is excused: an over larger than it
-                  is still an unrecorded issue. */
+                  is still an unrecorded issue.
+
+                  And only where the shorts on either side do not cover the
+                  over (6 Oct 2026): the segment's running total is above zero
+                  here (SegP), AND what is left of the segment from here on
+                  (SegT - SegP + this shift) is above zero too. An over a short
+                  covers is one miscounted closing, not stock from nowhere —
+                  counted low, then right (MONSTER MARIPO, branch 17: 8 Sep
+                  night closed 12 with nothing sold, -6; the day counted 18
+                  with nothing issued, +6), or counted high, then right (2LIT
+                  COKE: +2 on 8 Sep night, -1 and -1 after). Each held back a
+                  chain whose total is nil; balancing moves the one closing.
+                  Ryan: "if a chain is 0 … what is it held back for". An over
+                  neither side covers is still U1/U2 and still blocks. */
                CONVERT(bit, CASE WHEN ch.QtyPOS - (ch.OpenRep + ch.QtyIssued
                                      + CASE WHEN ch.BreakKept = 1 AND ch.ChainBreak > 0 THEN ch.ChainBreak ELSE 0 END) > @eps
+                                  AND ch.SegP > @eps
+                                  AND ch.SegT - ch.SegP + ch.QtyVarRep > @eps
                                  THEN 1 ELSE 0 END)                        AS FlagSoldMoreThanOnHand,
                CONVERT(bit, CASE WHEN ch.QtyClose - (ch.OpenRep + ch.QtyIssued
                                      + CASE WHEN ch.BreakKept = 1 AND ch.ChainBreak > 0 THEN ch.ChainBreak ELSE 0 END) > @eps
+                                  AND ch.SegP > @eps
+                                  AND ch.SegT - ch.SegP + ch.QtyVarRep > @eps
                                  THEN 1 ELSE 0 END)                        AS FlagCloseExceedsOnHand,
                /* U4 — a segment ends over. No amendment can remove it, and
                   pushing it across a pinned closing is what the rule forbids. */

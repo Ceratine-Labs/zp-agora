@@ -154,8 +154,14 @@ BEGIN
 
     /* The chain. `IsClicked` marks the row the reader came from, so a panel
        over twelve shifts does not make them find it again. `CumulativeVar` is
-       the curve the method is drawn on — the counted running total, which is
-       what makes the envelope legible without a chart. */
+       the curve the method is drawn on, which is what makes the envelope
+       legible without a chart: the running total on the BALANCING basis, so
+       it ends on the chain total in the card above. Each shift adds its
+       variance as counted, plus where its opening was set to the previous
+       closing (ChainBreak) and a clear duplicate issue taken out. Until 6 Oct
+       2026 it ran over the counted variance alone and ended somewhere else —
+       PIEMANS at branch 17 ended on 1 under a chain total of 0 (Ryan: "balance
+       to 0 but … show a movement of 1 in cumulative"). */
     SELECT
         rl.Id,
         rl.[LineNo],
@@ -226,7 +232,10 @@ BEGIN
         rl.CommitState,
         rl.BlockReason,
         CONVERT(bit, CASE WHEN rl.Id = @LineId THEN 1 ELSE 0 END)          AS IsClicked,
-        SUM(rl.QtyVar) OVER (ORDER BY rl.[LineNo] ROWS UNBOUNDED PRECEDING) AS CumulativeVar,
+        SUM(rl.QtyVar
+            + CASE WHEN ABS(ISNULL(rl.ChainBreak, 0)) > 0.0005 THEN rl.ChainBreak ELSE 0 END
+            + CASE WHEN @Removed = 1 AND rl.DupTier = 'D1' THEN rl.QtyIssued ELSE 0 END)
+            OVER (ORDER BY rl.[LineNo] ROWS UNBOUNDED PRECEDING)            AS CumulativeVar,
         am.[State]                                                          AS AmendmentState,
         am.PriorQtyOpen, am.PriorQtyClose, am.PriorQtyIssued
     FROM agora.StockReconRunLine rl
