@@ -542,8 +542,10 @@ same list with the wording the screen uses.
 | **S10a** | Opening below the previous closing | `Open < Close(i−1)` | repaired |
 | **E1** | No till sales linked | `T < −max(3, pack)`, 2+ days, `Σ POS ≤ 10% of \|T\|` | blocks |
 | **S1** | Over of a whole pack | over within 10% of k × multiple | blocks |
-| **U1** | Unrecorded issue, proven | `POS > Open + Issued` | blocks |
-| **U2** | Closing exceeds what was on hand | `Close > Open + Issued` | blocks |
+| **U1** | Unrecorded issue, proven | `POS > Open + Issued` (Open = the repaired opening, or the counted one on a kept break above the previous closing) | blocks |
+| **U2** | Closing exceeds what was on hand | `Close > Open + Issued` (as U1) | blocks |
+
+**A kept break is not stock from nowhere (6 Oct 2026).** Where a shift opens up to 3 above the previous closing, the closing before it is the miscount — staff counted 0, the next shift counted the same 2 again — and the kept break lets that closing move. So U1 and U2 read the opening as counted there, not the repaired one; only the break is excused, and an over beyond it still blocks. Before this, ZAMBUK at branch 17 (11 Sep) was held back at a chain total of nil; on run 45 ten chains were, every one at T = 0, and on branch 23's September six.
 | **D2** | Possible duplicate issue | short within 10% of the issue, an identical issue on a neighbouring shift, not clear | holds the chain back, nothing written, until corrected or released |
 | **D1** | Duplicate issue removed | short = the issue exactly, the twin arrived, same day or not the usual size, one per pair, shelf goods | removed |
 | **U3** | Selling with no issues captured at all | `Σ Issued = 0 and Σ POS > 0` and a segment over | blocks |

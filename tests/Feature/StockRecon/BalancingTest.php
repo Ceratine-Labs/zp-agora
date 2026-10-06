@@ -375,6 +375,59 @@ class BalancingTest extends TestCase
         $this->assertEqualsWithDelta(-2.0, (float) $exceptions->ChainBreak, 0.005, 'With its qty.');
     }
 
+    /**
+     * ZAMBUK, branch 17, 11 Sep 2026 (Ryan, 6 Oct: "chain total is 0 … but
+     * held back"). A slow shelf item: the day shift counted its last 2 tins as
+     * 0, the night counted the same 2 again. Nothing was sold or lost — the
+     * chain total is nil. Read against the repaired opening (0), the night
+     * "closed holding more than it ever received" (U2) and the whole chain was
+     * held back. The break is 2, so it is kept, and the closing before it may
+     * move: the day's closing goes 0 → 2, exactly what head office did by
+     * hand, and every shift balances.
+     */
+    public function test_a_closing_counted_short_and_counted_again_next_shift_balances_rather_than_blocking(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 2, 1]],
+            '2026-07-19' => [1 => [2, 0, 0, 0], 3 => [2, 0, 2, 0]],
+            '2026-07-20' => [1 => [2, 0, 1, 1], 3 => [1, 0, 1, 0]],
+            '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $miscount = $this->lineAt($run, '2026-07-19', 1);
+        $next = $this->lineAt($run, '2026-07-19', 3);
+
+        $this->assertTrue((bool) $next->BreakKept, 'A break of 2 is kept.');
+        $this->assertFalse((bool) $next->FlagCloseExceedsOnHand, 'The tins were counted at the start of the night: nothing came from nowhere.');
+        $this->assertFalse((bool) $next->FlagSoldMoreThanOnHand);
+        $this->assertFalse((bool) $next->ChainBlocked, 'A chain whose total is nil is not held back by a miscount.');
+        $this->assertEqualsWithDelta(0.0, (float) $miscount->ChainNetVar, 0.001);
+        $this->assertEqualsWithDelta(2.0, (float) $miscount->QtyCloseNew, 0.005, 'The miscounted closing goes 0 → 2, as head office did by hand.');
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
+    }
+
+    /**
+     * Only the kept break is excused. Had that night closed on 4 — 2 more than
+     * it was counted holding at the start — that is still stock from nowhere,
+     * and still U2.
+     */
+    public function test_an_over_beyond_a_kept_break_is_still_an_unrecorded_issue(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 2, 1]],
+            '2026-07-19' => [1 => [2, 0, 0, 0], 3 => [2, 0, 4, 0]],
+            '2026-07-20' => [1 => [4, 0, 3, 1], 3 => [3, 0, 3, 0]],
+            '2026-07-21' => [1 => [3, 0, 3, 0], 3 => [3, 0, 2, 1]],
+        ]);
+
+        $over = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-19', 3);
+        $this->assertTrue((bool) $over->FlagCloseExceedsOnHand, 'An over beyond the kept break is still an unrecorded issue.');
+        $this->assertTrue((bool) $over->ChainBlocked);
+    }
+
     /** At 0 the option restores the split: the same break blocks the chain, as before 4 Oct. */
     public function test_keeping_breaks_can_be_switched_off(): void
     {

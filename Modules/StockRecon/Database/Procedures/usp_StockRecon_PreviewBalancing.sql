@@ -849,12 +849,27 @@ BEGIN
                CONVERT(decimal(18,4),
                    ch.QtyPOS - (ch.QtyOpenNew + ch.QtyIssued - ch.QtyCloseNew)) AS QtyVarNew,
 
-               /* U1 — the till sold more than the shift could possibly hold. */
-               CONVERT(bit, CASE WHEN ch.QtyPOS - (ch.OpenRep + ch.QtyIssued) > @eps THEN 1 ELSE 0 END)
-                                                                           AS FlagSoldMoreThanOnHand,
-               /* U2 — it closed holding more than it ever received. */
-               CONVERT(bit, CASE WHEN ch.QtyClose - (ch.OpenRep + ch.QtyIssued) > @eps THEN 1 ELSE 0 END)
-                                                                           AS FlagCloseExceedsOnHand,
+               /* U1 — the till sold more than the shift could possibly hold.
+                  U2 — it closed holding more than it ever received.
+
+                  Both read the repaired opening, EXCEPT where the opening
+                  sits on a KEPT break above the previous closing (6 Oct
+                  2026). There the opening as counted is the stock that was
+                  there: the closing before it is the miscount, and the kept
+                  break exists so that closing may move. Read against the
+                  repaired opening, a closing counted 0 and the next shift
+                  counting the same 2 again looked like 2 received from
+                  nowhere — U2 — and blocked a chain whose total is nil
+                  (ZAMBUK, branch 17, 11 Sep; ten such chains on run 45,
+                  every one at T = 0; Ryan: "chain total is 0 … but held
+                  back"). Only the break is excused: an over larger than it
+                  is still an unrecorded issue. */
+               CONVERT(bit, CASE WHEN ch.QtyPOS - (ch.OpenRep + ch.QtyIssued
+                                     + CASE WHEN ch.BreakKept = 1 AND ch.ChainBreak > 0 THEN ch.ChainBreak ELSE 0 END) > @eps
+                                 THEN 1 ELSE 0 END)                        AS FlagSoldMoreThanOnHand,
+               CONVERT(bit, CASE WHEN ch.QtyClose - (ch.OpenRep + ch.QtyIssued
+                                     + CASE WHEN ch.BreakKept = 1 AND ch.ChainBreak > 0 THEN ch.ChainBreak ELSE 0 END) > @eps
+                                 THEN 1 ELSE 0 END)                        AS FlagCloseExceedsOnHand,
                /* U4 — a segment ends over. No amendment can remove it, and
                   pushing it across a pinned closing is what the rule forbids. */
                CONVERT(bit, ch.AnySegmentOver)                             AS FlagNetOver,
