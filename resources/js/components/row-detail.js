@@ -89,6 +89,7 @@ function open(table, row, columns) {
 
     if (template) {
         cell.replaceChildren(template.content.cloneNode(true));
+        wire(cell);
         return;
     }
 
@@ -97,7 +98,7 @@ function open(table, row, columns) {
             if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
             return response.text();
         })
-        .then((html) => { cell.innerHTML = html; })
+        .then((html) => { cell.innerHTML = html; wire(cell); })
         .catch((error) => {
             // Said in the row rather than in a toast: the failure belongs to
             // this line, and a toast would leave the row looking merely empty.
@@ -106,6 +107,18 @@ function open(table, row, columns) {
                 + escapeHtml(error.message)
                 + '. The figures in the row above still stand; they came from the preview.</p>';
         });
+}
+
+/*
+ * A detail is markup that arrived after load, exactly like a recon centre tab,
+ * and needs the same wiring. Until 6 Oct 2026 it got none: the stock recon
+ * chain panel's info button did nothing, and its two-row head never measured
+ * itself — the column headings took the OUTER table's offset (--head-row-h
+ * inherits) and sat over the first shift. Ryan: "when the row opens the first
+ * row cuts off". Each component marks what it wires, so this is safe to run.
+ */
+function wire(cell) {
+    if (window.Agora && typeof window.Agora.hydrate === 'function') window.Agora.hydrate(cell);
 }
 
 function escapeHtml(value) {

@@ -357,6 +357,14 @@ div.emptystate { padding: 44px 20px; text-align: center; }
    page never scrolls sideways (feature-rules §3).
    --------------------------------------------------------------------------- */
 .table-block { display: block; }
+/* Each table measures its own first head row (stickyHead() in table-tools.js)
+   and writes it on itself. A custom property inherits, so a table NESTED in
+   another one — the stock recon chain panel inside a proposals row — took its
+   parent's measurement until its own was written, and pushed its headings down
+   over its first row (Ryan, 6 Oct 2026). A nested table starts from nothing;
+   its own measurement, written inline, still wins. Not `@property … inherits:
+   false`: the head cells read the value from the table, so it MUST inherit. */
+table.dt table.dt { --head-row-h: 0px; }
 /* THE STICKY HEAD, and why it needed a height.
    `table.dt thead th` has declared `position: sticky; top: 0` since the table
    was written, and it never once stuck. `overflow-x: auto` alone makes this a
