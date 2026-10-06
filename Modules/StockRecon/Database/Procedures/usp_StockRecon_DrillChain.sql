@@ -46,6 +46,13 @@ BEGIN
     IF @StockItemNo IS NULL
         THROW 51000, 'AGORA:NO_LINE:That line is not on this run.', 1;
 
+    /* Whether this run took clear duplicate issues (D1) out of its balancing
+       basis — the one term of the chain total the lines cannot say alone. */
+    DECLARE @Removed BIT = ISNULL((
+        SELECT TRY_CONVERT(bit, JSON_VALUE(r.ParamsJson, '$.RemoveDuplicates'))
+        FROM agora.StockReconRun r
+        WHERE r.BranchId = @BranchId AND r.Id = @RunId), 0);
+
     /* The header. The chain totals come off the lines rather than from the run,
        because the run is about every item and this panel is about one. */
     SELECT
@@ -82,6 +89,25 @@ BEGIN
         SUM(CONVERT(int, rl.IsDormant))                     AS DormantShifts,
         MAX(rl.ChainNetVar)                                 AS ChainNetVar,
         CONVERT(decimal(18,2), MAX(rl.ChainNetVar) * MAX(ISNULL(rl.SellPrice, 0))) AS ChainNetVarValue,
+        /* HOW THE CHAIN TOTAL IS MADE UP (Ryan, 6 Oct 2026: "how is this chain
+           total 1 when its cumulative ends at 6?"). The Cumulative column runs
+           over the variance AS COUNTED, each shift from the opening staff
+           wrote down. T starts every shift from the previous closing instead
+           (the pack's rule 3), and takes a clear duplicate issue out. So
+             T = counted + Σ(opening − previous closing) + Σ(D1 issue taken out)
+           exactly, on every run since the method settled on 30 Sep 2026. A run
+           made before that was totalled another way; TotalReconciles says so
+           rather than the panel printing a sum that does not add up. */
+        SUM(rl.QtyVar)                                                         AS CountedTotal,
+        SUM(CASE WHEN ABS(ISNULL(rl.ChainBreak, 0)) > 0.0005 THEN rl.ChainBreak ELSE 0 END) AS OpeningsMoved,
+        SUM(CASE WHEN ABS(ISNULL(rl.ChainBreak, 0)) > 0.0005 THEN 1 ELSE 0 END)              AS OpeningsCount,
+        SUM(CASE WHEN @Removed = 1 AND rl.DupTier = 'D1' THEN rl.QtyIssued ELSE 0 END)       AS DuplicatesTaken,
+        SUM(CASE WHEN @Removed = 1 AND rl.DupTier = 'D1' THEN 1 ELSE 0 END)                  AS DuplicatesCount,
+        CONVERT(bit, CASE WHEN ABS(MAX(rl.ChainNetVar)
+                                   - SUM(rl.QtyVar)
+                                   - SUM(CASE WHEN ABS(ISNULL(rl.ChainBreak, 0)) > 0.0005 THEN rl.ChainBreak ELSE 0 END)
+                                   - SUM(CASE WHEN @Removed = 1 AND rl.DupTier = 'D1' THEN rl.QtyIssued ELSE 0 END)) <= 0.001
+                          THEN 1 ELSE 0 END)                                   AS TotalReconciles,
         MAX(CONVERT(int, rl.ChainBlocked))                  AS ChainBlocked,
         /* WHY it is blocked, named rather than left for the reader to work out
            from ten bits. First one wins, most serious first — the same order

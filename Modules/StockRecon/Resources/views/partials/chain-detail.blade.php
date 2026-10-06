@@ -269,4 +269,35 @@
         @endforeach
     </x-table>
 
+    {{-- How the Cumulative column, which ends on the counted total, becomes the
+         chain total in the card above (Ryan, 6 Oct 2026: "how is this chain
+         total 1 when its cumulative ends at 6?"). The terms come from
+         usp_StockRecon_DrillChain, which also says whether they add up: a run
+         made before the method settled on 30 Sep 2026 was totalled another way,
+         and gets a plain sentence instead of a sum that does not hold. --}}
+    @php($signed = fn ($v) => ((float) $v > 0.0005 ? '+' : '').\App\Support\Format::n($v, 3))
+    @php($openings = (int) ($item?->OpeningsCount ?? 0))
+    @php($dups = (int) ($item?->DuplicatesCount ?? 0))
+    @if ($item && ! $item->TotalReconciles)
+        <p class="muted">
+            The Cumulative column ends at {{ \App\Support\Format::n($item->CountedTotal, 3) }}, as counted. This run's
+            chain total was worked out by an earlier version of the balancing, so the two do not add up here —
+            preview again to see how the total is made up.
+        </p>
+    @elseif ($item && ($openings > 0 || $dups > 0))
+        <p class="muted">
+            The Cumulative column ends at {{ \App\Support\Format::n($item->CountedTotal, 3) }}, counted from each
+            opening as staff wrote it down.
+            @if ($openings > 0)
+                Setting {{ $openings }} {{ \Illuminate\Support\Str::plural('opening', $openings) }} to the previous
+                closing moves {{ $signed($item->OpeningsMoved) }}{{ $dups > 0 ? ',' : '' }}
+            @endif
+            @if ($dups > 0)
+                {{ $openings > 0 ? 'and taking' : 'Taking' }} out {{ $dups }} clear duplicate
+                {{ \Illuminate\Support\Str::plural('issue', $dups) }} moves {{ $signed($item->DuplicatesTaken) }}
+            @endif
+            — which makes the chain total {{ \App\Support\Format::n($item->ChainNetVar, 3) }}.
+        </p>
+    @endif
+
 </div>

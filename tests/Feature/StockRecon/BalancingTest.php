@@ -291,6 +291,50 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * Ryan, 6 Oct 2026: "how is this chain total 1 when its cumulative ends at
+     * 6?". The Cumulative column runs over the variance as counted; T starts
+     * every shift from the previous closing. The panel says so in one line,
+     * with the figures — and on a run totalled the old way, says that instead
+     * of printing a sum that does not hold.
+     */
+    public function test_the_chain_panel_says_how_the_cumulative_column_becomes_the_chain_total(): void
+    {
+        $this->setCounts('2026-07-19', 1, ['QtyOpen_Original' => 999, 'QtyOpen' => 999]);
+
+        $run = $this->preview();
+        $broken = $run->lines->where('StockItemNo', self::ITEM)
+            ->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-19' && $l->ShiftNo === 1);
+
+        $item = $this->service->chain($run, $broken)['item'];
+        $this->assertEqualsWithDelta(-954.0, (float) $item->CountedTotal, 0.001, 'Where the Cumulative column ends.');
+        $this->assertEqualsWithDelta(949.0, (float) $item->OpeningsMoved, 0.001);
+        $this->assertSame(1, (int) $item->OpeningsCount);
+        $this->assertSame(0, (int) $item->DuplicatesCount);
+        $this->assertTrue((bool) $item->TotalReconciles);
+
+        $this->actingAs($this->person('admin'));
+        $panel = fn () => $this->get(route('app.stockrecon.line', [$run, $broken]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk();
+
+        $panel()
+            ->assertSee('The Cumulative column ends at -954.000', false)
+            ->assertSee('Setting 1 opening to the previous', false)
+            ->assertSee('closing moves +949.000', false)
+            ->assertSee('which makes the chain total -5.000', false);
+
+        // A run totalled before the method settled: the stored T no longer
+        // equals the sum of its parts, and the panel does not pretend it does.
+        $this->db()->table('agora.StockReconRunLine')
+            ->where('RunId', $run->Id)->where('StockItemNo', self::ITEM)
+            ->update(['ChainNetVar' => 0]);
+
+        $this->assertFalse((bool) $this->service->chain($run, $broken)['item']->TotalReconciles);
+        $panel()
+            ->assertSee('worked out by an earlier version of the balancing', false)
+            ->assertDontSee('which makes the chain total', false);
+    }
+
+    /**
      * ZRP, 4 Oct 2026: a break of 1, 2 or 3 units does not split the chain.
      *
      * 19 Jul shift 3 opens at 28 against a previous closing of 30. Split there,
@@ -1261,6 +1305,15 @@ class BalancingTest extends TestCase
         $this->assertStringStartsWith('Duplicate issue removed (D1)', $dup->Outcome);
         $this->assertNull($twin->DupTier, 'The twin arrived; it is not a duplicate of anything.');
         $this->assertSame(1, (int) $run->fresh()->DuplicatesClear);
+
+        // The chain panel's account of its total: the 20 taken out is the
+        // term that turns the counted total into T.
+        $item = $this->service->chain($run, $dup)['item'];
+        $this->assertSame(1, (int) $item->DuplicatesCount);
+        $this->assertEqualsWithDelta(20.0, (float) $item->DuplicatesTaken, 0.005);
+        $this->assertEqualsWithDelta((float) $item->ChainNetVar,
+            (float) $item->CountedTotal + (float) $item->OpeningsMoved + (float) $item->DuplicatesTaken, 0.001);
+        $this->assertTrue((bool) $item->TotalReconciles);
 
         $before = $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3);
         $result = $this->service->commit($run);
