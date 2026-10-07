@@ -81,7 +81,7 @@ KNOWN='RolePermissionSeeder|RoleSeeder|RoleLandingSeeder|RetireRolesSeeder|Stock
 for seeder in $(find Modules -path '*/Database/Seeders/*.php' | sort); do
     name=$(basename "$seeder" .php)
 
-    if echo "$name" | grep -qE "^($KNOWN)$"; then
+    if grep -qE "^($KNOWN)$" <<< "$name"; then
         continue
     fi
 

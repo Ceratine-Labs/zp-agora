@@ -39,7 +39,9 @@ while IFS= read -r hit; do
     checked=$((checked + 1))
 
     # NOTHING is a constant, not a method, and is written without parentheses.
-    if ! printf '%s\n' "$methods" | grep -qx "$method"; then
+    # A here-string, not `printf | grep -q`: under pipefail an early-leaving
+    # grep made printf die of SIGPIPE and a real method read as missing.
+    if ! grep -qx "$method" <<< "$methods"; then
         printf '  %s:%s: Format::%s() is not a method on App\\Support\\Format.\n' "$file" "$line" "$method"
         fail=1
     fi

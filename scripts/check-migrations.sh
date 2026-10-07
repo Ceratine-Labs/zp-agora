@@ -34,7 +34,7 @@ for file in $files; do
     # And a third, for the module that uses all 26: Recon reached v1__13pz on
     # 5 Oct 2026, so its next is v1__13pza ("pz_" sorts before "pza", so the
     # order holds). Only ever after the two-letter run is spent.
-    if ! echo "$name" | grep -qE '^v[0-9]+__[0-9]{2}[a-z]{0,3}_[a-z0-9_]+\.php$'; then
+    if ! grep -qE '^v[0-9]+__[0-9]{2}[a-z]{0,3}_[a-z0-9_]+\.php$' <<< "$name"; then
         say "$file: name does not match v{N}__{NN}[letter][letter][letter]_{module}_{what}.php"
     fi
 
@@ -47,7 +47,7 @@ for file in $files; do
 
     # Foreign keys live in one v1__95_{module}_foreign_keys.php per module: the
     # reference graph has cycles SQL Server rejects inside a create.
-    if ! echo "$name" | grep -q '_foreign_keys\.php$'; then
+    if ! grep -q '_foreign_keys\.php$' <<< "$name"; then
         if grep -qE -- '->(constrained|foreign)\(' "$file"; then
             line=$(grep -nE -- '->(constrained|foreign)\(' "$file" | head -1 | cut -d: -f1)
             say "$file:$line: foreign key outside a v1__95_{module}_foreign_keys.php file."
@@ -111,11 +111,11 @@ for file in $files; do
     # anything at all and passed every file vacuously.
     code=$(sed -E 's;//.*$;;; s;^[[:space:]]*\*.*$;;' "$file")
 
-    if echo "$code" | grep -qiE "Schema::[a-zA-Z]+\(\s*['\"]dbo\."; then
+    if grep -qiE "Schema::[a-zA-Z]+\(\s*['\"]dbo\." <<< "$code"; then
         say "$file: points a Schema:: call at the dbo schema. Migrations only create objects in agora."
     fi
 
-    if echo "$code" | grep -qiE "(CREATE|ALTER|DROP|TRUNCATE)[[:space:]]+(TABLE|INDEX|VIEW|PROCEDURE|SCHEMA)?[[:space:]]*\[?dbo\]?\."; then
+    if grep -qiE "(CREATE|ALTER|DROP|TRUNCATE)[[:space:]]+(TABLE|INDEX|VIEW|PROCEDURE|SCHEMA)?[[:space:]]*\[?dbo\]?\." <<< "$code"; then
         say "$file: DDL against the dbo schema. The customer runs schema changes to their own tables."
     fi
 done
