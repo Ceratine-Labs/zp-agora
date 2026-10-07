@@ -2,6 +2,7 @@
 
 namespace Modules\StockRecon\Http\Requests;
 
+use App\Support\BusinessDate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
 use Modules\StockRecon\Services\ReconPeriods;
@@ -31,10 +32,14 @@ class BalancePreviewRequest extends FormRequest
             // deliberately not carried forward into a stored run, where a
             // reader six months later would have to know what it meant.
             'area_no' => ['nullable', 'integer', 'min:0'],
-            'from' => ['required', 'date'],
-            // ONE WEEK AT A TIME (Ryan, 7 Oct 2026). The form posts only the
-            // week's first day; the end is worked out in to(), never taken
-            // from the request, so no post can ask for a month.
+            // Any day up to today (ZRP, 7 Oct 2026: "select a from date").
+            // The customer's today, not the server's: `today` in a rule is
+            // UTC, a day behind between midnight and 02:00 SAST.
+            'from' => ['required', 'date', 'before_or_equal:'.BusinessDate::today()->toDateString()],
+            // ONE WEEK AT A TIME (Ryan, 7 Oct 2026). The end is worked out in
+            // to() — the week to date from `from` — and never taken from the
+            // request: the form shows a `to`, and it is ignored here, so no
+            // post can ask for a month.
 
             // A name on the run. Capped at the column — 400 in the migration —
             // so a longer one is a refusal here rather than a truncation the
@@ -55,10 +60,10 @@ class BalancePreviewRequest extends FormRequest
         return Carbon::parse($this->date('from'))->startOfDay();
     }
 
-    /** The end of the week `from` falls in — its Sunday, or its month's last day. */
+    /** The week to date from `from`: six days later, or today if that is sooner. */
     public function to(): Carbon
     {
-        return ReconPeriods::weekEnd($this->from());
+        return ReconPeriods::weekTo($this->from(), BusinessDate::today());
     }
 
     /** Null for every area at the site — never 0, which is the legacy sentinel. */

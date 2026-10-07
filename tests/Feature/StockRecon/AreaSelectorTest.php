@@ -4,7 +4,9 @@ namespace Tests\Feature\StockRecon;
 
 use App\Support\ProcedureService;
 use Illuminate\Database\Connection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Modules\Core\Models\User;
 use Modules\StockRecon\Http\Requests\BalancePreviewRequest;
 use Modules\StockRecon\Services\StockReconService;
@@ -129,39 +131,49 @@ class AreaSelectorTest extends TestCase
     }
 
     /**
-     * A month, then ONE week inside it — not free dates (ZRP, 4 Oct 2026;
-     * Ryan, 7 Oct 2026: "only let the users pick one week at a time"). The
-     * week select posts `from`; there is no end to choose — the request works
-     * it out — so no post can ask for more than a week.
+     * A from date, and the week to date worked out from it (ZRP, 7 Oct 2026:
+     * "select a from date, and it auto calculates what the week to date would
+     * be"). Still one week at a time (Ryan, 7 Oct 2026): the `to` is shown,
+     * read-only, and the request works it out again.
      */
-    public function test_the_period_is_a_month_then_one_week_within_it(): void
+    public function test_the_period_is_a_from_date_and_the_week_to_date_from_it(): void
     {
         $this->actingAs($this->admin());
 
-        $page = $this->get(route('app.stockrecon.index', ['from' => '2026-09-07']))->assertOk();
+        $page = $this->get(route('app.stockrecon.index', ['from' => '2026-09-10']))->assertOk();
+        $html = (string) $page->getContent();
+        $today = Carbon::today()->toDateString();
 
-        // Selects, not date inputs (the runs grid below has date filters of its own).
-        $page->assertSee('<select id="f-from" name="from"', false);
-        $page->assertDontSee('name="to"', false);
-        $page->assertSee('name="month"', false);
-        $page->assertSee('<option value="2026-09" selected>', false);
-        $page->assertSee('data-linked-select="month"', false);
-        $this->assertMatchesRegularExpression('/value="2026-09-07"\s+data-when="2026-09"\s+selected>Week 2 · 7–13 Sep</',
-            $page->getContent(), 'The week opens on the week ?from= falls in.');
+        $this->assertMatchesRegularExpression('/<input type="date" id="f-from" name="from"\s+value="2026-09-10"\s+max="'.$today.'"/', $html,
+            'Any day, up to today.');
+        $this->assertMatchesRegularExpression('/<input type="date" id="f-to" name="to"\s+value="2026-09-16"\s+max="'.$today.'"\s+readonly\s+data-follows="from" data-span-days="7"/', $html,
+            'The week to date, worked out and read-only.');
+        $page->assertDontSee('name="month"', false);
 
         // The standing text is behind an info button, not on the page.
         $page->assertSee('class="info', false);
     }
 
-    /** The end is the week's, whatever is posted: a month cannot be asked for. */
+    /** The end is worked out, whatever is posted: a month cannot be asked for. */
     public function test_a_preview_request_is_one_week_whatever_it_posts(): void
     {
-        $request = BalancePreviewRequest::create('/', 'POST', ['from' => '2026-09-07', 'to' => '2026-09-30']);
+        $request = BalancePreviewRequest::create('/', 'POST', ['from' => '2026-09-10', 'to' => '2026-09-30']);
+        $this->assertSame('2026-09-16', $request->to()->toDateString(), 'Six days on, not the posted end.');
 
-        $this->assertSame('2026-09-13', $request->to()->toDateString(), 'Sunday of the week, not the posted end.');
+        $request = BalancePreviewRequest::create('/', 'POST', ['from' => Carbon::today()->subDays(2)->toDateString()]);
+        $this->assertSame(Carbon::today()->toDateString(), $request->to()->toDateString(), 'A week not over yet ends today.');
+    }
 
-        $request = BalancePreviewRequest::create('/', 'POST', ['from' => '2026-09-28']);
-        $this->assertSame('2026-09-30', $request->to()->toDateString(), 'Cut at the month\'s edge.');
+    /** A from date after today is refused, not run as an empty week; today itself is a one-day week. */
+    public function test_a_from_date_after_today_is_refused(): void
+    {
+        $rules = (new BalancePreviewRequest)->rules();
+
+        $tomorrow = Validator::make(['branch_id' => 23, 'from' => Carbon::today()->addDay()->toDateString()], $rules);
+        $this->assertArrayHasKey('from', $tomorrow->errors()->toArray());
+
+        $today = Validator::make(['branch_id' => 23, 'from' => Carbon::today()->toDateString()], $rules);
+        $this->assertFalse($today->fails());
     }
 
     private function admin(): User

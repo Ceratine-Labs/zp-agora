@@ -7,6 +7,7 @@ use App\Grid\GridRegistry;
 use App\Grid\GridService;
 use App\Http\Controllers\Controller;
 use App\Support\BranchContext;
+use App\Support\BusinessDate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,13 +65,14 @@ class StockReconController extends Controller
         $branchId = (int) $request->query('branch_id', $context->id() ?? 0);
 
         /*
-         * A month, then ONE week inside it (ZRP, 4 Oct 2026; one week only
-         * since 7 Oct 2026), opening on the last full week. ?from= still
-         * works, and picks the month it falls in.
+         * A from date, and the week to date from it (ZRP, 7 Oct 2026), opening
+         * on the last full Monday–Sunday week. ?from= still works.
          */
-        $week = ReconPeriods::lastFullWeek(Carbon::today());
-        $from = (string) $request->query('from', $week['from']);
-        $months = ReconPeriods::months(Carbon::today());
+        $today = BusinessDate::today();
+        $asked = $request->query('from');
+        $from = is_string($asked) && strtotime($asked) !== false
+            ? Carbon::parse($asked)->toDateString()
+            : ReconPeriods::lastFullWeek($today)['from'];
 
         $branches = $this->branches();
 
@@ -92,9 +94,8 @@ class StockReconController extends Controller
             ),
             'areaNo' => (int) $request->query('area_no', 0),
             'from' => $from,
-            'month' => substr($from, 0, 7),
-            'months' => $months,
-            'weeks' => collect(array_keys($months))->mapWithKeys(fn ($m) => [$m => ReconPeriods::weeks($m)])->all(),
+            'to' => ReconPeriods::weekTo(Carbon::parse($from), $today)->toDateString(),
+            'today' => $today->toDateString(),
             'options' => $this->service->options(),
             'excluded' => (array) config('stockrecon.excluded_area_groups'),
             'stampMode' => config('stockrecon.stamp_mode'),

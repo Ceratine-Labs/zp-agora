@@ -906,6 +906,9 @@ table.dt tr[class*="bal-g"] td:first-child { box-shadow: inset 4px 0 0 var(--bal
     border: 1px solid var(--line); border-radius: var(--r);
     padding: 7px 9px; font: inherit; font-size: 13px; width: 100%;
     &:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+    /* Worked out, not asked for — the stock recon "to" (ZRP, 7 Oct 2026).
+       Sunk into the surface so it does not read as a box to type in. */
+    &[readonly] { background: var(--surface-2); color: var(--ink-2); border-style: dashed; cursor: default; }
   }
   .field-check {
     display: flex; align-items: center; gap: 7px; font-size: 13px;

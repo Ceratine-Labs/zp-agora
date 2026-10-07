@@ -18,6 +18,7 @@ import reconSuggest from './components/recon-suggest';
 import modal from './components/modal';
 import tableTools from './components/table-tools';
 import linkedSelect from './components/linked-select';
+import dateSpan from './components/date-span';
 import bulkSelection from './components/bulk-selection';
 import postLink from './components/post-link';
 import duplicateRelease from './components/duplicate-release';
@@ -48,6 +49,9 @@ tableTools();
 // areas at a site. Does nothing on a page with none, which is every page but
 // the stock recon centre.
 linkedSelect();
+// A date worked out from another — the stock recon "to", a week from its
+// "from". Does nothing on a page with no `data-follows`.
+dateSpan();
 // Copies a grid's ticked rows into the batch form that acts on them. Does
 // nothing on a page with no `data-bulk-form`, which is every page but the
 // stock recon master.

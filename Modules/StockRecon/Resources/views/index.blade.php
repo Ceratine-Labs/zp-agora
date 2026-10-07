@@ -119,22 +119,21 @@
                             ]))->all()"
                          info="One area at a time is the working habit: it keeps the proposals short enough to read before committing." />
 
-                {{-- A MONTH, THEN ONE WEEK INSIDE IT, not free dates (ZRP,
-                     4 Oct 2026; one week only since 7 Oct 2026 — Ryan: "only
-                     let the users pick one week at a time"). Monday–Sunday
-                     weeks — the client's pack reviews those — cut at the
-                     month's edge; ReconPeriods builds them. The week select IS
-                     `from`, following the month through linked-select.js as the
-                     area follows the site; the request works out the week's
-                     end (BalancePreviewRequest::to()). --}}
-                <x-field name="month" label="Month" :choices="$months" :value="old('month', $month)" />
-
-                <x-field name="from" label="Week" linked="month"
+                {{-- A FROM DATE, AND THE WEEK TO DATE FROM IT (ZRP, 7 Oct 2026:
+                     "select a from date, and it auto calculates what the week
+                     to date would be"). Still one week at a time (Ryan, 7 Oct
+                     2026). `to` is shown, worked out as `from` changes
+                     (date-span.js), and NOT trusted: the request works it out
+                     again (BalancePreviewRequest::to()). It replaced the month
+                     and Monday–Sunday week selects of 4 Oct. --}}
+                <x-field name="from" label="From" type="date" :max="$today"
                          :value="old('from', $from)"
-                         :choices="collect($weeks)->flatMap(fn ($ws, $m) => collect($ws)->map(fn ($w) => [
-                             'value' => $w['from'], 'when' => $m, 'label' => $w['label'],
-                         ]))->values()->all()"
-                         info="One week at a time, Monday to Sunday, cut at the month's edge." />
+                         info="Any day up to today. The run covers the week from it: seven days, or up to today if that week is not over yet." />
+
+                <x-field name="to" label="To — week to date" type="date" readonly
+                         follows="from" :span-days="\Modules\StockRecon\Services\ReconPeriods::DAYS" :max="$today"
+                         :value="$to"
+                         info="Worked out from the from date — six days later, or today — not chosen." />
 
                 {{-- What to call it. A clerk previews the same period several
                      times while tightening the caps, and "August Hot Foods,

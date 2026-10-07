@@ -736,6 +736,15 @@ reconciled as stock, on the same reasoning that keeps fuel out of the pack.
 
 ## Running it
 
+**The period is a from date and the week to date from it** (ZRP, 7 Oct 2026:
+*"select a from date, and it auto calculates what the week to date would
+be"*). Any day up to today; the run covers seven days counting it, or up to
+today if that week is not over. The form shows the end read-only as the from
+date changes (`date-span.js`), and `BalancePreviewRequest::to()` works it out
+again (`ReconPeriods::weekTo()`), so no post can ask for more than a week. It
+replaced the month and Monday–Sunday week selects of 4 Oct, and with them the
+cut at the month's edge. It opens on the last full Monday–Sunday week.
+
 1. **Exception report first, on a full month.** Clear the S10a, E1, S1 and U items. The
    unrecorded issues are worth more than the balancing is.
 2. **Preview one area**, caps tight — try `MaxAmendmentPct = 0.50`. Read the

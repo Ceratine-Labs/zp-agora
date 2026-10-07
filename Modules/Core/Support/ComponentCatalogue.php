@@ -461,6 +461,9 @@ class ComponentCatalogue
                     ['step', 'mixed', 'null', 'Input step — required on a decimal, or 1 is assumed'],
                     ['linked', '?string', 'null', 'Name of the select this one follows; needs `when` on the choices'],
                     ['notBefore', '?string', 'null', 'Name of a control whose value this one\'s options may not sort below'],
+                    ['readonly', 'bool', 'false', 'A value worked out, not asked for: shown sunk and dashed'],
+                    ['follows', '?string', 'null', 'Name of a date input this one is worked out from (`date-span.js`), capped at `max` — the stock recon week to date (ZRP, 7 Oct 2026). Display only: the server works it out again'],
+                    ['spanDays', 'int', '1', 'With `follows`: the days the span covers, the first one counted'],
                 ],
             ],
             [

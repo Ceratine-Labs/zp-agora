@@ -27,6 +27,13 @@
     "an invalid form control is not focusable" and no visible message at all,
     because the field is inside a closed <details>. Caught on the stock recon
     caps, 8 September 2026: the Preview button simply did nothing.
+
+    `follows` makes an input a date WORKED OUT from another control's date:
+    `spanDays` days counting that one, capped at `max` — the stock recon "to",
+    a week from its "from" (ZRP, 7 Oct 2026). It is filled in by
+    date-span.js and is display only: whatever reads the form works the end
+    out again, so a page without JavaScript still runs the right period.
+    `readonly` says so to the person.
 --}}
 @props([
     'name',
@@ -42,6 +49,9 @@
     'linked' => null,
     'notBefore' => null,
     'placeholder' => null,
+    'readonly' => false,
+    'follows' => null,
+    'spanDays' => 1,
 ])
 
 @php($id = 'f-'.str_replace(['[', ']', '.'], '-', $name))
@@ -86,7 +96,9 @@
                @if ($min !== null) min="{{ $min }}" @endif
                @if ($max !== null) max="{{ $max }}" @endif
                @if ($step !== null) step="{{ $step }}" @endif
-               @if ($placeholder) placeholder="{{ $placeholder }}" @endif>
+               @if ($placeholder) placeholder="{{ $placeholder }}" @endif
+               @if ($readonly) readonly @endif
+               @if ($follows) data-follows="{{ $follows }}" data-span-days="{{ $spanDays }}" @endif>
     @endif
 
     @if ($help)<p class="field-help">{{ $help }}</p>@endif
