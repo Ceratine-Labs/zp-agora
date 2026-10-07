@@ -69,12 +69,16 @@ for file in $procs; do
     if grep -qiE '@FiltersJson' "$file"; then
         code=$(perl -0pe 's{/\*.*?\*/}{}gs; s{--[^\n]*}{}g' "$file")
 
-        if ! printf '%s' "$code" | grep -qF '$.column'; then
+        # A here-string, not `printf | grep -q`: under pipefail grep -q leaves
+        # on its first match, printf dies of SIGPIPE writing the rest, and the
+        # pipeline fails — so a file that DOES read $.column was reported as
+        # not reading it, now and then (7 Oct 2026, under `composer check-fast`).
+        if ! grep -qF '$.column' <<< "$code"; then
             say "$file: declares @FiltersJson but never reads \$.column — over a JSON array OPENJSON's [key] is the index, so the filters silently do nothing. See docs/grid.md."
         fi
 
         # The broken idiom itself, named so the message can point at it.
-        if printf '%s' "$code" | grep -qE '\.\[key\] *='; then
+        if grep -qE '\.\[key\] *=' <<< "$code"; then
             say "$file: keys @FiltersJson on OPENJSON's [key], which over a JSON array is the index (0, 1, 2), not the column name. The column is at \$.column. See docs/grid.md."
         fi
     fi

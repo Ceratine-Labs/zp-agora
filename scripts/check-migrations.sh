@@ -70,9 +70,14 @@ for file in $files; do
     # can name in prose will occur in the prose that names it.
     code=$(perl -0pe 's{/\*.*?\*/}{}gs; s{^\s*(//|\#).*$}{}gm' "$file")
 
-    if printf '%s' "$code" | grep -qE 'naturalKey\('; then
+    # Here-strings and a variable, not `printf | grep -q`: under pipefail
+    # grep -q leaves on its first match, the writer dies of SIGPIPE, and the
+    # pipeline fails — which made this whole check skip, silently, on a file
+    # that DOES call naturalKey() (7 Oct 2026, "printf: write error").
+    if grep -qE 'naturalKey\(' <<< "$code"; then
         # Each naturalKey( ... ) call flattened onto one line, then checked.
-        if printf '%s' "$code" | tr '\n' ' ' | grep -oE "naturalKey\([^)]*\)" | grep -qv 'BranchId'; then
+        calls=$(tr '\n' ' ' <<< "$code" | grep -oE "naturalKey\([^)]*\)")
+        if [ -n "$calls" ] && grep -qv 'BranchId' <<< "$calls"; then
             say "$file: a naturalKey() call omits BranchId. Every unique key in Agora includes the branch column."
         fi
     fi
