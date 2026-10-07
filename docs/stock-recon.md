@@ -130,6 +130,15 @@ the audit-conflict check (F3) does not withdraw the chain for it. What still
 holds a nil chain: a write that cannot be made (a closing below zero, a dormant
 shift moved) and a possible duplicate (D2).
 
+**Not held back is not the same as something to balance (7 Oct 2026).** A
+chain short with no over anywhere — ROOIBOS TEA BAG at branch 17, two shorts of
+one — is held back by nothing and has nothing to balance: balancing moves a
+short onto an over, it never removes one, so each short stays on the shift that
+counted it. The chain row and the chain panel say *Short 2 · nothing to
+balance* (`ChainSummary::verdict()`, one wording for both) where the panel used
+to say *Balanceable*, and the proposals strip counts **Chains to balance** —
+chains with something to write — with the chains not held back beside it.
+
 ### Reset to original — since 7 Oct 2026
 
 Head office balances by hand in PumpIT: the live columns move, the `_Original`

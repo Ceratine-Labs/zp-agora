@@ -93,6 +93,11 @@
      * "45 balanceable" beside "0 to amend" reads as a press that does not
      * work (Ryan, 7 Oct 2026). Reset to original takes the hand balancing off.
      */
+    $toBalance = $run->lines
+        ->filter(fn ($l) => $l->WouldAmend && ! $l->ChainBlocked)
+        ->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)
+        ->count();
+
     $alreadyBalanced = $run->lines
         ->groupBy(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)
         ->filter(fn ($chain) => ! $chain->first()->ChainBlocked
@@ -109,8 +114,13 @@
     <x-statstrip :stats="[
         ['label' => 'Shifts to amend', 'value' => \App\Support\Format::n($run->AmendedRows),
          'note' => \App\Support\Format::n($run->UnitsAmended, 3).' units moved', 'tone' => 'good'],
-        ['label' => 'Chains balanceable', 'value' => \App\Support\Format::n($run->BalanceableChains),
-         'note' => 'of '.\App\Support\Format::n($run->ChainCount)
+        /* Chains with something to WRITE, not chains nothing holds back: a
+           chain short with no over, or one head office already balanced, is
+           not held back and has nothing to balance — and counting those as
+           balanceable is what read as a press that does not work (Ryan,
+           7 Oct 2026, twice). */
+        ['label' => 'Chains to balance', 'value' => \App\Support\Format::n($toBalance),
+         'note' => \App\Support\Format::n($run->BalanceableChains).' not held back'
              .($alreadyBalanced > 0 ? ' · '.\App\Support\Format::n($alreadyBalanced).' already balanced in PumpIT' : ''),
          'tone' => 'good'],
         ['label' => 'Chains reported', 'value' => \App\Support\Format::n($run->BlockedChains), 'tone' => 'serious'],

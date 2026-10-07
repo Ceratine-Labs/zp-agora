@@ -2,6 +2,7 @@
 
 namespace Modules\StockRecon\Services;
 
+use App\Support\Format;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Modules\StockRecon\Models\StockReconRunLine;
@@ -123,23 +124,44 @@ final class ChainSummary
                 'title' => $reason->Outcome.($writes > 0 ? ' — '.$writes.' hand '.($writes === 1 ? 'amendment' : 'amendments').' put back to the counts.' : '')];
         }
 
-        $amend = $this->lines->filter(fn ($l) => $l->WouldAmend)->count();
+        $verdict = self::verdict(
+            (float) $first->ChainNetVar,
+            $this->lines->filter(fn ($l) => $l->WouldAmend)->count(),
+            $this->lines->contains(fn ($l) => abs((float) $l->QtyCloseNew - (float) $l->QtyClose) > 0.0005
+                || abs((float) $l->QtyOpenNew - (float) $l->QtyOpen) > 0.0005),
+        );
 
-        if ($amend > 0) {
-            $short = (float) $first->ChainNetVar < -0.0005;
+        return ['label' => $verdict['label'], 'tone' => $verdict['tone'], 'title' => $verdict['note']];
+    }
 
-            return ['label' => 'Balance '.$amend.' '.($amend === 1 ? 'shift' : 'shifts').($short ? ', short remains' : ''),
-                'tone' => $short ? 'warn' : 'good',
-                'title' => $short ? 'Balanced, and the chain total stays short: it is placed where the counts put it.' : 'Balances to nil.'];
-        }
+    /**
+     * What an UNBLOCKED chain comes to — the one wording the chain row and the
+     * chain panel share (Ryan, 7 Oct 2026, on ROOIBOS TEA BAG: "it says
+     * balanceable but it shows -2 and i can't do anything with it").
+     * "Balanceable" only ever meant "nothing holds it back"; a chain whose
+     * total is short with no over anywhere has NOTHING to balance — balancing
+     * moves a short onto an over, it never removes one — so it says that.
+     *
+     * @return array{label: string, tone: string, hint: ?string, note: string}
+     */
+    public static function verdict(float $total, int $writes, bool $moves): array
+    {
+        $short = $total < -0.0005;
+        $units = Format::n(abs($total), 3);
 
-        $moves = $this->lines->contains(fn ($l) => abs((float) $l->QtyCloseNew - (float) $l->QtyClose) > 0.0005
-            || abs((float) $l->QtyOpenNew - (float) $l->QtyOpen) > 0.0005);
-
-        return $moves
-            ? ['label' => 'Already balanced in PumpIT', 'tone' => 'neutral',
-                'title' => 'The balanced answer is what PumpIT holds: head office balanced it by hand. Reset to original to balance it here.']
-            : ['label' => 'No change', 'tone' => 'neutral', 'title' => 'Nothing to balance.'];
+        return match (true) {
+            $writes > 0 && $short => ['label' => 'Balance '.$writes.' '.($writes === 1 ? 'shift' : 'shifts').', short remains',
+                'tone' => 'warn', 'hint' => 'a short of '.$units.' stays',
+                'note' => 'Balanced; a real short of '.$units.' stays, on the shifts the counts put it on.'],
+            $writes > 0 => ['label' => 'Balance '.$writes.' '.($writes === 1 ? 'shift' : 'shifts'),
+                'tone' => 'good', 'hint' => 'to nil', 'note' => 'Balances to nil. Amend writes it.'],
+            $moves => ['label' => 'Already balanced in PumpIT', 'tone' => 'neutral', 'hint' => 'Reset to original to balance it here',
+                'note' => 'The balanced answer is what PumpIT holds: head office balanced it by hand. Reset to original to balance it here.'],
+            $short => ['label' => 'Short '.$units.' · nothing to balance', 'tone' => 'warn', 'hint' => 'a real loss: no over to set it against',
+                'note' => 'A real loss of '.$units.'. Balancing only moves a short onto an over, and there is no over on this chain, '
+                    .'so each short stays on the shift that counted it. Nothing for Amend to write.'],
+            default => ['label' => 'No change', 'tone' => 'neutral', 'hint' => null, 'note' => 'Nothing to balance.'],
+        };
     }
 
     /** @return Collection<int, string> one tone per shift, in order — the bar under the first cell */

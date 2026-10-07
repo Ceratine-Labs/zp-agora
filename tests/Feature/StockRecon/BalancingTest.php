@@ -756,6 +756,41 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * Ryan, 7 Oct 2026, on ROOIBOS TEA BAG: "it says balanceable but it shows
+     * -2 and i can't do anything with it". Two shorts of one and no over: a
+     * real loss of 2, nothing to set it against, nothing to write. The chain
+     * row and the panel say exactly that instead of "Balanceable".
+     */
+    public function test_a_chain_short_with_no_over_says_there_is_nothing_to_balance(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 0]],
+            '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 2, 1]],
+            '2026-07-19' => [1 => [2, 0, 2, 0], 3 => [2, 0, 1, 0]],
+            '2026-07-20' => [1 => [1, 0, 1, 0], 3 => [1, 0, 1, 0]],
+            '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($run, '2026-07-17', 3);
+
+        $this->assertFalse((bool) $line->ChainBlocked, 'Nothing holds it back…');
+        $this->assertEqualsWithDelta(-2.0, (float) $line->ChainNetVar, 0.001);
+        $this->assertFalse($run->lines->contains(fn ($l) => $l->WouldAmend), '…and there is nothing to write.');
+
+        $chain = ChainSummary::of($run->lines)->first(fn ($c) => $c->first()->StockItemNo === self::DUP_ITEM);
+        $this->assertSame('Short 2.000 · nothing to balance', $chain->state()['label']);
+        $this->assertSame('warn', $chain->state()['tone']);
+
+        $this->actingAs($this->person('admin'))
+            ->get(route('app.stockrecon.line', [$run, $line]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()
+            ->assertSee('Short 2.000 · nothing to balance')
+            ->assertSee('no over to set it against')
+            ->assertDontSee('Balanceable');
+    }
+
+    /**
      * With reset_issues on, the issue goes back to the original too, and comes
      * back on reversal. Off — the default — the issue is left as it stands.
      */

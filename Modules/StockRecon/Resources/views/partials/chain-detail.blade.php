@@ -11,6 +11,16 @@
     HTML rather than JSON. The formatting rules live in App\Support\Format, and
     rebuilding them in JavaScript is how the two drift apart.
 --}}
+@php
+    $verdict = $item?->ChainBlocked
+        ? ['label' => 'Held back', 'tone' => 'serious', 'hint' => 'see why below', 'note' => '']
+        : \Modules\StockRecon\Services\ChainSummary::verdict(
+            (float) ($item?->ChainNetVar ?? 0),
+            $shifts->filter(fn ($s) => (bool) $s->WouldAmend)->count(),
+            $shifts->contains(fn ($s) => abs((float) $s->QtyCloseNew - (float) $s->QtyClose) > 0.0005
+                || abs((float) $s->QtyOpenNew - (float) $s->QtyOpen) > 0.0005),
+        );
+@endphp
 @php($blocks = collect([
     $item?->BlockPossibleDuplicate,
     $item?->BlockPackOver, $item?->BlockNoPosLink,
@@ -64,13 +74,22 @@
          'tone' => (float) ($item?->ChainNetVar ?? 0) > 0.005 ? 'warn' : 'neutral'],
         ['label' => 'Shifts', 'value' => \App\Support\Format::n($item?->ChainShifts),
          'note' => \App\Support\Format::n($item?->ActiveShifts).' active, '.\App\Support\Format::n($item?->DormantShifts).' dormant'],
-        ['label' => 'Chain', 'value' => ($item?->ChainBlocked ? 'Reported' : 'Balanceable'),
-         'tone' => $item?->ChainBlocked ? 'serious' : 'good'],
+        /* What the chain comes to, in the chain row's words (ChainSummary::
+           verdict). It said Balanceable for any chain nothing held back,
+           including one short 2 with no over anywhere, which has nothing to
+           balance (Ryan, 7 Oct 2026). No double quotes in this comment: it
+           sits inside the attribute, and one would end it. */
+        ['label' => 'Chain', 'value' => $verdict['label'], 'note' => $verdict['hint'], 'tone' => $verdict['tone']],
         /* How many different people appear anywhere on this chain. One is a
            chain a single person is answerable for; six is a chain where a
            persistent short is about the item or the process, not a person. */
         ['label' => 'People on it', 'value' => \App\Support\Format::n($item?->DistinctEmployeeSets)],
     ]" />
+
+    {{-- A real short with nothing to set it against says why, in a line. --}}
+    @if (! $item?->ChainBlocked && str_starts_with($verdict['label'], 'Short '))
+        <p class="muted" style="margin:8px 0 0">{{ $verdict['note'] }}</p>
+    @endif
 
     @if ($blocks->isNotEmpty())
         <x-notice tone="stop" title="Why this chain is reported rather than balanced">
