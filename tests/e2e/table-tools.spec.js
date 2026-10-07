@@ -174,6 +174,12 @@ test.describe('pills and paging', () => {
     test('a pill is a filter: one click rescopes, and the heading says so', async ({ page }) => {
         await page.goto('/dev/components');
 
+        // Pills are several at once (7 Oct 2026): from the opening scope,
+        // Blocked is ADDED to Balanced; All, then Blocked, is Blocked alone.
+        await strip(page).locator('.tt-pill', { hasText: 'Blocked' }).click();
+        await expect(strip(page).locator('.tt-pill.is-on')).toHaveText(['Balanced39', 'Blocked7']);
+
+        await strip(page).locator('.tt-pill', { hasText: 'All' }).click();
         await strip(page).locator('.tt-pill', { hasText: 'Blocked' }).click();
 
         await expect(shown(page)).toHaveCount(7);
@@ -186,6 +192,12 @@ test.describe('pills and paging', () => {
         // Seven rows cannot be paged into anything, so the pager takes itself
         // off rather than sitting there saying "1".
         await expect(strip(page).locator('.tt-pager')).toBeHidden();
+
+        // A second pill joins the first; pressing one again takes it out.
+        await strip(page).locator('.tt-pill', { hasText: 'Short' }).click();
+        await expect(shown(page)).toHaveCount(18);
+        await strip(page).locator('.tt-pill', { hasText: 'Blocked' }).click();
+        await expect(shown(page)).toHaveCount(11);
 
         await strip(page).locator('.tt-pill', { hasText: 'All' }).click();
         await expect(shown(page)).toHaveCount(25);

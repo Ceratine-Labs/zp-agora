@@ -413,8 +413,10 @@ each case's table):
 * `?dup=` in the address is the case left open, so a release (which redirects
   back) lands on the case it was pressed on.
 * **On the proposals**, a D1 being taken out and a D2 have their own outcome
-  pills (*Duplicate issue removed*, *Possible duplicate*) and the strip opens on
-  **Balanced and Duplicate issue removed** together. Until this, a D1 that sold
+  pills (*Duplicate issue removed*, *Possible duplicate*). The strip opened on
+  **Balanced and Duplicate issue removed** together until 7 Oct 2026, when Ryan
+  asked for it to open on **All** with the pills **several at once**; the Chain
+  set beside it (Positive, Short, Nil) works the same way. Until this, a D1 that sold
   nothing read as *Dormant* and sat outside the press, so the commit skipped the
   rest of its chain ("write that shift with it").
 * **The chain panel** names a D1 on its chain and links to its case.

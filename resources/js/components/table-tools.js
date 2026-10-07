@@ -971,10 +971,27 @@ class TableTools {
     }
 
     choosePill(column, value) {
-        // One pill at a time. The tick list is still the way to say "these
-        // three"; a pill strip is the way to say "that one", which is the
-        // question it was asked for.
-        column.chosen = value === null ? null : new Set([value]);
+        /*
+         * SEVERAL AT ONCE (Ryan, 7 Oct 2026: "make them multiple
+         * selectable"). A pill toggles itself in or out of the scope; All, or
+         * taking the last one out, is no filter at all — and so is every pill
+         * that has rows lit at once, which is stored as none rather than as a
+         * filter that hides nothing. Until then it was one pill at a time.
+         */
+        if (value === null) {
+            column.chosen = null;
+        } else {
+            const next = new Set(column.chosen ?? []);
+
+            if (next.has(value)) next.delete(value);
+            else next.add(value);
+
+            const present = column.pillButtons
+                .filter(({ button, value: v }) => v !== null && !button.disabled)
+                .map(({ value: v }) => v);
+
+            column.chosen = next.size === 0 || present.every((v) => next.has(v)) ? null : next;
+        }
 
         this.markColumn(column);
         this.markPills(column);

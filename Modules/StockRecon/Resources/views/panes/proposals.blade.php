@@ -17,13 +17,13 @@
     (22 Sep 2026) because a branch-month is thousands of shifts and the browser
     was laying out every one of them.
 
-    The outcome column is a PILL STRIP rather than a tick list, opening scoped
-    to Balanced — same customer, same day. The pills set the same
-    `column.chosen` the tick list set, so scoping to a state disables the rows
-    outside it exactly as any other filter does, and the Amend button's count
-    follows. That is deliberate: opening on Balanced means the press arrives
-    scoped to the shifts that balance clean, and the amber note in the action
-    bar says how many rows the scope is holding back.
+    The outcome column is a PILL STRIP rather than a tick list — same customer,
+    same day. The pills set the same `column.chosen` the tick list set, so
+    scoping to a state disables the rows outside it exactly as any other filter
+    does, and the Amend button's count follows, with the amber note in the
+    action bar saying how many rows a scope is holding back. It opened scoped
+    to Balanced until 7 Oct 2026; it opens on All now, and pills are several
+    at once (Ryan: "default the pills to all, make them multiple selectable").
 --}}
 @php
     $tones = [
@@ -263,13 +263,13 @@
                         <th class="pick"><input type="checkbox" data-check-all aria-label="Select every amendable shift"></th>
                     @endif
                     {{-- Filtered by the pill strip above the table, not by a
-                         tick list in the filter row. `data-tt-pills` is the
-                         pills it opens scoped to — Balanced, and a duplicate
-                         issue taken out, which is written with its chain or
-                         the chain is not written; the order is declared so a run
-                         with no blocked chains still shows "Blocked 0" in the
-                         same place rather than reshuffling the strip. --}}
-                    <th data-tt-pills="{{ $states['balanced'] }}|{{ $states['duplicate'] }}"
+                         tick list in the filter row. It OPENS ON ALL (Ryan,
+                         7 Oct 2026: "default the pills to all"); until then it
+                         opened scoped to Balanced and a duplicate taken out.
+                         Pills are several at once. The order is declared so a
+                         run with no blocked chains still shows "Blocked 0" in
+                         the same place rather than reshuffling the strip. --}}
+                    <th data-tt-pills
                         data-tt-pill-order="{{ $stateOrder }}">Outcome</th>
                     <th>Item</th>
                     {{-- The item's chain total, and a second pill set in the
