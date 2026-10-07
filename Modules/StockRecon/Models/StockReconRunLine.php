@@ -219,6 +219,23 @@ class StockReconRunLine extends BaseModel
         return $at === false ? $this->Outcome : rtrim(substr($this->Outcome, 0, $at));
     }
 
+    /**
+     * Which way the item's chain totals: Positive (more sold or held than it
+     * was ever given — an unrecorded issue), Short (a loss to place), or Nil.
+     * The proposals filter on it (Ryan, 7 Oct 2026: "show only positive
+     * chains or short chains").
+     */
+    public function chainState(): string
+    {
+        $t = (float) $this->ChainNetVar;
+
+        return match (true) {
+            $t > 0.0005 => 'Positive',
+            $t < -0.0005 => 'Short',
+            default => 'Nil',
+        };
+    }
+
     /** The chip tone for that outcome. */
     public function tone(): string
     {

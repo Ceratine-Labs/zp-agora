@@ -36,6 +36,8 @@
  *   <th data-tt-pills="Balanced"                  — this column as a pill strip
  *       data-tt-pill-order="A|B|C">                 above the table, opening on
  *                                                   that value (`A|B`: on both)
+ *   <th data-tt-pills data-tt-pills-join>         — its pills in the strip
+ *                                                   already there, same row
  *   <td data-sort="2026-09-08">8 Sep</td>         — sort and filter on this
  *                                                   instead of the rendered text
  *   <td data-sort="Balanced" data-tone="good">    — and the chip tone its pill
@@ -196,6 +198,9 @@ class TableTools {
                 pillOrder: (th.dataset.ttPillOrder || '').split('|')
                     .map((value) => value.trim()).filter(Boolean),
                 pillButtons: [],
+                // Its pills join the strip a column before it built, in the
+                // same row, rather than stacking a second strip above it.
+                pillJoin: th.dataset.ttPillsJoin !== undefined,
             };
 
             if (!skip) column.type = this.inferType(column);
@@ -666,15 +671,35 @@ class TableTools {
             .filter((value) => !named.includes(value))
             .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-        const strip = document.createElement('div');
-        strip.className = 'tt-pills';
-        strip.setAttribute('role', 'group');
-        strip.setAttribute('aria-label', `Filter by ${column.label}`);
+        /*
+         * JOINED to the strip already there: the stock recon proposals carry a
+         * second set — the chain's total, Positive or Short — and Ryan asked
+         * for it "in the filters row" (7 Oct 2026), not as a second row. A
+         * rule between the sets keeps them readable as two filters.
+         */
+        const container = this.table.closest('.table-block') || this.table.parentElement;
+        const existing = column.pillJoin ? container.querySelector(':scope > .tt-pills') : null;
+        const strip = existing || document.createElement('div');
+
+        if (!existing) {
+            strip.className = 'tt-pills';
+        }
+
+        /*
+         * Each column's caption and pills are one SET, which wraps as a unit:
+         * on a narrower screen the second set drops to the next line whole
+         * rather than leaving its caption stranded at the end of the first.
+         */
+        const set = document.createElement('span');
+        set.className = 'tt-pills-set';
+        set.setAttribute('role', 'group');
+        set.setAttribute('aria-label', `Filter by ${column.label}`);
+        strip.append(set);
 
         const caption = document.createElement('span');
         caption.className = 'tt-pills-label';
         caption.textContent = column.label;
-        strip.append(caption);
+        set.append(caption);
 
         column.pillButtons = [];
 
@@ -700,14 +725,14 @@ class TableTools {
             button.title = count === 1 ? `1 shift · ${label}` : `${count} shifts · ${label}`;
             button.addEventListener('click', () => this.choosePill(column, value));
 
-            strip.append(button);
+            set.append(button);
             column.pillButtons.push({ button, value });
         };
 
         add(null, 'All', 'neutral', this.rows.length);
         named.concat(rest).forEach((value) => add(value, value, tones.get(value) || 'neutral', counts.get(value) || 0));
 
-        (this.table.closest('.table-block') || this.table.parentElement).prepend(strip);
+        if (!existing) container.prepend(strip);
 
         /*
          * The pill the screen opens on. A default this particular run has no

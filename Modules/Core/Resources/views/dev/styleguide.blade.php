@@ -435,6 +435,34 @@
                 </x-table>
             </div>
             <div class="gal-variant">
+                <p class="eyebrow">
+                    <code>data-tt-pills-join</code> — a second pilled column whose pills go in the SAME strip,
+                    as their own set, ruled off from the first; each set wraps as a unit. The two filters AND
+                    together. The stock recon proposals use it for the chain's total beside Outcome
+                </p>
+                <x-table tools id="gal-table-joined"
+                         :procedure="'agora.usp_Cash_GridDailyBanking'" :count="count($fixtures['pagedRows'])">
+                    <x-slot:head>
+                        <tr>
+                            <th data-tt-pills data-tt-pill-order="Balanced|Short|Blocked|Unrecorded issue">State</th>
+                            <th data-tt-pills data-tt-pills-join>Site</th>
+                            <th>Reference</th><th class="num">Declared</th>
+                        </tr>
+                    </x-slot:head>
+                    @foreach ($fixtures['pagedRows'] as $row)
+                        @php($tone = ['Balanced' => 'good', 'Short' => 'warn', 'Blocked' => 'serious', 'Unrecorded issue' => 'crit'][$row['state']])
+                        <tr>
+                            <td data-sort="{{ $row['state'] }}" data-tone="{{ $tone }}">
+                                <x-chip :tone="$tone">{{ $row['state'] }}</x-chip>
+                            </td>
+                            <td>{{ $row['site'] }}</td>
+                            <td class="mono">{{ $row['ref'] }}</td>
+                            <td class="num">{{ \App\Support\Format::r($row['amount']) }}</td>
+                        </tr>
+                    @endforeach
+                </x-table>
+            </div>
+            <div class="gal-variant">
                 <p class="eyebrow">Empty — a designed answer, not a gap</p>
                 <x-table :count="0" empty="The procedure ran and found nothing in this period. That is an answer, not a failure." />
             </div>

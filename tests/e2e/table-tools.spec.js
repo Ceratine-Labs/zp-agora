@@ -285,3 +285,43 @@ test.describe('the reconcile confirmation', () => {
         await expect(signedIn.locator('.swal2-popup')).toBeHidden();
     });
 });
+
+/**
+ * Two pill sets in one strip (`data-tt-pills-join`, 7 Oct 2026). Ryan asked for
+ * the stock recon chain filter "in the filters row": a second set beside
+ * Outcome rather than a second strip. The gallery entry is `#gal-table-joined`
+ * — State, and Site joined to it.
+ */
+test.describe('joined pill sets', () => {
+    test.use(anonymous);
+
+    const JOINED = '#gal-table-joined';
+    const block = (page) => page.locator(JOINED)
+        .locator('xpath=ancestor::div[contains(@class,"table-block")]');
+    const shown = (page) => page.locator(`${JOINED} tbody tr:not(.tt-out):not(.tt-page-out)`);
+
+    test('the second set sits in the same strip, captioned, and the two filters combine', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        await expect(block(page).locator('.tt-pills')).toHaveCount(1);
+        const sets = block(page).locator('.tt-pills-set');
+        await expect(sets).toHaveCount(2);
+        await expect(sets.nth(0).locator('.tt-pills-label')).toHaveText('State');
+        await expect(sets.nth(1).locator('.tt-pills-label')).toHaveText('Site');
+        await expect(sets.nth(1).locator('.tt-pill')).toHaveCount(5);
+
+        // Every fourth row is one site; 16 of 64.
+        await sets.nth(1).locator('.tt-pill', { hasText: 'Total Mkuze' }).click();
+        await expect(shown(page)).toHaveCount(16);
+
+        // And with a state: the two narrow together, not one replacing the other.
+        await sets.nth(0).locator('.tt-pill', { hasText: 'Short' }).click();
+        const both = await shown(page).count();
+        expect(both).toBeGreaterThan(0);
+        expect(both).toBeLessThan(16);
+        for (const text of await shown(page).locator('td:nth-child(2)').allTextContents()) {
+            expect(text.trim()).toBe('Total Mkuze');
+        }
+    });
+});
+

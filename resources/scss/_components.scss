@@ -667,6 +667,11 @@ tr.tt-page-out { display: none; }
   background: var(--surface-2);
 }
 
+/* One column's caption and pills: wraps as a unit. A second set in the same
+   row (`data-tt-pills-join`) is ruled off from the first. */
+.tt-pills-set { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tt-pills-set + .tt-pills-set { padding-left: 12px; margin-left: 6px; border-left: 1px solid var(--line); }
+
 .tt-pills-label {
   font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
   margin-right: 2px;

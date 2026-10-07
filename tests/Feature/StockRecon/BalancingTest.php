@@ -642,6 +642,25 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * Ryan, 7 Oct 2026: "show only positive chains or short chains". Each row
+     * carries its chain's total, filtered as a second pill set in the Outcome
+     * strip. The worked example ends five units short.
+     */
+    public function test_the_proposals_carry_the_chain_total_as_a_second_pill_set(): void
+    {
+        $run = $this->preview();
+        $line = $run->lines->firstWhere('StockItemNo', self::ITEM);
+        $this->assertSame('Short', $line->chainState());
+
+        $this->actingAs($this->person('admin'))
+            ->get(route('app.stockrecon.run', $run))
+            ->assertOk()
+            ->assertSee('data-tt-pills data-tt-pills-join data-tt-pill-order="Positive|Short|Nil">Chain</th>', false)
+            ->assertSee('data-sort="Short"', false)
+            ->assertSee('-5.000');
+    }
+
+    /**
      * With reset_issues on, the issue goes back to the original too, and comes
      * back on reversal. Off — the default — the issue is left as it stands.
      */

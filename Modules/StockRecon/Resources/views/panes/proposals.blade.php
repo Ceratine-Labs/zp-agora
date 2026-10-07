@@ -269,6 +269,12 @@
                     <th data-tt-pills="{{ $states['balanced'] }}|{{ $states['duplicate'] }}"
                         data-tt-pill-order="{{ $stateOrder }}">Outcome</th>
                     <th>Item</th>
+                    {{-- The item's chain total, and a second pill set in the
+                         same row as Outcome: Positive, Short, Nil (Ryan, 7 Oct
+                         2026: "show only positive chains or short chains").
+                         The cell sorts and filters on the state, and shows the
+                         figure. --}}
+                    <th data-tt-pills data-tt-pills-join data-tt-pill-order="Positive|Short|Nil">Chain</th>
                     {{-- `fit-min`: a date is short and must never wrap. Under
                          `fit` the surplus goes to the word columns, and without
                          this the browser squeezed "01 Sep" onto two lines and
@@ -365,6 +371,11 @@
                     <td class="cell-name">
                         {{ $line->itemLabel() }}
                         <br><span class="muted mono" style="font-size:11px">{{ $line->StockItemNo }} · {{ $line->areaLabel() }}</span>
+                    </td>
+                    <td class="num" data-sort="{{ $line->chainState() }}"
+                        data-tone="{{ ['Positive' => 'crit', 'Short' => 'warn'][$line->chainState()] ?? 'neutral' }}"
+                        title="Chain total {{ \App\Support\Format::n($line->ChainNetVar, 3) }}">
+                        {{ $line->chainState() === 'Nil' ? '—' : ($line->chainState() === 'Positive' ? '+' : '').\App\Support\Format::n($line->ChainNetVar, 3) }}
                     </td>
                     <td class="fit-min">{{ $line->TransactionDate->format('d M') }}</td>
                     <td class="num">{{ $line->ShiftNo }}</td>
