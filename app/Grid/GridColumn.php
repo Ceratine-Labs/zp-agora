@@ -40,7 +40,7 @@ final class GridColumn
 
     /** Every format the cell partial knows how to write. */
     public const FORMATS = [
-        'text', 'mono', 'chip', 'bool', 'date', 'datetime',
+        'text', 'mono', 'chip', 'bool', 'date', 'datetime', 'instant',
         'number', 'money', 'rk', 'lk', 'litres', 'cpl', 'pct', 'delta',
     ];
 
@@ -105,7 +105,7 @@ final class GridColumn
 
         return match (true) {
             $this->isNumeric() => 'number',
-            in_array($this->format, ['date', 'datetime'], true) => 'date',
+            in_array($this->format, ['date', 'datetime', 'instant'], true) => 'date',
             in_array($this->format, ['chip', 'bool'], true) => 'set',
             default => 'text',
         };

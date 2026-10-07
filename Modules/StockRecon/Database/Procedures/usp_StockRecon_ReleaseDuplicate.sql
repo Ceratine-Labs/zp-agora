@@ -157,10 +157,10 @@ BEGIN
            the issue before somebody re-keyed it: it is superseded, withdrawn
            by this person with a note saying why, never deleted. */
         UPDATE x SET
-            x.WithdrawnAt  = SYSDATETIME(),
+            x.WithdrawnAt  = SYSUTCDATETIME(),
             x.WithdrawnBy  = @UserId,
             x.WithdrawNote = CONCAT(N'Superseded: released again at issue ', FORMAT(l.QtyIssued, '0.###')),
-            x.UpdatedAt    = SYSDATETIME(),
+            x.UpdatedAt    = SYSUTCDATETIME(),
             x.UpdatedBy    = @UserId
         FROM agora.StockReconDuplicateRelease x WITH (UPDLOCK, HOLDLOCK)
         JOIN @Lines l
@@ -176,7 +176,7 @@ BEGIN
             CreatedAt, CreatedBy)
         SELECT @BranchId, l.AreaNo, l.StockItemNo, l.TransactionDate, l.ShiftNo, l.QtyIssued,
                l.DupTwinDate, l.DupTwinShift, l.DupReason, @Reason, @RunId, l.Id,
-               SYSDATETIME(), @UserId
+               SYSUTCDATETIME(), @UserId
         FROM @Lines l
         WHERE NOT EXISTS (SELECT 1 FROM agora.StockReconDuplicateRelease x WITH (UPDLOCK, HOLDLOCK)
                           WHERE x.BranchId = @BranchId AND x.AreaNo = l.AreaNo AND x.StockItemNo = l.StockItemNo

@@ -70,7 +70,7 @@ class ReconRunGrid extends GridDefinition
             new GridColumn(key: 'CommittedRows', label: 'Stamped', format: 'number', visible: false),
             new GridColumn(key: 'CommittedTotal', label: 'Stamped value', format: 'money', visible: false, total: true),
             new GridColumn(key: 'RunBy', label: 'Run by', sort: 'RunBy'),
-            new GridColumn(key: 'CreatedAt', label: 'Run at', format: 'datetime', sort: 'CreatedAt'),
+            new GridColumn(key: 'CreatedAt', label: 'Run at', format: 'instant', sort: 'CreatedAt'),
             new GridColumn(key: 'PreviewMs', label: 'Took (ms)', format: 'number', visible: false),
             new GridColumn(key: 'StampMode', label: 'Stamp mode', visible: false),
         ];

@@ -3,7 +3,7 @@
 namespace Modules\Recon\Http\Controllers\Concerns;
 
 use App\Support\BranchContext;
-use Illuminate\Support\Carbon;
+use App\Support\BusinessDate;
 use Illuminate\Support\Collection;
 use Modules\Core\Models\Branch;
 
@@ -81,8 +81,8 @@ trait AreaWorkbench
             'branches' => $this->branches(),
             'branchId' => (int) request('branch_id', $context->id() ?? 0),
             'pinned' => $context->isBranchWorkspace(),
-            'from' => request('from', Carbon::today()->subDays($days)->toDateString()),
-            'to' => request('to', Carbon::today()->toDateString()),
+            'from' => request('from', BusinessDate::today()->subDays($days)->toDateString()),
+            'to' => request('to', BusinessDate::today()->toDateString()),
             'stampMode' => config('recon.stamp_mode'),
         ];
     }

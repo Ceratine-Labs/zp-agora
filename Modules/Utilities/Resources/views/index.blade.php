@@ -88,7 +88,7 @@
                              :value="$branchId" />
                 @endif
                 <x-field name="date" label="Day to capture" type="date"
-                         :value="$day->toDateString()" :max="now()->toDateString()"
+                         :value="$day->toDateString()" :max="\App\Support\BusinessDate::today()->toDateString()"
                          info="Today, unless you are catching up. The month shown is this day's month." />
             </div>
             <div class="form-actions">
@@ -133,7 +133,7 @@
                 @endif
 
                 @if ($savedAt !== null)
-                    <p class="field-help" title="{{ $savedAt->format('Y-m-d H:i') }} UTC">
+                    <p class="field-help" title="{{ \App\Support\BusinessDate::show($savedAt) }} SAST">
                         Last recorded through Agora by {{ $lastSave->CreatedByName ?? 'an unknown user' }}
                         {{ $savedAt->diffForHumans() }}.
                     </p>

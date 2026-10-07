@@ -49,7 +49,7 @@ class UserGrid extends GridDefinition
             // over agora.UserPermission, which is the whole of their access.
             new GridColumn(key: 'PermissionCount', label: 'Permissions', format: 'number', sort: 'PermissionCount'),
             new GridColumn(key: 'BranchCount', label: 'Branches', format: 'number', sort: 'BranchCount'),
-            new GridColumn(key: 'LastSignInAt', label: 'Last sign-in', format: 'datetime', sort: 'LastSignInAt'),
+            new GridColumn(key: 'LastSignInAt', label: 'Last sign-in', format: 'instant', sort: 'LastSignInAt'),
             new GridColumn(key: 'Status', label: 'Status', format: 'chip'),
         ];
     }

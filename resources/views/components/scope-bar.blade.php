@@ -42,7 +42,7 @@
             @endif
             <label class="scope-field">
                 <span>As at</span>
-                <input type="date" name="asat" value="{{ request('asat', now()->toDateString()) }}" onchange="this.form.submit()">
+                <input type="date" name="asat" value="{{ request('asat', \App\Support\BusinessDate::today()->toDateString()) }}" onchange="this.form.submit()">
             </label>
             @if (request('ws'))<input type="hidden" name="ws" value="{{ request('ws') }}">@endif
         </form>

@@ -62,10 +62,10 @@ BEGIN
         BEGIN TRANSACTION;
 
         UPDATE agora.StockReconDuplicateRelease
-           SET WithdrawnAt  = SYSDATETIME(),
+           SET WithdrawnAt  = SYSUTCDATETIME(),
                WithdrawnBy  = @UserId,
                WithdrawNote = @Note,
-               UpdatedAt    = SYSDATETIME(),
+               UpdatedAt    = SYSUTCDATETIME(),
                UpdatedBy    = @UserId
         WHERE BranchId = @BranchId AND Id = @ReleaseId AND WithdrawnAt IS NULL;
 

@@ -50,7 +50,7 @@ class BranchGrid extends GridDefinition
             new GridColumn(key: 'SortOrder', label: 'Order', format: 'number', sort: 'SortOrder'),
             new GridColumn(key: 'BrandId', label: 'Brand', format: 'number', sort: 'BrandId', visible: false),
             new GridColumn(key: 'RegionId', label: 'Region', format: 'number', sort: 'RegionId', visible: false),
-            new GridColumn(key: 'CreatedAt', label: 'Created', format: 'datetime', sort: 'CreatedAt', visible: false),
+            new GridColumn(key: 'CreatedAt', label: 'Created', format: 'instant', sort: 'CreatedAt', visible: false),
         ];
     }
 

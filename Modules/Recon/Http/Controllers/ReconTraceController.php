@@ -5,6 +5,7 @@ namespace Modules\Recon\Http\Controllers;
 use App\Exceptions\AgoraProcException;
 use App\Http\Controllers\Controller;
 use App\Support\BranchContext;
+use App\Support\BusinessDate;
 use App\Support\ProcedureService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -59,7 +60,7 @@ class ReconTraceController extends Controller
         // screen rather than assumed: the window is what keeps a LIKE off the
         // whole of a 249 GB statement table, so the reader has to know it is
         // there and be able to widen it deliberately.
-        $to = $request->query('to') ?: Carbon::today()->toDateString();
+        $to = $request->query('to') ?: BusinessDate::today()->toDateString();
         $from = $request->query('from') ?: Carbon::parse($to)->subDays(90)->toDateString();
 
         return view('recon::trace', [

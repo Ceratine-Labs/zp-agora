@@ -1506,7 +1506,7 @@ BEGIN
         emp.EmployeeNames,
         ISNULL(emp.EmployeeCount, 0),
 
-        SYSDATETIME(), @UserId
+        SYSUTCDATETIME(), @UserId
     FROM #apply a
     /* OUTER APPLY, NOT A JOIN: STK_StockMaster is keyed by branch AND
        Location, and a join on the item alone multiplies the shift ON AN
@@ -1561,7 +1561,7 @@ BEGIN
         r.DuplicatesClear   = t.DuplicatesClear,
         r.DuplicatesPossible = t.DuplicatesPossible,
         r.AuditRows         = t.AuditRows,
-        r.UpdatedAt         = SYSDATETIME(),
+        r.UpdatedAt         = SYSUTCDATETIME(),
         r.UpdatedBy         = @UserId
     FROM agora.StockReconRun r
     CROSS JOIN (

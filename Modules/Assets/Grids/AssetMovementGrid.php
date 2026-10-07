@@ -55,7 +55,7 @@ class AssetMovementGrid extends GridDefinition
             new GridColumn(key: 'CapturedBy', label: 'Captured by'),
             new GridColumn(key: 'BranchName', label: 'Belongs to', visible: false, filter: 'none'),
             new GridColumn(key: 'ReverseReason', label: 'Why reversed', wide: true, visible: false, filter: 'none'),
-            new GridColumn(key: 'CapturedAt', label: 'Captured at', format: 'datetime', visible: false, filter: 'none'),
+            new GridColumn(key: 'CapturedAt', label: 'Captured at', format: 'instant', visible: false, filter: 'none'),
         ];
     }
 

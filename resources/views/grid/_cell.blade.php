@@ -51,7 +51,11 @@
 @elseif ($column->format === 'date')
     <span class="mono">{{ \Illuminate\Support\Carbon::parse((string) $value)->toDateString() }}</span>
 @elseif ($column->format === 'datetime')
+    {{-- A wall-clock time as stored: PumpIT's own, South African already. --}}
     <span class="mono">{{ \Illuminate\Support\Carbon::parse((string) $value)->format('Y-m-d H:i') }}</span>
+@elseif ($column->format === 'instant')
+    {{-- A time Agora stamped, in UTC, shown on the customer's clock (7 Oct 2026). --}}
+    <span class="mono">{{ \App\Support\BusinessDate::show($value) }}</span>
 @elseif ($column->format === 'bool')
     <x-chip :tone="$value ? 'good' : 'neutral'">{{ $value ? 'Yes' : 'No' }}</x-chip>
 @elseif ($column->format === 'chip')

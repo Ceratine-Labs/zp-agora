@@ -173,7 +173,7 @@ BEGIN
         CASE WHEN ABS(r.NewIssued - r.PriorIssued) > @eps THEN r.PriorIssued END,
         CASE WHEN ABS(r.NewIssued - r.PriorIssued) > @eps THEN r.NewIssued END,
         @StampMode, 'active',
-        SYSDATETIME(), @UserId
+        SYSUTCDATETIME(), @UserId
     FROM #reset r
     WHERE r.SkipReason IS NULL;
 
@@ -192,7 +192,7 @@ BEGIN
     UPDATE rl
        SET rl.CommitState = CASE WHEN r.SkipReason IS NULL THEN 'committed' ELSE 'skipped' END,
            rl.BlockReason = r.SkipReason,
-           rl.UpdatedAt   = SYSDATETIME(),
+           rl.UpdatedAt   = SYSUTCDATETIME(),
            rl.UpdatedBy   = @UserId
     FROM agora.StockReconRunLine rl
     JOIN #reset r ON r.Id = rl.Id
@@ -203,11 +203,11 @@ BEGIN
            SET [Status]       = 'committed',
                CommitKind     = 'reset',
                StampMode      = @StampMode,
-               CommittedAt    = SYSDATETIME(),
+               CommittedAt    = SYSUTCDATETIME(),
                CommittedBy    = @UserId,
                CommittedRows  = @Written,
                CommittedUnits = (SELECT ISNULL(SUM(ABS(NewClose - PriorClose)), 0) FROM #reset WHERE SkipReason IS NULL),
-               UpdatedAt      = SYSDATETIME(),
+               UpdatedAt      = SYSUTCDATETIME(),
                UpdatedBy      = @UserId
         WHERE BranchId = @BranchId AND Id = @RunId;
 

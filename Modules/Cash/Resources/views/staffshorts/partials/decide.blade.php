@@ -134,7 +134,7 @@
             </x-slot:head>
             @foreach ($trail as $e)
                 <tr>
-                    <td>{{ \Illuminate\Support\Carbon::parse($e->CreatedAt)->format('j M Y H:i') }}</td>
+                    <td>{{ \App\Support\BusinessDate::show($e->CreatedAt, 'j M Y H:i') }}</td>
                     <td>{{ $e->Event }}</td>
                     <td>{{ $e->ByUser ?? \App\Support\Format::NOTHING }}</td>
                     <td>{{ $e->Event === 'posted' ? 'till '.$e->TillNo.', shift '.$e->ShiftNo.', '.$day($e->TransactionDate) : ($e->Note ?? '') }}</td>

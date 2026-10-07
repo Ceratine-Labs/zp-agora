@@ -321,7 +321,7 @@ BEGIN
         CASE WHEN c.QtyIssuedNew IS NOT NULL THEN CONVERT(decimal(18,3), ISNULL(l.QtyIssued, 0)) END,
         c.QtyIssuedNew,
         @StampMode, 'active',
-        SYSDATETIME(), @UserId
+        SYSUTCDATETIME(), @UserId
     FROM #cand c
     JOIN agora.vw_StockReconLine l
       ON l.BranchId = @BranchId
@@ -355,7 +355,7 @@ BEGIN
     UPDATE rl
        SET rl.CommitState = 'committed',
            rl.BlockReason = NULL,
-           rl.UpdatedAt   = SYSDATETIME(),
+           rl.UpdatedAt   = SYSUTCDATETIME(),
            rl.UpdatedBy   = @UserId
     FROM agora.StockReconRunLine rl
     JOIN #cand c ON c.Id = rl.Id
@@ -364,7 +364,7 @@ BEGIN
     UPDATE rl
        SET rl.CommitState = 'skipped',
            rl.BlockReason = c.SkipReason,
-           rl.UpdatedAt   = SYSDATETIME(),
+           rl.UpdatedAt   = SYSUTCDATETIME(),
            rl.UpdatedBy   = @UserId
     FROM agora.StockReconRunLine rl
     JOIN #cand c ON c.Id = rl.Id
@@ -399,11 +399,11 @@ BEGIN
            SET [Status]       = 'committed',
                CommitKind     = NULL,
                StampMode      = @StampMode,
-               CommittedAt    = SYSDATETIME(),
+               CommittedAt    = SYSUTCDATETIME(),
                CommittedBy    = @UserId,
                CommittedRows  = @Written,
                CommittedUnits = @Units,
-               UpdatedAt      = SYSDATETIME(),
+               UpdatedAt      = SYSUTCDATETIME(),
                UpdatedBy      = @UserId
         WHERE BranchId = @BranchId AND Id = @RunId;
     END

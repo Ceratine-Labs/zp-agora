@@ -84,6 +84,13 @@ class AuditTrailTest extends TestCase
         $this->assertSame("Stock recon run {$a->RunId}", $row->Ref);
         $this->assertSame('STK_StockReconLine', $row->PumpItTable);
         $this->assertSame($a->State, $row->State);
+
+        // Stored on UTC since v1__14po, shown in SAST like every other ledger:
+        // the server's own offset added, never the raw stamp.
+        $offset = (int) $this->db()->selectOne('SELECT DATEPART(tzoffset, SYSDATETIMEOFFSET()) AS o')->o;
+        // Within a second: the view rounds to datetime2(0), strtotime truncates.
+        $this->assertEqualsWithDelta(strtotime((string) $a->CreatedAt) + $offset * 60, strtotime((string) $row->ChangedAt), 1,
+            'The stock recon ledger is converted to SAST like the others.');
     }
 
     public function test_the_report_answers_newest_first_and_counts_what_it_holds(): void

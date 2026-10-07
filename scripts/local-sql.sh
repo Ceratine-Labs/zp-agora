@@ -16,18 +16,33 @@
 #   scripts/local-sql.sh down     stop it (the volume survives)
 #   scripts/local-sql.sh status   is it up, and what is in it
 #   scripts/local-sql.sh destroy  stop it and delete the volume
+#   scripts/local-sql.sh recreate rebuild the container on the volume it already
+#                                 has — to pick up a setting fixed at creation (TZ)
 #
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
 NAME="${AGORA_SQL_CONTAINER:-agora-sql}"
-VOLUME="${NAME}-data"
+VOLUME="${AGORA_SQL_VOLUME:-${NAME}-data}"
 IMAGE="mcr.microsoft.com/mssql/server:2022-latest"
 PORT="$(grep -E '^AGORA_DB_PORT=' .env 2>/dev/null | cut -d= -f2 || echo 1433)"
 PORT="${PORT:-1433}"
 
 sa_password() {
     grep -E '^AGORA_DB_PASSWORD=' .env 2>/dev/null | cut -d= -f2-
+}
+
+# The container, on a given volume. Everything fixed at creation is here.
+#
+# TZ: the customer's instance runs South African time, and so does the
+# application (config/app.php). A UTC container makes every SYSDATETIME() two
+# hours behind PHP's now() — locally only (7 Oct 2026).
+run_container() {
+    docker run -d --name "$NAME" \
+        -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=$(sa_password)" -e MSSQL_PID=Developer \
+        -e TZ=Africa/Johannesburg \
+        -p "${PORT}:1433" -v "${1}:/var/opt/mssql" \
+        --restart unless-stopped "$IMAGE" >/dev/null
 }
 
 sql() {
@@ -45,14 +60,17 @@ up)
 
     if [ -z "$(docker ps -aq -f name="^${NAME}$")" ]; then
         docker volume create "$VOLUME" >/dev/null
-        docker run -d --name "$NAME" \
-            -e ACCEPT_EULA=Y -e "MSSQL_SA_PASSWORD=$PW" -e MSSQL_PID=Developer \
-            -p "${PORT}:1433" -v "${VOLUME}:/var/opt/mssql" \
-            --restart unless-stopped "$IMAGE" >/dev/null
+        run_container "$VOLUME"
         echo "Created ${NAME} on port ${PORT}."
     else
         docker start "$NAME" >/dev/null
         echo "Started ${NAME}."
+        # A container made before 7 Oct 2026 runs UTC. Its environment is
+        # fixed at creation, so the fix is to recreate it on its own volume.
+        if ! docker inspect "$NAME" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -q '^TZ=Africa/Johannesburg$'; then
+            echo "WARNING: ${NAME} runs UTC, the application South African time. Recreate it (the data stays):" >&2
+            echo "  scripts/local-sql.sh recreate" >&2
+        fi
     fi
 
     printf 'Waiting for SQL Server'
@@ -126,6 +144,23 @@ seed-branches)
     # Copy the real branch rows into the stub, so a local BranchSeeder run and
     # the vw_Branch view see what production sees. A read of 31 rows.
     php artisan agora:sync-local-branches
+    ;;
+
+recreate)
+    # On the volume the container HAS, read off it — not on ${VOLUME}. The
+    # container on Ryan's machine predates this script's naming and mounts
+    # agora-mssql-data; `docker rm -f && up` mounted a new, empty
+    # agora-sql-data instead and the databases seemed gone (7 Oct 2026). They
+    # were not: a named volume outlives its container.
+    vol="$(docker inspect "$NAME" --format '{{range .Mounts}}{{if eq .Destination "/var/opt/mssql"}}{{.Name}}{{end}}{{end}}' 2>/dev/null)"
+    if [ -z "$vol" ]; then
+        echo "No ${NAME} container to recreate — run: scripts/local-sql.sh up" >&2
+        exit 1
+    fi
+    docker rm -f "$NAME" >/dev/null
+    run_container "$vol"
+    echo "Recreated ${NAME} on volume ${vol}."
+    exec "$0" up
     ;;
 
 down)

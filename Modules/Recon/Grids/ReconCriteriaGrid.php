@@ -81,7 +81,7 @@ class ReconCriteriaGrid extends GridDefinition
 
             new GridColumn(key: 'Reason', label: 'Why', wide: true, sort: 'Reason'),
             new GridColumn(key: 'ChangedBy', label: 'Changed by', sort: 'ChangedBy'),
-            new GridColumn(key: 'ChangedAt', label: 'Changed', format: 'datetime', sort: 'ChangedAt'),
+            new GridColumn(key: 'ChangedAt', label: 'Changed', format: 'instant', sort: 'ChangedAt'),
         ];
     }
 

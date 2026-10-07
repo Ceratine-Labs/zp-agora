@@ -3,6 +3,7 @@
 namespace Modules\Cash\Support;
 
 use App\Support\BranchContext;
+use App\Support\BusinessDate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -38,7 +39,7 @@ final class DropSafeScope
         $days = max(1, (int) config('cash.dropsafe.default_days', 14));
         $max = max(1, (int) config('cash.dropsafe.max_days', 93));
 
-        $to = self::date($request->input('date_to')) ?? Carbon::today()->toDateString();
+        $to = self::date($request->input('date_to')) ?? BusinessDate::today()->toDateString();
         $from = self::date($request->input('date_from')) ?? Carbon::parse($to)->subDays($days - 1)->toDateString();
 
         if ($from > $to) {

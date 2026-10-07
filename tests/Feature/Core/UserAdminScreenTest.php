@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Core;
 
+use App\Support\BusinessDate;
 use App\Support\ProcedureService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -476,7 +477,8 @@ class UserAdminScreenTest extends TestCase
         $this->actingAs($this->person('admin'))
             ->get(route('app.setup.users.show', ['user' => $subject->Id]))
             ->assertOk()
-            ->assertSee($subject->fresh()->LastSignInAt->format('Y-m-d H:i'));
+            // On the customer's clock: stored UTC, shown SAST (7 Oct 2026).
+            ->assertSee(BusinessDate::show($subject->fresh()->LastSignInAt));
     }
 
     /**

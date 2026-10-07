@@ -3,6 +3,7 @@
 namespace Modules\Cash\Services;
 
 use App\Exceptions\AgoraProcException;
+use App\Support\BusinessDate;
 use App\Support\ProcedureService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -38,7 +39,7 @@ class DeductionService
      */
     public function defaultPeriod(): array
     {
-        $last = Carbon::today()->subMonthNoOverflow();
+        $last = BusinessDate::today()->subMonthNoOverflow();
 
         return [$last->copy()->startOfMonth(), $last->copy()->endOfMonth()];
     }

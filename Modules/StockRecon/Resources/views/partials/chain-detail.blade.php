@@ -295,7 +295,7 @@
                         </x-chip>
                         @if ($shift->ReleaseId)
                             <br>Released by {{ $shift->ReleasedBy ?? 'somebody' }},
-                            {{ \Illuminate\Support\Carbon::parse($shift->ReleasedAt)->format('d M H:i') }}: {{ $shift->ReleaseReason }}
+                            {{ \App\Support\BusinessDate::show($shift->ReleasedAt, 'd M H:i') }}: {{ $shift->ReleaseReason }}
                             @if ((int) $shift->ReleaseId !== (int) $shift->DupReleaseId) — since this preview; preview again. @endif
                             @include('stockrecon::partials.duplicate-release', [
                                 'run' => $run, 'withdraw' => (int) $shift->ReleaseId, 'summary' => $what,

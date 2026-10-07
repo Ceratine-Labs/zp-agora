@@ -3,6 +3,7 @@
 namespace App\Grid\Export;
 
 use App\Grid\GridColumn;
+use App\Support\BusinessDate;
 use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -129,12 +130,13 @@ final class XlsxWriter
                     $column->isNumeric() => 'number',
                     $column->format === 'date' => 'date',
                     $column->format === 'datetime' => 'datetime',
+                    $column->format === 'instant' => 'instant',
                     default => 'text',
                 },
                 'style' => match (true) {
                     $column->isNumeric() => $this->numericStyle($column),
                     $column->format === 'date' => self::STYLE_DATE,
-                    $column->format === 'datetime' => self::STYLE_DATETIME,
+                    in_array($column->format, ['datetime', 'instant'], true) => self::STYLE_DATETIME,
                     default => self::STYLE_TEXT,
                 },
             ];
@@ -206,7 +208,12 @@ final class XlsxWriter
             return '<c r="'.$reference.'" s="'.$cell['style'].'">'.$this->number((float) $raw).'</c>';
         }
 
-        if ($cell['kind'] === 'date' || $cell['kind'] === 'datetime') {
+        if ($cell['kind'] === 'instant') {
+            // Agora's UTC stamp, on the customer's clock like the screen.
+            $raw = BusinessDate::fromUtc($raw)?->format('Y-m-d H:i:s') ?? $raw;
+        }
+
+        if (in_array($cell['kind'], ['date', 'datetime', 'instant'], true)) {
             $serial = $this->serial((string) $raw);
 
             if ($serial !== null) {
@@ -332,7 +339,7 @@ final class XlsxWriter
             $width = match (true) {
                 $column->wide => 42,
                 $column->isNumeric() => max(12, mb_strlen($column->label) + 2),
-                $column->format === 'datetime' => 18,
+                in_array($column->format, ['datetime', 'instant'], true) => 18,
                 default => min(40, max(12, mb_strlen($column->label) + 4)),
             };
 

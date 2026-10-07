@@ -26,6 +26,35 @@ Agora is not a guest in PumpIT any more. It reads the old estate through
 `agora.vw_*` views, which name it across databases (`[PumpIT].dbo.SS_Branch`),
 and it writes to nothing but its own.
 
+### Time: stored in UTC, shown and dated in South Africa (7 Oct 2026)
+
+The customer is on SAST (+02:00), and so is their SQL Server; the application
+runs on UTC. Three rules keep that from showing:
+
+1. **An instant Agora writes is UTC.** Eloquent stamps UTC; a procedure stamps
+   `SYSUTCDATETIME()`, never `SYSDATETIME()` or `GETDATE()` (Recon v1__13py,
+   StockRecon v1__14po; `ReconClockTest` and `StockReconClockTest` read the
+   procedure text). A write into a PumpIT table is the exception: PumpIT stamps
+   its own rows in local time, so `GETDATE()` there is right.
+2. **A business date is South African.** "Today", a default To date, the week
+   to date: `App\Support\BusinessDate::today()`, never `Carbon::today()`,
+   `now()->toDateString()` or a `before_or_equal:today` rule — those are the UTC
+   date, a day behind from midnight to 02:00. `scripts/check-business-date.sh`
+   (in `composer check`) refuses them. In SQL, `CONVERT(date, GETDATE())` is
+   already right on the customer's instance.
+3. **An instant is shown on the customer's clock.** A grid column of Agora's
+   stamps is `format: 'instant'`; a Blade view uses
+   `BusinessDate::show($instant, $pattern)`; the audit trail adds the server's
+   offset. `format: 'datetime'` is for PumpIT's own stamps, which are local
+   already — label them "PumpIT clock" where it matters.
+
+The one deliberate exception: the Product procedures stamp local time
+(`@Now = SYSDATETIME()`). `StockItemCountStat.RefreshedAt` is compared with
+PumpIT's own `STK_StockReconLine.CreateDateTime` to decide whether the rollup
+is stale (`agora:refresh-count-stats --if-stale`), and both must be on the same
+clock; it is shown as stored. Move it to UTC only together with that
+comparison.
+
 ---
 
 ## 2. Procedures

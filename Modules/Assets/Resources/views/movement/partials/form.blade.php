@@ -34,7 +34,7 @@
 
         <div class="field-row">
             <x-field name="MovementType" label="Movement" :choices="$typeChoices" :value="old('MovementType')" />
-            <x-field name="MovementDate" label="Date" type="date" :value="old('MovementDate', now()->toDateString())"
+            <x-field name="MovementDate" label="Date" type="date" :value="old('MovementDate', \App\Support\BusinessDate::today()->toDateString())"
                      info="When it happened. Movements are kept in date order." />
         </div>
 

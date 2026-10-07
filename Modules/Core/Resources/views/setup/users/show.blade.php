@@ -64,7 +64,7 @@
              percentages and has never had a date method. The written form is
              the grid's own (grid/_cell.blade.php), so the list and this screen
              cannot disagree about what a timestamp looks like. --}}
-        ['label' => 'Last sign-in', 'value' => $person->LastSignInAt?->format('Y-m-d H:i') ?? 'Never'],
+        ['label' => 'Last sign-in', 'value' => $person->LastSignInAt ? \App\Support\BusinessDate::show($person->LastSignInAt) : 'Never'],
         ['label' => 'Legacy type', 'value' => $person->LegacyUserType ?? \App\Support\Format::NOTHING],
     ]" />
 

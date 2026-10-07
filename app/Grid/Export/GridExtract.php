@@ -6,6 +6,7 @@ use App\Grid\GridColumn;
 use App\Grid\GridColumnView;
 use App\Grid\GridDefinition;
 use App\Grid\GridQuery;
+use App\Support\BusinessDate;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -111,7 +112,7 @@ final class GridExtract
     {
         $slug = Str::slug($this->definition->title()) ?: 'extract';
 
-        return $slug.'-'.now()->format('Y-m-d').'.'.$extension;
+        return $slug.'-'.BusinessDate::today()->format('Y-m-d').'.'.$extension;
     }
 
     /** The value as it sits in the result set, untouched. */
@@ -149,6 +150,10 @@ final class GridExtract
 
         if ($column->format === 'bool') {
             return $value ? 'Yes' : 'No';
+        }
+
+        if ($column->format === 'instant') {
+            return BusinessDate::show($value);
         }
 
         if (in_array($column->format, ['date', 'datetime'], true)) {

@@ -36,7 +36,7 @@
 
         <div class="field-row">
             <x-field name="CallDate" label="Called in" type="date"
-                     :value="old('CallDate', $editing ? $d($repair->CallDate) : now()->toDateString())"
+                     :value="old('CallDate', $editing ? $d($repair->CallDate) : \App\Support\BusinessDate::today()->toDateString())"
                      info="The day the repair was called in. The comeback rule measures between these." />
             <x-field name="TransactionNo" label="Purchase request" :value="old('TransactionNo', $repair?->TransactionNo)"
                      placeholder="CR000550" help="Optional — can be added later."

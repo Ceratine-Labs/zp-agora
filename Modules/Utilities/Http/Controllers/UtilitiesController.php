@@ -7,6 +7,7 @@ use App\Grid\GridRegistry;
 use App\Grid\GridService;
 use App\Http\Controllers\Controller;
 use App\Support\BranchContext;
+use App\Support\BusinessDate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,7 +47,7 @@ class UtilitiesController extends Controller
         $branchId = $this->branchFor($request, $context);
         $day = $this->day($request->query('date'));
         $monthFrom = $day->copy()->startOfMonth();
-        $monthTo = $day->copy()->endOfMonth()->min(Carbon::today());
+        $monthTo = $day->copy()->endOfMonth()->min(BusinessDate::today());
 
         $capture = ['lines' => collect(), 'meters' => collect(), 'lastSave' => null];
         $month = ['lines' => collect(), 'meters' => collect(), 'lastSave' => null];
@@ -186,7 +187,7 @@ class UtilitiesController extends Controller
      */
     protected function day(mixed $asked): Carbon
     {
-        $today = Carbon::today();
+        $today = BusinessDate::today();
 
         if (! is_string($asked) || preg_match('/^\d{4}-\d{2}-\d{2}$/', $asked) !== 1) {
             return $today;

@@ -147,9 +147,9 @@ BEGIN
 
     UPDATE agora.StockReconAmendment
        SET [State]     = 'reversed',
-           ReversedAt  = SYSDATETIME(),
+           ReversedAt  = SYSUTCDATETIME(),
            ReversedBy  = @UserId,
-           UpdatedAt   = SYSDATETIME(),
+           UpdatedAt   = SYSUTCDATETIME(),
            UpdatedBy   = @UserId
     WHERE BranchId = @BranchId AND RunId = @RunId AND [State] = 'active';
 
@@ -160,16 +160,16 @@ BEGIN
     UPDATE agora.StockReconRunLine
        SET CommitState = 'pending',
            BlockReason = NULL,
-           UpdatedAt   = SYSDATETIME(),
+           UpdatedAt   = SYSUTCDATETIME(),
            UpdatedBy   = @UserId
     WHERE BranchId = @BranchId AND RunId = @RunId AND CommitState = 'committed';
 
     UPDATE agora.StockReconRun
        SET [Status]        = 'reversed',
-           ReversedAt      = SYSDATETIME(),
+           ReversedAt      = SYSUTCDATETIME(),
            ReversedBy      = @UserId,
            ReversalReason  = @Reason,
-           UpdatedAt       = SYSDATETIME(),
+           UpdatedAt       = SYSUTCDATETIME(),
            UpdatedBy       = @UserId
     WHERE BranchId = @BranchId AND Id = @RunId;
 

@@ -7,6 +7,7 @@ use App\Grid\GridDefinition;
 use App\Grid\GridFilter;
 use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
+use App\Support\BusinessDate;
 use Modules\Assets\Services\AssetsService;
 
 /**
@@ -149,6 +150,6 @@ class AssetRegisterGrid extends GridDefinition
             return $asked;
         }
 
-        return now()->toDateString();
+        return BusinessDate::today()->toDateString();
     }
 }
