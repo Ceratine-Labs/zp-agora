@@ -126,7 +126,8 @@ export default function loader() {
             node = document.createElement('span');
             node.className = 'loader-mini';
             node.setAttribute('aria-hidden', 'true');
-            node.append(uniquely(overlay.querySelector('.loader-cup').cloneNode(true)));
+            // `.loader-art`: the cup, or on the stock recon screens the cart.
+            node.append(uniquely(overlay.querySelector('.loader-art').cloneNode(true)));
             el.before(node);
         }, DELAY);
 

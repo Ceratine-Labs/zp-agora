@@ -58,7 +58,7 @@
                    — lotto, airtime and electricity are virtual products with no issues and no count.</p>
             @endif
         </x-slot:info>
-        <form method="POST" action="{{ route('app.stockrecon.preview') }}">
+        <form method="POST" action="{{ route('app.stockrecon.preview') }}" data-loader="Loading the chains and balancing them…">
             @csrf
 
             <div class="field-row">
@@ -193,7 +193,7 @@
                     ]" />
 
             @if ($context->id() !== null)
-                <form method="POST" action="{{ route('app.stockrecon.clear') }}"
+                <form method="POST" action="{{ route('app.stockrecon.clear') }}" data-loader="Clearing previews…"
                       data-confirm="Discard every preview you have made for this site?"
                       data-confirm-text="Previews only. Nothing in PumpIT is affected — a preview is a record of a read — and any run you have committed is kept."
                       data-confirm-action="Discard previews" data-confirm-danger>

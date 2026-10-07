@@ -145,6 +145,7 @@
     @can('stockrecon.runs.execute')
         @if ($run->isOpen())
             <form method="POST" action="{{ route('app.stockrecon.reset', $run) }}" id="reset-{{ $run->Id }}"
+                  data-loader="Putting the original counts back, then balancing again…"
                   data-confirm="{{ $stampMode === 'live' ? 'Reset these shifts to the original counts in PumpIT?' : 'Record a reset to the original counts?' }}"
                   data-confirm-text="{{ $stampMode === 'live'
                       ? 'Every shift on this run whose '.(config('stockrecon.reset_issues') ? 'open, issue or close' : 'open or close').' differs from the staff\'s original is set back to it in STK_StockReconLine — head office\'s hand balancing comes off. A chain held by a possible duplicate is left alone. Each row\'s prior is recorded, so reversing this run puts it all back. The same window is then previewed again, to balance from.'
@@ -157,6 +158,7 @@
     @endcan
 
     <form method="POST" action="{{ route('app.stockrecon.commit', $run) }}" id="commit-{{ $run->Id }}"
+          data-loader="{{ $stampMode === 'live' ? 'Amending in PumpIT…' : 'Recording the amendments…' }}"
           {{-- Names the table so the confirmation can say out loud that a
                column filter is holding rows back. Silent when none is. --}}
           data-confirm-filtered="stockrecon-lines-{{ $run->Id }}"
@@ -497,6 +499,7 @@
     @if ($run->isCommitted())
         <footer class="run-actions">
             <form method="POST" action="{{ route('app.stockrecon.reverse', $run) }}" class="reverse-form"
+                  data-loader="Reversing…"
                   data-confirm="Reverse run #{{ $run->Id }}?"
                   data-confirm-text="Every shift this run amended goes back to the counts it held before — the prior pair recorded per row, not the original counts, so an earlier hand amendment is not thrown away."
                   data-confirm-action="Reverse" data-confirm-danger>

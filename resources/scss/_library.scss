@@ -578,7 +578,7 @@ table.gal-props {
   padding: 24px 12px;
 }
 .loader-box { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.loader-cup { width: 88px; height: 88px; overflow: visible; }
+.loader-art { width: 88px; height: 88px; overflow: visible; }
 .loader-label { margin: 0; font-size: 13px; color: var(--ink-2); text-align: center; max-width: 28ch; }
 
 .loader-saucer { fill: var(--line); }
@@ -621,6 +621,66 @@ table.gal-props {
   .loader-steam path { opacity: .6; }
 }
 
+/* <x-loader variant="cart">: the inventory loader on the stock recon screens
+   (ZP, 7 Oct 2026). Same 2.8 s clock as the cup:
+     0–24%   the first carton drops in and bounces; the cart dips under it
+     18–42%  the second
+     36–60%  the third, on top of the first
+     60–86%  loaded
+     86–100% unloaded, ready for the next
+   The wheels turn the whole time. */
+.loader-frame {
+  fill: none; stroke: var(--ink-2); stroke-width: 4; stroke-linejoin: round; stroke-linecap: round;
+}
+.loader-basket { fill: var(--surface-2); opacity: .92; }
+.loader-mesh { fill: none; stroke: var(--line); stroke-width: 2.5; }
+.loader-carton rect { fill: var(--carton); stroke: var(--carton-edge); stroke-width: 1.5; }
+.loader-tape { fill: none; stroke: var(--carton-tape); stroke-width: 5; }
+.loader-flap { fill: none; stroke: var(--carton-edge); stroke-width: 1.2; opacity: .7; }
+.loader-wheel circle { fill: var(--surface); stroke: var(--ink-2); stroke-width: 4; }
+.loader-wheel path { fill: none; stroke: var(--ink-2); stroke-width: 2.5; stroke-linecap: round; }
+
+.loader-wheel { transform-box: fill-box; transform-origin: center; animation: loader-spin 1s linear infinite; }
+.loader-cart-body { animation: loader-dip 2.8s ease-in-out infinite; }
+.loader-carton-1 { animation: loader-drop-1 2.8s ease-in infinite; }
+.loader-carton-2 { animation: loader-drop-2 2.8s ease-in infinite; }
+.loader-carton-3 { animation: loader-drop-3 2.8s ease-in infinite; }
+
+@keyframes loader-spin { to { transform: rotate(360deg); } }
+@keyframes loader-dip {
+  0%, 13%, 21%, 31%, 39%, 49%, 57%, 100% { transform: translateY(0); }
+  17%, 35%, 53% { transform: translateY(2px); }
+}
+@keyframes loader-drop-1 {
+  0%       { transform: translateY(-80px); opacity: 0; }
+  4%       { opacity: 1; }
+  16%      { transform: translateY(0); }
+  20%      { transform: translateY(-5px); }
+  24%, 86% { transform: translateY(0); opacity: 1; }
+  100%     { transform: translateY(0); opacity: 0; }
+}
+@keyframes loader-drop-2 {
+  0%, 18%  { transform: translateY(-80px); opacity: 0; }
+  22%      { opacity: 1; }
+  34%      { transform: translateY(0); }
+  38%      { transform: translateY(-5px); }
+  42%, 86% { transform: translateY(0); opacity: 1; }
+  100%     { transform: translateY(0); opacity: 0; }
+}
+@keyframes loader-drop-3 {
+  0%, 36%  { transform: translateY(-80px); opacity: 0; }
+  40%      { opacity: 1; }
+  52%      { transform: translateY(0); }
+  56%      { transform: translateY(-5px); }
+  60%, 86% { transform: translateY(0); opacity: 1; }
+  100%     { transform: translateY(0); opacity: 0; }
+}
+
+/* Still: a loaded cart, wheels at rest, and the words. */
+@media (prefers-reduced-motion: reduce) {
+  .loader-wheel, .loader-cart-body, .loader-carton { animation: none; }
+}
+
 /* The page-level wait. Over everything, because a navigation is under way and
    a second press would be a second run; the backdrop lets the page show
    through so it reads as "this page, busy" rather than a new screen. */
@@ -632,7 +692,7 @@ table.gal-props {
     background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
     box-shadow: var(--shadow-pop); padding: 22px 28px 18px;
   }
-  .loader-cup { width: 112px; height: 112px; }
+  .loader-art { width: 112px; height: 112px; }
   .loader-label { font-size: 14px; color: var(--ink); }
 }
 .loader-overlay[hidden] { display: none; }
@@ -643,5 +703,5 @@ table.gal-props {
 /* In front of a line that already says what is happening. */
 .loader-mini {
   display: inline-flex; vertical-align: middle; margin-right: 8px;
-  .loader-cup { width: 30px; height: 30px; }
+  .loader-art { width: 30px; height: 30px; }
 }

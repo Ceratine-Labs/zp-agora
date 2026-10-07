@@ -70,9 +70,12 @@
     </div>
 </footer>
 
-{{-- The page's one coffee cup, hidden until a wait is long enough to show
-     (loader.js). Every other cup on the page is a clone of this one. --}}
-<x-loader overlay />
+{{-- The page's one loader, hidden until a wait is long enough to show
+     (loader.js). Every other one on the page is a clone of it. The coffee cup,
+     or the variant config('agora.loaders') names for this route — the stock
+     recon screens load a shopping cart (ZP, 7 Oct 2026). --}}
+@php($loaderVariant = collect(config('agora.loaders', []))->first(fn ($variant, $pattern) => request()->routeIs($pattern), 'cup'))
+<x-loader overlay :variant="$loaderVariant" />
 
 </body>
 </html>

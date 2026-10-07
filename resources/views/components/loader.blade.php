@@ -1,5 +1,7 @@
 {{--
-    The wait, drawn as a cup of coffee — ZP's ask through Ryan, 23 Sep 2026.
+    The wait, drawn as a cup of coffee — ZP's ask through Ryan, 23 Sep 2026 —
+    or, on the stock recon screens, as a shopping cart being loaded with
+    cartons (`variant="cart"`, ZP's ask, 7 Oct 2026).
 
     The cup fills, the ZRP badge sits on its face, steam rises once it is full,
     and it drains and fills again until the thing being waited for finishes.
@@ -24,6 +26,11 @@
 @props([
     'label' => 'Working…',
     'overlay' => false,
+    // 'cup' everywhere; 'cart' on the stock recon screens — cartons dropping
+    // into a shopping cart with the ZRP badge on its side (ZP's ask, 7 Oct
+    // 2026: "a package or a shopping cart loader for the stock recon"). The
+    // app shell picks it from config('agora.loaders') by route.
+    'variant' => 'cup',
 ])
 
 @php($uid = 'ldr-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(6)))
@@ -32,7 +39,59 @@
      @if ($overlay) data-loader-overlay hidden @endif
      role="status" aria-live="polite">
     <div class="loader-box">
-        <svg class="loader-cup" viewBox="0 0 160 160" aria-hidden="true" focusable="false">
+        @if ($variant === 'cart')
+        {{-- One cycle, on the cup's 2.8 s clock: three cartons drop into the
+             cart one after another, each landing with a small bounce and the
+             cart dipping under it; it holds full, then they are gone and the
+             next load starts. The wheels turn throughout. --}}
+        <svg class="loader-art loader-cart" viewBox="0 0 160 160" aria-hidden="true" focusable="false">
+            <defs>
+                <clipPath id="{{ $uid }}-badge">
+                    <circle cx="91" cy="91" r="15" />
+                </clipPath>
+            </defs>
+
+            <ellipse class="loader-saucer" cx="86" cy="147" rx="58" ry="6" />
+
+            <g class="loader-cart-body">
+                <path class="loader-frame" d="M12 32 H28 L40 66" />
+
+                <g class="loader-carton loader-carton-1">
+                    <rect x="48" y="46" width="36" height="42" rx="2" />
+                    <path class="loader-tape" d="M66 46 V60" />
+                    <path class="loader-flap" d="M48 53 H84" />
+                </g>
+                <g class="loader-carton loader-carton-2">
+                    <rect x="88" y="54" width="34" height="34" rx="2" />
+                    <path class="loader-tape" d="M105 54 V66" />
+                    <path class="loader-flap" d="M88 60 H122" />
+                </g>
+                <g class="loader-carton loader-carton-3">
+                    <rect x="60" y="18" width="34" height="28" rx="2" />
+                    <path class="loader-tape" d="M77 18 V30" />
+                    <path class="loader-flap" d="M60 24 H94" />
+                </g>
+
+                <path class="loader-basket" d="M38 66 H142 L131 114 H51 Z" />
+                <path class="loader-mesh" d="M44 90 H136 M68 66 V114 M114 66 V114" />
+                <path class="loader-frame" d="M38 66 H142 L131 114 H51 Z M51 114 L55 124 H128 L131 114" />
+
+                <circle class="loader-badge-ring" cx="91" cy="91" r="16.5" />
+                <image href="{{ asset('images/zrp-logo.png') }}" x="76" y="76" width="30" height="30"
+                       clip-path="url(#{{ $uid }}-badge)" preserveAspectRatio="xMidYMid meet" />
+
+                <g class="loader-wheel">
+                    <circle cx="64" cy="133" r="9" />
+                    <path d="M64 124 V142 M55 133 H73" />
+                </g>
+                <g class="loader-wheel">
+                    <circle cx="120" cy="133" r="9" />
+                    <path d="M120 124 V142 M111 133 H129" />
+                </g>
+            </g>
+        </svg>
+        @else
+        <svg class="loader-art loader-cup" viewBox="0 0 160 160" aria-hidden="true" focusable="false">
             <defs>
                 {{-- The inside of the cup: what the coffee is poured into. --}}
                 <clipPath id="{{ $uid }}-in">
@@ -69,6 +128,7 @@
                 <path d="M98 44 C 90 36, 106 28, 98 18" />
             </g>
         </svg>
+        @endif
         <p class="loader-label" data-loader-label>{{ $label }}</p>
     </div>
 </div>

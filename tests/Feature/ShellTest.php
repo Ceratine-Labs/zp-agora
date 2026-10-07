@@ -104,4 +104,24 @@ class ShellTest extends TestCase
 
         $this->assertSame(0, $stray);
     }
+
+    /**
+     * ZP, 7 Oct 2026: the stock recon screens wait with a shopping cart being
+     * loaded, everything else with the coffee cup — one overlay per page,
+     * chosen by route from config('agora.loaders').
+     */
+    public function test_the_stock_recon_screens_wait_with_the_cart_and_the_rest_with_the_cup(): void
+    {
+        $admin = $this->admin();
+
+        $recon = $this->actingAs($admin)->get(route('app.stockrecon.index'))->assertOk()->getContent();
+        $this->assertSame(1, substr_count($recon, 'data-loader-overlay'), 'One loader per page.');
+        $this->assertStringContainsString('loader-art loader-cart', $recon);
+        $this->assertStringNotContainsString('loader-art loader-cup', $recon);
+        $this->assertStringContainsString('data-loader="Loading the chains and balancing them…"', $recon);
+
+        $home = $this->actingAs($admin)->get('/app')->getContent();
+        $this->assertStringContainsString('loader-art loader-cup', $home);
+        $this->assertStringNotContainsString('loader-cart', $home);
+    }
 }

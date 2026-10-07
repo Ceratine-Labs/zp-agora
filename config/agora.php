@@ -106,4 +106,20 @@ return [
         'pos_landing' => env('MIST_DB_DATABASE', 'MIST_Import'),
         'reporting' => env('ALTERYX_DB_DATABASE', 'Alteryx'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Which loader a screen waits with
+    |--------------------------------------------------------------------------
+    |
+    | <x-loader> is a cup of coffee with the ZRP badge (23 Sep 2026). ZP asked
+    | on 7 Oct 2026 for the stock recon screens to wait with "a package or a
+    | shopping cart" instead: route name pattern => variant. The first match
+    | wins; anything unmatched gets the cup. The app shell reads it.
+    |
+    */
+
+    'loaders' => [
+        'app.stockrecon.*' => 'cart',
+    ],
 ];

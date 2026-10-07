@@ -21,7 +21,7 @@
         <x-slot:actions>
             <a class="btn-ghost" href="{{ route('app.stockrecon.index') }}">Run another</a>
             @unless ($run->isCommitted())
-                <form method="POST" action="{{ route('app.stockrecon.discard', $run) }}"
+                <form method="POST" action="{{ route('app.stockrecon.discard', $run) }}" data-loader="Discarding…"
                       data-confirm="Discard run #{{ $run->Id }}?"
                       data-confirm-text="This preview and its {{ $run->TotalRows }} {{ Str::plural('shift', $run->TotalRows) }} go. Nothing in PumpIT is affected — a preview is a record of a read."
                       data-confirm-action="Discard" data-confirm-danger>

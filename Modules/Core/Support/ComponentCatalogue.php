@@ -669,13 +669,14 @@ class ComponentCatalogue
             [
                 'name' => 'x-loader',
                 'group' => 'Messages',
-                'summary' => 'A wait, drawn as a cup of coffee: it fills, carries the ZRP badge, steams when full and goes round again until the action completes.',
+                'summary' => 'A wait, drawn as a cup of coffee: it fills, carries the ZRP badge, steams when full and goes round again until the action completes. On the stock recon screens, a shopping cart being loaded with cartons instead.',
                 'mockup' => '—',
                 'notes' => 'ZP\'s ask through Ryan, 23 Sep 2026, replacing the busy states. **One per page**: `<x-app-shell>` renders it once as the `overlay`, hidden, and `loader.js` is the one place that decides when a wait is seen — nothing appears under 300 ms, because a cup that flashes on every quick press teaches people to stop looking at it. A screen never writes a second one: it puts `data-loader="What is happening…"` on a form that navigates (shown on submit, cleared by the next page, taken down on a bfcache `pageshow`), or calls `window.Agora.loader` — `show(label)` returns `{update, hide}` for the page-level overlay, `within(el, label)` puts a cup where a fragment will land (the recon centre\'s tabs), `beside(el)` puts a small one in front of a status line that already says what is happening (the Every site runner, whose table filling in IS the progress), and `submitting(form)` is for code that submits a form itself (`confirm-form.js`, whose `form.submit()` fires no event). Clones get their clip-path ids renamed, so a cup never depends on one that is hidden. **Reduced motion** gets a full, still cup and the words — the label carries the meaning, the motion only says "still going". Colours are tokens (`--coffee` `--crema` `--steam` `--backdrop` `--badge`), so both themes are the theme\'s. The badge is `public/images/zrp-logo.png`, copied from ZP-NQL.',
                 'js' => 'loader.js',
                 'props' => [
                     ['label', 'string', "'Working…'", 'What is being waited for'],
                     ['overlay', 'bool', 'false', 'The page-level instance (the shell\'s)'],
+                    ['variant', 'string', "'cup'", "'cart' — cartons dropping into a shopping cart with the ZRP badge; the shell picks it by route from config('agora.loaders') (the stock recon screens, ZP's ask, 7 Oct 2026)"],
                 ],
             ],
             [

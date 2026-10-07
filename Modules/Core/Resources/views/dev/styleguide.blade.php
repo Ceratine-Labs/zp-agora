@@ -856,6 +856,10 @@
                 <x-loader label="Reading the suggestions…" />
             </div>
             <div class="gal-variant">
+                <p class="eyebrow"><code>variant="cart"</code> — the stock recon screens: cartons dropping into a shopping cart</p>
+                <x-loader variant="cart" label="Loading the chains and balancing them…" />
+            </div>
+            <div class="gal-variant">
                 <p class="eyebrow">Try it: the overlay, for three seconds</p>
                 <button type="button" class="btn" onclick="const w = window.Agora.loader.show('Balancing FNB card settlement…'); setTimeout(() => w.hide(), 3000)">Show the overlay</button>
             </div>

@@ -51,6 +51,9 @@
   /* The ZRP badge is printed on white in both themes: it is the customer's
      mark, and its navy ring disappears on a dark ground. */
   --badge:#ffffff;
+  /* The inventory loader (<x-loader variant="cart">, 7 Oct 2026): cartons and
+     their tape. */
+  --carton:#c99a62; --carton-edge:#8f6232; --carton-tape:#e8d2ab;
 
   --font-display:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;
   --font-text:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -71,6 +74,7 @@
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.8);
   --shadow-pop:0 12px 40px -8px rgba(0,0,0,.75);
   --coffee:#8a5530; --crema:#d9a877; --steam:#6d7f85; --backdrop:rgba(8,12,13,.72);
+  --carton:#b8834d; --carton-edge:#e0b47f; --carton-tape:#7a5530;
 }
 
 @media (prefers-color-scheme: dark) {
