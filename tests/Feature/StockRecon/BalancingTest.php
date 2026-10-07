@@ -716,6 +716,46 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * Ryan, 7 Oct 2026: the codes explained in a modal, in plain words for the
+     * people at the sites — not "the client's weekly pack" — opened from the
+     * "i" on the exceptions and from any code badge; the badges in their
+     * colours, the rows washed in theirs.
+     */
+    public function test_the_exceptions_explain_every_code_in_a_modal_opened_from_its_badge(): void
+    {
+        foreach (['exceptions', 'audit'] as $set) {
+            foreach ((array) config('stockrecon.'.$set) as $code => $entry) {
+                foreach (['plain', 'todo', 'who'] as $field) {
+                    $this->assertNotEmpty($entry[$field] ?? null, "{$code} has no {$field}.");
+                    $this->assertStringNotContainsStringIgnoringCase('client', $entry[$field], "{$code} {$field} talks about the client.");
+                }
+            }
+        }
+
+        $this->setCounts('2026-07-19', 1, ['QtyOpen_Original' => 999, 'QtyOpen' => 999]);   // an S10b
+        $run = $this->preview();
+        $this->actingAs($this->person('admin'));
+
+        $html = $this->get(route('app.stockrecon.exceptions', $run))->assertOk()
+            ->assertSee('id="stockrecon-codes"', false)
+            ->assertSee('What the codes mean')
+            ->assertSee('class="info-btn info-btn-modal" data-modal-open="stockrecon-codes"', false)
+            ->assertSee('id="stockrecon-codes-S10a"', false)
+            ->assertSee('id="stockrecon-codes-S12"', false)
+            ->assertDontSee("Codes are the client's weekly pack's")
+            ->getContent();
+
+        $this->assertMatchesRegularExpression('/<button type="button" class="chip \w+ tone-\w+ chip-code"\s+data-modal-open="stockrecon-codes" data-modal-anchor="S10b"/', $html,
+            'A code on the grid is a coloured badge that opens the modal at itself.');
+        $this->assertMatchesRegularExpression('/<tr[^>]*class="is-(crit|serious|warn|matched)"/', $html, 'Rows carry their code\'s colour.');
+
+        // The proposals' code under the outcome is the same badge.
+        $this->get(route('app.stockrecon.run', $run))->assertOk()
+            ->assertSee('data-modal-anchor="S10b"', false)
+            ->assertSee('id="stockrecon-codes"', false);
+    }
+
+    /**
      * With reset_issues on, the issue goes back to the original too, and comes
      * back on reversal. Off — the default — the issue is left as it stands.
      */

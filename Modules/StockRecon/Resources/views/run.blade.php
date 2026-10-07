@@ -91,4 +91,7 @@
     <x-tabs :items="$tabs" :active="$tab" label="Run" style="margin:16px 0" />
 
     @include('stockrecon::panes.'.$tab)
+{{-- What every code means, opened from the "i" on the exceptions and from
+     any code badge on this page (7 Oct 2026). --}}
+@include('stockrecon::partials.codes-modal')
 </x-app-shell>

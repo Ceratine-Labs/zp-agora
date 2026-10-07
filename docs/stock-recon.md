@@ -581,6 +581,18 @@ by how much, on whose authority, or what they were before.
 
 ## The exception classes
 
+**On screen the codes explain themselves (7 Oct 2026).** The people at the
+sites do not know the client's weekly pack, so the run screen carries one
+modal, *What the codes mean* (`partials/codes-modal`), opened from the "i" on
+the exceptions and from every code badge (`partials/code`) — on the
+exceptions grid, under a proposal's outcome and in the chain panel — which
+lands on that code. Each code says what it means, what to do and who does it,
+in plain words: the client's own where its pack defines the code
+(`config('stockrecon.exceptions.*.plain|todo|who')`, and the same for the
+audit). The badges carry their code's colour and the exceptions rows are
+washed in it. It replaced the two folded legend tables and the line that said
+"codes are the client's weekly pack's".
+
 Ranked most serious first, which is also the order the report comes in. A line
 that satisfies several tests is reported under the first it trips. Every test
 reads the **repaired** opening. `config('stockrecon.exceptions')` carries the

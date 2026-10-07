@@ -158,6 +158,7 @@ class ComponentCatalogue
                     ['collapsible', 'bool', 'false', 'Head becomes a <details> toggle'],
                     ['open', 'bool', 'false', 'Which way a collapsible card starts'],
                     ['remember', '?string', 'null', 'disclosure.js key for the open state'],
+                    ['infoModal', '?string', 'null', 'The id of a modal the "i" beside the title opens instead of the info popover — for an explanation too long for one (the stock recon codes, 7 Oct 2026)'],
                     ['actions', 'slot', '—', 'Controls in the head, pushed right'],
                     ['foot', 'slot', '—', 'A runbar or toolbar under the body'],
                 ],
@@ -235,7 +236,7 @@ class ComponentCatalogue
                 'mockup' => 'dg',
                 'notes' => 'Feature-rules §3 in one component, and a screen gets all of it by passing `$grid`. '
                     .'**Everything it draws is declared on the GridDefinition, never in the screen.** '
-                    .'A column with `link: true` is rendered as an anchor to `rowUrl($row)` — that is §3.7 for the row\'s OWN resource, and the two together are what makes a list openable. '
+                    .'A column with `link: true` is rendered as an anchor to `rowUrl($row)` — that is §3.7 for the row\'s OWN resource, and the two together are what makes a list openable. '.'**`rowClass($row)`** on the definition gives a row its tone wash (`is-crit`, `is-serious`, `is-warn`, `is-matched`), as the reconcile tables carry — the stock recon exceptions colour each row by its code (7 Oct 2026). '
                     .'`rowActions($row)` adds a trailing column of buttons, and an action the caller may not perform is simply absent from the array, which is §4\'s "a control the user cannot use is not rendered". '
                     .'A value naming some OTHER record stays in the grid\'s own `_cells` partial, because only the screen knows which values do that. '
                     .'Both the table and the phone cards read the same two hooks. '
@@ -287,7 +288,12 @@ class ComponentCatalogue
                     .'**Fetched EVERY open**, unlike `row-detail.js`\'s fetch-once — the reason to open an edit '
                     .'form is that what you saw last time may no longer be there. '
                     .'**When not to use it:** a modal interrupts. A row that merely wants to show more of itself '
-                    .'belongs in `data-row-detail`, which expands in place and keeps the list visible.',
+                    .'belongs in `data-row-detail`, which expands in place and keeps the list visible. '
+                    .'**`data-modal-anchor="X"`** beside `data-modal-open` opens the dialog at the element `#{id}-X`, '
+                    .'marked `is-target` — a stock recon code badge opens the codes modal at its own code (7 Oct 2026). '
+                    .'**The title and the close sit in one sticky header** (`.modal-head`); until 7 Oct 2026 the title was '
+                    .'pulled up under a sticky close row whose background painted over it, in every modal. The dialog '
+                    .'is `height: fit-content`, so a short one is short.',
                 'js' => 'modal.js',
                 'props' => [
                     ['id', 'string', '—', 'The handle data-modal-open refers to'],
@@ -358,6 +364,7 @@ class ComponentCatalogue
                 'props' => [
                     ['tone', 'string', "'neutral'", 'neutral good warn serious crit'],
                     ['dot', 'bool', 'true', 'The leading dot'],
+                    ['as', 'string', "'span'", "'button' for a chip somebody presses — the stock recon code badges (7 Oct 2026)"],
                 ],
             ],
             [

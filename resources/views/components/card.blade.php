@@ -25,6 +25,11 @@
     'title' => null,
     'sub' => null,
     'infoWide' => false,
+    // The id of a modal dialog the "i" beside the title opens, in place of
+    // the `info` popover — for an explanation too long for one (the stock
+    // recon codes, 7 Oct 2026). Never write a component tag in a comment
+    // here: Blade compiles it even inside the props array.
+    'infoModal' => null,
     'flush' => false,
     'collapsible' => false,
     'open' => false,
@@ -61,6 +66,12 @@
                         <div class="card-t">
                             <h3>{{ $title }}</h3>
                             <x-info :class="$infoWide ? 'info-wide' : ''" :label="'About '.Str::lower($title)">{{ $info }}</x-info>
+                        </div>
+                    @elseif ($infoModal)
+                        <div class="card-t">
+                            <h3>{{ $title }}</h3>
+                            <button type="button" class="info-btn info-btn-modal" data-modal-open="{{ $infoModal }}"
+                                    aria-label="About {{ Str::lower($title) }}" title="About {{ Str::lower($title) }}"><span aria-hidden="true">i</span></button>
                         </div>
                     @else
                         <h3>{{ $title }}</h3>

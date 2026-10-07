@@ -41,13 +41,32 @@ class StockReconExceptionGrid extends GridDefinition
 
     public function blurb(): ?string
     {
-        return 'Every line the counts or the hand balancing put in question. The codes are the client\'s '
-            .'where the client\'s weekly pack defines the test: S10a/S10b an opening that was not the previous '
-            .'closing, S1 an over of a whole pack, E1 no till sales linked. U rows are stock that entered the '
-            .'store without an issue; F is a data fault; N a count that was never taken; L the residual short '
-            .'that survives balancing and the only class that can carry a charge — "On shift" names who was '
-            .'signed on, and where two were, neither can be held to it alone. Audit is what the hand balancing '
-            .'already in PumpIT did that the client\'s rules do not allow.';
+        return 'Every line the counts or the hand balancing put in question, coloured by its code. Click a code '
+            .'for what it means and what to do. "On shift" names who was signed on; where two were, neither can '
+            .'be held to a short alone.';
+    }
+
+    /** The codes are badges that open the codes modal (partials/codes-modal). */
+    public function cellsPartial(): string
+    {
+        return 'stockrecon::grid._cells';
+    }
+
+    /**
+     * Each row washed in its code's colour, as the proposals' rows are, so a
+     * page of exceptions reads by severity at a glance (Ryan, 7 Oct 2026).
+     */
+    public function rowClass(object $row): ?string
+    {
+        $tone = config('stockrecon.exceptions.'.($row->ExceptionCode ?? '').'.tone');
+
+        return match ($tone) {
+            'crit' => 'is-crit',
+            'serious' => 'is-serious',
+            'warn' => 'is-warn',
+            'good' => 'is-matched',
+            default => null,
+        };
     }
 
     public function columns(): array

@@ -417,7 +417,7 @@
                         data-tone="{{ $line->tone() }}">
                         <x-chip :tone="$line->tone()" :title="$line->Outcome">{{ $line->outcomeLabel() }}</x-chip>
                         @if ($line->ExceptionCode)
-                            <br><span class="drill-line-id">{{ $line->ExceptionCode }}</span>
+                            <br>@include('stockrecon::partials.code', ['code' => $line->ExceptionCode])
                         @endif
                         @if ($line->CommitState === 'skipped')
                             <br><span class="drill-line-id">{{ $line->BlockReason }}</span>

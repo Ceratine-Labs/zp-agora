@@ -210,7 +210,8 @@
         @foreach ($grid->rows as $index => $row)
             @php($url = $expands ? $definition->detailUrl($row) : null)
             @php($rowUrl = $definition->rowUrl($row))
-            <tr @if ($url) data-detail-url="{{ $url }}" @endif>
+            @php($rowClass = $definition->rowClass($row))
+            <tr @if ($url) data-detail-url="{{ $url }}" @endif @if ($rowClass) class="{{ $rowClass }}" @endif>
                 @if ($selectable)
                     <td class="pick">
                         <input type="checkbox" data-check

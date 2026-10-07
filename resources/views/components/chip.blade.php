@@ -12,9 +12,19 @@
     the text says which. Set `dot="false"` where the chip is a plain label
     rather than a state.
 --}}
-@props(['tone' => 'neutral', 'dot' => true])
+@props(['tone' => 'neutral', 'dot' => true, 'as' => 'span'])
 
+{{-- `as="button"`: a chip somebody presses — a stock recon code badge opens
+     the codes modal (7 Oct 2026). Same pill, a real button underneath, so it
+     is focusable and reachable from the keyboard. --}}
+@if ($as === 'button')
+<button type="button" {{ $attributes->merge(['class' => 'chip '.$tone.' tone-'.$tone]) }}>
+    @if ($dot)<span class="dot" aria-hidden="true"></span>@endif
+    {{ $slot }}
+</button>
+@else
 <span {{ $attributes->merge(['class' => 'chip '.$tone.' tone-'.$tone]) }}>
     @if ($dot)<span class="dot" aria-hidden="true"></span>@endif
     {{ $slot }}
 </span>
+@endif

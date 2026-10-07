@@ -226,10 +226,8 @@
                     @if ($shift->IsDormant)<x-chip tone="neutral" :dot="false">dormant</x-chip>@endif
                     @if ($shift->AmendmentState === 'active')<x-chip tone="good" :dot="false">amended</x-chip>@endif
                     @if ($shift->AuditCode)
-                        <x-chip tone="crit" :dot="false"
-                                :title="config('stockrecon.audit.'.$shift->AuditCode.'.label').' — PumpIT holds '.\App\Support\Format::n($shift->QtyOpenNow, 3).' / '.\App\Support\Format::n($shift->QtyCloseNow, 3)">
-                            {{ $shift->AuditCode }}
-                        </x-chip>
+                        @include('stockrecon::partials.code', ['code' => $shift->AuditCode,
+                            'title' => 'PumpIT holds '.\App\Support\Format::n($shift->QtyOpenNow, 3).' / '.\App\Support\Format::n($shift->QtyCloseNow, 3)])
                     @endif
                     {{-- A clear duplicate: the issue it takes out, or why it
                          does not — and its case on the run's panel. --}}

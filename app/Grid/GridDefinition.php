@@ -178,6 +178,16 @@ abstract class GridDefinition
     }
 
     /**
+     * A class for the row's <tr> — the tone wash a screen uses to say what
+     * kind of row it is (`is-crit`, `is-serious`, `is-warn`, `is-matched`),
+     * as the reconcile tables do. Null: a plain row.
+     */
+    public function rowClass(object $row): ?string
+    {
+        return null;
+    }
+
+    /**
      * What a row lets you DO, beyond opening it — rendered as a trailing
      * column of links.
      *

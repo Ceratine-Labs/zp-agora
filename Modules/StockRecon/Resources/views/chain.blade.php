@@ -35,4 +35,7 @@
     <x-card flush>
         @include('stockrecon::partials.chain-detail')
     </x-card>
+{{-- What every code means, opened from the "i" on the exceptions and from
+     any code badge on this page (7 Oct 2026). --}}
+@include('stockrecon::partials.codes-modal')
 </x-app-shell>

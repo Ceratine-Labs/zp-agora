@@ -26,15 +26,20 @@
 
 <dialog {{ $attributes->merge(['class' => 'modal'.($wide ? ' modal-wide' : '')]) }}
         id="{{ $id }}" data-modal aria-labelledby="{{ $id }}-title">
-    <form method="dialog" class="modal-x">
-        <button type="submit" class="iconbtn" aria-label="Close">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-            </svg>
-        </button>
-    </form>
-
-    <h2 class="modal-title" id="{{ $id }}-title">{{ $title }}</h2>
+    {{-- The title and the close in ONE sticky header. They were a sticky close
+         row with the title pulled up under it by a negative margin, and the
+         row's own background painted over the title in every modal (found on
+         the stock recon codes, 7 Oct 2026). --}}
+    <header class="modal-head">
+        <h2 class="modal-title" id="{{ $id }}-title">{{ $title }}</h2>
+        <form method="dialog" class="modal-x">
+            <button type="submit" class="iconbtn" aria-label="Close">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </form>
+    </header>
 
     {{-- Where a fetched body lands. A slot given inline stays put and is used
          as the resting state — which is what the person sees for the moment

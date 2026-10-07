@@ -6,7 +6,9 @@
  * not:
  *
  *   1. `data-modal-open="ID"` on any control opens that dialog. Where the
- *      control also carries `data-modal-url`, the body is fetched from it.
+ *      control also carries `data-modal-url`, the body is fetched from it;
+ *      where it carries `data-modal-anchor="X"`, the dialog opens at the
+ *      element `#ID-X`, marked (the stock recon codes, 7 Oct 2026).
  *   2. The body is fetched EVERY open, not cached. row-detail.js caches
  *      because a proposal's constituent rows do not change while you look at
  *      them; a configuration form is the opposite — the whole reason to open
@@ -47,6 +49,21 @@ export default function modal() {
 
         event.preventDefault();
         open(dialog, trigger.dataset.modalUrl);
+
+        // `data-modal-anchor="X"`: land on the entry `#{dialog id}-X` and mark
+        // it — a code badge opens the codes modal at its own code.
+        if (trigger.dataset.modalAnchor) {
+            const target = dialog.querySelector(`#${CSS.escape(`${dialog.id}-${trigger.dataset.modalAnchor}`)}`);
+
+            if (target) {
+                dialog.querySelectorAll('.is-target').forEach((el) => el.classList.remove('is-target'));
+                target.classList.add('is-target');
+                target.scrollIntoView({ block: 'start' });
+            }
+        } else {
+            dialog.querySelector('.modal-body')?.scrollTo({ top: 0 });
+            dialog.querySelectorAll('.is-target').forEach((el) => el.classList.remove('is-target'));
+        }
     });
 }
 
