@@ -463,6 +463,49 @@
                 </x-table>
             </div>
             <div class="gal-variant">
+                <p class="eyebrow">
+                    <code>data-tt-groups</code> — a head row per group (<code>tr.tt-group</code>,
+                    <code>data-tt-group-head</code>) over its members (<code>data-tt-group</code>), shut on arrival.
+                    Filters and pills act on the members; a head shows while any member passes; pages count
+                    groups. Shut is a way of looking — a collapsed member's tick stays in the submission. The
+                    head's own box (<code>data-tt-group-check</code>) ticks its members. The stock recon proposals
+                    use it for one row per chain
+                </p>
+                <x-table tools id="gal-table-grouped" data-tt-groups data-tt-group-noun="site"
+                         :procedure="'agora.usp_Cash_GridDailyBanking'" :count="count($fixtures['pagedRows'])">
+                    <x-slot:head>
+                        <tr>
+                            <th class="pick"><input type="checkbox" data-check-all aria-label="Every row"></th>
+                            <th data-tt-pills data-tt-pill-order="Balanced|Short|Blocked|Unrecorded issue">State</th>
+                            <th>Site</th><th>Reference</th><th class="num">Declared</th>
+                        </tr>
+                    </x-slot:head>
+                    @foreach (collect($fixtures['pagedRows'])->groupBy('site') as $site => $group)
+                        <tr class="tt-group" data-tt-group-head="{{ $site }}" tabindex="0" aria-expanded="false">
+                            <td class="pick"><input type="checkbox" data-tt-group-check aria-label="Every row of {{ $site }}"></td>
+                            <td data-sort="{{ $group->count() }}">
+                                <span class="chain-bar" aria-hidden="true">@foreach ($group as $row)<i class="tone-{{ ['Balanced' => 'good', 'Short' => 'warn', 'Blocked' => 'serious', 'Unrecorded issue' => 'crit'][$row['state']] }}"></i>@endforeach</span>
+                            </td>
+                            <td><span class="tt-caret" aria-hidden="true"></span>{{ $site }}</td>
+                            <td class="mono">{{ $group->count() }} rows</td>
+                            <td class="num">{{ \App\Support\Format::r($group->sum('amount')) }}</td>
+                        </tr>
+                        @foreach ($group as $row)
+                            @php($tone = ['Balanced' => 'good', 'Short' => 'warn', 'Blocked' => 'serious', 'Unrecorded issue' => 'crit'][$row['state']])
+                            <tr data-tt-group="{{ $site }}">
+                                <td class="pick"><input type="checkbox" name="gal-grouped[]" value="{{ $row['ref'] }}" data-check checked aria-label="{{ $row['ref'] }}"></td>
+                                <td data-sort="{{ $row['state'] }}" data-tone="{{ $tone }}">
+                                    <x-chip :tone="$tone">{{ $row['state'] }}</x-chip>
+                                </td>
+                                <td>{{ $row['site'] }}</td>
+                                <td class="mono">{{ $row['ref'] }}</td>
+                                <td class="num">{{ \App\Support\Format::r($row['amount']) }}</td>
+                            </tr>
+                        @endforeach
+                    @endforeach
+                </x-table>
+            </div>
+            <div class="gal-variant">
                 <p class="eyebrow">Empty — a designed answer, not a gap</p>
                 <x-table :count="0" empty="The procedure ran and found nothing in this period. That is an answer, not a failure." />
             </div>

@@ -325,3 +325,71 @@ test.describe('joined pill sets', () => {
     });
 });
 
+/**
+ * Grouped rows (`data-tt-groups`, 7 Oct 2026): the stock recon proposals show
+ * one row per chain that opens to its shifts. The gallery entry is
+ * `#gal-table-grouped` — 64 rows in four site groups of 16, every row ticked.
+ *
+ * The line that matters is the same one as for paging: shutting a group is a
+ * way of looking, so its rows stay in the submission; a FILTER takes rows out.
+ */
+test.describe('grouped rows', () => {
+    test.use(anonymous);
+
+    const GROUPED = '#gal-table-grouped';
+    const heads = (page) => page.locator(`${GROUPED} tbody tr.tt-group:not(.tt-out):not(.tt-page-out)`);
+    const members = (page) => page.locator(`${GROUPED} tbody tr[data-tt-group]:not(.tt-out):not(.tt-page-out):not(.tt-collapsed)`);
+    const count = (page) => page.locator(GROUPED)
+        .locator('xpath=ancestor::div[contains(@class,"table-block")]').locator('.table-count');
+
+    test('shut on arrival, one row per group, counted as groups', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        await expect(heads(page)).toHaveCount(4);
+        await expect(members(page)).toHaveCount(0);
+        await expect(count(page)).toHaveText('4 sites · 64 rows');
+    });
+
+    test('a head opens to its rows and shuts again; a shut row stays in the submission', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        const first = heads(page).first();
+        await first.click();
+        await expect(first).toHaveAttribute('aria-expanded', 'true');
+        await expect(members(page)).toHaveCount(16);
+
+        await first.click();
+        await expect(members(page)).toHaveCount(0);
+
+        // Shut, not filtered: every box still enabled and ticked.
+        await expect(page.locator(`${GROUPED} [data-check]:checked:not(:disabled)`)).toHaveCount(64);
+    });
+
+    test('a filter narrows the rows, and a head shows while any of its rows does', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        const block = page.locator(GROUPED).locator('xpath=ancestor::div[contains(@class,"table-block")]');
+        await block.locator('.tt-pill', { hasText: 'Blocked' }).click();
+
+        // Blocked is every ninth row: 7 rows, over the sites they fall in.
+        const shown = await heads(page).count();
+        expect(shown).toBeGreaterThan(0);
+        expect(shown).toBeLessThanOrEqual(4);
+        await expect(page.locator(`${GROUPED} [data-check]:not(:disabled)`)).toHaveCount(7);
+
+        await block.locator('.tt-expand-all').click();
+        await expect(members(page)).toHaveCount(7);
+    });
+
+    test('the head box ticks and unticks its own rows', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        const box = heads(page).first().locator('[data-tt-group-check]');
+        await expect(box).toBeChecked();
+        await box.uncheck();
+        await expect(page.locator(`${GROUPED} [data-check]:checked`)).toHaveCount(48);
+        await box.check();
+        await expect(page.locator(`${GROUPED} [data-check]:checked`)).toHaveCount(64);
+    });
+});
+

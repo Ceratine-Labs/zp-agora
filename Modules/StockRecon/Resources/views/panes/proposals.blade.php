@@ -247,6 +247,9 @@
                  :id="'stockrecon-lines-'.$run->Id"
                  tools fit
                  data-tt-page="50"
+                 data-tt-groups
+                 data-tt-group-noun="chain"
+                 data-tt-row-noun="shift"
                  data-row-detail
                  empty="The procedure ran and found no shifts in this period. That is an answer, not a failure.">
             <x-slot:head>
@@ -317,10 +320,63 @@
                 </tr>
             </x-slot:head>
 
-            @foreach ($rows as $line)
+            {{-- ONE ROW PER CHAIN, its shifts beneath it (Ryan, 7 Oct 2026:
+                 "collapse them into a single row, can expand to detail and
+                 expand again"). Collapsed on arrival. The chain row is not a
+                 data row: the filters, the pills and the press act on the
+                 shifts, and a chain shows while any of its shifts does
+                 (table-tools `data-tt-groups`). Its figures: the first opening,
+                 the last closing, and the sums between. --}}
+            @foreach (\Modules\StockRecon\Services\ChainSummary::of($rows) as $chain)
+                @php($state = $chain->state())
+                @php($first = $chain->first())
+                <tr class="tt-group" data-tt-group-head="{{ $chain->key }}" tabindex="0" aria-expanded="false">
+                    @if ($run->isOpen())
+                        <td class="pick">
+                            @if ($chain->writable() > 0)
+                                <input type="checkbox" data-tt-group-check
+                                       aria-label="Every amendable shift of {{ $first->StockItemNo }}">
+                            @endif
+                        </td>
+                    @endif
+                    <td data-sort="{{ $state['label'] }}">
+                        <x-chip :tone="$state['tone']" :title="$state['title']">{{ $state['label'] }}</x-chip>
+                        {{-- A segment per shift, in order, in that shift's outcome
+                             colour — the chain at a glance while it is shut. --}}
+                        <span class="chain-bar" aria-hidden="true">
+                            @foreach ($chain->segments() as $tone)<i class="tone-{{ $tone }}"></i>@endforeach
+                        </span>
+                    </td>
+                    <td class="cell-name">
+                        <span class="tt-caret" aria-hidden="true"></span>{{ $first->itemLabel() }}
+                        <br><span class="muted mono" style="font-size:11px">{{ $first->StockItemNo }} · {{ $first->areaLabel() }} · {{ $chain->count() }} {{ Str::plural('shift', $chain->count()) }}</span>
+                    </td>
+                    <td class="num" data-sort="{{ (float) $first->ChainNetVar }}">
+                        {{ $first->chainState() === 'Nil' ? '—' : ($first->chainState() === 'Positive' ? '+' : '').\App\Support\Format::n($first->ChainNetVar, 3) }}
+                    </td>
+                    <td class="fit-min" data-sort="{{ $chain->from()->toDateString() }}">
+                        {{ $chain->from()->format('d M') }}{{ $chain->to()->ne($chain->from()) ? ' – '.$chain->to()->format('d M') : '' }}
+                    </td>
+                    <td class="num">{{ $chain->count() }}</td>
+                    <td class="num">{{ \App\Support\Format::n($first->QtyOpen, 3) }}</td>
+                    <td class="num">{{ abs($chain->breaks()) > 0.0005 ? \App\Support\Format::n($chain->breaks(), 3) : '—' }}</td>
+                    <td class="num">{{ abs($chain->issued()) < 0.0005 ? '—' : \App\Support\Format::n($chain->issued(), 3) }}</td>
+                    <td class="num">{{ \App\Support\Format::n($chain->last()->QtyClose, 3) }}</td>
+                    <td class="num">{{ abs($chain->pos()) < 0.0005 ? '—' : \App\Support\Format::n($chain->pos(), 3) }}</td>
+                    <td class="num">{{ abs($chain->variance()) < 0.0005 ? '—' : \App\Support\Format::n($chain->variance(), 3) }}</td>
+                    <td class="num grp">{{ \App\Support\Format::n($first->QtyOpenNew, 3) }}</td>
+                    <td class="num">{{ \App\Support\Format::n($chain->last()->QtyCloseNew, 3) }}</td>
+                    <td class="num" title="Units the balancing moves on this chain, either way">{{ $chain->moved() < 0.0005 ? '—' : \App\Support\Format::n($chain->moved(), 3) }}</td>
+                    <td class="num">{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::n($chain->varianceNew(), 3) }}</td>
+                    @if ($run->isOpen())
+                        <td class="fit-min"></td>
+                    @endif
+                </tr>
+            @foreach ($chain->lines as $line)
                 {{-- Click, or Enter, opens the whole chain behind the row.
                      Fetched on demand: a branch-month is thousands of shifts. --}}
                 <tr class="{{ $tones[$line->outcomeKey()] ?? '' }}"
+                    data-tt-group="{{ $chain->key }}"
                     data-detail-url="{{ route('app.stockrecon.line', [$run, $line]) }}">
                     @if ($run->isOpen())
                         <td class="pick">
@@ -421,6 +477,7 @@
                         </td>
                     @endif
                 </tr>
+            @endforeach
             @endforeach
         </x-table>
     </form>

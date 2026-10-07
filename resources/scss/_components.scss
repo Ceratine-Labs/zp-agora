@@ -667,6 +667,39 @@ tr.tt-page-out { display: none; }
   background: var(--surface-2);
 }
 
+/* ---------------------------------------------------------------------------
+   Grouped rows (table-tools `data-tt-groups`, 7 Oct 2026): a head row per
+   group that opens to its members. Collapsed members are hidden, NOT filtered
+   — their inputs stay in the submission — so this is its own class. */
+.dt tr.tt-collapsed { display: none; }
+
+.dt tr.tt-group { cursor: pointer; }
+.dt tr.tt-group > td { background: var(--surface); border-top: 1px solid var(--line); }
+.dt tr.tt-group:hover > td { background: var(--surface-2); }
+.dt tr.tt-group:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.dt tr.tt-group.is-open > td { background: var(--surface-2); font-weight: 600; }
+/* Members of an open group read as inside it. */
+.dt tr[data-tt-group]:not(.tt-collapsed) > td:nth-child(2) { box-shadow: inset 3px 0 0 var(--line); }
+
+.tt-caret::before {
+  content: '▸'; display: inline-block; width: 1.1em; color: var(--muted);
+  transition: transform .12s ease;
+}
+tr.is-open .tt-caret::before { transform: rotate(90deg); }
+
+/* The chain at a glance: one segment per shift, in its outcome's colour. */
+.chain-bar {
+  display: flex; gap: 2px; height: 5px; margin-top: 6px; min-width: 96px;
+  border-radius: 3px; overflow: hidden;
+}
+.chain-bar i { flex: 1 1 0; min-width: 2px; background: var(--line); }
+.chain-bar i.tone-good    { background: var(--good); }
+.chain-bar i.tone-warn    { background: var(--warn); }
+.chain-bar i.tone-serious { background: var(--serious); }
+.chain-bar i.tone-crit    { background: var(--crit); }
+
+.tt-pills .tt-expand-all { margin-left: auto; }
+
 /* One column's caption and pills: wraps as a unit. A second set in the same
    row (`data-tt-pills-join`) is ruled off from the first. */
 .tt-pills-set { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

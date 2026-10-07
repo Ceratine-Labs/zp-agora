@@ -16,6 +16,7 @@ use Modules\Core\Services\PermissionService;
 use Modules\StockRecon\Models\StockReconAmendment;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
+use Modules\StockRecon\Services\ChainSummary;
 use Modules\StockRecon\Services\StockReconService;
 use Tests\Fixtures\GrantsAccess;
 use Tests\TestCase;
@@ -658,6 +659,37 @@ class BalancingTest extends TestCase
             ->assertSee('data-tt-pills data-tt-pills-join data-tt-pill-order="Positive|Short|Nil">Chain</th>', false)
             ->assertSee('data-sort="Short"', false)
             ->assertSee('-5.000');
+    }
+
+    /**
+     * Ryan, 7 Oct 2026: one row per chain that opens to its shifts, with a bar
+     * under the first cell — a segment per shift in its outcome's colour. The
+     * chain row carries the first opening, the last closing and the sums.
+     */
+    public function test_the_proposals_show_one_row_per_chain_that_opens_to_its_shifts(): void
+    {
+        $run = $this->preview();
+        $chains = ChainSummary::of($run->lines);
+        $chain = $chains->first(fn (ChainSummary $c) => $c->first()->StockItemNo === self::ITEM);
+
+        $this->assertSame($run->lines->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->count(), $chains->count());
+        $this->assertSame($run->lines->where('StockItemNo', self::ITEM)->count(), $chain->count());
+        $this->assertEqualsWithDelta((float) $run->lines->where('StockItemNo', self::ITEM)->sum('QtyVar'), $chain->variance(), 0.001);
+        $this->assertTrue($chain->lines->first()->TransactionDate->lte($chain->lines->last()->TransactionDate), 'In date order.');
+        $this->assertSame($chain->count(), $chain->segments()->count(), 'A segment per shift.');
+
+        $html = $this->actingAs($this->person('admin'))
+            ->get(route('app.stockrecon.run', $run))
+            ->assertOk()
+            ->assertSee('data-tt-groups', false)
+            ->assertSee('data-tt-group-head="'.$chain->key.'"', false)
+            ->assertSee('data-tt-group="'.$chain->key.'"', false)
+            ->getContent();
+
+        // Every shown shift sits under its chain's row; the hidden empty
+        // chains have no row at all.
+        $this->assertSame(substr_count($html, 'class="tt-group"'), substr_count($html, 'data-tt-group-head="'));
+        $this->assertGreaterThan(0, substr_count($html, 'class="chain-bar"'));
     }
 
     /**

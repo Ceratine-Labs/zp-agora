@@ -38,6 +38,11 @@
  *                                                   that value (`A|B`: on both)
  *   <th data-tt-pills data-tt-pills-join>         — its pills in the strip
  *                                                   already there, same row
+ *   <table data-tt-groups data-tt-group-noun="chain" data-tt-row-noun="shift">
+ *                                                 — rows in GROUPS: a head row
+ *     <tr class="tt-group" data-tt-group-head="k">  then its members, each
+ *     <tr data-tt-group="k">                        carrying its key. Collapsed
+ *                                                   on arrival; see GROUPS below
  *   <td data-sort="2026-09-08">8 Sep</td>         — sort and filter on this
  *                                                   instead of the rendered text
  *   <td data-sort="Balanced" data-tone="good">    — and the chip tone its pill
@@ -163,6 +168,186 @@ class TableTools {
         this.page = 1;
         this.columns = this.readColumns();
         this.usable = this.columns.length > 0 && this.rows.length > 0;
+        // Grouped: the order the groups are in on screen, and which are open.
+        this.grouped = table.hasAttribute('data-tt-groups');
+        // What a group is called in the count line — `data-tt-group-noun`.
+        this.groupNoun = table.dataset.ttGroupNoun || 'group';
+        this.rowNoun = table.dataset.ttRowNoun || 'row';
+        this.expanded = new Set();
+        if (this.grouped) this.readGroups();
+    }
+
+    /* -------------------------------------------------------------- groups */
+
+    /**
+     * GROUPS (7 Oct 2026, the stock recon proposals: one row per chain that
+     * opens to its shifts). A head row summarises; its members are the data.
+     *
+     * The head is NOT a data row. Filters, pills, sorting's tick lists and the
+     * press all act on the members exactly as before; a head shows while any
+     * of its members passes the filters. Pages count GROUPS, so a chain is
+     * never cut across two pages.
+     *
+     * Collapsing is a way of looking, like a page: a collapsed member is
+     * hidden (`tt-collapsed`) but NOT disabled, so its tick stays in the
+     * submission and on the button's count. Only a filter takes a row out.
+     */
+    readGroups() {
+        const byKey = new Map();
+
+        this.groups = Array.from(this.body.rows)
+            .filter((row) => row.classList.contains('tt-group'))
+            .map((head) => {
+                const group = { key: head.dataset.ttGroupHead, head, members: [], passing: 0 };
+                byKey.set(group.key, group);
+                return group;
+            });
+
+        this.rows.forEach((row) => byKey.get(row.dataset.ttGroup)?.members.push(row));
+        this.groupOrder = this.groups.slice();
+        this.groupView = this.groups.slice();
+    }
+
+    buildGroups() {
+        this.groups.forEach((group) => {
+            const toggle = () => this.toggleGroup(group);
+
+            group.head.addEventListener('click', (event) => {
+                if (event.target.closest('a, button, input, select, label')) return;
+                toggle();
+            });
+            group.head.addEventListener('keydown', (event) => {
+                if (event.target !== group.head) return;
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                toggle();
+            });
+
+            /*
+             * The chain's own box ticks every member the press could write.
+             * No `data-check` and no name: it is a control, not a row, so it
+             * is never counted on the button and never posted.
+             */
+            const box = group.head.querySelector('[data-tt-group-check]');
+
+            if (box) {
+                group.box = box;
+                box.addEventListener('click', (event) => event.stopPropagation());
+                box.addEventListener('change', () => {
+                    this.memberBoxes(group).forEach((b) => { b.checked = box.checked; });
+                    this.table.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
+        });
+
+        this.table.addEventListener('change', () => this.groups.forEach((group) => this.syncGroupBox(group)));
+
+        // Open or shut every group at once, from the strip if there is one.
+        const all = document.createElement('button');
+        all.type = 'button';
+        all.className = 'btn-ghost tt-expand-all';
+        all.addEventListener('click', () => {
+            const open = this.groups.some((group) => group.passing > 0 && !this.expanded.has(group.key));
+            this.groups.forEach((group) => { if (open) this.expanded.add(group.key); else this.expanded.delete(group.key); });
+            this.apply();
+        });
+        this.expandAllButton = all;
+
+        const container = this.table.closest('.table-block') || this.table.parentElement;
+        const strip = container.querySelector(':scope > .tt-pills');
+
+        if (strip) strip.append(all);
+        else container.prepend(all);
+    }
+
+    memberBoxes(group) {
+        return group.members.flatMap((row) => Array.from(row.querySelectorAll('[data-check]:not(:disabled)')));
+    }
+
+    syncGroupBox(group) {
+        if (!group.box) return;
+
+        const boxes = this.memberBoxes(group);
+        const ticked = boxes.filter((b) => b.checked).length;
+
+        group.box.hidden = boxes.length === 0;
+        group.box.checked = ticked > 0 && ticked === boxes.length;
+        group.box.indeterminate = ticked > 0 && ticked < boxes.length;
+    }
+
+    toggleGroup(group) {
+        if (this.expanded.has(group.key)) this.expanded.delete(group.key);
+        else this.expanded.add(group.key);
+
+        this.markGroup(group);
+    }
+
+    /** Open or shut on screen: the members, and whatever panels they opened. */
+    markGroup(group) {
+        const open = this.expanded.has(group.key);
+
+        group.head.classList.toggle('is-open', open);
+        group.head.setAttribute('aria-expanded', String(open));
+        group.members.forEach((row) => block(row).forEach((node) => node.classList.toggle('tt-collapsed', !open)));
+    }
+
+    applyGroups() {
+        const passing = [];
+        let rows = 0;
+
+        this.groupView.forEach((group) => {
+            group.passing = 0;
+
+            group.members.forEach((row) => {
+                const show = this.matches(row);
+
+                block(row).forEach((node) => {
+                    node.classList.toggle('tt-out', !show);
+                    node.classList.remove('tt-page-out');
+                });
+                enable(row, show);
+
+                if (show) group.passing += 1;
+            });
+
+            const show = group.passing > 0;
+
+            group.head.classList.toggle('tt-out', !show);
+            group.head.classList.remove('tt-page-out');
+            enable(group.head, show);
+            this.markGroup(group);
+            this.syncGroupBox(group);
+
+            rows += group.passing;
+            if (show) passing.push(group);
+        });
+
+        this.paginateGroups(passing);
+
+        if (this.expandAllButton) {
+            const shut = passing.some((group) => !this.expanded.has(group.key));
+            this.expandAllButton.textContent = shut ? 'Expand all' : 'Collapse all';
+        }
+
+        this.report(rows, passing.length);
+    }
+
+    paginateGroups(groups) {
+        const pages = this.pageSize ? Math.max(1, Math.ceil(groups.length / this.pageSize)) : 1;
+
+        this.page = Math.min(Math.max(1, this.page), pages);
+
+        const first = this.pageSize ? (this.page - 1) * this.pageSize : 0;
+        const last = this.pageSize ? Math.min(first + this.pageSize, groups.length) : groups.length;
+
+        groups.forEach((group, index) => {
+            const on = index >= first && index < last;
+
+            group.head.classList.toggle('tt-page-out', !on);
+            group.members.forEach((row) => block(row).forEach((node) => node.classList.toggle('tt-page-out', !on)));
+        });
+
+        this.drawPager(pages, groups.length, first, last);
     }
 
     /**
@@ -238,6 +423,7 @@ class TableTools {
         this.rows = Array.from(this.body.rows).filter((row) => isDataRow(row));
         this.order = this.rows.slice();
         this.view = this.rows.slice();
+        if (this.grouped) this.readGroups();
         this.sort = null;
         this.page = 1;
         this.apply();
@@ -247,6 +433,7 @@ class TableTools {
         this.buildSort();
         this.buildFilters();
         this.buildPills();
+        if (this.grouped) this.buildGroups();
         this.buildPager();
         stickyHead(this.table);
         // Not `report(total)`: a pill strip can arrive with a default scope on,
@@ -291,6 +478,11 @@ class TableTools {
             if (arrow) arrow.textContent = '';
         });
 
+        if (this.grouped) {
+            this.sortGroups(column);
+            return;
+        }
+
         let ordered = this.order;
 
         if (this.sort) {
@@ -313,6 +505,35 @@ class TableTools {
         // and that order has just changed. Back to page one, because page four
         // of a new sort is somewhere nobody asked to be.
         this.view = ordered.slice();
+        this.page = 1;
+        this.apply();
+    }
+
+    /**
+     * Grouped, the GROUPS sort, on the value their head row carries for the
+     * column; a group's members keep their own order beneath it.
+     */
+    sortGroups(column) {
+        let ordered = this.groupOrder;
+
+        if (this.sort) {
+            const { direction } = this.sort;
+
+            column.th.setAttribute('aria-sort', direction === 1 ? 'ascending' : 'descending');
+            const arrow = column.th.querySelector('.tt-arrow');
+            if (arrow) arrow.textContent = direction === 1 ? '▲' : '▼';
+
+            ordered = this.groupOrder.slice().sort((a, b) => this.compare(a.head, b.head, column) * direction);
+        }
+
+        const fragment = document.createDocumentFragment();
+        ordered.forEach((group) => {
+            fragment.append(group.head);
+            group.members.forEach((row) => block(row).forEach((node) => fragment.append(node)));
+        });
+        this.body.append(fragment);
+
+        this.groupView = ordered.slice();
         this.page = 1;
         this.apply();
     }
@@ -916,6 +1137,11 @@ class TableTools {
     }
 
     apply() {
+        if (this.grouped) {
+            this.applyGroups();
+            return;
+        }
+
         const passing = [];
 
         this.view.forEach((row) => {
@@ -940,6 +1166,18 @@ class TableTools {
      * sentence has to say which is which. "Showing 1–50 of 312 — filtered from
      * 940" is the whole state in one line.
      */
+    /** Grouped: the groups on screen, and the rows inside them. */
+    groupCountText(groups, rows, filtered) {
+        const total = this.groups.length;
+        const noun = (n) => (n === 1 ? this.groupNoun : `${this.groupNoun}s`);
+        const shown = this.pageSize && groups > this.pageSize
+            ? `Showing ${(this.page - 1) * this.pageSize + 1}–${Math.min(this.page * this.pageSize, groups)} of ${groups} ${noun(groups)}`
+            : `${groups} ${noun(groups)}`;
+        const of = filtered ? ` — filtered from ${total}` : '';
+
+        return `${shown}${of} · ${rows} ${rows === 1 ? this.rowNoun : `${this.rowNoun}s`}`;
+    }
+
     countText(visible, total, filtered) {
         if (!this.pageSize || visible <= this.pageSize) {
             return filtered ? `Showing ${visible} of ${total} — filtered` : this.originalCount;
@@ -957,7 +1195,7 @@ class TableTools {
      * came from the server and is now wrong; the empty state was never
      * rendered at all, because the server had rows to show.
      */
-    report(visible) {
+    report(visible, groups = null) {
         const total = this.rows.length;
         const filtered = visible !== total;
         const block_ = this.table.closest('.table-block');
@@ -975,7 +1213,9 @@ class TableTools {
 
             if (count) {
                 if (this.originalCount === undefined) this.originalCount = count.textContent;
-                count.textContent = this.countText(visible, total, filtered);
+                count.textContent = groups === null
+                    ? this.countText(visible, total, filtered)
+                    : this.groupCountText(groups, visible, filtered);
             }
 
             let empty = block_.querySelector('[data-tt-empty]');
@@ -1137,7 +1377,8 @@ function pageNumbers(page, pages) {
 
 /** A data row, not a drilled panel and not the grid's totals line. */
 function isDataRow(row) {
-    return !row.classList.contains('row-detail') && !row.classList.contains('dg-total');
+    return !row.classList.contains('row-detail') && !row.classList.contains('dg-total')
+        && !row.classList.contains('tt-group');
 }
 
 /** A row and whatever row-detail.js has opened under it. */
