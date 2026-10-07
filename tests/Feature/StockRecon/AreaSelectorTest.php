@@ -6,8 +6,8 @@ use App\Support\ProcedureService;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\User;
-use Modules\StockRecon\Services\StockReconService;
 use Modules\StockRecon\Http\Requests\BalancePreviewRequest;
+use Modules\StockRecon\Services\StockReconService;
 use Tests\TestCase;
 
 /**
