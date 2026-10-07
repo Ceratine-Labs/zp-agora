@@ -45,6 +45,10 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
         ->middleware('can:stockrecon.runs.execute')->name('commit');
     Route::post('runs/{run}/reverse', [StockReconController::class, 'reverse'])
         ->middleware('can:stockrecon.runs.reverse')->name('reverse');
+    // Reset to original (7 Oct 2026): writes PumpIT as a commit does, so it
+    // sits behind the commit's permission; its Reverse is the run's.
+    Route::post('runs/{run}/reset', [StockReconController::class, 'resetToOriginal'])
+        ->middleware('can:stockrecon.runs.execute')->name('reset');
 
     /*
      | A possible duplicate issue (D2) holds its chain back from the commit

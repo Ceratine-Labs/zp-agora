@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Modules\Core\Models\Branch;
 use Modules\StockRecon\Http\Requests\BalancePreviewRequest;
 use Modules\StockRecon\Models\StockReconRun;
@@ -308,6 +309,28 @@ class StockReconController extends Controller
             ->with('committed', $result['status']->Message)
             ->with('committedCode', $result['status']->Code)
             ->with('committedLines', $result['lines']->toArray());
+    }
+
+    /**
+     * Reset to original, then the same window previewed again — the new run is
+     * where the operator lands, because it is the one to balance from. The
+     * reset itself stays on this run, which is where its Reverse lives.
+     */
+    public function resetToOriginal(StockReconRun $run): RedirectResponse
+    {
+        try {
+            $result = $this->service->resetToOriginal($run);
+        } catch (AgoraProcException $e) {
+            return back()->with('refusal', $e->getMessage());
+        }
+
+        $next = $result['run'];
+        $amendable = $next->lines()->where('WouldAmend', true)->count();
+
+        return redirect()
+            ->route('app.stockrecon.run', $next)
+            ->with('committed', $result['status']->Message.' Previewed again as run '.$next->Id.': '
+                .$amendable.' '.Str::plural('shift', $amendable).' to amend. To undo the reset, reverse run '.$run->Id.'.');
     }
 
     /**

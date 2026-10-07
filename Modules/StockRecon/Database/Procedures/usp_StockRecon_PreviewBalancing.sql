@@ -703,6 +703,23 @@ BEGIN
                                           THEN 1 ELSE 0 END)
         WHERE DupTier = 'D1';
 
+    /* A CHAIN WHOSE TOTAL IS NIL RUNS THROUGH EVERY BREAK (Ryan, 7 Oct 2026:
+       "if it shows out by 0 WHY DOES IT NOT BALANCE"). Split at a break bigger
+       than @KeepBreaksUpTo, a nil chain becomes one segment ending over and
+       one ending short — U4, held back — though nothing is missing. So on a
+       nil chain every break is kept: the closing before it may move, and the
+       chain balances to nil. The client's engine reads S12 on that closing
+       whatever its size; Ryan's call. */
+    ;WITH nil AS (
+        SELECT AreaNo, StockItemNo FROM #rep
+        GROUP BY AreaNo, StockItemNo
+        HAVING ABS(SUM(QtyVarRep)) <= @eps
+    )
+    UPDATE r SET BreakKept = 1
+    FROM #rep r
+    JOIN nil n ON n.AreaNo = r.AreaNo AND n.StockItemNo = r.StockItemNo
+    WHERE r.LinkBroken = 1 AND r.BreakKept = 0;
+
     /* Segments and sequence numbers. A repaired break starts a new segment, so
        the closing before it is the last closing of the segment before — pinned,
        exactly as the latest count is. A KEPT break does not: the segment, and
@@ -946,12 +963,20 @@ BEGIN
                CONVERT(bit, MAX(CASE WHEN @BlockPossibleDuplicates = 1 AND s.DupTier = 'D2'
                                       AND s.DupReleaseId IS NULL THEN 1 ELSE 0 END)
                    OVER (PARTITION BY s.AreaNo, s.StockItemNo))            AS DupHold,
-               CONVERT(bit, MAX(CONVERT(int, s.FlagNetOver) + CONVERT(int, s.FlagSoldMoreThanOnHand)
-                              + CONVERT(int, s.FlagCloseExceedsOnHand) + CONVERT(int, s.FlagIssueWentNowhere)
-                              + CONVERT(int, s.FlagBigAmendment) + CONVERT(int, s.FlagPctAmendment)
-                              + CONVERT(int, s.FlagNegativeClose) + CONVERT(int, s.FlagShortChain)
-                              + CONVERT(int, s.FlagDormantMoved) + CONVERT(int, s.FlagPackOver)
-                              + CONVERT(int, s.FlagNoPosLink)
+               /* A NIL CHAIN IS NOT HELD BACK by a finding (Ryan, 7 Oct
+                  2026): U1–U4, S1, F2, E1, the caps and "too short" are
+                  still raised and reported on the exceptions, but nothing is
+                  missing — the next count proves the miscount, however big —
+                  so the chain balances. What still holds it: a write that
+                  cannot be made (a closing below zero, a dormant shift moved)
+                  and a possible duplicate (D2). */
+               CONVERT(bit, MAX(CASE WHEN ABS(s.ChainNetVar) <= @eps THEN 0
+                                     ELSE CONVERT(int, s.FlagNetOver) + CONVERT(int, s.FlagSoldMoreThanOnHand)
+                                        + CONVERT(int, s.FlagCloseExceedsOnHand) + CONVERT(int, s.FlagIssueWentNowhere)
+                                        + CONVERT(int, s.FlagShortChain) + CONVERT(int, s.FlagPackOver)
+                                        + CONVERT(int, s.FlagNoPosLink)
+                                        + CONVERT(int, s.FlagBigAmendment) + CONVERT(int, s.FlagPctAmendment) END
+                              + CONVERT(int, s.FlagNegativeClose) + CONVERT(int, s.FlagDormantMoved)
                               + CASE WHEN @BlockPossibleDuplicates = 1 AND s.DupTier = 'D2'
                                       AND s.DupReleaseId IS NULL THEN 1 ELSE 0 END)
                    OVER (PARTITION BY s.AreaNo, s.StockItemNo))            AS ChainBlocked
@@ -1116,7 +1141,7 @@ BEGIN
                    ORDER BY a.TransactionDate, a.ShiftNo)                   AS PrevCloseP,
                a.EffOpenNew, a.EffCloseNew,
                CONVERT(decimal(18,4), a.QtyPOS - (a.EffOpenNew + a.QtyIssued - a.EffCloseNew)) AS VarP,
-               a.StaffVar, a.HandVar, a.BreakOrig, a.PrevCloseOrig, a.PrevCloseNow,
+               a.StaffVar, a.HandVar, a.BreakOrig, a.BreakKept, a.PrevCloseOrig, a.PrevCloseNow,
                a.QtyOpenNow, a.QtyCloseNow, a.QtyCloseOrig, a.IsLastInWindow
         FROM #apply a
         WHERE a.ChainBlocked = 0 OR a.RestoresHand = 1
@@ -1128,9 +1153,11 @@ BEGIN
                /* @split, not @tol, for the reason the audit above uses it: a
                   closing that moves at a KEPT break is the chain balancing
                   through it, which is the whole point of keeping it. */
-               CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.EffOpenNew - p.PrevCloseP)     > @tol THEN 1 ELSE 0 END AS S13After,
+               /* And a break kept because its chain is nil (7 Oct 2026) is
+                  kept here too, whatever its size. */
+               CASE WHEN ABS(p.BreakOrig) > @split AND p.BreakKept = 0 AND ABS(p.EffOpenNew - p.PrevCloseP) > @tol THEN 1 ELSE 0 END AS S13After,
                CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.QtyOpenNow - p.PrevCloseNow)   > @tol THEN 1 ELSE 0 END AS S13Now,
-               CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.PrevCloseP - p.PrevCloseOrig)  > @tol THEN 1 ELSE 0 END AS S12After,
+               CASE WHEN ABS(p.BreakOrig) > @split AND p.BreakKept = 0 AND ABS(p.PrevCloseP - p.PrevCloseOrig) > @tol THEN 1 ELSE 0 END AS S12After,
                CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.PrevCloseNow - p.PrevCloseOrig) > @tol THEN 1 ELSE 0 END AS S12Now,
                CASE WHEN p.StaffVar > 0.5 AND p.VarP    < -0.5                 THEN 1 ELSE 0 END AS S7After,
                CASE WHEN p.StaffVar > 0.5 AND p.HandVar < -0.5                 THEN 1 ELSE 0 END AS S7Now,
@@ -1337,17 +1364,20 @@ BEGIN
                                                    + ISNULL(FORMAT(a.DupTwinDate, 'd MMM', 'en-US') + N' shift '
                                                             + CONVERT(nvarchar(4), a.DupTwinShift), N'unknown')
                                                    + N'; fix PumpIT or release'
-            WHEN a.FlagPackOver = 1           THEN 'Missed issue sheet: an over of a whole pack, captured not balanced'
-            WHEN a.FlagNoPosLink = 1          THEN 'No till sales linked: stock falls, the till shows nothing, charge nobody'
-            WHEN a.FlagSoldMoreThanOnHand = 1 THEN 'Unrecorded issue, proven: the till sold more than the shift held'
-            WHEN a.FlagCloseExceedsOnHand = 1 THEN 'Unrecorded issue: closed holding more than it ever received'
-            WHEN a.FlagNetOver = 1 AND a.ChainIssues < @eps AND a.ChainPOS > @eps
+            /* A finding holds a chain back only where the chain is not nil (7 Oct
+               2026). On a nil chain the row says what happens to it; the finding
+               stays on the exceptions. */
+            WHEN a.ChainBlocked = 1 AND a.FlagPackOver = 1           THEN 'Missed issue sheet: an over of a whole pack, captured not balanced'
+            WHEN a.ChainBlocked = 1 AND a.FlagNoPosLink = 1          THEN 'No till sales linked: stock falls, the till shows nothing, charge nobody'
+            WHEN a.ChainBlocked = 1 AND a.FlagSoldMoreThanOnHand = 1 THEN 'Unrecorded issue, proven: the till sold more than the shift held'
+            WHEN a.ChainBlocked = 1 AND a.FlagCloseExceedsOnHand = 1 THEN 'Unrecorded issue: closed holding more than it ever received'
+            WHEN a.ChainBlocked = 1 AND a.FlagNetOver = 1 AND a.ChainIssues < @eps AND a.ChainPOS > @eps
                                               THEN 'Unrecorded issue: selling all window with no issues captured'
-            WHEN a.FlagNetOver = 1            THEN 'Unrecorded issue: net over for the window, cannot be balanced'
+            WHEN a.ChainBlocked = 1 AND a.FlagNetOver = 1            THEN 'Unrecorded issue: net over for the window, cannot be balanced'
             WHEN a.QtyOpen < -@eps OR a.QtyClose < -@eps
                                               THEN 'Data fault: a count below zero'
             WHEN a.FlagNegativeClose = 1      THEN 'Data fault: balancing would drive the closing below zero'
-            WHEN a.FlagBigAmendment = 1 OR a.FlagPctAmendment = 1
+            WHEN a.ChainBlocked = 1 AND (a.FlagBigAmendment = 1 OR a.FlagPctAmendment = 1)
                                               THEN 'Implausible amendment: the correction is too large to be a miscount'
             /* Before F2: a possible duplicate IS an issue that went nowhere,
                and this says what to do about it. Released, it no longer holds
@@ -1357,9 +1387,9 @@ BEGIN
                                               THEN 'Possible duplicate (D2), released: chain not held; reason kept on the release'
             WHEN a.DupTier = 'D2' AND a.EffVarNew < -@eps
                                               THEN 'Possible duplicate issue (D2): check the issue book before charging'
-            WHEN a.FlagIssueWentNowhere = 1   THEN 'Issue went nowhere: issued, nothing sold, count unchanged'
+            WHEN a.ChainBlocked = 1 AND a.FlagIssueWentNowhere = 1   THEN 'Issue went nowhere: issued, nothing sold, count unchanged'
             WHEN a.FlagAuditConflict = 1      THEN 'Audit conflict: an issue changed at balancing, counts cannot fix it'
-            WHEN a.FlagShortChain = 1         THEN 'Chain too short: not enough active shifts in the window'
+            WHEN a.ChainBlocked = 1 AND a.FlagShortChain = 1         THEN 'Chain too short: not enough active shifts in the window'
             WHEN a.DupHold = 1                THEN 'Held back: a possible duplicate issue (D2) on this item holds the chain'
             WHEN a.ChainBlocked = 1           THEN 'Held back: another shift on this item blocks the chain'
             /* The qty leads, so it is on the pill and in the extract. At most

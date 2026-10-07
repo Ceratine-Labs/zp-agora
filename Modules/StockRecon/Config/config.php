@@ -126,6 +126,23 @@ return [
     'issue_mode' => 'live',
 
     /*
+    |--------------------------------------------------------------------------
+    | Reset to original — the issue too?
+    |--------------------------------------------------------------------------
+    | Reset to original (usp_StockRecon_ResetToOriginal, 7 Oct 2026) always sets
+    | QtyOpen and QtyClose back to the _Original pair. With this true it sets
+    | QtyIssued back to QtyIssued_Original as well — head office's third UPDATE
+    | — and only when issue_mode above is 'live'.
+    |
+    | FALSE BY DEFAULT, because the issue head office changed at balancing is
+    | usually a missing issue captured (the pack's S4a), and undoing it brings
+    | the over back as an unrecorded issue. Measured on branch 23, 1-29 Sep
+    | (local copy): counts only, 81 chains to write and 55 held back; counts
+    | and issues, 65 to write and 89 held back. A literal, like the modes.
+    */
+    'reset_issues' => false,
+
+    /*
     | Areas whose AreaGroup is in this list are excluded from every figure.
     |
     | Lotto, airtime and electricity are VIRTUAL products: no issues are ever

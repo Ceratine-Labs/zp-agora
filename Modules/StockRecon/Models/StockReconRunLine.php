@@ -175,8 +175,10 @@ class StockReconRunLine extends BaseModel
             $this->isPossibleDuplicate() => 'possible',
             $this->IsDormant => 'dormant',
             // The classes that say stock arrived with no paperwork — see
-            // config('stockrecon.exceptions').
-            in_array($this->ExceptionCode, ['U1', 'U2', 'U3', 'U4', 'S1'], true) => 'unrecorded',
+            // config('stockrecon.exceptions'). Only where they hold the chain
+            // back: a nil chain balances, and its rows read what happens to
+            // them (7 Oct 2026); the code stays on the exceptions.
+            $this->ChainBlocked && in_array($this->ExceptionCode, ['U1', 'U2', 'U3', 'U4', 'S1'], true) => 'unrecorded',
             // A blocked chain put back to the staff counts: the hand amendment
             // is reversed, the chain is still not balanced.
             $this->RestoresHand && $this->WouldAmend => 'restored',
@@ -360,7 +362,10 @@ class StockReconRunLine extends BaseModel
      */
     public function isEmptyChain(): bool
     {
+        // Not a row the commit would write: a nil chain balances since
+        // 7 Oct 2026, and an opening it repairs is not "no movement".
         return (bool) $this->FlagShortChain
-            && abs((float) $this->ChainNetVar) < 0.0005;
+            && abs((float) $this->ChainNetVar) < 0.0005
+            && ! $this->WouldAmend;
     }
 }

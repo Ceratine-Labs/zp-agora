@@ -488,6 +488,200 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * Ryan, 7 Oct 2026: "if it shows out by 0 WHY DOES IT NOT BALANCE". A
+     * closing counted 5 high, the next shift counting the right 3: a break of
+     * -5, bigger than the 3 a chain keeps, so it used to split — one segment
+     * ending +5 (U4), one -5 — and the chain was held back at nil. A nil chain
+     * runs through every break, and the client-audit check does not withdraw
+     * it for moving the closing at that break.
+     */
+    public function test_a_nil_chain_balances_through_a_break_bigger_than_the_kept_size(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 8, 0], 3 => [3, 0, 3, 0]],
+            '2026-07-19' => [1 => [3, 0, 2, 1], 3 => [2, 0, 2, 0]],
+            '2026-07-20' => [1 => [2, 0, 1, 1], 3 => [1, 0, 1, 0]],
+            '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $high = $this->lineAt($run, '2026-07-18', 1);
+
+        $this->assertEqualsWithDelta(0.0, (float) $high->ChainNetVar, 0.001);
+        $this->assertFalse((bool) $high->ChainBlocked, 'Nil: not held back.');
+        $this->assertFalse((bool) $high->FlagNetOver);
+        $this->assertFalse((bool) $high->FlagAuditConflict);
+        $this->assertEqualsWithDelta(3.0, (float) $high->QtyCloseNew, 0.005, 'The closing counted high goes 8 → 3.');
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
+    }
+
+    /**
+     * A finding on a nil chain is reported, not a hold: here the +6 is
+     * covered by the shorts on BOTH sides together (-2 before, -4 after) and
+     * by neither alone, so it is still U2 — and the chain still balances,
+     * its rows saying what happens to them rather than "Unrecorded issue".
+     */
+    public function test_a_finding_on_a_nil_chain_is_reported_and_the_chain_still_balances(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 1, 0], 3 => [1, 0, 7, 0]],
+            '2026-07-19' => [1 => [7, 0, 3, 0], 3 => [3, 0, 2, 1]],
+            '2026-07-20' => [1 => [2, 0, 2, 0], 3 => [2, 0, 1, 1]],
+            '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $over = $this->lineAt($run, '2026-07-18', 3);
+
+        $this->assertTrue((bool) $over->FlagCloseExceedsOnHand, 'Neither side covers the 6 alone: still U2.');
+        $this->assertSame('U2', $over->ExceptionCode, 'And reported as one.');
+        $this->assertFalse((bool) $over->ChainBlocked, 'But the chain is nil, so it balances.');
+        $this->assertNotSame('unrecorded', $over->outcomeKey());
+        $this->assertStringStartsNotWith('Unrecorded issue', $over->Outcome);
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
+    }
+
+    /**
+     * Ryan, 7 Oct 2026, with head office's own script: "update the amended
+     * with the original column values". Head office has balanced a miscount
+     * by hand, so the preview has nothing to write and the balanceable chain
+     * cannot be pressed. Reset to original takes the hand balancing off; the
+     * preview after it balances from the staff counts and the press writes it.
+     * Each step unwinds in order.
+     */
+    public function test_reset_to_original_lets_a_chain_head_office_balanced_by_hand_be_balanced_here(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 1, 0]],
+            '2026-07-19' => [1 => [1, 0, 3, 0], 3 => [3, 0, 2, 1]],
+            '2026-07-20' => [1 => [2, 0, 2, 0], 3 => [2, 0, 1, 1]],
+            '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+        // Head office: the night's closing up to 3, the day's opening with it.
+        $this->setRow(self::DUP_ITEM, '2026-07-18', 3, ['QtyClose' => 3]);
+        $this->setRow(self::DUP_ITEM, '2026-07-19', 1, ['QtyOpen' => 3]);
+
+        $handBalanced = $this->previewArea(self::SHELF_AREA);
+        $this->assertFalse($handBalanced->lines->contains(fn ($l) => $l->ChainBlocked), 'Balanceable…');
+        $this->assertFalse($handBalanced->lines->contains(fn ($l) => $l->WouldAmend), '…and nothing to write: PumpIT holds the answer.');
+
+        $reset = $this->service->resetToOriginal($handBalanced);
+        $this->assertSame('RESET', $reset['status']->Code);
+        $this->assertStringContainsString('2 shift(s) put back to the original counts', $reset['status']->Message);
+        $this->assertEqualsWithDelta(1.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.0005);
+        $this->assertEqualsWithDelta(1.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyOpen, 0.0005);
+
+        $handBalanced->refresh();
+        $this->assertSame('committed', $handBalanced->Status);
+        $this->assertSame('reset', $handBalanced->CommitKind);
+        $ledger = StockReconAmendment::query()->acrossBranches()->where('RunId', $handBalanced->Id)->get();
+        $this->assertCount(2, $ledger);
+        $this->assertEqualsWithDelta(3.0, (float) $ledger->firstWhere('ShiftNo', 3)->PriorQtyClose, 0.0005, 'The hand figure is the prior.');
+
+        // The audit trail names it.
+        $this->assertSame(2, $this->db()->table(config('agora.schema').'.vw_PumpItChange')
+            ->where('Ledger', 'StockReconAmendment')->where('Ref', 'Stock recon run '.$handBalanced->Id)
+            ->where('Action', 'Reset to original')->count());
+
+        // The preview after it balances from the staff counts, and writes.
+        $next = $reset['run']->load('lines');
+        $miscount = $this->lineAt($next, '2026-07-18', 3);
+        $this->assertTrue((bool) $miscount->WouldAmend);
+        $this->assertEqualsWithDelta(3.0, (float) $miscount->QtyCloseNew, 0.005);
+
+        $commit = $this->service->commit($next);
+        $this->assertSame('COMMITTED', $commit['status']->Code, 'A balancing commit stands on the reset.');
+        $this->assertEqualsWithDelta(3.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.0005);
+
+        // Unwound in order: the reset refuses while the balancing stands.
+        try {
+            $this->service->reverse($handBalanced->fresh(), 'TEST-out of order');
+            $this->fail('The reset must not be reversed over the balancing written on it.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('COUNT_MOVED', $e->code());
+        }
+
+        $this->service->reverse($next->fresh(), 'TEST-balancing off');
+        $this->assertEqualsWithDelta(1.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.0005);
+        $this->service->reverse($handBalanced->fresh(), 'TEST-reset off');
+        $this->assertEqualsWithDelta(3.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.0005, 'Back to the hand figure.');
+        $this->assertEqualsWithDelta(3.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyOpen, 0.0005);
+    }
+
+    /** The press is on the run, and lands on the preview made after it. */
+    public function test_the_reset_press_is_on_the_run_and_lands_on_the_new_preview(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 1, 0]],
+            '2026-07-19' => [1 => [1, 0, 3, 0], 3 => [3, 0, 2, 1]],
+            '2026-07-20' => [1 => [2, 0, 2, 0], 3 => [2, 0, 1, 1]],
+            '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+        $this->setRow(self::DUP_ITEM, '2026-07-18', 3, ['QtyClose' => 3]);
+        $this->setRow(self::DUP_ITEM, '2026-07-19', 1, ['QtyOpen' => 3]);
+        $run = $this->previewArea(self::SHELF_AREA);
+
+        $this->actingAs($this->person('admin'));
+        $this->get(route('app.stockrecon.run', $run))
+            ->assertOk()
+            ->assertSee('Reset to original')
+            ->assertSee('already balanced in PumpIT', false);
+
+        $response = $this->post(route('app.stockrecon.reset', $run));
+        $next = StockReconRun::query()->acrossBranches()->where('BranchId', self::BRANCH)->orderByDesc('Id')->first();
+
+        $this->assertNotSame($run->Id, $next->Id);
+        $response->assertRedirect(route('app.stockrecon.run', $next))
+            ->assertSessionHas('committed', fn ($m) => str_contains($m, 'Previewed again as run '.$next->Id.': 2 shifts to amend'));
+    }
+
+    /**
+     * With reset_issues on, the issue goes back to the original too, and comes
+     * back on reversal. Off — the default — the issue is left as it stands.
+     */
+    public function test_reset_to_original_puts_the_issue_back_and_reverse_restores_it(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.reset_issues' => true]);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 6, 8, 1], 3 => [8, 0, 7, 1]],
+            '2026-07-19' => [1 => [7, 0, 6, 1], 3 => [6, 0, 6, 0]],
+            '2026-07-20' => [1 => [6, 0, 5, 1], 3 => [5, 0, 5, 0]],
+            '2026-07-21' => [1 => [5, 0, 5, 0], 3 => [5, 0, 4, 1]],
+        ]);
+        // Head office cut the issue to 5 and the closing with it.
+        $this->setRow(self::DUP_ITEM, '2026-07-18', 1, ['QtyIssued' => 5, 'QtyClose' => 7]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $this->service->resetToOriginal($run);
+
+        $row = $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1);
+        $this->assertEqualsWithDelta(6.0, (float) $row->QtyIssued, 0.0005, 'The issue as staff keyed it.');
+        $this->assertEqualsWithDelta(8.0, (float) $row->QtyClose, 0.0005);
+
+        $amendment = StockReconAmendment::query()->acrossBranches()->where('RunId', $run->Id)->sole();
+        $this->assertEqualsWithDelta(5.0, (float) $amendment->PriorQtyIssued, 0.0005);
+        $this->assertEqualsWithDelta(6.0, (float) $amendment->NewQtyIssued, 0.0005);
+
+        $this->service->reverse($run->fresh(), 'TEST-reset off');
+        $row = $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1);
+        $this->assertEqualsWithDelta(5.0, (float) $row->QtyIssued, 0.0005, 'Head office\'s issue is back.');
+        $this->assertEqualsWithDelta(7.0, (float) $row->QtyClose, 0.0005);
+        config(['stockrecon.reset_issues' => false]);
+        $again = $this->previewArea(self::SHELF_AREA);
+        $this->service->resetToOriginal($again);
+        $row = $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1);
+        $this->assertEqualsWithDelta(5.0, (float) $row->QtyIssued, 0.0005, 'Off: the issue stays as head office keyed it.');
+        $this->assertEqualsWithDelta(8.0, (float) $row->QtyClose, 0.0005, 'The counts still go back.');
+    }
+
+    /**
      * An over no short covers is still stock from nowhere: the same day
      * closing on 3 from an opening of 1, with no short before or after it.
      */

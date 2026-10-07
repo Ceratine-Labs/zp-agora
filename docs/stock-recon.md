@@ -118,6 +118,52 @@ balances to exactly T.
 
 ---
 
+### A chain whose total is nil always balances — since 7 Oct 2026
+
+Ryan, 7 Oct 2026: *"if it shows out by 0 WHY DOES IT NOT BALANCE"*. A nil chain
+has nothing missing, so no finding holds it back: U1–U4, S1, F2, E1, the caps
+and "too short" are still raised and reported on the exceptions, but the chain
+balances. It also runs through every break, whatever its size — split at a big
+break, a nil chain becomes one segment ending over and one ending short, held
+back as U4. The client's engine reads S12 on a closing moved at such a break;
+the audit-conflict check (F3) does not withdraw the chain for it. What still
+holds a nil chain: a write that cannot be made (a closing below zero, a dormant
+shift moved) and a possible duplicate (D2).
+
+### Reset to original — since 7 Oct 2026
+
+Head office balances by hand in PumpIT: the live columns move, the `_Original`
+ones keep what staff counted. Where the hand balancing already holds the
+answer, the preview has nothing to write — a balanceable chain cannot be
+pressed (the strip says "N already balanced in PumpIT"). Head office's way back
+is a script per branch-day; Ryan gave it: `QtyOpen = QtyOpen_Original`,
+`QtyIssued = QtyIssued_Original`, `QtyClose = QtyClose_Original`.
+
+**Reset to original** on a run is that script for the shifts the run covers
+(`agora.usp_StockRecon_ResetToOriginal`, permission `stockrecon.runs.execute`):
+
+* every row's prior goes to `agora.StockReconAmendment` first, the run is
+  marked committed with `CommitKind = 'reset'`, and its **Reverse** puts it
+  all back (refusing, COUNT_MOVED, while a balancing written since stands —
+  reverse that first);
+* a chain a possible duplicate holds back is left alone;
+* a shift carrying a balancing amendment from another run is skipped;
+* the same window is then **previewed again** and the operator lands on it:
+  the chains balance from the staff counts and **Amend** writes them. A
+  balancing commit may stand on a reset.
+
+**The issue is reset only when `config('stockrecon.reset_issues')` is true**
+(a literal, false by default) and `issue_mode` is `live`. The issue head office
+changed at balancing is usually a missing issue captured (S4a); undoing it
+brings the over back as an unrecorded issue. Measured on branch 23, 1–29 Sep
+(local copy): counts only — 81 chains to write (517 shifts), 55 held back;
+counts and issues — 65 to write, 89 held back. Before the reset: 37 to write,
+45 already balanced in PumpIT, 56 held back.
+
+The audit trail names it *Reset to original* (`v1__22e`).
+
+---
+
 ## The client's rules (ZRP weekly pack, 23 Sep 2026)
 
 On 23 Sep 2026 ZRP's CEO issued the *Weekly Stock Recon Process* pack to the
@@ -409,6 +455,7 @@ the same size) without any duplicate rule.
 |---|---|
 | `agora.usp_StockRecon_PreviewBalancing` | The whole answer, computed and recorded. Reads PumpIT through `agora.vw_Stock*`; writes only Agora's ledger. |
 | `agora.usp_StockRecon_Commit` | Acts on the ticked rows of a recorded run, re-checks each one, writes the amendment record. Touches PumpIT in `live` mode only. |
+| `agora.usp_StockRecon_ResetToOriginal` | Puts one run's shifts back to the staff's original open and close (and issue, with `reset_issues`) in PumpIT, each prior kept; previewed again after. Reversed by the run's Reverse. |
 | `agora.usp_StockRecon_Reverse` | Puts back the prior pair the commit stored — and refuses the whole reversal (**COUNT_MOVED**, **ISSUE_MOVED**) if any row it wrote to PumpIT has changed since, naming the shift and what it holds now (5 Oct 2026). The legacy procedure can undo nothing. |
 | `agora.usp_StockRecon_DiscardRuns` | Throws away previews. Refuses a committed run. |
 | `agora.usp_StockRecon_GridRuns` | The runs grid. |

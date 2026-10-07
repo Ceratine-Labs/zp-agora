@@ -70,7 +70,7 @@ BEGIN
                             N' on ', CONVERT(char(10), a.TransactionDate, 23), N' shift ', a.ShiftNo,
                             CASE WHEN l.StockItemNo IS NULL
                                  THEN N' is no longer in PumpIT'
-                                 ELSE CONCAT(N' has changed since this run set its duplicate issue to 0 (it now holds issue ',
+                                 ELSE CONCAT(N' has changed since this run changed its issue (it now holds issue ',
                                              FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyIssued, 0)), '0.###'),
                                              N', opening ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyOpen, 0)), '0.###'),
                                              N', closing ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyClose, 0)), '0.###'), N')') END,

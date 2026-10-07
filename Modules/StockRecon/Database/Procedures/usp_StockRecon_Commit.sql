@@ -208,7 +208,13 @@ BEGIN
         SELECT 1 FROM agora.StockReconAmendment a
         WHERE a.BranchId = @BranchId AND a.[State] = 'active'
           AND a.AreaNo = c.AreaNo AND a.StockItemNo = c.StockItemNo
-          AND a.TransactionDate = c.TransactionDate AND a.ShiftNo = c.ShiftNo);
+          AND a.TransactionDate = c.TransactionDate AND a.ShiftNo = c.ShiftNo
+          /* A RESET TO THE ORIGINALS is the starting point this balancing was
+             previewed from, not a competing amendment (7 Oct 2026). Stacking is
+             safe: the reset's Reverse refuses (COUNT_MOVED) while this commit's
+             counts stand, so the two unwind in order. */
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconRun x
+                          WHERE x.BranchId = a.BranchId AND x.Id = a.RunId AND x.CommitKind = 'reset'));
 
     /* A duplicate is written as 0 because the issue the preview read was
        keyed twice. If the issue has been changed since, that is no longer
@@ -391,6 +397,7 @@ BEGIN
     BEGIN
         UPDATE agora.StockReconRun
            SET [Status]       = 'committed',
+               CommitKind     = NULL,
                StampMode      = @StampMode,
                CommittedAt    = SYSDATETIME(),
                CommittedBy    = @UserId,

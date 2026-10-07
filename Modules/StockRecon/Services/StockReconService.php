@@ -263,6 +263,56 @@ class StockReconService
     }
 
     /**
+     * Reset to original: put this run's shifts back to the staff's original
+     * open, issue and close in PumpIT, then preview the same window again.
+     *
+     * Ryan, 7 Oct 2026, with head office's own script: "update the amended
+     * with the original column values". Where hand balancing already holds the
+     * answer, a balanceable chain has nothing to write; reset, the preview that
+     * follows balances it from the staff counts and the press writes it. Each
+     * row's prior is kept, so this run's Reverse undoes the reset.
+     *
+     * Modes are read here and passed in, as the commit's are.
+     *
+     * @return array{status: object, lines: Collection<int, object>, run: StockReconRun}
+     */
+    public function resetToOriginal(StockReconRun $run): array
+    {
+        $sets = $this->procedures->callSets('usp_StockRecon_ResetToOriginal', [
+            'RunId' => $run->Id,
+            'BranchId' => $run->BranchId,
+            'StampMode' => (string) config('stockrecon.stamp_mode'),
+            // The issue only when both switches say so — see reset_issues.
+            'IssueMode' => config('stockrecon.reset_issues', false)
+                ? (string) config('stockrecon.issue_mode', 'off')
+                : 'off',
+            'UserId' => auth()->id(),
+        ]);
+
+        $status = ($sets[0] ?? collect())->first();
+
+        if ($status === null || ! (bool) $status->Ok) {
+            throw new AgoraProcException(
+                $status->Code ?? 'REFUSED',
+                $status->Message ?? 'The reset was declined without saying why.',
+                'usp_StockRecon_ResetToOriginal',
+            );
+        }
+
+        $next = $this->preview(
+            $run->BranchId,
+            $run->AreaNo,
+            Carbon::parse($run->FromDate),
+            Carbon::parse($run->ToDate),
+            $run->params(),
+            $run->GroupRef,
+            'After reset to original (run '.$run->Id.')',
+        );
+
+        return ['status' => $status, 'lines' => $sets[1] ?? collect(), 'run' => $next];
+    }
+
+    /**
      * Release possible duplicate issues (D2) from holding their chains back,
      * with one reason for the lot.
      *

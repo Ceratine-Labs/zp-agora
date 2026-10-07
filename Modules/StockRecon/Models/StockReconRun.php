@@ -50,6 +50,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $CommittedBy
  * @property int $CommittedRows
  * @property string $CommittedUnits
+ * @property string|null $CommitKind
  * @property Carbon|null $ReversedAt
  * @property int|null $ReversedBy
  * @property string|null $ReversalReason

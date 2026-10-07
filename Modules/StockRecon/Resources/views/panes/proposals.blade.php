@@ -73,6 +73,20 @@
     $emptyLines = $run->lines->filter(fn ($l) => $l->isEmptyChain());
     $emptyChains = $emptyLines->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->count();
     $rows = $hideEmpty ? $run->lines->reject(fn ($l) => $l->isEmptyChain()) : $run->lines;
+
+    /*
+     * Balanceable, but nothing to write: the balanced answer is what PumpIT
+     * already holds — head office balanced it by hand. Said on the strip, or
+     * "45 balanceable" beside "0 to amend" reads as a press that does not
+     * work (Ryan, 7 Oct 2026). Reset to original takes the hand balancing off.
+     */
+    $alreadyBalanced = $run->lines
+        ->groupBy(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)
+        ->filter(fn ($chain) => ! $chain->first()->ChainBlocked
+            && ! $chain->contains(fn ($l) => $l->WouldAmend)
+            && $chain->contains(fn ($l) => abs((float) $l->QtyCloseNew - (float) $l->QtyClose) > 0.0005
+                || abs((float) $l->QtyOpenNew - (float) $l->QtyOpen) > 0.0005))
+        ->count();
 @endphp
 
 <x-card :title="'Proposals'"
@@ -83,7 +97,9 @@
         ['label' => 'Shifts to amend', 'value' => \App\Support\Format::n($run->AmendedRows),
          'note' => \App\Support\Format::n($run->UnitsAmended, 3).' units moved', 'tone' => 'good'],
         ['label' => 'Chains balanceable', 'value' => \App\Support\Format::n($run->BalanceableChains),
-         'note' => 'of '.\App\Support\Format::n($run->ChainCount), 'tone' => 'good'],
+         'note' => 'of '.\App\Support\Format::n($run->ChainCount)
+             .($alreadyBalanced > 0 ? ' · '.\App\Support\Format::n($alreadyBalanced).' already balanced in PumpIT' : ''),
+         'tone' => 'good'],
         ['label' => 'Chains reported', 'value' => \App\Support\Format::n($run->BlockedChains), 'tone' => 'serious'],
         ['label' => 'Unrecorded issue', 'value' => \App\Support\Format::r($run->NetOverValue),
          'note' => \App\Support\Format::n($run->NetOverUnits, 3).' units', 'tone' => 'warn'],
@@ -118,9 +134,27 @@
                   :title="$run->BlockedChains.' '.Str::plural('chain', $run->BlockedChains).' reported rather than balanced'">
             <p>If any shift trips a test, none of the chain is amended: an over of a whole pack, no till sales
                linked, a shift that sold or closed holding more than it received, a stretch that ends over, an
-               amendment over a cap, or too few active shifts. Open a row to see which.</p>
+               amendment over a cap, or too few active shifts. Open a row to see which. A chain that totals
+               nil is never held back by these: it balances, and the finding stays on the exceptions.</p>
         </x-notice>
     @endif
+
+    {{-- Reset to original (Ryan, 7 Oct 2026: "update the amended with the
+         original column values"). Its own form, because a form cannot sit
+         inside the commit's; its button is in the action bar below. --}}
+    @can('stockrecon.runs.execute')
+        @if ($run->isOpen())
+            <form method="POST" action="{{ route('app.stockrecon.reset', $run) }}" id="reset-{{ $run->Id }}"
+                  data-confirm="{{ $stampMode === 'live' ? 'Reset these shifts to the original counts in PumpIT?' : 'Record a reset to the original counts?' }}"
+                  data-confirm-text="{{ $stampMode === 'live'
+                      ? 'Every shift on this run whose '.(config('stockrecon.reset_issues') ? 'open, issue or close' : 'open or close').' differs from the staff\'s original is set back to it in STK_StockReconLine — head office\'s hand balancing comes off. A chain held by a possible duplicate is left alone. Each row\'s prior is recorded, so reversing this run puts it all back. The same window is then previewed again, to balance from.'
+                      : 'Journal mode: the reset is recorded in Agora with each prior, and nothing in PumpIT changes.' }}"
+                  data-confirm-action="Reset"
+                  @if ($stampMode === 'live') data-confirm-danger @endif>
+                @csrf
+            </form>
+        @endif
+    @endcan
 
     <form method="POST" action="{{ route('app.stockrecon.commit', $run) }}" id="commit-{{ $run->Id }}"
           {{-- Names the table so the confirmation can say out loud that a
@@ -172,7 +206,14 @@
                     @else
                         <p><strong>Journal mode:</strong> recorded in Agora only; nothing in PumpIT changes.</p>
                     @endif
+                    <p><strong>Reset to original</strong> sets every shift on this run back to the staff's original
+                       {{ config('stockrecon.reset_issues') ? 'open, issue and close' : 'open and close' }}, then previews again — so a chain head office balanced by hand is
+                       balanced here. Reverse this run to undo it.</p>
                 </x-info>
+
+                @can('stockrecon.runs.execute')
+                    <button type="submit" form="reset-{{ $run->Id }}" class="btn-ghost">Reset to original</button>
+                @endcan
             </x-action-bar>
         @endif
 
