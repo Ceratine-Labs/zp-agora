@@ -48,6 +48,15 @@ says so. Do not add it back without also moving Agora off `/app`.
 
 ## The deploy
 
+> **Ship a commit, not a working tree (7 Oct 2026).** `scripts/deploy.sh`
+> rsyncs the checkout as it stands when the rsync runs. A deploy approved for
+> 09aafc3 was dry-run clean and, minutes later, shipped another session's
+> unfinished stock recon procedure from the same checkout and ran its
+> migration on live; it was restored within minutes and nothing ran on it. The
+> script now refuses while any code is modified or untracked (`--dry-run`
+> warns). Commit or stash, or deploy from `git worktree add` of the commit;
+> `--allow-dirty` is for a named go-ahead to ship exactly that uncommitted work.
+
 Agora is deployed by **rsync from a local checkout**, not by a git pull — the
 server has no `.git`, so nothing on the box can tell you what it is running.
 The commit is recorded in the project manager's deployment row instead.

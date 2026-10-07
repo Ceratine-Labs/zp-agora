@@ -5,6 +5,7 @@
 #   scripts/deploy.sh              build, ship, migrate, seed, cache, restart
 #   scripts/deploy.sh --no-migrate ship without touching the database
 #   scripts/deploy.sh --dry-run    show what would be shipped and stop
+#   scripts/deploy.sh --allow-dirty  ship uncommitted code too (named go-ahead only)
 #
 # This exists because the exclude list is not something to retype from memory.
 # Two of the entries below have already caused an incident:
@@ -40,6 +41,7 @@ HOST="${AGORA_DEPLOY_HOST:-root@agora.ceratine.com}"
 REMOTE="${AGORA_DEPLOY_PATH:-/var/www/agora}"
 MIGRATE=1
 DRY=""
+ALLOW_DIRTY=0
 
 for arg in "$@"; do
     case "$arg" in
@@ -47,9 +49,35 @@ for arg in "$@"; do
         # --itemize-changes because a bare --dry-run prints nothing at all:
         # it would "show what would be shipped" by showing an empty screen.
         --dry-run)    DRY="--dry-run --itemize-changes" ;;
+        # Ship uncommitted code on purpose — only on a named go-ahead for
+        # exactly that work (the live-mirror + overlay deploys).
+        --allow-dirty) ALLOW_DIRTY=1 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
 done
+
+# SHIP A COMMIT, NOT A WORKING TREE. rsync sends the tree as it is at the
+# moment it runs. On 7 Oct 2026 a deploy approved for one commit (09aafc3)
+# was dry-run clean, and minutes later shipped another session's unfinished
+# edits to the stock recon preview procedure, which had appeared in the same
+# checkout in between — and ran their migration on live. It was restored
+# within minutes and nothing ran on it, but the dry-run had proved nothing.
+# So a real deploy refuses while any code is modified or untracked; commit
+# it, stash it, or deploy from a clean worktree of the commit
+# (git worktree add). A dry run says so and carries on.
+dirty=$(git status --porcelain -- Modules app bootstrap config database lang resources routes scripts public \
+            composer.json composer.lock package.json package-lock.json vite.config.js 2>/dev/null || true)
+if [ -n "$dirty" ]; then
+    if [ -n "$DRY" ]; then
+        echo "==> NOTE: uncommitted code in this checkout — a real deploy would refuse:" >&2
+        echo "$dirty" >&2
+    elif [ "$ALLOW_DIRTY" -ne 1 ]; then
+        echo "Refusing to deploy: uncommitted code in this checkout would ship with it:" >&2
+        echo "$dirty" >&2
+        echo "Commit or stash it, deploy from a clean worktree, or pass --allow-dirty on a go-ahead for exactly this." >&2
+        exit 1
+    fi
+fi
 
 # Refuse to deploy a tree that does not pass its own gates. A deploy is not
 # the place to find out that pint or a procedure check fails.
