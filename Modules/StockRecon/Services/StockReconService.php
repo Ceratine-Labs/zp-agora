@@ -486,12 +486,15 @@ class StockReconService
      *                            written. On since 5 Oct 2026 (PM decision
      *                            01a10b21). The commit takes it too.
      *
-     * @return array{RemoveDuplicates: int, BlockPossibleDuplicates: int}
+     * @return array{RemoveDuplicates: int, UseOriginalCounts: int, BlockPossibleDuplicates: int}
      */
     protected function duplicateSwitches(): array
     {
         return [
             'RemoveDuplicates' => (int) (config('stockrecon.issue_mode') === 'live'),
+            // Always the original values (Ryan, 7 Oct 2026: "we must use
+            // original"). Recorded on the run, so the commit replays it.
+            'UseOriginalCounts' => 1,
             'BlockPossibleDuplicates' => (int) (bool) config('stockrecon.exceptions.D2.blocks', false),
         ];
     }

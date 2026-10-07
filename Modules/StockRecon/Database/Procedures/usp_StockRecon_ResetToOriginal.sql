@@ -29,8 +29,10 @@
  *   - A shift carrying a balancing amendment from another run is left alone
  *     and says so: reverse that run first.
  *
- * Only shifts whose original is recorded and differs. A run made since is the
- * one to balance from: the preview that follows reads PumpIT as reset.
+ * Only shifts whose original is recorded and differs — and, for each item,
+ * the closing of the shift just before the week, which the preview reads as
+ * the first previous closing (7 Oct 2026). A run made since is the one to
+ * balance from: the preview that follows reads PumpIT as reset.
  *
  * Result set 1: the status row.
  * Result set 2: one row per shift considered, written or skipped and why.
@@ -95,6 +97,47 @@ BEGIN
            OR (@IssueMode = 'live' AND l.QtyIssued_Original IS NOT NULL
                AND ABS(ISNULL(l.QtyIssued, 0) - l.QtyIssued_Original) > @eps));
 
+    /* AND THE SHIFT JUST BEFORE THE WEEK, its closing only (7 Oct 2026). The
+       preview reads the ORIGINAL closing of the last shift before the window
+       as the first opening's previous closing; where head office changed it
+       by hand (about one item in seven, September), the chain cannot be
+       written without breaking PumpIT at the week's edge. So its closing goes
+       back too — the opening, the issue and the rest of that shift's week are
+       not touched. It is not a line of this run: its amendment carries the
+       NEGATIVE id of the item's first line, so the run's Reverse finds it and
+       the ledger's key stays unique. */
+    DECLARE @From DATE = (SELECT FromDate FROM agora.StockReconRun WHERE BranchId = @BranchId AND Id = @RunId);
+
+    ;WITH items AS (
+        SELECT AreaNo, StockItemNo, MIN(Id) AS FirstLineId, MAX(CONVERT(int, DupHold)) AS Held
+        FROM agora.StockReconRunLine
+        WHERE BranchId = @BranchId AND RunId = @RunId
+        GROUP BY AreaNo, StockItemNo
+    ),
+    before AS (
+        SELECT l.AreaNo, l.StockItemNo, CONVERT(date, l.TransactionDate) AS TransactionDate, l.ShiftNo,
+               l.QtyOpen, l.QtyClose, l.QtyClose_Original, l.QtyIssued,
+               ROW_NUMBER() OVER (PARTITION BY l.AreaNo, l.StockItemNo
+                                  ORDER BY l.TransactionDate DESC, l.ShiftNo DESC) AS rn
+        FROM agora.vw_StockReconLine l
+        JOIN items i ON i.AreaNo = l.AreaNo AND i.StockItemNo = l.StockItemNo
+        WHERE l.BranchId = @BranchId
+          AND l.TransactionDate >= DATEADD(day, -35, @From)
+          AND l.TransactionDate <  @From
+    )
+    INSERT INTO #reset (Id, [LineNo], AreaNo, StockItemNo, TransactionDate, ShiftNo,
+                        PriorOpen, PriorClose, PriorIssued, NewOpen, NewClose, NewIssued, SkipReason)
+    SELECT -i.FirstLineId, 0, b.AreaNo, b.StockItemNo, b.TransactionDate, b.ShiftNo,
+           CONVERT(decimal(18,3), ISNULL(b.QtyOpen, 0)), CONVERT(decimal(18,3), ISNULL(b.QtyClose, 0)),
+           CONVERT(decimal(18,3), ISNULL(b.QtyIssued, 0)),
+           CONVERT(decimal(18,3), ISNULL(b.QtyOpen, 0)), CONVERT(decimal(18,3), b.QtyClose_Original),
+           CONVERT(decimal(18,3), ISNULL(b.QtyIssued, 0)), NULL
+    FROM before b
+    JOIN items i ON i.AreaNo = b.AreaNo AND i.StockItemNo = b.StockItemNo
+    WHERE b.rn = 1 AND i.Held = 0
+      AND b.QtyClose_Original IS NOT NULL
+      AND ABS(ISNULL(b.QtyClose, 0) - b.QtyClose_Original) > @eps;
+
     /* A balancing amendment from another run still standing on the shift: two
        priors on one row and no way to know which is real. Reverse that first.
        An earlier reset is not one of them — its "new" is the original, so a
@@ -108,7 +151,8 @@ BEGIN
           AND a.TransactionDate = r.TransactionDate AND a.ShiftNo = r.ShiftNo);
 
     DECLARE @Written INT = (SELECT COUNT(*) FROM #reset WHERE SkipReason IS NULL),
-            @Skipped INT = (SELECT COUNT(*) FROM #reset WHERE SkipReason IS NOT NULL);
+            @Skipped INT = (SELECT COUNT(*) FROM #reset WHERE SkipReason IS NOT NULL),
+            @Anchors INT = (SELECT COUNT(*) FROM #reset WHERE SkipReason IS NULL AND Id < 0);
 
     IF NOT EXISTS (SELECT 1 FROM #reset)
         THROW 51000, 'AGORA:NOTHING_TO_RESET:Every shift on this run already holds the original counts.', 1;
@@ -180,6 +224,9 @@ BEGIN
            CASE WHEN @Written = 0
                 THEN 'Nothing was reset. ' + ISNULL((SELECT TOP 1 SkipReason FROM #reset WHERE SkipReason IS NOT NULL), '')
                 ELSE CONVERT(nvarchar(20), @Written) + ' shift(s) put back to the original counts'
+                     + CASE WHEN @Anchors > 0
+                            THEN ' (' + CONVERT(nvarchar(20), @Anchors) + ' of them the closing just before the week)'
+                            ELSE '' END
                      + CASE WHEN @Skipped > 0 THEN ', ' + CONVERT(nvarchar(20), @Skipped) + ' skipped (each says why)' ELSE '' END
                      + CASE WHEN @StampMode = 'live' THEN ', written to PumpIT.'
                             ELSE ', recorded in Agora only — PumpIT was not touched.' END

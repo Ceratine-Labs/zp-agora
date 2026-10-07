@@ -63,7 +63,8 @@
         A <strong>clear</strong> duplicate (D1) is an issue keyed twice: the shift is short by exactly the issue
         and the identical issue on the shift beside it arrived, so the issue is set to 0 and nobody is charged.
         A <strong>possible</strong> one (D2) cannot be proven from the counts, so it holds its item's chain back
-        until the site corrects the issue in PumpIT or somebody releases it with a reason.
+        until somebody who has checked the issue book releases it with a reason. Correcting the issue in PumpIT
+        does not clear it: Agora works on what staff keyed (the original values).
     </x-slot:info>
 
     @if ($cases->isEmpty())

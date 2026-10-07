@@ -613,6 +613,49 @@ class BalancingTest extends TestCase
         $this->assertEqualsWithDelta(3.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyOpen, 0.0005);
     }
 
+    /**
+     * Ryan, 7 Oct 2026: "we must use original". The preview reads the
+     * ORIGINAL closing of the shift just before the week as the first
+     * previous closing, and the ORIGINAL issue and POS — so Reset to original
+     * puts that closing back too (not its opening or issue), recorded and
+     * reversible like the rest.
+     */
+    public function test_the_calculation_is_on_the_originals_and_reset_puts_back_the_closing_before_the_week(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-16' => [3 => [5, 0, 4, 1]],
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 6, 9, 1]],
+            '2026-07-18' => [1 => [9, 0, 9, 0], 3 => [9, 0, 8, 1]],
+            '2026-07-19' => [1 => [8, 0, 8, 0], 3 => [8, 0, 7, 1]],
+            '2026-07-20' => [1 => [7, 0, 7, 0], 3 => [7, 0, 6, 1]],
+            '2026-07-21' => [1 => [6, 0, 6, 0], 3 => [6, 0, 5, 1]],
+        ]);
+        // Head office: the closing before the week up to 6, an issue and a
+        // POS changed by hand inside it.
+        $this->setRow(self::DUP_ITEM, '2026-07-16', 3, ['QtyClose' => 6]);
+        $this->setRow(self::DUP_ITEM, '2026-07-17', 3, ['QtyIssued' => 8]);
+        $this->setRow(self::DUP_ITEM, '2026-07-18', 3, ['QtyComputer' => 3]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $first = $this->lineAt($run, '2026-07-17', 1);
+        $this->assertEqualsWithDelta(4.0, (float) $first->PrevClose, 0.0005, 'The ORIGINAL closing before the week.');
+        $this->assertEqualsWithDelta(6.0, (float) $this->lineAt($run, '2026-07-17', 3)->QtyIssued, 0.0005, 'The issue as keyed by staff.');
+        $this->assertEqualsWithDelta(1.0, (float) $this->lineAt($run, '2026-07-18', 3)->QtyPOS, 0.0005, 'The POS as counted.');
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVar) < 0.0005), 'On the originals every shift is nil.');
+
+        $reset = $this->service->resetToOriginal($run);
+        $this->assertStringContainsString('1 of them the closing just before the week', $reset['status']->Message);
+        $this->assertEqualsWithDelta(4.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-16', 3)->QtyClose, 0.0005);
+        $this->assertEqualsWithDelta(5.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-16', 3)->QtyOpen, 0.0005, 'Its opening is not touched.');
+        $this->assertEqualsWithDelta(6.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyIssued, 0.0005, 'The issue goes back too.');
+        $this->assertSame(1, StockReconAmendment::query()->acrossBranches()->where('RunId', $run->Id)->where('RunLineId', '<', 0)->count());
+
+        $this->service->reverse($run->fresh(), 'TEST-reset off');
+        $this->assertEqualsWithDelta(6.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-16', 3)->QtyClose, 0.0005, 'Reversed: the hand figure is back.');
+        $this->assertEqualsWithDelta(8.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyIssued, 0.0005);
+    }
+
     /** The press is on the run, and lands on the preview made after it. */
     public function test_the_reset_press_is_on_the_run_and_lands_on_the_new_preview(): void
     {
@@ -1050,12 +1093,14 @@ class BalancingTest extends TestCase
     {
         // One extra unit sold on the last shift, with nothing issued to cover
         // it, tips the whole window over.
+        // The sale as counted — the original column, which every preview
+        // reads since 7 Oct 2026 — and the live one with it.
         $this->db()->table('PumpIT.dbo.STK_StockReconLine')
             ->where('SSBranchId', self::BRANCH)
             ->where('StockItemNo', self::ITEM)
             ->where('TransactionDate', '2026-07-21')
             ->where('ShiftNo', 3)
-            ->update(['QtyComputer' => 100]);
+            ->update(['QtyComputer' => 100, 'QtyComputer_Original' => 100]);
 
         $run = $this->preview();
         $lines = $run->lines->where('StockItemNo', self::ITEM);
@@ -1848,7 +1893,12 @@ class BalancingTest extends TestCase
 
         $again = $this->previewArea(self::SHELF_AREA);
         $line = $this->lineAt($again, '2026-07-17', 3);
-        $this->assertNull($line->DupTier, 'PumpIT already holds the answer: nothing is found twice.');
+        // On the original basis (7 Oct 2026) the duplicate is in what staff
+        // keyed, so it is found again — but PumpIT already holds 0, so there
+        // is nothing to write and it says so.
+        $this->assertSame('D1', $line->DupTier, 'Found in the originals.');
+        $this->assertNull($line->QtyIssuedNew, 'Nothing to write: PumpIT holds 0.');
+        $this->assertSame('Already taken out: PumpIT holds no issue on this shift', $line->DupReason);
         $this->assertSame('S4b', $line->AuditCode, 'The client\'s pack reads it as "issue reduced at balancing".');
         $this->assertSame(0, (int) $again->fresh()->AmendedRows);
 
@@ -1908,7 +1958,7 @@ class BalancingTest extends TestCase
 
         $this->assertSame(1, $night->DupTwinShift, 'Each names the other as its twin.');
         $this->assertSame(3, $day->DupTwinShift);
-        $this->assertSame('Held back, possible duplicate (D2): twin 17 Jul shift 1; fix PumpIT or release', $night->Outcome,
+        $this->assertSame('Held back, possible duplicate (D2): twin 17 Jul shift 1; check, then release', $night->Outcome,
             'The row says it is held, names the twin, and says the two ways out.');
         $this->assertSame('Held back, possible duplicate (D2)', $night->outcomeLabel());
         $this->assertTrue($run->lines->every(fn ($l) => $l->ChainBlocked && $l->DupHold), 'The whole chain is held back.');
@@ -2124,9 +2174,12 @@ class BalancingTest extends TestCase
         $rekeyed = $this->previewArea(self::SHELF_AREA);
         $night = $this->lineAt($rekeyed, '2026-07-17', 3);
 
+        // On the original basis the counted issue is still 20 — the re-key
+        // is in PumpIT's live column only — and the release no longer stands
+        // because PumpIT does not hold the 20 it was given for.
         $this->assertSame('D2', $night->DupTier);
-        $this->assertEqualsWithDelta(22.0, (float) $night->DupQty, 0.005);
-        $this->assertNull($night->DupReleaseId, 'The release was of 20.');
+        $this->assertEqualsWithDelta(20.0, (float) $night->DupQty, 0.005);
+        $this->assertNull($night->DupReleaseId, 'PumpIT no longer holds the 20 the release was given for.');
         $this->assertTrue($rekeyed->lines->every(fn ($l) => $l->DupHold && $l->ChainBlocked), 'Held back again.');
 
         // And the run that was released against cannot release the old issue

@@ -134,13 +134,16 @@ return [
     | QtyIssued back to QtyIssued_Original as well — head office's third UPDATE
     | — and only when issue_mode above is 'live'.
     |
-    | FALSE BY DEFAULT, because the issue head office changed at balancing is
-    | usually a missing issue captured (the pack's S4a), and undoing it brings
-    | the over back as an unrecorded issue. Measured on branch 23, 1-29 Sep
-    | (local copy): counts only, 81 chains to write and 55 held back; counts
-    | and issues, 65 to write and 89 held back. A literal, like the modes.
+    | TRUE SINCE 7 OCT 2026, when the calculation moved onto the original
+    | issue and POS as well as the counts (Ryan: "we must use original"). The
+    | counts a commit writes are balanced against the ORIGINAL issue, so PumpIT
+    | has to hold that issue too, or the shift reads short or over there by
+    | whatever head office changed. (It was false while the calculation read
+    | the live issue: then undoing a captured missing issue, the pack's S4a,
+    | brought the over back — 81 chains to write against 65 on branch 23.)
+    | A literal, like the modes.
     */
-    'reset_issues' => false,
+    'reset_issues' => true,
 
     /*
     | Areas whose AreaGroup is in this list are excluded from every figure.
@@ -243,14 +246,9 @@ return [
             'type' => 'bool',
         ],
 
-        'UseOriginalCounts' => [
-            'label' => 'Recompute from the original counts',
-            'help' => 'On, the preview reads QtyOpen_Original and QtyClose_Original, which is what makes '
-                .'a run idempotent — re-running never compounds an earlier amendment. Turn it off only to '
-                .'balance on top of edits somebody has already made by hand.',
-            'default' => 1,
-            'type' => 'bool',
-        ],
+        /* 'UseOriginalCounts' was an option here until 7 Oct 2026. It is not a
+           choice any more: every preview calculates on the original values
+           (Ryan: "we must use original"), and StockReconService passes it on. */
     ],
 
     /*
@@ -339,7 +337,7 @@ return [
         | stockrecon.duplicates.release). A released D2 is still listed.
         */
         'D2' => ['plain' => 'The same issue was keyed on a shift next to this one, and this shift is short by about that amount — but the counts cannot prove which issue was real.',
-            'todo' => 'Check the issue book, the storeroom count or the delivery note. Correct the issue in PumpIT, or release it here with a reason. Until then nothing on this item is written.',
+            'todo' => 'Check the issue book, the storeroom count or the delivery note, then release it here with a reason. Correcting the issue in PumpIT does not clear it — Agora works on what staff keyed. Until it is released nothing on this item is written.',
             'who' => 'Site manager',
             'tone' => 'serious', 'label' => 'Possible duplicate issue',
             'test' => 'short within 10% of the issue, an identical issue on a neighbouring shift, not clear',
@@ -406,8 +404,8 @@ return [
             'blocks' => true,
             'blurb' => 'Stock was issued, nothing was sold, and the count did not move. Either the issue '
                 .'was never delivered or the count was never taken.'],
-        'F3' => ['plain' => 'An issue was changed when the recon was balanced by hand, and a count was moved to match. With that change in place no set of counts passes every one of the weekly checks.',
-            'todo' => 'Put the issue back as it was keyed, or confirm it against the issue book, then preview again.',
+        'F3' => ['plain' => 'An issue or a POS quantity was changed by hand in PumpIT, or the closing just before the week was, so the counts Agora would write cannot line up with what PumpIT holds without breaking one of the weekly checks.',
+            'todo' => 'Press Reset to original — it puts the hand changes back to the original values — then preview again.',
             'who' => 'Site manager',
             'tone' => 'warn', 'label' => 'Audit conflict — issue changed at balancing',
             'test' => 'writing the chain would trip S7, S8, S11, S12 or S13 on a shift that trips none today',

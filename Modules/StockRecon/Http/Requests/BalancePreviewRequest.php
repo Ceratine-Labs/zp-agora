@@ -45,7 +45,6 @@ class BalancePreviewRequest extends FormRequest
             'options.MaxAmendmentPct' => ['nullable', 'numeric'],
             'options.MaxAmendment' => ['nullable', 'integer'],
             'options.MinShiftsInChain' => ['nullable', 'integer'],
-            'options.UseOriginalCounts' => ['nullable', 'boolean'],
             'options.HoldBackIncomplete' => ['nullable', 'boolean'],
             'options.KeepBreaksUpTo' => ['nullable', 'integer'],
         ];

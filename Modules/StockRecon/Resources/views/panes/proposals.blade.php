@@ -171,7 +171,7 @@
                   data-loader="Putting the original counts back, then balancing again…"
                   data-confirm="{{ $stampMode === 'live' ? 'Reset these shifts to the original counts in PumpIT?' : 'Record a reset to the original counts?' }}"
                   data-confirm-text="{{ $stampMode === 'live'
-                      ? 'Every shift on this run whose '.(config('stockrecon.reset_issues') ? 'open, issue or close' : 'open or close').' differs from the staff\'s original is set back to it in STK_StockReconLine — head office\'s hand balancing comes off. A chain held by a possible duplicate is left alone. Each row\'s prior is recorded, so reversing this run puts it all back. The same window is then previewed again, to balance from.'
+                      ? 'Every shift on this run whose '.(config('stockrecon.reset_issues') ? 'open, issue or close' : 'open or close').' differs from the staff\'s original is set back to it in STK_StockReconLine, with the closing of the shift just before the week — head office\'s hand balancing comes off. A chain held by a possible duplicate is left alone. Each row\'s prior is recorded, so reversing this run puts it all back. The same window is then previewed again, to balance from.'
                       : 'Journal mode: the reset is recorded in Agora with each prior, and nothing in PumpIT changes.' }}"
                   data-confirm-action="Reset"
                   @if ($stampMode === 'live') data-confirm-danger @endif>
@@ -232,7 +232,8 @@
                         <p><strong>Journal mode:</strong> recorded in Agora only; nothing in PumpIT changes.</p>
                     @endif
                     <p><strong>Reset to original</strong> sets every shift on this run back to the staff's original
-                       {{ config('stockrecon.reset_issues') ? 'open, issue and close' : 'open and close' }}, then previews again — so a chain head office balanced by hand is
+                       {{ config('stockrecon.reset_issues') ? 'open, issue and close' : 'open and close' }}, and the closing just
+                       before the week, then previews again — so a chain head office balanced by hand is
                        balanced here. Reverse this run to undo it.</p>
                 </x-info>
 

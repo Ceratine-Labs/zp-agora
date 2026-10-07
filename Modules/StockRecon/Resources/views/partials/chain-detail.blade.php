@@ -109,9 +109,9 @@
                the count cannot say which issue was real. Nothing on this chain is written to PumpIT — not the
                balancing, and not a hand amendment put back — because that could return a short somebody hid by
                moving counts to staff pay.</p>
-            <p><strong>Two ways out.</strong> The site corrects the issue in PumpIT against the issue book, the
-               storeroom count or the delivery note, and the next preview no longer finds it. Or somebody who has
-               checked releases it here with a reason, and the next preview lets the chain commit.</p>
+            <p><strong>The way out.</strong> Somebody who has checked the issue book, the storeroom count or the
+               delivery note releases it here with a reason, and the next preview lets the chain commit. Correcting
+               the issue in PumpIT does not clear it: Agora works on what staff keyed (the original values).</p>
             @if ($unreleased->isNotEmpty())
                 @include('stockrecon::partials.duplicate-release', [
                     'run' => $run,

@@ -87,8 +87,8 @@
             'Why it is not proven' => rtrim((string) ($case->DupReason ?: 'The count cannot say which issue was real'), '.')
                 .'. Only the issue book, the storeroom count or the delivery note can say which issue was real.',
             'Result' => match ($case->State) {
-                'held' => 'Holding this item\'s chain back: nothing on it is written until the site corrects the issue '
-                    .'in PumpIT or somebody releases it with a reason. '.$shortValue.' stays on the shift as counted.',
+                'held' => 'Holding this item\'s chain back: nothing on it is written until somebody who has checked '
+                    .'the issue book releases it with a reason. '.$shortValue.' stays on the shift as counted.',
                 'released' => 'Released by '.$who($case->ReleasedBy).' on '.$when($case->ReleasedAt).': "'.$case->ReleaseReason
                     .'". It holds nothing back; '.$shortValue.' stays on the shift as counted.',
                 'released_since' => 'Released by '.$who($case->ReleasedBy).' on '.$when($case->ReleasedAt).', after this run '

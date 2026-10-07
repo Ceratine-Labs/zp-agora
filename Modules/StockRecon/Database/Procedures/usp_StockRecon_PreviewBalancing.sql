@@ -265,10 +265,25 @@ BEGIN
         CONVERT(decimal(18,2), ISNULL(l.SellPrice, 0))                    AS SellPrice,
         CONVERT(decimal(18,4), ISNULL(CASE WHEN @UseOriginalCounts = 1
                  THEN l.QtyOpen_Original  ELSE l.QtyOpen  END, 0))        AS QtyOpen,
-        CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0))                    AS QtyIssued,
+        /* THE ISSUE AND THE POS AS COUNTED TOO (Ryan, 7 Oct 2026: "we must
+           use original" — the customer saw us calculate on amended). Until
+           then only the counts were original and the issue and POS were the
+           live, amended columns: 3,553 issues and 2,659 POS quantities in
+           September differed. A fat-finger issue (123456, corrected later) is
+           read as corrected, as the pack's own staff basis reads it. */
+        CONVERT(decimal(18,4), CASE WHEN @UseOriginalCounts = 1
+                 THEN CASE WHEN ISNULL(l.QtyIssued_Original, 0) > 20
+                            AND ISNULL(l.QtyIssued_Original, 0) > 5 * CASE WHEN ISNULL(l.QtyIssued, 0) > 1 THEN l.QtyIssued ELSE 1 END
+                           THEN ISNULL(l.QtyIssued, 0) ELSE ISNULL(l.QtyIssued_Original, 0) END
+                 ELSE ISNULL(l.QtyIssued, 0) END)                         AS QtyIssued,
         CONVERT(decimal(18,4), ISNULL(CASE WHEN @UseOriginalCounts = 1
                  THEN l.QtyClose_Original ELSE l.QtyClose END, 0))        AS QtyClose,
-        CONVERT(decimal(18,4), ISNULL(l.QtyComputer, 0))                  AS QtyPOS,
+        CONVERT(decimal(18,4), ISNULL(CASE WHEN @UseOriginalCounts = 1
+                 THEN l.QtyComputer_Original ELSE l.QtyComputer END, 0))  AS QtyPOS,
+        /* What PumpIT holds now — the audit, the hand variance and what a
+           commit leaves behind read these. */
+        CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0))                    AS QtyIssuedNow,
+        CONVERT(decimal(18,4), ISNULL(l.QtyComputer, 0))                  AS QtyPOSNow,
         CONVERT(decimal(18,4), ISNULL(l.QtyOpen, 0))                      AS QtyOpenNow,
         CONVERT(decimal(18,4), ISNULL(l.QtyClose, 0))                     AS QtyCloseNow,
         CONVERT(decimal(18,4), ISNULL(l.QtyOpen_Original, 0))             AS QtyOpenOrig,
@@ -307,7 +322,14 @@ BEGIN
     ;WITH items AS (SELECT DISTINCT AreaNo, StockItemNo FROM #chain),
     prior AS (
         SELECT l.AreaNo, l.StockItemNo,
-               CONVERT(decimal(18,4), ISNULL(l.QtyClose, 0))          AS PredClose,
+               /* The basis: its ORIGINAL closing when the run is on the
+                  originals (7 Oct 2026) — the pack's staff basis repairs the
+                  opening to the original previous closing. Where head office
+                  changed that closing by hand, Reset to original puts it back,
+                  and until then the audit-conflict check holds the chain. */
+               CONVERT(decimal(18,4), ISNULL(CASE WHEN @UseOriginalCounts = 1
+                        THEN l.QtyClose_Original ELSE l.QtyClose END, 0)) AS PredClose,
+               CONVERT(decimal(18,4), ISNULL(l.QtyClose, 0))          AS PredCloseNow,
                CONVERT(decimal(18,4), ISNULL(l.QtyClose_Original, 0)) AS PredCloseOrig,
                ROW_NUMBER() OVER (PARTITION BY l.AreaNo, l.StockItemNo
                                   ORDER BY l.TransactionDate DESC, l.ShiftNo DESC) AS rn
@@ -317,7 +339,7 @@ BEGIN
           AND l.TransactionDate >= DATEADD(day, -35, @FromDate)
           AND l.TransactionDate <  @FromDate
     )
-    SELECT AreaNo, StockItemNo, PredClose, PredCloseOrig INTO #pred FROM prior WHERE rn = 1;
+    SELECT AreaNo, StockItemNo, PredClose, PredCloseNow, PredCloseOrig INTO #pred FROM prior WHERE rn = 1;
 
     /* The item: its pack size and whether it is weighed. Head office's
        workbook first (v1__14f), the stock master second; weighed where the
@@ -376,7 +398,7 @@ BEGIN
                LAG(c.QtyCloseOrig, 1, p.PredCloseOrig) OVER (
                    PARTITION BY c.AreaNo, c.StockItemNo
                    ORDER BY c.TransactionDate, c.ShiftNo)                   AS PrevCloseOrig,
-               LAG(c.QtyCloseNow, 1, p.PredClose) OVER (
+               LAG(c.QtyCloseNow, 1, p.PredCloseNow) OVER (
                    PARTITION BY c.AreaNo, c.StockItemNo
                    ORDER BY c.TransactionDate, c.ShiftNo)                   AS PrevCloseNow,
                CONVERT(bit, CASE WHEN LEAD(c.ShiftNo) OVER (
@@ -411,7 +433,7 @@ BEGIN
               BASIS issue below, 0 on a clear duplicate (stage 2b); every
               reading of PumpIT as it stands — the audit, the hand variance,
               what the run records as issued — reads this one. */
-           rep.QtyIssued                                                         AS QtyIssuedKeyed,
+           rep.QtyIssuedNow                                                      AS QtyIssuedKeyed,
            CONVERT(decimal(18,4), 0)                                             AS IssueCut,
            CONVERT(nvarchar(2),   NULL)                                          AS DupTier,
            CONVERT(date,          NULL)                                          AS DupTwinDate,
@@ -490,10 +512,10 @@ BEGIN
         ;WITH items AS (SELECT DISTINCT AreaNo, StockItemNo FROM #rep)
         INSERT INTO #dn (AreaNo, StockItemNo, TransactionDate, ShiftNo, Q, V, InWindow)
         SELECT l.AreaNo, l.StockItemNo, CONVERT(date, l.TransactionDate), l.ShiftNo,
-               CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0)),
-               CONVERT(decimal(18,4), ISNULL(l.QtyComputer, 0)
+               CONVERT(decimal(18,4), ISNULL(CASE WHEN @UseOriginalCounts = 1 THEN l.QtyIssued_Original ELSE l.QtyIssued END, 0)),
+               CONVERT(decimal(18,4), ISNULL(CASE WHEN @UseOriginalCounts = 1 THEN l.QtyComputer_Original ELSE l.QtyComputer END, 0)
                    - (ISNULL(CASE WHEN @UseOriginalCounts = 1 THEN l.QtyOpen_Original ELSE l.QtyOpen END, 0)
-                      + ISNULL(l.QtyIssued, 0)
+                      + ISNULL(CASE WHEN @UseOriginalCounts = 1 THEN l.QtyIssued_Original ELSE l.QtyIssued END, 0)
                       - ISNULL(CASE WHEN @UseOriginalCounts = 1 THEN l.QtyClose_Original ELSE l.QtyClose END, 0))),
                CONVERT(bit, 0)
         FROM agora.vw_StockReconLine l
@@ -564,14 +586,15 @@ BEGIN
             WHERE TwinArrived = 1 AND TwinInWindow = 1 AND DayGap = 1
         ),
         iss AS (
-            SELECT l.AreaNo, l.StockItemNo, CONVERT(decimal(18,4), l.QtyIssued) AS Q
+            SELECT l.AreaNo, l.StockItemNo,
+                   CONVERT(decimal(18,4), CASE WHEN @UseOriginalCounts = 1 THEN l.QtyIssued_Original ELSE l.QtyIssued END) AS Q
             FROM agora.vw_StockReconLine l
             JOIN (SELECT DISTINCT AreaNo, StockItemNo FROM need) n
               ON n.AreaNo = l.AreaNo AND n.StockItemNo = l.StockItemNo
             WHERE l.BranchId = @BranchId
               AND l.TransactionDate >= DATEADD(day, -56, @FromDate)
               AND l.TransactionDate <  DATEADD(day, 1, @CompleteTo)
-              AND l.QtyIssued > @eps
+              AND CASE WHEN @UseOriginalCounts = 1 THEN l.QtyIssued_Original ELSE l.QtyIssued END > @eps
         )
         INSERT INTO #dusual (AreaNo, StockItemNo, Q, UsualShare)
         SELECT n.AreaNo, n.StockItemNo, n.Q,
@@ -686,6 +709,10 @@ BEGIN
           AND x.ShiftNo         = r.ShiftNo
           AND x.WithdrawnAt IS NULL
           AND ABS(x.QtyIssued - r.QtyIssued) <= @tol
+          /* And PumpIT still holds that issue — on the original basis
+             (7 Oct 2026) the counted issue never moves, so a re-key shows only
+             here; the commit checks the same and would skip the chain. */
+          AND ABS(x.QtyIssued - r.QtyIssuedNow) <= @tol
         ORDER BY x.Id DESC
     ) x
     WHERE r.DupTier = 'D2';
@@ -1046,7 +1073,7 @@ BEGIN
                                    + CASE WHEN r.MisKeyed = 1 THEN r.QtyIssuedKeyed ELSE r.QtyIssuedOrig END
                                    - r.QtyCloseOrig) + r.BreakOrig)        AS StaffVar,
                CONVERT(decimal(18,4),
-                   r.QtyPOS - (r.QtyOpenNow + r.QtyIssuedKeyed - r.QtyCloseNow)) AS HandVar
+                   r.QtyPOSNow - (r.QtyOpenNow + r.QtyIssuedKeyed - r.QtyCloseNow)) AS HandVar
         FROM ranked r
     )
     SELECT a.*,
@@ -1140,7 +1167,14 @@ BEGIN
                    PARTITION BY a.AreaNo, a.StockItemNo
                    ORDER BY a.TransactionDate, a.ShiftNo)                   AS PrevCloseP,
                a.EffOpenNew, a.EffCloseNew,
-               CONVERT(decimal(18,4), a.QtyPOS - (a.EffOpenNew + a.QtyIssued - a.EffCloseNew)) AS VarP,
+               /* What PumpIT will hold after the commit: the counts written,
+                  beside its own POS and its own issue — 0 where the commit
+                  takes out a clear duplicate. On the original basis
+                  (7 Oct 2026) those can differ from what the counts were
+                  balanced against; where that would hand the client a new
+                  flag, the chain is held for Reset to original. */
+               CONVERT(decimal(18,4), a.QtyPOSNow
+                   - (a.EffOpenNew + CASE WHEN a.IssueCut > 0 THEN 0 ELSE a.QtyIssuedKeyed END - a.EffCloseNew)) AS VarP,
                a.StaffVar, a.HandVar, a.BreakOrig, a.BreakKept, a.PrevCloseOrig, a.PrevCloseNow,
                a.QtyOpenNow, a.QtyCloseNow, a.QtyCloseOrig, a.IsLastInWindow
         FROM #apply a
@@ -1218,6 +1252,10 @@ BEGIN
     FROM #apply a
     WHERE a.IssueCut > @eps
       AND a.DupHold = 0
+      /* PumpIT still holds an issue to take out. On the original basis the
+         duplicate is found in what staff keyed whether or not it has been
+         cut since; once PumpIT holds 0 there is nothing to write. */
+      AND a.QtyIssuedKeyed > @eps
       AND (   a.ChainBlocked = 0
            OR a.RestoresHand = 1
            OR ABS(a.HandVar + a.IssueCut) <= a.DupTol);
@@ -1229,7 +1267,11 @@ BEGIN
                             THEN N'Not removed: a possible duplicate (D2) holds this chain back'
                             ELSE N'Not removed: PumpIT no longer holds this short and the chain is blocked' END,
            IsDormant = 0
-    WHERE IssueCut > @eps AND IssueWrite = 0;
+    WHERE IssueCut > @eps AND IssueWrite = 0 AND QtyIssuedKeyed > @eps;
+
+    UPDATE #apply
+       SET DupReason = N'Already taken out: PumpIT holds no issue on this shift'
+    WHERE IssueCut > @eps AND IssueWrite = 0 AND QtyIssuedKeyed <= @eps;
 
     /* And the chain's count of shifts left short (L1) follows what the row
        now ends as — on a blocked chain only, where 7f is what decided it. */
@@ -1301,7 +1343,11 @@ BEGIN
         a.AreaNo, a.StockItemNo, a.TransactionDate, a.ShiftNo, a.SellPrice,
         /* The issue as keyed: what the shift was given on paper. A removed
            duplicate shows in QtyIssuedNew. */
-        a.QtyOpen, a.QtyIssuedKeyed, a.QtyClose, a.QtyPOS, a.QtyVar,
+        /* The issue the run COUNTED with — the original since 7 Oct 2026,
+           before a clear duplicate is taken out — so the Issued column sits
+           beside the counts it was balanced against. A commit compares it to
+           what PumpIT holds and skips a duplicate whose issue has moved. */
+        a.QtyOpen, a.QtyIssued + a.IssueCut, a.QtyClose, a.QtyPOS, a.QtyVar,
         a.EffOpenNew, a.EffCloseNew, a.EffVarNew, a.EffAmend,
         a.IsDormant, a.ActiveSeq, a.ActiveLen, a.ChainNetVar,
         a.FlagNetOver, a.FlagSoldMoreThanOnHand, a.FlagCloseExceedsOnHand, a.FlagIssueWentNowhere,
@@ -1363,7 +1409,7 @@ BEGIN
                                               THEN N'Held back, possible duplicate (D2): twin '
                                                    + ISNULL(FORMAT(a.DupTwinDate, 'd MMM', 'en-US') + N' shift '
                                                             + CONVERT(nvarchar(4), a.DupTwinShift), N'unknown')
-                                                   + N'; fix PumpIT or release'
+                                                   + N'; check, then release'
             /* A finding holds a chain back only where the chain is not nil (7 Oct
                2026). On a nil chain the row says what happens to it; the finding
                stays on the exceptions. */

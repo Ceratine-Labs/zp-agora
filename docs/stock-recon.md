@@ -9,6 +9,38 @@ means. The arithmetic is the part to get right, and every default in
 
 ---
 
+## Everything is calculated on the original values (7 Oct 2026)
+
+Ryan, 7 Oct 2026: *"we must use original"* — the customer saw Agora calculate on
+amended figures. Until then only the open and close counts were read from the
+`_Original` columns; the **issue** and the **POS** were the live, amended ones
+(September: 3,553 issues and 2,659 POS quantities differed), and so was the
+**closing of the shift just before the week**, which the first opening is
+checked against (about one item in seven had it changed by hand). Now every
+preview reads all of them from the originals — the pack's own staff basis — and
+a fat-finger issue (123456, corrected later) is read as corrected, as the pack
+reads it. The live values travel beside them (`QtyIssuedNow`, `QtyPOSNow`,
+`PredCloseNow`) for the audit, the hand variance and what a commit leaves in
+PumpIT. There is no option to calculate on amended figures any more.
+
+What follows from it:
+
+* **Reset to original** puts back the counts, the **issue** (`reset_issues`,
+  true since this change) and the **closing just before the week** (not that
+  shift's opening or issue), so PumpIT holds what the counts are balanced
+  against. POS is not reset: writing `QtyComputer` would be a new write.
+* Where PumpIT still holds a hand-changed issue, POS or previous closing that
+  would make a written chain trip one of the weekly checks, the chain is held
+  as **F3** until Reset to original.
+* A **possible duplicate (D2)** is no longer cleared by correcting the issue in
+  PumpIT — the correction is in the live column, and the calculation reads what
+  staff keyed. It is released with a reason; a release stands only while
+  PumpIT holds the issue it was given for.
+* A **clear duplicate (D1)** already cut in PumpIT is still found in the
+  originals, and says *Already taken out* with nothing to write.
+
+---
+
 ## The one fact everything follows from
 
 A shift's variance is
