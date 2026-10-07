@@ -7,6 +7,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\User;
 use Modules\StockRecon\Services\StockReconService;
+use Modules\StockRecon\Http\Requests\BalancePreviewRequest;
 use Tests\TestCase;
 
 /**
@@ -128,30 +129,39 @@ class AreaSelectorTest extends TestCase
     }
 
     /**
-     * A month, then weeks inside it — not free dates (ZRP, 4 Oct 2026). The
-     * week selects post `from` and `to`, so the request is unchanged; they
-     * follow the month, and the end may not be set before the start.
+     * A month, then ONE week inside it — not free dates (ZRP, 4 Oct 2026;
+     * Ryan, 7 Oct 2026: "only let the users pick one week at a time"). The
+     * week select posts `from`; there is no end to choose — the request works
+     * it out — so no post can ask for more than a week.
      */
-    public function test_the_period_is_a_month_then_weeks_within_it(): void
+    public function test_the_period_is_a_month_then_one_week_within_it(): void
     {
         $this->actingAs($this->admin());
 
-        $page = $this->get(route('app.stockrecon.index', ['from' => '2026-09-07', 'to' => '2026-09-20']))->assertOk();
+        $page = $this->get(route('app.stockrecon.index', ['from' => '2026-09-07']))->assertOk();
 
         // Selects, not date inputs (the runs grid below has date filters of its own).
         $page->assertSee('<select id="f-from" name="from"', false);
-        $page->assertSee('<select id="f-to" name="to"', false);
+        $page->assertDontSee('name="to"', false);
         $page->assertSee('name="month"', false);
         $page->assertSee('<option value="2026-09" selected>', false);
         $page->assertSee('data-linked-select="month"', false);
-        $page->assertSee('data-not-before="from"', false);
         $this->assertMatchesRegularExpression('/value="2026-09-07"\s+data-when="2026-09"\s+selected>Week 2 · 7–13 Sep</',
-            $page->getContent(), 'The From week opens on the week ?from= falls in.');
-        $this->assertMatchesRegularExpression('/value="2026-09-20"\s+data-when="2026-09"\s+selected>Week 3 · 14–20 Sep</',
-            $page->getContent(), 'The To week opens on the week ?to= ends.');
+            $page->getContent(), 'The week opens on the week ?from= falls in.');
 
         // The standing text is behind an info button, not on the page.
         $page->assertSee('class="info', false);
+    }
+
+    /** The end is the week's, whatever is posted: a month cannot be asked for. */
+    public function test_a_preview_request_is_one_week_whatever_it_posts(): void
+    {
+        $request = BalancePreviewRequest::create('/', 'POST', ['from' => '2026-09-07', 'to' => '2026-09-30']);
+
+        $this->assertSame('2026-09-13', $request->to()->toDateString(), 'Sunday of the week, not the posted end.');
+
+        $request = BalancePreviewRequest::create('/', 'POST', ['from' => '2026-09-28']);
+        $this->assertSame('2026-09-30', $request->to()->toDateString(), 'Cut at the month\'s edge.');
     }
 
     private function admin(): User

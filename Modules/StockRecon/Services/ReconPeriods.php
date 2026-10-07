@@ -7,13 +7,14 @@ use Illuminate\Support\Carbon;
 /**
  * The months and weeks the stock recon form offers instead of free dates.
  *
- * ZRP, 4 Oct 2026: pick a month, then a week or a run of weeks inside it. A
+ * ZRP, 4 Oct 2026: pick a month, then a week inside it — ONE week since
+ * 7 Oct 2026 (Ryan: "only let the users pick one week at a time"). A
  * week is Monday to Sunday — the client's weekly pack reviews Monday–Sunday
  * weeks — and is cut at the month's edge, so "week 1" of September 2026 is
  * Tuesday 1 to Sunday 6 and the last is Monday 28 to Wednesday 30.
  *
- * The form still posts `from` and `to` as dates, so the request, the run and
- * the procedure are unchanged: this only decides which dates can be chosen.
+ * The form posts the week's first day as `from`; the request works out `to`
+ * with weekEnd(), so the run and the procedure are unchanged.
  */
 class ReconPeriods
 {
@@ -70,6 +71,20 @@ class ReconPeriods
         }
 
         return $weeks;
+    }
+
+    /**
+     * The last day of the week a date falls in: its Sunday, or the last day of
+     * its month if that comes first — the same cut weeks() makes. A preview is
+     * ONE week (Ryan, 7 Oct 2026: "only let the users pick one week at a
+     * time"), so the end is never chosen, only worked out from the start.
+     */
+    public static function weekEnd(Carbon $from): Carbon
+    {
+        $sunday = $from->copy()->startOfDay()->endOfWeek(Carbon::SUNDAY)->startOfDay();
+        $monthEnd = $from->copy()->endOfMonth()->startOfDay();
+
+        return $sunday->lt($monthEnd) ? $sunday : $monthEnd;
     }
 
     /**

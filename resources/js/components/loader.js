@@ -154,6 +154,29 @@ export default function loader() {
         if (event.persisted) clear();
     });
 
+    /*
+     * A PAGE THAT HOLDS THE LOADER (Ryan, 7 Oct 2026: "show the loader until
+     * the grid has been initialized"). The shell rendered the overlay already
+     * showing; it comes down once every `table[data-loader-hold]` is marked
+     * ready by table-tools — which has usually happened by the time this runs,
+     * as table-tools is wired first. A table that never reports (no tools on
+     * it) does not hold anything: only tables that carry tools are waited on,
+     * and the stylesheet gives up on its own after a minute whatever happens.
+     */
+    if (overlay?.hasAttribute('data-loader-hold')) {
+        const waiting = () => Array.from(document.querySelectorAll('table[data-loader-hold][data-table-tools]'))
+            .filter((table) => !table.hasAttribute('data-tt-ready'));
+
+        const release = () => {
+            if (!overlay.hasAttribute('data-loader-hold') || waiting().length > 0) return;
+            overlay.removeAttribute('data-loader-hold');
+            if (holders === 0) overlay.hidden = true;
+        };
+
+        document.addEventListener('table-tools:ready', release);
+        release();
+    }
+
     return { show, hide: clear, within, beside, submitting };
 }
 

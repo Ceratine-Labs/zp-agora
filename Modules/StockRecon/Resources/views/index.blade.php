@@ -118,27 +118,22 @@
                             ]))->all()"
                          info="One area at a time is the working habit: it keeps the proposals short enough to read before committing." />
 
-                {{-- A MONTH, THEN WEEKS INSIDE IT, not free dates (ZRP, 4 Oct
-                     2026). Monday–Sunday weeks — the client's pack reviews
-                     those — cut at the month's edge; ReconPeriods builds them.
-                     The two week selects ARE `from` and `to`, so the request
-                     and the run are unchanged, and they follow the month
-                     through linked-select.js exactly as the area follows the
-                     site. Same week in both is one week; different weeks are a
-                     run of them. `notBefore` keeps the end after the start. --}}
+                {{-- A MONTH, THEN ONE WEEK INSIDE IT, not free dates (ZRP,
+                     4 Oct 2026; one week only since 7 Oct 2026 — Ryan: "only
+                     let the users pick one week at a time"). Monday–Sunday
+                     weeks — the client's pack reviews those — cut at the
+                     month's edge; ReconPeriods builds them. The week select IS
+                     `from`, following the month through linked-select.js as the
+                     area follows the site; the request works out the week's
+                     end (BalancePreviewRequest::to()). --}}
                 <x-field name="month" label="Month" :choices="$months" :value="old('month', $month)" />
 
-                <x-field name="from" label="From week" linked="month"
+                <x-field name="from" label="Week" linked="month"
                          :value="old('from', $from)"
                          :choices="collect($weeks)->flatMap(fn ($ws, $m) => collect($ws)->map(fn ($w) => [
                              'value' => $w['from'], 'when' => $m, 'label' => $w['label'],
-                         ]))->values()->all()" />
-
-                <x-field name="to" label="To week" linked="month" not-before="from"
-                         :value="old('to', $to)"
-                         :choices="collect($weeks)->flatMap(fn ($ws, $m) => collect($ws)->map(fn ($w) => [
-                             'value' => $w['to'], 'when' => $m, 'label' => $w['label'],
-                         ]))->values()->all()" />
+                         ]))->values()->all()"
+                         info="One week at a time, Monday to Sunday, cut at the month's edge." />
 
                 {{-- What to call it. A clerk previews the same period several
                      times while tightening the caps, and "August Hot Foods,

@@ -31,12 +31,15 @@
     // 2026: "a package or a shopping cart loader for the stock recon"). The
     // app shell picks it from config('agora.loaders') by route.
     'variant' => 'cup',
+    // On the overlay only: show it from the first paint, saying this, until
+    // the page's held tables are ready (loader.js). Null: hidden as usual.
+    'hold' => null,
 ])
 
 @php($uid = 'ldr-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(6)))
 
 <div {{ $attributes->merge(['class' => 'loader'.($overlay ? ' loader-overlay' : '')]) }}
-     @if ($overlay) data-loader-overlay hidden @endif
+     @if ($overlay) data-loader-overlay @if ($hold) data-loader-hold @else hidden @endif @endif
      role="status" aria-live="polite">
     <div class="loader-box">
         @if ($variant === 'cart')
@@ -129,6 +132,6 @@
             </g>
         </svg>
         @endif
-        <p class="loader-label" data-loader-label>{{ $label }}</p>
+        <p class="loader-label" data-loader-label>{{ $hold ?: $label }}</p>
     </div>
 </div>

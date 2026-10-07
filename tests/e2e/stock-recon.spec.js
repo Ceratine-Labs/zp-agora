@@ -55,27 +55,23 @@ test.describe('stock recon centre', () => {
         await expect(page.getByText(/Virtual Items/)).toBeVisible();
     });
 
-    test('the period is a month, then weeks inside it', async ({ signedIn: page }) => {
+    test('the period is a month, then one week inside it', async ({ signedIn: page }) => {
         await page.goto('/app/stock-recon');
 
         const form = page.locator('form[action$="/stock-recon/preview"]');
         const month = form.locator('select[name="month"]');
-        const from = form.locator('select[name="from"]');
-        const to = form.locator('select[name="to"]');
+        const week = form.locator('select[name="from"]');
 
-        // ZRP, 4 Oct 2026. A month narrows the weeks in the browser, and the
-        // end cannot be set before the start.
+        // ZRP, 4 Oct 2026: a month narrows the weeks in the browser. Ryan,
+        // 7 Oct 2026: one week at a time — there is no end to choose.
+        await expect(form.locator('[name="to"]')).toHaveCount(0);
+
         const months = await month.locator('option').evaluateAll((o) => o.map((x) => x.value));
         await month.selectOption(months[1]);
 
-        const weeks = await from.locator('option:not([disabled])').allTextContents();
+        const weeks = await week.locator('option:not([disabled])').allTextContents();
         expect(weeks.length, 'four to six Monday-Sunday weeks in a month').toBeGreaterThanOrEqual(4);
         expect(weeks[0]).toMatch(/^Week 1 · /);
-
-        await from.selectOption({ label: weeks[2] });
-        const ends = await to.locator('option:not([disabled])').allTextContents();
-        expect(ends[0], 'the first end offered is the week the start is in').toBe(weeks[2]);
-        expect(await to.inputValue() >= await from.inputValue(), 'the end follows the start').toBe(true);
     });
 
     test('the counting areas narrow to the chosen site, without a round trip', async ({ signedIn: page }) => {

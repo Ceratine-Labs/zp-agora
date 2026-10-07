@@ -4,6 +4,7 @@ namespace Modules\StockRecon\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
+use Modules\StockRecon\Services\ReconPeriods;
 
 /**
  * Shape only.
@@ -31,7 +32,9 @@ class BalancePreviewRequest extends FormRequest
             // reader six months later would have to know what it meant.
             'area_no' => ['nullable', 'integer', 'min:0'],
             'from' => ['required', 'date'],
-            'to' => ['required', 'date', 'after_or_equal:from'],
+            // ONE WEEK AT A TIME (Ryan, 7 Oct 2026). The form posts only the
+            // week's first day; the end is worked out in to(), never taken
+            // from the request, so no post can ask for a month.
 
             // A name on the run. Capped at the column — 400 in the migration —
             // so a longer one is a refusal here rather than a truncation the
@@ -48,22 +51,15 @@ class BalancePreviewRequest extends FormRequest
         ];
     }
 
-    /** @return array<string, string> */
-    public function messages(): array
-    {
-        return [
-            'to.after_or_equal' => 'The end of the period cannot fall before its start.',
-        ];
-    }
-
     public function from(): Carbon
     {
         return Carbon::parse($this->date('from'))->startOfDay();
     }
 
+    /** The end of the week `from` falls in — its Sunday, or its month's last day. */
     public function to(): Carbon
     {
-        return Carbon::parse($this->date('to'))->startOfDay();
+        return ReconPeriods::weekEnd($this->from());
     }
 
     /** Null for every area at the site — never 0, which is the legacy sentinel. */

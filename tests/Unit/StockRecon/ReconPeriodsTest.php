@@ -59,4 +59,13 @@ class ReconPeriodsTest extends TestCase
         $this->assertSame('October 2026', reset($months));
         $this->assertSame('2025-10', array_key_last($months));
     }
+
+    /** One week at a time (7 Oct 2026): the end is the start's Sunday, or its month's last day. */
+    public function test_a_week_ends_on_its_sunday_or_at_the_months_edge(): void
+    {
+        $this->assertSame('2026-09-13', ReconPeriods::weekEnd(Carbon::parse('2026-09-07'))->toDateString());
+        $this->assertSame('2026-09-13', ReconPeriods::weekEnd(Carbon::parse('2026-09-10'))->toDateString());
+        $this->assertSame('2026-09-06', ReconPeriods::weekEnd(Carbon::parse('2026-09-01'))->toDateString(), 'Tuesday 1 to Sunday 6.');
+        $this->assertSame('2026-09-30', ReconPeriods::weekEnd(Carbon::parse('2026-09-28'))->toDateString(), 'Cut at the month.');
+    }
 }

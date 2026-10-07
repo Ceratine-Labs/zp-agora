@@ -41,6 +41,19 @@
      moves down the page is worse than either width on its own. --}}
 <body class="{{ $wide ? 'is-wide' : '' }}">
 
+{{-- The page's one loader, hidden until a wait is long enough to show
+     (loader.js). Every other one on the page is a clone of it. The coffee cup,
+     or the variant config('agora.loaders') names for this route — the stock
+     recon screens load a shopping cart (ZP, 7 Oct 2026).
+
+     FIRST in the body, so it can paint before a long page has finished
+     arriving: a page that holds it (the request attribute `loader_hold`, set
+     by the page — the stock recon proposals) gets it already showing, and loader.js takes it
+     down once every `table[data-loader-hold]` has been laid out (Ryan, 7 Oct
+     2026: "show the loader until the grid has been initialized"). --}}
+@php($loaderVariant = collect(config('agora.loaders', []))->first(fn ($variant, $pattern) => request()->routeIs($pattern), 'cup'))
+<x-loader overlay :variant="$loaderVariant" :hold="request()->attributes->get('loader_hold')" />
+
 <x-app-bar
     :sections="$shellSections"
     :workspace="$shellWorkspace"
@@ -69,13 +82,6 @@
         <span>Agora v1.0</span>
     </div>
 </footer>
-
-{{-- The page's one loader, hidden until a wait is long enough to show
-     (loader.js). Every other one on the page is a clone of it. The coffee cup,
-     or the variant config('agora.loaders') names for this route — the stock
-     recon screens load a shopping cart (ZP, 7 Oct 2026). --}}
-@php($loaderVariant = collect(config('agora.loaders', []))->first(fn ($variant, $pattern) => request()->routeIs($pattern), 'cup'))
-<x-loader overlay :variant="$loaderVariant" />
 
 </body>
 </html>

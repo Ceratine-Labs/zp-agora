@@ -89,9 +89,15 @@ export default function tableTools(root = document) {
     fresh('table[data-table-tools]', 'data-table-tools-ready').forEach((table) => {
         const tools = new TableTools(table);
 
-        if (!tools.usable) return;
+        if (!tools.usable) {
+            ready(table);
+            return;
+        }
 
         tools.mount();
+        // Laid out: filtered, paged, grouped. A loader holding for this table
+        // (loader.js, `data-loader-hold`) comes down on this.
+        ready(table);
 
         // A screen that replaces rows after load — the group runner swaps each
         // site's row in as its preview answers — says so, and the filters are
@@ -99,6 +105,12 @@ export default function tableTools(root = document) {
         // holding references to rows the DOM has thrown away.
         table.addEventListener('table-tools:rescan', () => tools.refresh());
     });
+}
+
+/** Mark a table as laid out, and say so. */
+function ready(table) {
+    table.setAttribute('data-tt-ready', '');
+    table.dispatchEvent(new CustomEvent('table-tools:ready', { bubbles: true }));
 }
 
 /* ------------------------------------------------------------------ sticky */

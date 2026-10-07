@@ -25,7 +25,20 @@
     to Balanced until 7 Oct 2026; it opens on All now, and pills are several
     at once (Ryan: "default the pills to all, make them multiple selectable").
 --}}
+{{-- The loader stays up until this table is laid out (Ryan, 7 Oct 2026:
+     "show the loader until the grid has been initialized when running a stock
+     recon preview"). A branch-week is hundreds of chains and the browser spends
+     seconds parsing, grouping and paging them; without this the cart came down
+     on arrival and the page sat frozen and half drawn. The shell renders the
+     overlay already showing, with these words — a request attribute, read
+     after this pane has rendered, because the slot renders before the shell —
+     and loader.js takes it down when table-tools marks the table ready. --}}
 @php
+    // Here, inside this block, and not as a one-line directive above it:
+    // Blade pairs the first opening php directive in a file with the first
+    // closing one, so a one-liner above a block swallows the block.
+    request()->attributes->set('loader_hold', 'Laying out the chains…');
+
     $tones = [
         'balanced' => 'is-matched', 'duplicate' => 'is-matched', 'short' => 'is-warn',
         'possible' => 'is-serious', 'blocked' => 'is-serious',
@@ -250,6 +263,7 @@
                  tools fit
                  data-tt-page="50"
                  data-tt-groups
+                 data-loader-hold
                  data-tt-group-noun="chain"
                  data-tt-row-noun="shift"
                  data-row-detail

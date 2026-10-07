@@ -64,9 +64,9 @@ class StockReconController extends Controller
         $branchId = (int) $request->query('branch_id', $context->id() ?? 0);
 
         /*
-         * A month, then a week or a run of weeks inside it (ZRP, 4 Oct 2026),
-         * opening on the last full week. ?from= and ?to= still work, and pick
-         * the month they fall in.
+         * A month, then ONE week inside it (ZRP, 4 Oct 2026; one week only
+         * since 7 Oct 2026), opening on the last full week. ?from= still
+         * works, and picks the month it falls in.
          */
         $week = ReconPeriods::lastFullWeek(Carbon::today());
         $from = (string) $request->query('from', $week['from']);
@@ -92,7 +92,6 @@ class StockReconController extends Controller
             ),
             'areaNo' => (int) $request->query('area_no', 0),
             'from' => $from,
-            'to' => $request->query('to', $week['to']),
             'month' => substr($from, 0, 7),
             'months' => $months,
             'weeks' => collect(array_keys($months))->mapWithKeys(fn ($m) => [$m => ReconPeriods::weeks($m)])->all(),

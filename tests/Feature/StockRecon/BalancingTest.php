@@ -693,6 +693,29 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * Ryan, 7 Oct 2026: "show the loader until the grid has been initialized
+     * when running a stock recon preview". The run page arrives with the
+     * shell's loader already showing — first in the body, held, with its own
+     * words — and the proposals table names itself as what it waits for; the
+     * hub's loader is hidden as everywhere else.
+     */
+    public function test_the_run_page_arrives_with_the_loader_held_until_its_grid_is_laid_out(): void
+    {
+        $run = $this->preview();
+        $this->actingAs($this->person('admin'));
+
+        $html = $this->get(route('app.stockrecon.run', $run))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/data-loader-overlay\s+data-loader-hold/', $html, 'Held, not hidden.');
+        $this->assertStringContainsString('Laying out the chains…', $html);
+        $this->assertLessThan(strpos($html, 'id="stockrecon-lines-'), strpos($html, 'data-loader-overlay'), 'It comes first, so it can paint first.');
+        $this->assertMatchesRegularExpression('/id="stockrecon-lines-\d+"[^>]*data-loader-hold|data-loader-hold[^>]*id="stockrecon-lines-/s',
+            substr($html, strpos($html, '<table'), 4000).' '.$html);
+
+        $hub = $this->get(route('app.stockrecon.index'))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/data-loader-overlay\s+hidden/', $hub);
+    }
+
+    /**
      * With reset_issues on, the issue goes back to the original too, and comes
      * back on reversal. Off — the default — the issue is left as it stands.
      */
