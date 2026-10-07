@@ -28,6 +28,11 @@
         if (in_array($code, ['S10a', 'S10b'], true)) {
             return ['Repaired', 'good'];
         }
+        // A class that no longer holds its chain back but leaves something on
+        // the shift (U1–U4, S1 since 7 Oct 2026) says both.
+        if (isset($e['effect'])) {
+            return $e['effect'];
+        }
         if (isset($e['balanced'])) {
             return [ucfirst(preg_replace('/^No — /u', '', $e['balanced'])), 'serious'];
         }

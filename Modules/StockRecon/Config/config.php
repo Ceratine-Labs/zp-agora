@@ -294,29 +294,35 @@ return [
                 .'or recipe is not reducing this item, so every count looks short. A system fault, not a '
                 .'loss — nobody is charged, and it is not balanced. Link the PLU and re-run.'],
         'S1' => ['plain' => 'An over the size of a whole pack: a pack reached the counter without an issue sheet.',
-            'todo' => 'Capture the missing issue on the shift it happened. Balancing it away would hide the paperwork failure.',
+            'todo' => 'Capture the missing issue on the shift it happened. The chain still balances; this line is what says an issue sheet is missing.',
             'who' => 'Site manager / issuer',
             'tone' => 'crit', 'label' => 'Over of a whole pack — issue not written up',
             'test' => 'over within 10% of k × issue multiple, k ≥ 1, not weighed',
-            'blocks' => true,
+            'blocks' => false,
+            'effect' => ['Balanced · reported', 'crit'],
             'blurb' => 'A whole pack reached the counter without an issue sheet (rule 5). Capture the issue '
-                .'on the shift it happened; balancing it away would hide the paperwork failure.'],
+                .'on the shift it happened. Since 7 Oct 2026 it no longer holds the chain back (ZRP: "don\'t hold '
+                .'chains back"): the chain balances, and this line stays on the report so the issue is captured.'],
         'U1' => ['plain' => 'The till sold more in one shift than the shift could have held — its opening plus every issue recorded to it. The stock was there; the issue was not written up.',
             'todo' => 'Find and capture the missing issue, then preview again.',
             'who' => 'Site manager / issuer',
             'tone' => 'crit', 'label' => 'Unrecorded issue — proven',
             'test' => 'POS > Open + Issued (the counted opening on a kept break above the previous closing), and no short before or after it on the chain covers it',
-            'blocks' => true,
+            'blocks' => false,
+            'effect' => ['Balanced · over stays', 'crit'],
             'blurb' => 'The till sold more in one shift than the opening plus every recorded issue could '
-                .'supply. The stock was there; the paperwork was not.'],
+                .'supply. The stock was there; the paperwork was not. The chain balances around it and '
+                .'the over that is left stays on this shift, as the issue to capture.'],
         'U2' => ['plain' => 'The shift closed holding more than it opened with plus everything issued to it: stock arrived without an issue sheet. (An over that a short just before or after it covers is a miscounted closing, not this.)',
             'todo' => 'Find and capture the missing issue, then preview again.',
             'who' => 'Site manager / issuer',
             'tone' => 'crit', 'label' => 'Closing exceeds what was on hand',
             'test' => 'Close > Open + Issued (the counted opening on a kept break above the previous closing), and no short before or after it on the chain covers it',
-            'blocks' => true,
+            'blocks' => false,
+            'effect' => ['Balanced · over stays', 'crit'],
             'blurb' => 'The shift closed holding more than it opened with plus everything issued to it. '
-                .'The surplus arrived without a document.'],
+                .'The surplus arrived without a document. The chain balances around it and the over that '
+                .'is left stays on the shift, as the issue to capture.'],
         /*
         | Duplicate issues (1 Oct 2026). Above the chain-wide classes: they are
         | this shift's own explanation of its short, and a chain that ends over
@@ -368,18 +374,22 @@ return [
             'who' => 'Site manager / IT',
             'tone' => 'serious', 'label' => 'Selling with no issues captured at all',
             'test' => 'Σ Issued = 0 and Σ POS > 0 and a segment ends over',
-            'blocks' => true,
+            'blocks' => false,
+            'effect' => ['Balanced · over stays', 'crit'],
             'blurb' => 'Sales all through the window and not one issue recorded. Usually a recipe or a '
-                .'transfer route that was never set up, rather than a one-off omission.'],
-        'U4' => ['plain' => 'Over the week the item sold or kept more than it ever received. No change to the counts can fix that — the missing piece is an issue.',
+                .'transfer route that was never set up, rather than a one-off omission. The chain balances '
+                .'and the over stays on the shifts that carry it.'],
+        'U4' => ['plain' => 'Over the week the item sold or kept more than it ever received. No change to the counts can fix that — the missing piece is an issue. The rest of the chain still balances; the over stays on the shifts that carry it.',
             'todo' => 'Find and capture the missing issue, then preview again.',
             'who' => 'Site manager / issuer',
             'tone' => 'serious', 'label' => 'Net over for the window',
             'test' => 'a segment\'s total T > 0',
-            'blocks' => true,
+            'blocks' => false,
+            'effect' => ['Balanced · over stays', 'crit'],
             'blurb' => 'The window (or the stretch between two repaired openings) received less than it '
-                .'sold. No set of closing counts changes that, so chasing it with amendments only spreads '
-                .'a data fault across innocent shifts.'],
+                .'sold. No set of closing counts changes that. Since 7 Oct 2026 the stretch balances by the '
+                .'mirror of the method: its shorts are miscounts and go to nil, and the over stays on the '
+                .'shifts that sold or held stock nobody issued — never spread across innocent shifts.'],
         'S10b' => ['plain' => 'Stock appeared between two shifts: the shift opened with more than the shift before counted at its close. It can hide an over or offset a short.',
             'todo' => 'The opening is set to the previous closing (Agora does this when it balances). A difference of 3 or fewer is fixed without splitting the chain, and shows in the Break column.',
             'who' => 'Site manager',

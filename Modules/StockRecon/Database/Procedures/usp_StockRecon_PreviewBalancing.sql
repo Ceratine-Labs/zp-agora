@@ -25,7 +25,8 @@
  *      An over never becomes a short, a short never grows, and the latest
  *      closing count stands.
  *   5. An over within 10% of a whole issue multiple is an issue not written
- *      up. It is captured, not balanced away.
+ *      up. It is reported on the shift (S1) — and since 7 Oct 2026 it no
+ *      longer holds the chain back (ZRP: "don't hold chains back").
  *   10. A site is analysed only up to its last complete recon day.
  *   E1. Stock falling with no till sales against it is a PLU or recipe link
  *      fault. Nobody is charged for it.
@@ -46,12 +47,29 @@
  * smallest such curve, so it overrides the fewest counts. The last active shift
  * is pinned at zero amendment — the latest count stands.
  *
+ * A STRETCH THAT ENDS OVER IS BALANCED TOO, by the mirror (7 Oct 2026). ZRP,
+ * on a pizza box chain +39 over with -1/+1 and +7/-6/-1 sitting in it: "you can
+ * clearly see that items should be balancing"; Ryan: "it needs to balance
+ * anyways". Where T > 0 the reverse running MINIMUM replaces the maximum:
+ *
+ *   m(k) = MIN(P(j) : j >= k)
+ *   Q(k) = CLAMP(m(k), between 0 and T)
+ *
+ * Q never falls, so every short in the stretch is a miscount and goes to nil;
+ * it never sits above P, so an over only shrinks; and the over that is left —
+ * T, which no count can remove — stays on the shifts that sold or held stock
+ * nobody issued, where the missing issue is to be captured. Rule 4 holds
+ * either way round: nothing changes sign and nothing grows. The maximum on an
+ * over stretch would have pushed all of T onto its first shift, which is why
+ * a net over was reported and never balanced until now.
+ *
  * WHERE AN OPENING WAS REPAIRED, THE CLOSING BEFORE IT IS PINNED TOO. The pack
  * audits a break by asking whether the previous closing moved; it cannot tell
  * "moved to match" from "moved to balance", and flags both (S12). So a break
  * splits the chain into SEGMENTS at that point, each balanced on its own with
- * its own last closing pinned. An over that its own segment cannot absorb is
- * a net over and is reported, never pushed across a count the rule says stands.
+ * its own last closing pinned. An over that its own segment cannot absorb
+ * stays in that segment, on its own shifts, and is reported (U4) — never
+ * pushed across a count the rule says stands.
  *
  * EXCEPT A SMALL ONE (ZRP, 4 Oct 2026). A break of @KeepBreaksUpTo units or
  * fewer — 1, 2 or 3 by default — does not split the chain. The opening is
@@ -808,8 +826,10 @@ BEGIN
 
     /* ------------------------------------------------------------- stage 3
        The algorithm, per segment, on active shifts only. The nested CASE is a
-       clamp written without GREATEST/LEAST: the band is 0..T when T is
-       negative and T..0 when T is positive. */
+       clamp written without GREATEST/LEAST: the band is T..0 when T is
+       negative and 0..T when T is positive. The envelope is the reverse
+       running maximum on a short or nil stretch and the reverse running
+       MINIMUM on one that ends over (7 Oct 2026) — see the head of the file. */
     IF OBJECT_ID('tempdb..#apply') IS NOT NULL DROP TABLE #apply;
 
     ;WITH act AS
@@ -825,10 +845,16 @@ BEGIN
     env AS
     (
         SELECT act.*,
-               MAX(act.P) OVER (
-                   PARTITION BY act.AreaNo, act.StockItemNo, act.SegNo
-                   ORDER BY act.SegSeq
-                   ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)       AS M
+               CASE WHEN act.T > 0
+                    THEN MIN(act.P) OVER (
+                             PARTITION BY act.AreaNo, act.StockItemNo, act.SegNo
+                             ORDER BY act.SegSeq
+                             ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)
+                    ELSE MAX(act.P) OVER (
+                             PARTITION BY act.AreaNo, act.StockItemNo, act.SegNo
+                             ORDER BY act.SegSeq
+                             ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)
+               END                                                         AS M
         FROM act
     ),
     sol AS
@@ -928,7 +954,8 @@ BEGIN
                   COKE: +2 on 8 Sep night, -1 and -1 after). Each held back a
                   chain whose total is nil; balancing moves the one closing.
                   Ryan: "if a chain is 0 … what is it held back for". An over
-                  neither side covers is still U1/U2 and still blocks. */
+                  neither side covers is still U1/U2 — reported, and since
+                  7 Oct 2026 no longer a block. */
                CONVERT(bit, CASE WHEN ch.QtyPOS - (ch.OpenRep + ch.QtyIssued
                                      + CASE WHEN ch.BreakKept = 1 AND ch.ChainBreak > 0 THEN ch.ChainBreak ELSE 0 END) > @eps
                                   AND ch.SegP > @eps
@@ -940,7 +967,9 @@ BEGIN
                                   AND ch.SegT - ch.SegP + ch.QtyVarRep > @eps
                                  THEN 1 ELSE 0 END)                        AS FlagCloseExceedsOnHand,
                /* U4 — a segment ends over. No amendment can remove it, and
-                  pushing it across a pinned closing is what the rule forbids. */
+                  pushing it across a pinned closing is what the rule forbids,
+                  so it stays on the segment's own shifts. Reported; since
+                  7 Oct 2026 the segment balances around it (stage 3). */
                CONVERT(bit, ch.AnySegmentOver)                             AS FlagNetOver,
                /* F2 — issued, nothing sold, count unchanged. It LOOKS dormant
                   and is not, so it must never be folded away. */
@@ -964,7 +993,8 @@ BEGIN
                                   AND ABS(ch.QtyCloseNew - ch.QtyOpenNew) > @eps
                                  THEN 1 ELSE 0 END)                        AS FlagDormantMoved,
                /* S1 — an over of a whole pack: an issue not written up. On
-                  the shift that has it; the chain is blocked by stage 7. */
+                  the shift that has it; reported, and since 7 Oct 2026 it no
+                  longer blocks (stage 7). */
                CONVERT(bit, ch.PackOver)                                   AS FlagPackOver,
                /* E1 — the pack's "no till sales linked": the stock fell by
                   more than max(3, a pack) over at least two days and the till
@@ -991,16 +1021,22 @@ BEGIN
                                       AND s.DupReleaseId IS NULL THEN 1 ELSE 0 END)
                    OVER (PARTITION BY s.AreaNo, s.StockItemNo))            AS DupHold,
                /* A NIL CHAIN IS NOT HELD BACK by a finding (Ryan, 7 Oct
-                  2026): U1–U4, S1, F2, E1, the caps and "too short" are
-                  still raised and reported on the exceptions, but nothing is
-                  missing — the next count proves the miscount, however big —
-                  so the chain balances. What still holds it: a write that
-                  cannot be made (a closing below zero, a dormant shift moved)
-                  and a possible duplicate (D2). */
+                  2026): F2, E1, the caps and "too short" are still raised
+                  and reported on the exceptions, but nothing is missing — the
+                  next count proves the miscount, however big — so the chain
+                  balances. What still holds it: a write that cannot be made
+                  (a closing below zero, a dormant shift moved) and a possible
+                  duplicate (D2).
+
+                  AN UNRECORDED ISSUE HOLDS NO CHAIN BACK, nil or not (ZRP and
+                  Ryan, 7 Oct 2026: "don't hold chains back", "it needs to
+                  balance anyways"). U1, U2, U3, U4 and S1 are raised on the
+                  shift and reported; the chain balances around them, and
+                  whatever over is left stays on the shifts that carry it as
+                  the issue to capture. */
                CONVERT(bit, MAX(CASE WHEN ABS(s.ChainNetVar) <= @eps THEN 0
-                                     ELSE CONVERT(int, s.FlagNetOver) + CONVERT(int, s.FlagSoldMoreThanOnHand)
-                                        + CONVERT(int, s.FlagCloseExceedsOnHand) + CONVERT(int, s.FlagIssueWentNowhere)
-                                        + CONVERT(int, s.FlagShortChain) + CONVERT(int, s.FlagPackOver)
+                                     ELSE CONVERT(int, s.FlagIssueWentNowhere)
+                                        + CONVERT(int, s.FlagShortChain)
                                         + CONVERT(int, s.FlagNoPosLink)
                                         + CONVERT(int, s.FlagBigAmendment) + CONVERT(int, s.FlagPctAmendment) END
                               + CONVERT(int, s.FlagNegativeClose) + CONVERT(int, s.FlagDormantMoved)
@@ -1412,14 +1448,10 @@ BEGIN
                                                    + N'; check, then release'
             /* A finding holds a chain back only where the chain is not nil (7 Oct
                2026). On a nil chain the row says what happens to it; the finding
-               stays on the exceptions. */
-            WHEN a.ChainBlocked = 1 AND a.FlagPackOver = 1           THEN 'Missed issue sheet: an over of a whole pack, captured not balanced'
+               stays on the exceptions. An unrecorded issue (U1–U4, S1) holds no
+               chain back at all since 7 Oct 2026: its row says what is left on
+               it, below, and the code says why. */
             WHEN a.ChainBlocked = 1 AND a.FlagNoPosLink = 1          THEN 'No till sales linked: stock falls, the till shows nothing, charge nobody'
-            WHEN a.ChainBlocked = 1 AND a.FlagSoldMoreThanOnHand = 1 THEN 'Unrecorded issue, proven: the till sold more than the shift held'
-            WHEN a.ChainBlocked = 1 AND a.FlagCloseExceedsOnHand = 1 THEN 'Unrecorded issue: closed holding more than it ever received'
-            WHEN a.ChainBlocked = 1 AND a.FlagNetOver = 1 AND a.ChainIssues < @eps AND a.ChainPOS > @eps
-                                              THEN 'Unrecorded issue: selling all window with no issues captured'
-            WHEN a.ChainBlocked = 1 AND a.FlagNetOver = 1            THEN 'Unrecorded issue: net over for the window, cannot be balanced'
             WHEN a.QtyOpen < -@eps OR a.QtyClose < -@eps
                                               THEN 'Data fault: a count below zero'
             WHEN a.FlagNegativeClose = 1      THEN 'Data fault: balancing would drive the closing below zero'
@@ -1438,6 +1470,11 @@ BEGIN
             WHEN a.ChainBlocked = 1 AND a.FlagShortChain = 1         THEN 'Chain too short: not enough active shifts in the window'
             WHEN a.DupHold = 1                THEN 'Held back: a possible duplicate issue (D2) on this item holds the chain'
             WHEN a.ChainBlocked = 1           THEN 'Held back: another shift on this item blocks the chain'
+            /* What balancing could not remove: the over on a stretch that
+               received less than it sold (7 Oct 2026). It is the missing
+               issue, on the shift that needs it captured. At most 70
+               characters against the column's 80. */
+            WHEN a.EffVarNew > @eps           THEN 'Unrecorded issue, over left: capture the missing issue on this shift'
             /* The qty leads, so it is on the pill and in the extract. At most
                74 characters against the column's 80. */
             WHEN a.BreakKept = 1              THEN N'Break ' + FORMAT(a.ChainBreak, '+0.###;-0.###')

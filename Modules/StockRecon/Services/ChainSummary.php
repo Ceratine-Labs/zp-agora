@@ -111,8 +111,10 @@ final class ChainSummary
 
         if ($first->ChainBlocked) {
             // The shift that holds it, named — every other row says only
-            // "another shift on this item blocks the chain".
+            // "another shift on this item blocks the chain". Failing a row
+            // with a state of its own, the first that says what blocks it.
             $reason = $this->lines->first(fn ($l) => ! in_array($l->outcomeKey(), ['blocked', 'dormant', 'clean'], true))
+                ?? $this->lines->first(fn ($l) => ! str_starts_with((string) $l->Outcome, 'Held back: another shift'))
                 ?? $first;
 
             // Held back, but hand amendments the client's rules forbid are
@@ -147,12 +149,24 @@ final class ChainSummary
     public static function verdict(float $total, int $writes, bool $moves): array
     {
         $short = $total < -0.0005;
+        $over = $total > 0.0005;
         $units = Format::n(abs($total), 3);
 
         return match (true) {
             $writes > 0 && $short => ['label' => 'Balance '.$writes.' '.($writes === 1 ? 'shift' : 'shifts').', short remains',
                 'tone' => 'warn', 'hint' => 'a short of '.$units.' stays',
                 'note' => 'Balanced; a real short of '.$units.' stays, on the shifts the counts put it on.'],
+            /* A chain that received less than it sold (7 Oct 2026): it balances
+               around the over, and the over stays on the shifts that carry
+               it — the missing issue. */
+            $writes > 0 && $over => ['label' => 'Balance '.$writes.' '.($writes === 1 ? 'shift' : 'shifts').', over '.$units.' remains',
+                'tone' => 'crit', 'hint' => 'an unrecorded issue of '.$units.' stays',
+                'note' => 'Balanced; an over of '.$units.' stays on the shifts that sold or held stock nobody issued. '
+                    .'No count can remove it: capture the missing issue there.'],
+            $over && ! $moves => ['label' => 'Over '.$units.' · capture the missing issue', 'tone' => 'crit',
+                'hint' => 'an unrecorded issue: nothing to balance',
+                'note' => 'An over of '.$units.' with no short to set against it: stock was sold or held that was never issued. '
+                    .'Capture the missing issue on the shift that carries it.'],
             $writes > 0 => ['label' => 'Balance '.$writes.' '.($writes === 1 ? 'shift' : 'shifts'),
                 'tone' => 'good', 'hint' => 'to nil', 'note' => 'Balances to nil. Amend writes it.'],
             $moves => ['label' => 'Already balanced in PumpIT', 'tone' => 'neutral', 'hint' => 'Reset to original to balance it here',
@@ -168,5 +182,98 @@ final class ChainSummary
     public function segments(): Collection
     {
         return $this->lines->map(fn ($l) => $l->tone());
+    }
+
+    /**
+     * Which shifts balance against which (ZRP, 7 Oct 2026: "you can clearly
+     * see that items should be balancing … identification of the rows").
+     *
+     * Read straight off the amendments. Moving a closing moves variance
+     * between that shift and the next, so two neighbouring shifts balance
+     * together exactly where the closing between them is amended; a run of
+     * them joined that way is one group, and a closing left as counted ends
+     * it. A dormant shift inside a group moves with it and is marked with it.
+     * Groups of one are not marked: nothing balanced against them. A blocked
+     * chain has no amendments, so it has no groups.
+     *
+     * Keyed by run line id: the group's letter (A, B … per chain), its colour
+     * (1–5, the series tokens), the other active shifts in it, and what the
+     * group leaves after balancing.
+     *
+     * @return array<int, array{letter: string, series: int, with: string, net: float}>
+     */
+    public function balanceGroups(): array
+    {
+        return self::groupsOfShifts($this->lines);
+    }
+
+    /**
+     * The same, for any one chain's shifts in order — run lines here, the
+     * chain drill's rows on the panel behind a shift. Each needs Id,
+     * TransactionDate, ShiftNo, IsDormant, AmendClose and QtyVarNew.
+     *
+     * @template TShift of object
+     *
+     * @param  Collection<int, TShift>  $shifts
+     * @return array<int, array{letter: string, series: int, with: string, net: float}>
+     */
+    public static function groupsOfShifts(Collection $shifts): array
+    {
+        $groups = [];
+        $current = [];
+
+        foreach ($shifts as $shift) {
+            if ($current !== [] && abs((float) end($current)->AmendClose) < 0.0005) {
+                $groups[] = $current;
+                $current = [];
+            }
+            $current[] = $shift;
+        }
+
+        if ($current !== []) {
+            $groups[] = $current;
+        }
+
+        $marked = [];
+        $n = 0;
+
+        foreach ($groups as $group) {
+            if (count($group) < 2) {
+                continue;
+            }
+
+            $letter = chr(65 + $n % 26).($n >= 26 ? (string) intdiv($n, 26) : '');
+            $series = $n % 5 + 1;
+            $net = (float) array_sum(array_map(fn (object $s) => (float) $s->QtyVarNew, $group));
+            $n++;
+
+            foreach ($group as $shift) {
+                $with = collect($group)
+                    ->filter(fn (object $s) => (int) $s->Id !== (int) $shift->Id && ! $s->IsDormant)
+                    ->map(fn (object $s) => Carbon::parse($s->TransactionDate)->format('d M').' shift '.$s->ShiftNo)
+                    ->implode(', ');
+
+                $marked[(int) $shift->Id] = ['letter' => $letter, 'series' => $series, 'with' => $with, 'net' => $net];
+            }
+        }
+
+        return $marked;
+    }
+
+    /**
+     * The group's tag as a sentence, for the hover.
+     *
+     * @param  array{letter: string, series: int, with: string, net: float}  $group
+     */
+    public static function balanceNote(array $group): string
+    {
+        $units = Format::n(abs($group['net']), 3);
+
+        return 'Group '.$group['letter'].' — balances with '.($group['with'] !== '' ? $group['with'] : 'the shifts beside it').'. '
+            .match (true) {
+                $group['net'] > 0.0005 => 'Together they leave an over of '.$units.': the missing issue, on the shift that carries it.',
+                $group['net'] < -0.0005 => 'Together they leave a short of '.$units.'.',
+                default => 'Together they come to nil.',
+            };
     }
 }

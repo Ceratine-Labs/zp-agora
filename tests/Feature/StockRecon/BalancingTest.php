@@ -430,7 +430,8 @@ class BalancingTest extends TestCase
 
         $over = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-19', 3);
         $this->assertTrue((bool) $over->FlagCloseExceedsOnHand, 'An over beyond the kept break is still an unrecorded issue.');
-        $this->assertTrue((bool) $over->ChainBlocked);
+        $this->assertSame('U2', $over->ExceptionCode, 'Reported…');
+        $this->assertFalse((bool) $over->ChainBlocked, '…and since 7 Oct 2026 it holds no chain back.');
     }
 
     /**
@@ -887,12 +888,20 @@ class BalancingTest extends TestCase
             '2026-07-21' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
         ]);
 
-        $over = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-19', 1);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $over = $this->lineAt($run, '2026-07-19', 1);
         $this->assertTrue((bool) $over->FlagCloseExceedsOnHand, 'Two more than the shift ever held, and no short either side to cover it.');
-        $this->assertTrue((bool) $over->ChainBlocked);
+        $this->assertSame('U2', $over->ExceptionCode);
+        $this->assertFalse((bool) $over->ChainBlocked, 'Reported, and the chain balances around it (7 Oct 2026).');
+        $this->assertEqualsWithDelta((float) $over->ChainNetVar,
+            (float) $run->lines->where('StockItemNo', self::DUP_ITEM)->sum(fn ($l) => (float) $l->QtyVarNew), 0.005,
+            'Whatever is left is the chain total — the issue to capture.');
     }
 
-    /** At 0 the option restores the split: the same break blocks the chain, as before 4 Oct. */
+    /**
+     * At 0 the option restores the split: the stretch after the break ends
+     * over, as before 4 Oct — reported, and since 7 Oct balanced around.
+     */
     public function test_keeping_breaks_can_be_switched_off(): void
     {
         $this->setCounts('2026-07-19', 3, ['QtyOpen_Original' => 28, 'QtyOpen' => 28]);
@@ -906,18 +915,26 @@ class BalancingTest extends TestCase
 
         $this->assertTrue($lines->every(fn ($l) => ! $l->BreakKept));
         $this->assertTrue($lines->contains(fn ($l) => $l->FlagNetOver), 'Split, the stretch after the break ends over.');
-        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked));
+        $this->assertTrue($lines->every(fn ($l) => ! $l->ChainBlocked), 'An over holds no chain back.');
+
+        // The closing before the break is pinned: the over stays on its own
+        // side of it, never pushed across a count the rule says stands.
+        $before = $lines->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-19' && $l->ShiftNo === 2);
+        $this->assertEqualsWithDelta(0.0, (float) $before->AmendClose, 0.005);
+        $this->assertTrue($lines->contains(fn ($l) => (float) $l->QtyVarNew > 0.005), 'The over is left, on its stretch.');
     }
 
     /**
      * The client's rule 5: an over within 10% of a whole issue multiple is an
-     * issue not written up. It is captured, never balanced away — so the chain
-     * is reported and the shift carries S1.
+     * issue not written up, so the shift carries S1. Until 7 Oct 2026 it held
+     * the chain back; ZRP then asked that a chain with an over within 10% be
+     * balanced ("don't hold chains back"), so it is reported and the chain
+     * balances.
      *
      * The multiple comes from agora.StockIssueMultiple — head office's
      * workbook — because PumpIT's own column is empty on the pack's sites.
      */
-    public function test_an_over_of_a_whole_pack_is_reported_not_balanced(): void
+    public function test_an_over_of_a_whole_pack_is_reported_and_the_chain_still_balances(): void
     {
         $this->db()->table(config('agora.schema').'.StockIssueMultiple')->insert([
             'BranchId' => self::BRANCH, 'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM,
@@ -931,9 +948,10 @@ class BalancingTest extends TestCase
         $pack = $lines->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-17' && $l->ShiftNo === 3);
 
         $this->assertTrue($pack->FlagPackOver);
-        $this->assertSame('S1', $pack->ExceptionCode);
-        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked), 'A missing issue sheet blocks the chain whole.');
-        $this->assertTrue($lines->every(fn ($l) => ! $l->WouldAmend));
+        $this->assertSame('S1', $pack->ExceptionCode, 'Still reported on the shift.');
+        $this->assertTrue($lines->every(fn ($l) => ! $l->ChainBlocked), 'But it no longer holds the chain back.');
+        $this->assertTrue($lines->contains(fn ($l) => $l->isWritable()), 'The chain balances, and the press writes it.');
+        $this->assertEqualsWithDelta(-5.0, (float) $lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.005, 'Redistributed, never reduced.');
     }
 
     /**
@@ -1020,27 +1038,28 @@ class BalancingTest extends TestCase
      * PumpIT, because a blocked chain carried no proposal at all — on real data
      * that was most chains. Now the chain is put back to the staff counts with
      * every opening repaired (the pack's own staff basis), and is still not
-     * balanced: the whole-pack over that blocks it stands, and is reported.
+     * balanced: what blocks it stands, and is reported.
+     *
+     * Blocked by the share cap since 7 Oct 2026; a whole-pack over (S1) did
+     * it until then, and an over holds no chain back now.
      */
     public function test_a_forbidden_hand_amendment_on_a_blocked_chain_goes_back_to_the_count(): void
     {
         config(['stockrecon.stamp_mode' => 'live']);
 
-        // Blocked: 17 Jul shift 3 is over by exactly one pack of 10 (S1).
-        $this->db()->table(config('agora.schema').'.StockIssueMultiple')->insert([
-            'BranchId' => self::BRANCH, 'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM,
-            'IssueMultiple' => 10, 'IsWeighed' => 0, 'Workbook' => 'TEST-multiples',
-        ]);
-
-        // And somebody balanced it away by hand, past nil into a short (S7).
+        // Somebody balanced 17 Jul shift 3 away by hand, past nil into a short (S7).
         $this->setCounts('2026-07-17', 3, ['QtyClose' => 45]);
         $this->setCounts('2026-07-18', 1, ['QtyOpen' => 45]);
 
-        $run = $this->preview();
+        // Blocked: no correction may exceed 1% of what the shift held (F1).
+        $run = $this->service->preview(
+            self::BRANCH, self::AREA, Carbon::parse('2026-07-17'), Carbon::parse('2026-07-21'),
+            ['MaxAmendmentPct' => 0.01], note: 'TEST-balancing',
+        )->load('lines');
         $lines = $run->lines->where('StockItemNo', self::ITEM);
         $line = $lines->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-17' && $l->ShiftNo === 3);
 
-        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked), 'The pack over still blocks the chain.');
+        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked), 'The cap blocks the chain.');
         $this->assertSame('S7', $line->AuditCode);
         $this->assertTrue($line->RestoresHand && $line->isWritable());
         $this->assertEqualsWithDelta(60.0, (float) $line->QtyCloseNew, 0.005, 'Back to what the staff counted.');
@@ -1088,8 +1107,13 @@ class BalancingTest extends TestCase
             'The whole chain is held back — nothing on it is written.');
     }
 
-    /** A window that ends over cannot be balanced by any amendment, so it is reported. */
-    public function test_a_net_over_chain_is_reported_rather_than_balanced(): void
+    /**
+     * A window that ends over still balances (ZRP and Ryan, 7 Oct 2026: "don't
+     * hold chains back", "it needs to balance anyways"). No amendment removes
+     * the over, so it stays on the shift that carries it and is reported; every
+     * short around it is a miscount and goes to nil.
+     */
+    public function test_a_net_over_chain_balances_and_the_over_stays_on_its_shift(): void
     {
         // One extra unit sold on the last shift, with nothing issued to cover
         // it, tips the whole window over.
@@ -1106,9 +1130,97 @@ class BalancingTest extends TestCase
         $lines = $run->lines->where('StockItemNo', self::ITEM);
 
         $this->assertTrue($lines->contains(fn ($l) => $l->FlagNetOver));
-        $this->assertTrue($lines->every(fn ($l) => $l->ChainBlocked));
+        $this->assertTrue($lines->every(fn ($l) => ! $l->ChainBlocked), 'An over holds no chain back.');
         $this->assertTrue($lines->contains(fn ($l) => in_array($l->ExceptionCode, ['U1', 'U2', 'U3', 'U4'], true)),
             'A net over is an unrecorded issue and belongs in the U classes.');
+
+        // T = 89: the counted -5 plus the 94 the last shift sold beyond its stock.
+        $last = $lines->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-21' && $l->ShiftNo === 3);
+        $this->assertEqualsWithDelta(89.0, (float) $last->QtyVarNew, 0.005, 'The whole over stays on the shift that sold it.');
+        $this->assertSame('unrecorded', $last->outcomeKey());
+        $this->assertStringStartsWith('Unrecorded issue, over left', $last->Outcome);
+        $this->assertEqualsWithDelta(0.0, (float) $last->AmendClose, 0.005, 'The latest count stands.');
+
+        foreach ($lines->reject(fn ($l) => $l->Id === $last->Id) as $l) {
+            $this->assertEqualsWithDelta(0.0, (float) $l->QtyVarNew, 0.005,
+                "{$l->TransactionDate->toDateString()} shift {$l->ShiftNo}: every other shift balances to nil.");
+            if ((float) $l->QtyVar < -0.005) {
+                $this->assertGreaterThanOrEqual((float) $l->QtyVar - 0.005, (float) $l->QtyVarNew, 'A short never grows.');
+            }
+        }
+
+        $this->assertEqualsWithDelta((float) $last->ChainNetVar, (float) $lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.005,
+            'Redistributed, never reduced: T is what is left.');
+        $this->assertTrue($lines->contains(fn ($l) => $l->isWritable()), 'And the press writes it.');
+    }
+
+    /**
+     * The customer's own chain (ZRP, 7 Oct 2026): D Pizza Box Large at
+     * Debonairs FOH, 1–6 Sep, 39 over and held back whole as an unrecorded
+     * issue — with -1/+1 and +7/-6/-1 sitting in it, plainly balancing. Five
+     * days of it, same counts. It balances: those offsets go to nil, the -2 the
+     * next closing proves was there goes into the over beside it, and the 39
+     * stays on the three shifts that sold from an empty shelf.
+     *
+     * And the rows that balance together are marked: A, B and C.
+     */
+    public function test_a_chain_that_ends_over_balances_around_the_missing_issue_and_marks_what_balances_with_what(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [56, 0, 52, 3],  3 => [52, 0, 39, 14]],
+            '2026-07-18' => [1 => [39, 0, 34, 12], 3 => [34, 0, 27, 1]],
+            '2026-07-19' => [1 => [27, 0, 21, 5],  3 => [21, 0, 7, 14]],
+            '2026-07-20' => [1 => [7, 0, 0, 5],    3 => [0, 0, 0, 20]],
+            '2026-07-21' => [1 => [0, 0, 0, 7],    3 => [0, 0, 0, 14]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $lines = $run->lines->where('StockItemNo', self::DUP_ITEM)->values();
+
+        $this->assertEqualsWithDelta(39.0, (float) $lines->first()->ChainNetVar, 0.005);
+        $this->assertTrue($lines->every(fn ($l) => ! $l->ChainBlocked), 'Not held back.');
+
+        $at = fn (string $date, int $shift) => $this->lineAt($run, $date, $shift);
+
+        // Closings: 52 → 53, 34 → 27, 27 → 26, 0 → 2; the rest stand.
+        foreach ([['2026-07-17', 1, 53], ['2026-07-17', 3, 39], ['2026-07-18', 1, 27], ['2026-07-18', 3, 26],
+            ['2026-07-19', 1, 21], ['2026-07-19', 3, 7], ['2026-07-20', 1, 2], ['2026-07-20', 3, 0],
+            ['2026-07-21', 1, 0], ['2026-07-21', 3, 0]] as [$date, $shift, $close]) {
+            $this->assertEqualsWithDelta($close, (float) $at($date, $shift)->QtyCloseNew, 0.005, "{$date} shift {$shift} closes on {$close}.");
+        }
+
+        // What is left: the over, on the shifts that sold from an empty shelf.
+        foreach ([['2026-07-20', 3, 18], ['2026-07-21', 1, 7], ['2026-07-21', 3, 14]] as [$date, $shift, $over]) {
+            $line = $at($date, $shift);
+            $this->assertEqualsWithDelta($over, (float) $line->QtyVarNew, 0.005);
+            $this->assertSame('unrecorded', $line->outcomeKey(), "{$date} shift {$shift} is the missing issue.");
+        }
+        $this->assertSame('U1', $at('2026-07-20', 3)->ExceptionCode, 'Still reported: it sold more than it held.');
+        $this->assertEqualsWithDelta(0.0, (float) $lines->filter(fn ($l) => $l->TransactionDate->toDateString() < '2026-07-20'
+            || ($l->TransactionDate->toDateString() === '2026-07-20' && $l->ShiftNo === 1))->sum(fn ($l) => abs((float) $l->QtyVarNew)), 0.005,
+            'Everything before the empty shelf balances to nil.');
+
+        // What balances with what.
+        $groups = ChainSummary::of($lines)->first()->balanceGroups();
+        $letter = fn (string $date, int $shift) => $groups[$at($date, $shift)->Id]['letter'] ?? null;
+
+        $this->assertSame(['A', 'A'], [$letter('2026-07-17', 1), $letter('2026-07-17', 3)]);
+        $this->assertSame(['B', 'B', 'B'], [$letter('2026-07-18', 1), $letter('2026-07-18', 3), $letter('2026-07-19', 1)]);
+        $this->assertSame(['C', 'C'], [$letter('2026-07-20', 1), $letter('2026-07-20', 3)]);
+        $this->assertSame([null, null, null], [$letter('2026-07-19', 3), $letter('2026-07-21', 1), $letter('2026-07-21', 3)],
+            'A shift nothing balanced against carries no group.');
+        $this->assertSame('18 Jul shift 3, 19 Jul shift 1', $groups[$at('2026-07-18', 1)->Id]['with']);
+        $this->assertEqualsWithDelta(18.0, $groups[$at('2026-07-20', 1)->Id]['net'], 0.005, 'Group C leaves the over.');
+        $this->assertStringContainsString('come to nil', ChainSummary::balanceNote($groups[$at('2026-07-17', 1)->Id]));
+
+        $state = ChainSummary::of($lines)->first()->state();
+        $this->assertStringStartsWith('Balance ', $state['label']);
+        $this->assertStringContainsString('over 39', $state['label']);
+
+        // On screen: the rail, the letter and the sentence behind it.
+        $html = $this->actingAs($this->person('admin'))->get(route('app.stockrecon.run', $run))->assertOk()->getContent();
+        $this->assertStringContainsString('bal-g1', (string) $html);
+        $this->assertMatchesRegularExpression('/class="bal-tag" title="Group B — balances with 18 Jul shift 3, 19 Jul shift 1\. Together they come to nil\."/', (string) $html);
     }
 
     /** The counts are read from the _Original columns, so a re-run never compounds. */
@@ -2394,8 +2506,11 @@ class BalancingTest extends TestCase
     {
         config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
         $chain = $this->duplicateChain();
-        $chain['2026-07-20'][1] = [15, 0, 16, 0];       // closed holding more than it had: U2 blocks the chain
-        $chain['2026-07-20'][3] = [16, 0, 10, 6];
+        // Issued 5, nothing sold, count unchanged: F2 blocks the chain. (Until
+        // 7 Oct 2026 this was a closing 1 over what the shift held — U2 — and
+        // an unrecorded issue holds no chain back now.)
+        $chain['2026-07-20'][1] = [15, 5, 15, 0];
+        $chain['2026-07-20'][3] = [15, 0, 10, 5];
         $this->seedShelfChain($chain);
 
         $run = $this->previewArea(self::SHELF_AREA);

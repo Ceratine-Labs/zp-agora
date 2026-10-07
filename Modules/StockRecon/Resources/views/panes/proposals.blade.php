@@ -155,10 +155,12 @@
              it is the same paragraph every time and folds away once read. --}}
         <x-notice tone="warn" collapsible style="margin:12px 14px 0"
                   :title="$run->BlockedChains.' '.Str::plural('chain', $run->BlockedChains).' reported rather than balanced'">
-            <p>If any shift trips a test, none of the chain is amended: an over of a whole pack, no till sales
-               linked, a shift that sold or closed holding more than it received, a stretch that ends over, an
-               amendment over a cap, or too few active shifts. Open a row to see which. A chain that totals
-               nil is never held back by these: it balances, and the finding stays on the exceptions.</p>
+            <p>If any shift trips a test, none of the chain is amended: no till sales linked, an issue that went
+               nowhere, an amendment over a cap, too few active shifts, a possible duplicate issue, or a write the
+               client's weekly audit would flag. Open a row to see which. A chain that totals nil is never held
+               back by the first four: it balances, and the finding stays on the exceptions.</p>
+            <p>A missing issue does not hold a chain back. The chain balances around it, and the over that is
+               left stays on the shift that carries it, marked <strong>Unrecorded issue</strong>, to capture.</p>
         </x-notice>
     @endif
 
@@ -399,10 +401,16 @@
                         <td class="fit-min"></td>
                     @endif
                 </tr>
+            {{-- Which shifts balance against which (ZRP, 7 Oct 2026): a rail
+                 down the left in the group's colour and its letter beside the
+                 variance, the sentence on hover. ChainSummary::balanceGroups()
+                 reads it off the amendments. --}}
+            @php($groups = $chain->balanceGroups())
             @foreach ($chain->lines as $line)
+                @php($group = $groups[$line->Id] ?? null)
                 {{-- Click, or Enter, opens the whole chain behind the row.
                      Fetched on demand: a branch-month is thousands of shifts. --}}
-                <tr class="{{ $tones[$line->outcomeKey()] ?? '' }}"
+                <tr class="{{ $tones[$line->outcomeKey()] ?? '' }}{{ $group ? ' bal-g'.$group['series'] : '' }}"
                     data-tt-group="{{ $chain->key }}"
                     data-detail-url="{{ route('app.stockrecon.line', [$run, $line]) }}">
                     @if ($run->isOpen())
@@ -469,7 +477,14 @@
                     <td class="num">{{ (float) $line->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($line->QtyIssued, 3) }}</td>
                     <td class="num">{{ \App\Support\Format::n($line->QtyClose, 3) }}</td>
                     <td class="num">{{ (float) $line->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($line->QtyPOS, 3) }}</td>
-                    <td class="num">{{ (float) $line->QtyVar === 0.0 ? '—' : \App\Support\Format::n($line->QtyVar, 3) }}</td>
+                    {{-- `data-sort` so the letter beside the figure never reaches
+                         the sort or the filter. --}}
+                    <td class="num" @if ($group) data-sort="{{ (float) $line->QtyVar === 0.0 ? '—' : \App\Support\Format::n($line->QtyVar, 3) }}" @endif>
+                        @if ($group)
+                            <span class="bal-tag" title="{{ \Modules\StockRecon\Services\ChainSummary::balanceNote($group) }}">{{ $group['letter'] }}</span>
+                        @endif
+                        {{ (float) $line->QtyVar === 0.0 ? '—' : \App\Support\Format::n($line->QtyVar, 3) }}
+                    </td>
                     <td class="num grp">{{ \App\Support\Format::n($line->QtyOpenNew, 3) }}</td>
                     <td class="num">{{ \App\Support\Format::n($line->QtyCloseNew, 3) }}</td>
                     <td class="num">{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::n($line->AmendClose, 3) }}</td>

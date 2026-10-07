@@ -21,13 +21,18 @@
                 || abs((float) $s->QtyOpenNew - (float) $s->QtyOpen) > 0.0005),
         );
 @endphp
-@php($blocks = collect([
-    $item?->BlockPossibleDuplicate,
-    $item?->BlockPackOver, $item?->BlockNoPosLink,
-    $item?->BlockSoldMore, $item?->BlockCloseExceeds, $item?->BlockNetOver,
+{{-- What holds the chain back, listed only while something does: on a nil
+     chain the same flags are findings, not blocks. The unrecorded issues
+     (U1–U4, S1) hold nothing back since 7 Oct 2026 and say so apart. --}}
+@php($blocks = $item?->ChainBlocked ? collect([
+    $item?->BlockPossibleDuplicate, $item?->BlockNoPosLink,
     $item?->BlockIssueNowhere, $item?->BlockAuditConflict, $item?->BlockBigAmendment, $item?->BlockPctAmendment,
     $item?->BlockNegativeClose, $item?->BlockShortChain, $item?->BlockDormantMoved,
+])->filter()->values() : collect())
+@php($unrecorded = collect([
+    $item?->BlockPackOver, $item?->BlockSoldMore, $item?->BlockCloseExceeds, $item?->BlockNetOver,
 ])->filter()->values())
+@php($groups = \Modules\StockRecon\Services\ChainSummary::groupsOfShifts($shifts))
 
 {{-- The possible duplicates on this chain (PM decision 01a10b21): those with
      no release standing NOW, which the panel offers to release, and those
@@ -100,6 +105,17 @@
                 <p><strong>Not a loss:</strong> the selling PLU or recipe is not reducing this item. Link it and
                    re-run; nobody is charged.</p>
             @endif
+        </x-notice>
+    @endif
+
+    @if ($unrecorded->isNotEmpty())
+        <x-notice tone="warn" title="An issue was not written up">
+            <ul>
+                @foreach ($unrecorded as $why)<li>{{ $why }}</li>@endforeach
+            </ul>
+            <p>It does not hold the chain back. The shifts around it balance, and whatever over no count can remove
+               stays on the shift that carries it — marked <strong>Unrecorded issue</strong> — for the missing issue
+               to be captured there.</p>
         </x-notice>
     @endif
 
@@ -191,7 +207,9 @@
         </x-slot:head>
 
         @foreach ($shifts as $shift)
-            <tr @class(['is-matched' => (bool) $shift->IsClicked])>
+            {{-- The group it balances in, as on the proposals: rail and letter. --}}
+            @php($group = $groups[(int) $shift->Id] ?? null)
+            <tr @class(['is-matched' => (bool) $shift->IsClicked, 'bal-g'.($group['series'] ?? 0) => $group !== null])>
                 <td class="l fit-min">{{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }}</td>
                 <td class="num">{{ $shift->ShiftNo }}</td>
                 {{-- Who was signed on to this counting area for this shift.
@@ -222,7 +240,12 @@
                 <td class="num">{{ (float) $shift->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($shift->QtyIssued, 3) }}</td>
                 <td class="num">{{ \App\Support\Format::n($shift->QtyClose, 3) }}</td>
                 <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($shift->QtyPOS, 3) }}</td>
-                <td class="num">{{ (float) $shift->QtyVar === 0.0 ? '—' : \App\Support\Format::n($shift->QtyVar, 3) }}</td>
+                <td class="num">
+                    @if ($group)
+                        <span class="bal-tag" title="{{ \Modules\StockRecon\Services\ChainSummary::balanceNote($group) }}">{{ $group['letter'] }}</span>
+                    @endif
+                    {{ (float) $shift->QtyVar === 0.0 ? '—' : \App\Support\Format::n($shift->QtyVar, 3) }}
+                </td>
                 {{-- The rand behind the quantity. A variance is read as a pair
                      on the legacy screen and it should be read as a pair here:
                      0.1 kg of R240 cheese and 0.1 kg of sauce are the same

@@ -698,6 +698,26 @@ tr.is-open .tt-caret::before { transform: rotate(90deg); }
 .chain-bar i.tone-serious { background: var(--serious); }
 .chain-bar i.tone-crit    { background: var(--crit); }
 
+/* Shifts that balance against each other (ZRP, 7 Oct 2026: "identification of
+   the rows"). A rail down the row's first cell in the group's series colour,
+   and the group's letter beside the variance — ChainSummary::balanceGroups().
+   The colour cycles through the five series tokens; the letter carries the
+   identity, so two groups sharing a colour five apart are still told apart.
+   The group's rail replaces the outcome's on the same cell — declared after
+   it at the same specificity — and the outcome keeps the row's wash. */
+.bal-g1 { --bal: var(--s1); }
+.bal-g2 { --bal: var(--s2); }
+.bal-g3 { --bal: var(--s3); }
+.bal-g4 { --bal: var(--s4); }
+.bal-g5 { --bal: var(--s5); }
+table.dt tr[class*="bal-g"] td:first-child { box-shadow: inset 4px 0 0 var(--bal); }
+.bal-tag {
+  display: inline-block; min-width: 18px; margin-right: 6px; padding: 0 4px;
+  border: 1.5px solid var(--bal, var(--line)); border-radius: 4px;
+  font: 600 10.5px/15px var(--font-mono); color: var(--ink); text-align: center;
+  vertical-align: 1px; cursor: help;
+}
+
 .tt-pills .tt-expand-all { margin-left: auto; }
 
 /* One column's caption and pills: wraps as a unit. A second set in the same

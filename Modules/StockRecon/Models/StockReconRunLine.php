@@ -174,11 +174,15 @@ class StockReconRunLine extends BaseModel
             $this->removesDuplicate() => 'duplicate',
             $this->isPossibleDuplicate() => 'possible',
             $this->IsDormant => 'dormant',
-            // The classes that say stock arrived with no paperwork — see
-            // config('stockrecon.exceptions'). Only where they hold the chain
-            // back: a nil chain balances, and its rows read what happens to
-            // them (7 Oct 2026); the code stays on the exceptions.
-            $this->ChainBlocked && in_array($this->ExceptionCode, ['U1', 'U2', 'U3', 'U4', 'S1'], true) => 'unrecorded',
+            // Stock arrived with no paperwork. Since 7 Oct 2026 that holds no
+            // chain back: the chain balances around it, and the shift left
+            // over afterwards is the unrecorded issue — the one to capture.
+            ! $this->ChainBlocked && (float) $this->QtyVarNew > 0.005 => 'unrecorded',
+            // A run recorded before then, when U1–U4 and S1 held the chain
+            // back and the row said so. Another blocker's chain says "Held
+            // back" on these rows instead.
+            $this->ChainBlocked && in_array($this->ExceptionCode, ['U1', 'U2', 'U3', 'U4', 'S1'], true)
+                && ! str_starts_with((string) $this->Outcome, 'Held back') => 'unrecorded',
             // A blocked chain put back to the staff counts: the hand amendment
             // is reversed, the chain is still not balanced.
             $this->RestoresHand && $this->WouldAmend => 'restored',

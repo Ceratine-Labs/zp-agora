@@ -15,8 +15,9 @@
             <p>A shift's variance is <code>POS &minus; (Open + Issued &minus; Close)</code>, and one shift's
                closing <em>is</em> the next shift's opening. Balancing moves a closing count, which shifts
                variance from one shift to the next: it decides <strong>who carries</strong> a loss and cannot
-               make it smaller. A window that ends <strong>over</strong> sold more than it received — it is
-               reported, never balanced.</p>
+               make it smaller. A window that ends <strong>over</strong> sold more than it received: it still
+               balances, and the over that no count can remove stays on the shift that carries it, reported as
+               the missing issue. Shifts that balance against each other share a letter and a colour.</p>
             @if ($stampMode === 'journal')
                 <p><strong>Journal mode.</strong> A commit records each amendment in Agora with the prior counts;
                    nothing in PumpIT moves.</p>

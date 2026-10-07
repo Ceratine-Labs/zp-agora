@@ -67,7 +67,7 @@ most of the design:
 |---|---|
 | **T < 0** | Real loss of \|T\| over the window. Balancing decides which shifts carry it; it cannot make it smaller. |
 | **T = 0** | Every variance is a counting artefact. It balances to zero throughout. |
-| **T > 0** | More was sold than the books ever received. **No amendment removes it.** The chain is reported, never balanced. |
+| **T > 0** | More was sold than the books ever received. **No amendment removes it** — but since 7 Oct 2026 the chain still balances around it: every short goes to nil, and the over stays on the shifts that carry it, reported as the missing issue (see *A stretch that ends over balances too*). |
 
 ## The algorithm
 
@@ -171,6 +171,57 @@ balance* (`ChainSummary::verdict()`, one wording for both) where the panel used
 to say *Balanceable*, and the proposals strip counts **Chains to balance** —
 chains with something to write — with the chains not held back beside it.
 
+### A stretch that ends over balances too — since 7 Oct 2026
+
+ZRP, on the proposals for D Pizza Box Large at Debonairs FOH, 1–6 Sep: a chain
++39 over, held back whole as an unrecorded issue, with −1/+1 and +7/−6/−1
+sitting in it — *"you can clearly see that items should be balancing … don't
+hold chains back"*. Ryan: *"it needs to balance anyways"*.
+
+On a stretch whose total is over, the reverse running **maximum** would push
+all of T onto its first shift, which is why such a chain was reported and never
+balanced. The **mirror** does the right thing: where T > 0,
+
+```
+m(k) = MIN( P(j) : j ≥ k )            ← reverse running minimum
+Q(k) = CLAMP( m(k), between 0 and T )
+```
+
+Q never falls, so every short on the stretch is a miscount and goes to nil; Q
+never sits above P, so an over only shrinks; the latest closing stands and the
+first opening stays. What is left — exactly T, which no count can remove —
+stays on the shifts that sold or held stock nobody issued. Rule 4 holds either
+way round: nothing changes sign and nothing grows. One `CASE` in stage 3 picks
+the envelope by the sign of the segment's total.
+
+The pizza box chain, five days of it (`BalancingTest::test_a_chain_that_ends_over_…`):
+
+| | 1 | 3 | 1 | 3 | 1 | 3 | 1 | 3 | 1 | 3 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| counted | −1 | +1 | +7 | −6 | −1 | 0 | −2 | +20 | +7 | +14 |
+| balanced | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **+18** | **+7** | **+14** |
+| group | A | A | B | B | B | | C | C | | |
+
+Closings 52 → 53, 34 → 27, 27 → 26 and 0 → 2. The −2 goes into the +20 beside
+it — the next shift's sales prove the 2 were there — and the 39 stays on the
+three shifts that sold from an empty shelf.
+
+**What no longer holds a chain back:** U1, U2, U3, U4 and S1 — the unrecorded
+issues, the whole-pack over within 10% included. They are still raised on the
+shift, still on the exceptions, and a row left over after balancing says
+*Unrecorded issue, over left: capture the missing issue on this shift* (the
+*Unrecorded issue* pill). **What still does:** E1, F1 (the caps), F2, too few
+active shifts, a possible duplicate (D2), a write the client's audit would flag
+(F3), and a write that cannot be made.
+
+**What balances with what** is marked on the proposals and on the chain panel
+(`ChainSummary::balanceGroups()`). Two neighbouring shifts balance together
+exactly where the closing between them is amended, so a run of them joined that
+way is one group and a closing left as counted ends it. Each group gets a
+letter and a colour (a rail down the row, the letter beside the variance, the
+five series tokens in turn); the hover says which shifts it balances with and
+whether together they come to nil, leave a short, or leave the over.
+
 ### Reset to original — since 7 Oct 2026
 
 Head office balances by hand in PumpIT: the live columns move, the `_Original`
@@ -220,7 +271,7 @@ Where each rule lands:
 | 1. Variance = POS − (opening + issued − closing) | Unchanged. |
 | 3. Opening must equal the previous closing; amend the **opening**, never the closing | A break is **repaired**, not blocked: `QtyOpenNew` = the previous closing (the shift before the window for the first row). The closing before a repaired opening is **pinned** — the chain is balanced in segments split at each repair — because the pack flags any moved previous closing at a break as S12. Reported as **S10a** (opening below: stock vanished) or **S10b** (above). **A break of 3 or fewer does not split** (ZRP, 4 Oct 2026 — see above). |
 | 4. Over → nil, never a short; a short never grows; the latest closing stands | Unchanged — it is what the reverse running maximum already did. The last active shift of each segment is pinned. |
-| 5. An over within 10% of a whole issue multiple is an issue not written up | **S1**, blocks the chain: captured, never balanced away. Multiples come from `agora.StockIssueMultiple` (head office's workbook, seeded by `IssueMultipleSeeder`), falling back to `vw_StockItem.IssueMultiple` — PumpIT's column is ≥ 2 on 1 of 2,433 items at the pack's sites. |
+| 5. An over within 10% of a whole issue multiple is an issue not written up | **S1**, reported on the shift. It blocked the chain until 7 Oct 2026, when ZRP asked that such a chain be balanced; it now balances around it. Multiples come from `agora.StockIssueMultiple` (head office's workbook, seeded by `IssueMultipleSeeder`), falling back to `vw_StockItem.IssueMultiple` — PumpIT's column is ≥ 2 on 1 of 2,433 items at the pack's sites. |
 | 10. Analyse a site only up to its last complete recon day | Stage 0 of the preview. A day is complete when every shift the site normally runs carries ≥ 95% of its normal lines with ≥ half its normal share of closings, and POS is posted on ≥ half the normal share. The first incomplete day and everything after it is **held back** (`CompleteTo`, `HeldBackRows`). Option `HoldBackIncomplete`, default on. |
 | E1. Stock falling with no till sales linked is a system fault | **E1**, blocks the chain: T < −max(3, pack) over 2+ days with Σ POS ≤ 10% of \|T\|. Nobody is charged. |
 | S7, S8, S11, S12, S13, S4/S4a/S4b — the audit of hand balancing | `AuditCode` on every line: what the balancing **already in PumpIT** did against the rules, measured the pack's way (original counts, opening repaired to the original previous closing, fat-finger issues neutralised). |
@@ -643,13 +694,13 @@ same list with the wording the screen uses.
 |---|---|---|---|
 | **S10a** | Opening below the previous closing | `Open < Close(i−1)` | repaired |
 | **E1** | No till sales linked | `T < −max(3, pack)`, 2+ days, `Σ POS ≤ 10% of \|T\|` | blocks |
-| **S1** | Over of a whole pack | over within 10% of k × multiple | blocks |
-| **U1** | Unrecorded issue, proven | `POS > Open + Issued` (Open = the repaired opening, or the counted one on a kept break above the previous closing), and the shorts on the chain neither before nor after it cover it | blocks |
-| **U2** | Closing exceeds what was on hand | `Close > Open + Issued` (as U1, covered the same way) | blocks |
+| **S1** | Over of a whole pack | over within 10% of k × multiple | reported; the chain balances (7 Oct 2026) |
+| **U1** | Unrecorded issue, proven | `POS > Open + Issued` (Open = the repaired opening, or the counted one on a kept break above the previous closing), and the shorts on the chain neither before nor after it cover it | reported; the over stays, the chain balances (7 Oct 2026) |
+| **U2** | Closing exceeds what was on hand | `Close > Open + Issued` (as U1, covered the same way) | reported; the over stays, the chain balances (7 Oct 2026) |
 | **D2** | Possible duplicate issue | short within 10% of the issue, an identical issue on a neighbouring shift, not clear | holds the chain back, nothing written, until corrected or released |
 | **D1** | Duplicate issue removed | short = the issue exactly, the twin arrived, same day or not the usual size, one per pair, shelf goods | removed |
-| **U3** | Selling with no issues captured at all | `Σ Issued = 0 and Σ POS > 0` and a segment over | blocks |
-| **U4** | Net over | a segment's `T > 0` | blocks |
+| **U3** | Selling with no issues captured at all | `Σ Issued = 0 and Σ POS > 0` and a segment over | reported; the over stays, the chain balances (7 Oct 2026) |
+| **U4** | Net over | a segment's `T > 0` | reported; the segment balances by the mirror (7 Oct 2026) |
 | **S10b** | Opening above the previous closing | `Open > Close(i−1)` | repaired |
 | **F1** | Data fault | a count below zero, or a correction larger than the caps allow | blocks |
 | **F2** | Issue went nowhere | `Open = Close and Issued > 0 and POS = 0` | blocks |
@@ -662,7 +713,7 @@ same list with the wording the screen uses.
 
 **A kept break is not stock from nowhere (6 Oct 2026).** Where a shift opens up to 3 above the previous closing, the closing before it is the miscount — staff counted 0, the next shift counted the same 2 again — and the kept break lets that closing move. So U1 and U2 read the opening as counted there, not the repaired one; only the break is excused, and an over beyond it still blocks. Before this, ZAMBUK at branch 17 (11 Sep) was held back at a chain total of nil; on run 45 ten chains were, every one at T = 0, and on branch 23's September six.
 
-**An over a short covers is not stock from nowhere either (6 Oct 2026).** A closing counted low and counted right by the next shift is a short then an over of the same size, with no break between them — the next opening copies the wrong closing. Counted high, it is the over first and the short after. Either way the chain total is nil and balancing moves the one closing. So U1 and U2 block only where the segment's running total is above zero at that shift (no short before covers it) **and** what is left of the segment from that shift on is above zero too (no short after covers it). Before this, MONSTER MARIPO at branch 17 (8 Sep night −6, 9 Sep day +6) and 2LIT COKE (+2, then −1 and −1) were held back at T = 0. Measured: live run 46 (branch 17, 1–13 Sep) 4 of the 5 chains still held back on U1/U2 come free (BIOPLUS stays, U4); local branch 23, 1–29 Sep, 182 → 158 chains blocked, none the other way, 20 of the 24 at T = 0 and four with a real short of 2 to 14 now placed by the balancing; rows a commit would write 32 → 236, every one on a freed chain. An over neither side covers is still U1/U2 and still blocks.
+**An over a short covers is not stock from nowhere either (6 Oct 2026).** A closing counted low and counted right by the next shift is a short then an over of the same size, with no break between them — the next opening copies the wrong closing. Counted high, it is the over first and the short after. Either way the chain total is nil and balancing moves the one closing. So U1 and U2 block only where the segment's running total is above zero at that shift (no short before covers it) **and** what is left of the segment from that shift on is above zero too (no short after covers it). Before this, MONSTER MARIPO at branch 17 (8 Sep night −6, 9 Sep day +6) and 2LIT COKE (+2, then −1 and −1) were held back at T = 0. Measured: live run 46 (branch 17, 1–13 Sep) 4 of the 5 chains still held back on U1/U2 come free (BIOPLUS stays, U4); local branch 23, 1–29 Sep, 182 → 158 chains blocked, none the other way, 20 of the 24 at T = 0 and four with a real short of 2 to 14 now placed by the balancing; rows a commit would write 32 → 236, every one on a freed chain. An over neither side covers is still U1/U2 — and since 7 Oct 2026 that no longer blocks either: it is reported, and the chain balances around it.
 
 And, separately, the **audit** of what the hand balancing already in PumpIT did
 (`AuditCode`, `config('stockrecon.audit')`): S13 mismatch still open, S12
