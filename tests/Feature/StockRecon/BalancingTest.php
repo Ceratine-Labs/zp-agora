@@ -899,6 +899,39 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * One shift that traded and an over of 1 — item 104, Behind Counter (Ryan,
+     * 8 Oct 2026: "says held back but not held back ... which is it?"). Too
+     * few active shifts is reported, never a hold: there is nothing to move
+     * the over onto, so it reads as the issue to capture.
+     */
+    public function test_a_chain_with_one_active_shift_is_reported_not_held_back(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [5, 0, 5, 0], 3 => [5, 0, 5, 0]],
+            '2026-07-18' => [1 => [5, 0, 6, 0], 3 => [6, 0, 6, 0]],
+            '2026-07-19' => [1 => [6, 0, 6, 0], 3 => [6, 0, 6, 0]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($run, '2026-07-18', 1);
+
+        $this->assertTrue((bool) $line->FlagShortChain, 'Still reported as too few active shifts.');
+        $this->assertFalse((bool) $line->ChainBlocked, 'But it does not hold the chain back.');
+        $this->assertEqualsWithDelta(1.0, (float) $line->ChainNetVar, 0.001);
+        $this->assertFalse($line->isEmptyChain(), 'An over of 1 is never hidden.');
+
+        $chain = ChainSummary::of($run->lines)->first(fn ($c) => $c->first()->StockItemNo === self::DUP_ITEM);
+        $this->assertSame('Over 1.000 · capture the missing issue', $chain->state()['label']);
+
+        $this->actingAs($this->person('admin'))
+            ->get(route('app.stockrecon.line', [$run, $line]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()
+            ->assertSee('Over 1.000 · capture the missing issue')
+            ->assertDontSee('Held back')
+            ->assertDontSee('Too few active shifts to balance');
+    }
+
+    /**
      * At 0 the option restores the split: the stretch after the break ends
      * over, as before 4 Oct — reported, and since 7 Oct balanced around.
      */

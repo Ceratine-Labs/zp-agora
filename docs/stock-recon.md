@@ -210,8 +210,11 @@ three shifts that sold from an empty shelf.
 issues, the whole-pack over within 10% included. They are still raised on the
 shift, still on the exceptions, and a row left over after balancing says
 *Unrecorded issue, over left: capture the missing issue on this shift* (the
-*Unrecorded issue* pill). **What still does:** E1, F1 (the caps), F2, too few
-active shifts, a possible duplicate (D2), a write the client's audit would flag
+*Unrecorded issue* pill). **Nor does too few active shifts** (8 Oct 2026): with
+one shift that traded there is nothing to move a variance onto, so the chain
+reads as an over to capture or a short that stays, and the flag only reports it
+(and hides a chain that carries nothing). **What still does:** E1, F1 (the
+caps), F2, a possible duplicate (D2), a write the client's audit would flag
 (F3), and a write that cannot be made.
 
 **What balances with what** is marked on the proposals and on the chain panel

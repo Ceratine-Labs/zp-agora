@@ -1033,10 +1033,18 @@ BEGIN
                   balance anyways"). U1, U2, U3, U4 and S1 are raised on the
                   shift and reported; the chain balances around them, and
                   whatever over is left stays on the shifts that carry it as
-                  the issue to capture. */
+                  the issue to capture.
+
+                  NOR DOES "TOO FEW ACTIVE SHIFTS" (8 Oct 2026). With one shift
+                  that traded there is nothing to move a variance onto — the
+                  last active shift is pinned — so holding the chain changed
+                  only its label: Ryan, on an item with 1 active shift and an
+                  over of 1, "says held back but not held back ... which is
+                  it?". The flag stays (and hides an empty chain); the chain
+                  reads as what it is — an over to capture, or a short that
+                  stays where it was counted. */
                CONVERT(bit, MAX(CASE WHEN ABS(s.ChainNetVar) <= @eps THEN 0
                                      ELSE CONVERT(int, s.FlagIssueWentNowhere)
-                                        + CONVERT(int, s.FlagShortChain)
                                         + CONVERT(int, s.FlagNoPosLink)
                                         + CONVERT(int, s.FlagBigAmendment) + CONVERT(int, s.FlagPctAmendment) END
                               + CONVERT(int, s.FlagNegativeClose) + CONVERT(int, s.FlagDormantMoved)
