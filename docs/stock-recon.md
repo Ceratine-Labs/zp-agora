@@ -28,7 +28,9 @@ What follows from it:
 * **Reset to original** puts back the counts, the **issue** (`reset_issues`,
   true since this change) and the **closing just before the week** (not that
   shift's opening or issue), so PumpIT holds what the counts are balanced
-  against. POS is not reset: writing `QtyComputer` would be a new write.
+  against. Since 8 Oct 2026 the **POS** goes back too (`QtyComputer =
+  QtyComputer_Original`, Ryan: "clear any amendments, they will not be
+  inputting anything on v2"), so every amended column is cleared.
 * Where PumpIT still holds a hand-changed issue, POS or previous closing that
   would make a written chain trip one of the weekly checks, the chain is held
   as **F3** until Reset to original.
@@ -228,11 +230,13 @@ whether together they come to nil, leave a short, or leave the over.
 ### Reset to original — since 7 Oct 2026
 
 Head office balances by hand in PumpIT: the live columns move, the `_Original`
-ones keep what staff counted. Where the hand balancing already holds the
+ones keep what staff counted, and the till's POS. Where the hand balancing already holds the
 answer, the preview has nothing to write — a balanceable chain cannot be
 pressed (the strip says "N already balanced in PumpIT"). Head office's way back
 is a script per branch-day; Ryan gave it: `QtyOpen = QtyOpen_Original`,
-`QtyIssued = QtyIssued_Original`, `QtyClose = QtyClose_Original`.
+`QtyIssued = QtyIssued_Original`, `QtyClose = QtyClose_Original`. The POS
+(`QtyComputer = QtyComputer_Original`) was added on 8 Oct 2026 — all four
+amended columns go back.
 
 **Reset to original** on a run is that script for the shifts the run covers
 (`agora.usp_StockRecon_ResetToOriginal`, permission `stockrecon.runs.execute`):
@@ -240,7 +244,9 @@ is a script per branch-day; Ryan gave it: `QtyOpen = QtyOpen_Original`,
 * every row's prior goes to `agora.StockReconAmendment` first, the run is
   marked committed with `CommitKind = 'reset'`, and its **Reverse** puts it
   all back (refusing, COUNT_MOVED, while a balancing written since stands —
-  reverse that first);
+  reverse that first — and ISSUE_MOVED or POS_MOVED over an issue or POS
+  changed since). The POS prior is `PriorQtyPOS` / `NewQtyPOS` (`v1__14k`),
+  NULL where the reset did not change it;
 * a chain a possible duplicate holds back is left alone;
 * a shift carrying a balancing amendment from another run is skipped;
 * the same window is then **previewed again** and the operator lands on it:
@@ -255,7 +261,8 @@ brings the over back as an unrecorded issue. Measured on branch 23, 1–29 Sep
 counts and issues — 65 to write, 89 held back. Before the reset: 37 to write,
 45 already balanced in PumpIT, 56 held back.
 
-The audit trail names it *Reset to original* (`v1__22e`).
+The audit trail names it *Reset to original* (`v1__22e`), with the POS in the
+change column (`POS 0 → 1`, `v1__22g`).
 
 ---
 

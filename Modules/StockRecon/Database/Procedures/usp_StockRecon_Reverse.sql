@@ -7,13 +7,15 @@
  *           agora.StockReconRun, and in 'live' mode the two counts on
  *           [PumpIT].dbo.STK_StockReconLine — and QtyIssued, back to its
  *           prior, where the commit set a clear duplicate issue to 0 (1 Oct
- *           2026).
+ *           2026) or a reset put it back to the original; QtyComputer, the
+ *           POS, back to its prior where a reset put it back (8 Oct 2026).
  *
  * NOTHING IS WRITTEN OVER A ROW THAT HAS MOVED SINCE (5 Oct 2026). Every row
  * the commit wrote to PumpIT must still hold exactly what the commit left
  * there, or the whole reversal is refused before anything moves, naming the
  * shift and what it holds now: ISSUE_MOVED for a duplicate issue the commit set
- * to 0, COUNT_MOVED for a count it amended. Until then a reversal put the prior
+ * to 0, COUNT_MOVED for a count it amended, POS_MOVED for a POS a reset put
+ * back. Until then a reversal put the prior
  * counts back over whatever was there — a recount, a hand balancing — and the
  * change was lost without a trace. Journal-mode amendments wrote nothing and
  * are not checked.
@@ -127,6 +129,36 @@ BEGIN
     IF @Moved IS NOT NULL
         THROW 51000, @Moved, 1;
 
+    /*
+     * AND A POS A RESET PUT BACK (8 Oct 2026), the same way: the prior goes
+     * back only over the POS the reset wrote.
+     */
+    SET @Moved = (
+        SELECT TOP 1 CONCAT(N'AGORA:POS_MOVED:', ISNULL(rl.ItemDescription, a.StockItemNo),
+                            N' on ', CONVERT(char(10), a.TransactionDate, 23), N' shift ', a.ShiftNo,
+                            CASE WHEN l.StockItemNo IS NULL
+                                 THEN N' is no longer in PumpIT'
+                                 ELSE CONCAT(N' has changed since this run put its POS back (it now holds POS ',
+                                             FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyComputer, 0)), '0.###'),
+                                             N'; the run left ', FORMAT(a.NewQtyPOS, '0.###'), N')') END,
+                            N'. Putting the old POS back would write over that change, so nothing was reversed. Correct it in PumpIT first.')
+        FROM agora.StockReconAmendment a
+        LEFT JOIN agora.StockReconRunLine rl
+               ON rl.BranchId = a.BranchId AND rl.Id = a.RunLineId
+        LEFT JOIN [PumpIT].dbo.STK_StockReconLine l
+               ON l.SSBranchId = a.BranchId
+              AND CONVERT(date, l.TransactionDate) = a.TransactionDate
+              AND l.ShiftNo = a.ShiftNo AND l.AreaNo = a.AreaNo AND l.StockItemNo = a.StockItemNo
+        WHERE a.BranchId = @BranchId AND a.RunId = @RunId
+          AND a.[State] = 'active' AND a.StampMode = 'live'
+          AND a.NewQtyPOS IS NOT NULL
+          AND (   l.StockItemNo IS NULL
+               OR ABS(CONVERT(decimal(18,4), ISNULL(l.QtyComputer, 0)) - a.NewQtyPOS) > 0.005)
+        ORDER BY a.TransactionDate, a.ShiftNo, a.AreaNo, a.StockItemNo);
+
+    IF @Moved IS NOT NULL
+        THROW 51000, @Moved, 1;
+
     /* The live half first, so a failure there leaves the ledger saying the
        amendment is still active — which is true, and is the safe direction to
        be wrong in. Only amendments the commit actually wrote to PumpIT. The
@@ -134,7 +166,8 @@ BEGIN
     UPDATE l
        SET l.QtyOpen   = a.PriorQtyOpen,
            l.QtyClose  = a.PriorQtyClose,
-           l.QtyIssued = CASE WHEN a.NewQtyIssued IS NOT NULL THEN a.PriorQtyIssued ELSE l.QtyIssued END
+           l.QtyIssued = CASE WHEN a.NewQtyIssued IS NOT NULL THEN a.PriorQtyIssued ELSE l.QtyIssued END,
+           l.QtyComputer = CASE WHEN a.NewQtyPOS IS NOT NULL THEN a.PriorQtyPOS ELSE l.QtyComputer END
     FROM [PumpIT].dbo.STK_StockReconLine l
     JOIN agora.StockReconAmendment a
       ON l.SSBranchId = a.BranchId

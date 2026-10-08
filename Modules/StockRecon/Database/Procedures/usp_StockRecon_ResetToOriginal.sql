@@ -10,7 +10,10 @@
  *           QtyOpen = QtyOpen_Original, QtyClose = QtyClose_Original, and, when
  *           @IssueMode is 'live' too, QtyIssued = QtyIssued_Original (Ryan's
  *           named go-ahead, 7 Oct 2026: "update the amended with the original
- *           column values", with head office's own three UPDATEs).
+ *           column values", with head office's own three UPDATEs), and
+ *           QtyComputer = QtyComputer_Original, the POS (Ryan's named go-ahead,
+ *           8 Oct 2026: "clear any amendments, they will not be inputting
+ *           anything on v2"). Every amended column goes back.
  *
  * WHY. Head office balances by hand in PumpIT: the live columns move, the
  * _Original ones keep what staff counted. Where the hand balancing already
@@ -19,7 +22,7 @@
  * sets every live column to its original. This is that script, for the shifts
  * one run covers, with three things the script does not have:
  *
- *   - Every row's PRIOR open, close and issue is written to
+ *   - Every row's PRIOR open, close, issue and POS is written to
  *     agora.StockReconAmendment first, so the run's Reverse puts back exactly
  *     what was there (and refuses — COUNT_MOVED, ISSUE_MOVED — over anything
  *     changed since).
@@ -77,11 +80,13 @@ BEGIN
         CONVERT(decimal(18,3), ISNULL(l.QtyOpen,   0))                AS PriorOpen,
         CONVERT(decimal(18,3), ISNULL(l.QtyClose,  0))                AS PriorClose,
         CONVERT(decimal(18,3), ISNULL(l.QtyIssued, 0))                AS PriorIssued,
+        CONVERT(decimal(18,3), ISNULL(l.QtyComputer, 0))              AS PriorPOS,
         CONVERT(decimal(18,3), ISNULL(l.QtyOpen_Original,   l.QtyOpen))   AS NewOpen,
         CONVERT(decimal(18,3), ISNULL(l.QtyClose_Original,  l.QtyClose))  AS NewClose,
         CONVERT(decimal(18,3), CASE WHEN @IssueMode = 'live'
                                     THEN ISNULL(l.QtyIssued_Original, l.QtyIssued)
                                     ELSE l.QtyIssued END)                 AS NewIssued,
+        CONVERT(decimal(18,3), ISNULL(l.QtyComputer_Original, ISNULL(l.QtyComputer, 0))) AS NewPOS,
         CONVERT(nvarchar(200), NULL)                                      AS SkipReason
     INTO #reset
     FROM agora.StockReconRunLine rl
@@ -95,7 +100,9 @@ BEGIN
       AND (   (l.QtyOpen_Original  IS NOT NULL AND ABS(ISNULL(l.QtyOpen,  0) - l.QtyOpen_Original)  > @eps)
            OR (l.QtyClose_Original IS NOT NULL AND ABS(ISNULL(l.QtyClose, 0) - l.QtyClose_Original) > @eps)
            OR (@IssueMode = 'live' AND l.QtyIssued_Original IS NOT NULL
-               AND ABS(ISNULL(l.QtyIssued, 0) - l.QtyIssued_Original) > @eps));
+               AND ABS(ISNULL(l.QtyIssued, 0) - l.QtyIssued_Original) > @eps)
+           OR (l.QtyComputer_Original IS NOT NULL
+               AND ABS(ISNULL(l.QtyComputer, 0) - l.QtyComputer_Original) > @eps));
 
     /* AND THE SHIFT JUST BEFORE THE WEEK, its closing only (7 Oct 2026). The
        preview reads the ORIGINAL closing of the last shift before the window
@@ -116,7 +123,7 @@ BEGIN
     ),
     before AS (
         SELECT l.AreaNo, l.StockItemNo, CONVERT(date, l.TransactionDate) AS TransactionDate, l.ShiftNo,
-               l.QtyOpen, l.QtyClose, l.QtyClose_Original, l.QtyIssued,
+               l.QtyOpen, l.QtyClose, l.QtyClose_Original, l.QtyIssued, l.QtyComputer,
                ROW_NUMBER() OVER (PARTITION BY l.AreaNo, l.StockItemNo
                                   ORDER BY l.TransactionDate DESC, l.ShiftNo DESC) AS rn
         FROM agora.vw_StockReconLine l
@@ -126,12 +133,12 @@ BEGIN
           AND l.TransactionDate <  @From
     )
     INSERT INTO #reset (Id, [LineNo], AreaNo, StockItemNo, TransactionDate, ShiftNo,
-                        PriorOpen, PriorClose, PriorIssued, NewOpen, NewClose, NewIssued, SkipReason)
+                        PriorOpen, PriorClose, PriorIssued, PriorPOS, NewOpen, NewClose, NewIssued, NewPOS, SkipReason)
     SELECT -i.FirstLineId, 0, b.AreaNo, b.StockItemNo, b.TransactionDate, b.ShiftNo,
            CONVERT(decimal(18,3), ISNULL(b.QtyOpen, 0)), CONVERT(decimal(18,3), ISNULL(b.QtyClose, 0)),
-           CONVERT(decimal(18,3), ISNULL(b.QtyIssued, 0)),
+           CONVERT(decimal(18,3), ISNULL(b.QtyIssued, 0)), CONVERT(decimal(18,3), ISNULL(b.QtyComputer, 0)),
            CONVERT(decimal(18,3), ISNULL(b.QtyOpen, 0)), CONVERT(decimal(18,3), b.QtyClose_Original),
-           CONVERT(decimal(18,3), ISNULL(b.QtyIssued, 0)), NULL
+           CONVERT(decimal(18,3), ISNULL(b.QtyIssued, 0)), CONVERT(decimal(18,3), ISNULL(b.QtyComputer, 0)), NULL
     FROM before b
     JOIN items i ON i.AreaNo = b.AreaNo AND i.StockItemNo = b.StockItemNo
     WHERE b.rn = 1 AND i.Held = 0
@@ -163,7 +170,7 @@ BEGIN
     INSERT INTO agora.StockReconAmendment (
         BranchId, RunId, RunLineId, AreaNo, StockItemNo, TransactionDate, ShiftNo,
         PriorQtyOpen, PriorQtyClose, NewQtyOpen, NewQtyClose,
-        PriorQtyIssued, NewQtyIssued, StampMode, [State],
+        PriorQtyIssued, NewQtyIssued, PriorQtyPOS, NewQtyPOS, StampMode, [State],
         CreatedAt, CreatedBy)
     SELECT
         @BranchId, @RunId, r.Id, r.AreaNo, r.StockItemNo, r.TransactionDate, r.ShiftNo,
@@ -172,6 +179,8 @@ BEGIN
            reversal leaves it alone. */
         CASE WHEN ABS(r.NewIssued - r.PriorIssued) > @eps THEN r.PriorIssued END,
         CASE WHEN ABS(r.NewIssued - r.PriorIssued) > @eps THEN r.NewIssued END,
+        CASE WHEN ABS(r.NewPOS - r.PriorPOS) > @eps THEN r.PriorPOS END,
+        CASE WHEN ABS(r.NewPOS - r.PriorPOS) > @eps THEN r.NewPOS END,
         @StampMode, 'active',
         SYSUTCDATETIME(), @UserId
     FROM #reset r
@@ -181,7 +190,8 @@ BEGIN
         UPDATE l
            SET l.QtyOpen   = r.NewOpen,
                l.QtyClose  = r.NewClose,
-               l.QtyIssued = CASE WHEN ABS(r.NewIssued - r.PriorIssued) > @eps THEN r.NewIssued ELSE l.QtyIssued END
+               l.QtyIssued = CASE WHEN ABS(r.NewIssued - r.PriorIssued) > @eps THEN r.NewIssued ELSE l.QtyIssued END,
+               l.QtyComputer = CASE WHEN ABS(r.NewPOS - r.PriorPOS) > @eps THEN r.NewPOS ELSE l.QtyComputer END
         FROM [PumpIT].dbo.STK_StockReconLine l
         JOIN #reset r
           ON l.SSBranchId = @BranchId

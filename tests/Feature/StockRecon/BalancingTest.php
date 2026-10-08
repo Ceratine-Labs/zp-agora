@@ -875,6 +875,52 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * Ryan, 8 Oct 2026: "clear any amendments". The POS goes back to
+     * QtyComputer_Original with the counts, its prior kept; Reverse puts it
+     * back, and refuses over a POS changed since.
+     */
+    public function test_reset_to_original_puts_the_pos_back_and_reverse_restores_it(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.reset_issues' => true]);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
+            '2026-07-18' => [1 => [3, 0, 2, 1], 3 => [2, 0, 1, 1]],
+            '2026-07-19' => [1 => [1, 0, 1, 0], 3 => [1, 0, 0, 1]],
+        ]);
+        // Head office cut the POS to 0 by hand; the counts are as staff took them.
+        $this->setRow(self::DUP_ITEM, '2026-07-18', 1, ['QtyComputer' => 0]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $this->service->resetToOriginal($run);
+
+        $this->assertEqualsWithDelta(1.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyComputer, 0.0005,
+            'The POS as the till recorded it.');
+
+        $amendment = StockReconAmendment::query()->acrossBranches()->where('RunId', $run->Id)->sole();
+        $this->assertEqualsWithDelta(0.0, (float) $amendment->PriorQtyPOS, 0.0005);
+        $this->assertEqualsWithDelta(1.0, (float) $amendment->NewQtyPOS, 0.0005);
+        $this->assertNull($amendment->NewQtyIssued, 'The issue did not change, so it is not recorded.');
+
+        $change = $this->db()->table('agora.vw_PumpItChange')
+            ->where('Ledger', 'StockReconAmendment')->where('LedgerId', $amendment->Id)->first();
+        $this->assertStringContainsString('POS 0 → 1', (string) $change->Change, 'The audit trail shows it.');
+
+        // Somebody keys the POS again: the reversal must not write over it.
+        $this->setRow(self::DUP_ITEM, '2026-07-18', 1, ['QtyComputer' => 2]);
+        try {
+            $this->service->reverse($run->fresh(), 'TEST-reset off');
+            $this->fail('A POS changed since the reset must refuse the reversal.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('POS_MOVED', $e->code());
+        }
+
+        $this->setRow(self::DUP_ITEM, '2026-07-18', 1, ['QtyComputer' => 1]);
+        $this->service->reverse($run->fresh(), 'TEST-reset off');
+        $this->assertEqualsWithDelta(0.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyComputer, 0.0005,
+            'Head office\'s POS is back.');
+    }
+
+    /**
      * An over no short covers is still stock from nowhere: the same day
      * closing on 3 from an opening of 1, with no short before or after it.
      */
