@@ -43,6 +43,9 @@
  *     <tr class="tt-group" data-tt-group-head="k">  then its members, each
  *     <tr data-tt-group="k">                        carrying its key. Collapsed
  *                                                   on arrival; see GROUPS below
+ *   <table data-tt-groups data-tt-group-detail>   — the head opens the detail
+ *                                                   behind it (row-detail) and
+ *                                                   its members never show
  *   <td data-sort="2026-09-08">8 Sep</td>         — sort and filter on this
  *                                                   instead of the rendered text
  *   <td data-sort="Balanced" data-tone="good">    — and the chip tone its pill
@@ -186,6 +189,14 @@ class TableTools {
         this.groupNoun = table.dataset.ttGroupNoun || 'group';
         this.rowNoun = table.dataset.ttRowNoun || 'row';
         this.expanded = new Set();
+        /*
+         * The head opens a detail panel instead of its members (Ryan, 12 Oct
+         * 2026, the stock recon proposals: "get rid of the middle drill down"
+         * — the shifts under a chain were the same shifts its panel lists).
+         * The members stay in the document as the data: the filters, the
+         * pills, the ticks and the press still act on them, unseen.
+         */
+        this.groupDetail = this.grouped && table.hasAttribute('data-tt-group-detail');
         if (this.grouped) this.readGroups();
     }
 
@@ -224,16 +235,19 @@ class TableTools {
         this.groups.forEach((group) => {
             const toggle = () => this.toggleGroup(group);
 
-            group.head.addEventListener('click', (event) => {
-                if (event.target.closest('a, button, input, select, label')) return;
-                toggle();
-            });
-            group.head.addEventListener('keydown', (event) => {
-                if (event.target !== group.head) return;
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                toggle();
-            });
+            // A detail head is opened by row-detail, not here.
+            if (!this.groupDetail) {
+                group.head.addEventListener('click', (event) => {
+                    if (event.target.closest('a, button, input, select, label')) return;
+                    toggle();
+                });
+                group.head.addEventListener('keydown', (event) => {
+                    if (event.target !== group.head) return;
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    toggle();
+                });
+            }
 
             /*
              * The chain's own box ticks every member the press could write.
@@ -253,6 +267,8 @@ class TableTools {
         });
 
         this.table.addEventListener('change', () => this.groups.forEach((group) => this.syncGroupBox(group)));
+
+        if (this.groupDetail) return;
 
         // Open or shut every group at once, from the strip if there is one.
         const all = document.createElement('button');
@@ -298,6 +314,12 @@ class TableTools {
     markGroup(group) {
         const open = this.expanded.has(group.key);
 
+        // A detail head's open state is its panel's, kept by row-detail.
+        if (this.groupDetail) {
+            group.members.forEach((row) => block(row).forEach((node) => node.classList.add('tt-collapsed')));
+            return;
+        }
+
         group.head.classList.toggle('is-open', open);
         group.head.setAttribute('aria-expanded', String(open));
         group.members.forEach((row) => block(row).forEach((node) => node.classList.toggle('tt-collapsed', !open)));
@@ -324,8 +346,10 @@ class TableTools {
 
             const show = group.passing > 0;
 
-            group.head.classList.toggle('tt-out', !show);
-            group.head.classList.remove('tt-page-out');
+            block(group.head).forEach((node) => {
+                node.classList.toggle('tt-out', !show);
+                node.classList.remove('tt-page-out');
+            });
             enable(group.head, show);
             this.markGroup(group);
             this.syncGroupBox(group);
@@ -355,7 +379,7 @@ class TableTools {
         groups.forEach((group, index) => {
             const on = index >= first && index < last;
 
-            group.head.classList.toggle('tt-page-out', !on);
+            block(group.head).forEach((node) => node.classList.toggle('tt-page-out', !on));
             group.members.forEach((row) => block(row).forEach((node) => node.classList.toggle('tt-page-out', !on)));
         });
 
@@ -540,7 +564,7 @@ class TableTools {
 
         const fragment = document.createDocumentFragment();
         ordered.forEach((group) => {
-            fragment.append(group.head);
+            block(group.head).forEach((node) => fragment.append(node));
             group.members.forEach((row) => block(row).forEach((node) => fragment.append(node)));
         });
         this.body.append(fragment);

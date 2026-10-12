@@ -276,6 +276,7 @@
                  tools fit
                  data-tt-page="50"
                  data-tt-groups
+                 data-tt-group-detail
                  data-loader-hold
                  data-tt-group-noun="chain"
                  data-tt-row-noun="shift"
@@ -349,17 +350,20 @@
                 </tr>
             </x-slot:head>
 
-            {{-- ONE ROW PER CHAIN, its shifts beneath it (Ryan, 7 Oct 2026:
-                 "collapse them into a single row, can expand to detail and
-                 expand again"). Collapsed on arrival. The chain row is not a
-                 data row: the filters, the pills and the press act on the
-                 shifts, and a chain shows while any of its shifts does
-                 (table-tools `data-tt-groups`). Its figures: the first opening,
-                 the last closing, and the sums between. --}}
+            {{-- ONE ROW PER CHAIN (Ryan, 7 Oct 2026: "collapse them into a
+                 single row"), and it opens straight to the chain panel (12 Oct
+                 2026: "get rid of the middle drill down" — the shift rows that
+                 used to open under it were the same shifts the panel lists,
+                 with less on them). The shift rows are still here, unseen
+                 (`data-tt-group-detail`): the filters, the pills, the ticks and
+                 the press act on them, and a chain shows while any of its
+                 shifts passes. Its figures: the first opening, the last
+                 closing, and the sums between. --}}
             @foreach (\Modules\StockRecon\Services\ChainSummary::of($rows) as $chain)
                 @php($state = $chain->state())
                 @php($first = $chain->first())
-                <tr class="tt-group" data-tt-group-head="{{ $chain->key }}" tabindex="0" aria-expanded="false">
+                <tr class="tt-group" data-tt-group-head="{{ $chain->key }}" tabindex="0" aria-expanded="false"
+                    data-detail-url="{{ route('app.stockrecon.line', [$run, $first]) }}">
                     @if ($run->isOpen())
                         <td class="pick">
                             @if ($chain->writable() > 0)
@@ -398,7 +402,27 @@
                     <td class="num" title="Units the balancing moves on this chain, either way">{{ $chain->moved() < 0.0005 ? '—' : \App\Support\Format::n($chain->moved(), 3) }}</td>
                     <td class="num">{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::n($chain->varianceNew(), 3) }}</td>
                     @if ($run->isOpen())
-                        <td class="fit-min"></td>
+                        {{-- AMEND THIS ONE CHAIN, without touching the ticks
+                             (the per-shift button of 11 Sep 2026, moved up to
+                             the chain when the shift rows stopped showing). It
+                             posts `only` with the chain's writable shifts and
+                             the commit narrows to them — the same commit,
+                             re-check and reversal. --}}
+                        @php($writable = $chain->lines->filter(fn ($l) => $l->isWritable()))
+                        <td class="fit-min">
+                            @if ($writable->isNotEmpty())
+                                <button type="submit" name="only" value="{{ $writable->pluck('Id')->implode(',') }}"
+                                        class="btn-ghost btn-row"
+                                        data-confirm-single
+                                        data-confirm="{{ $stampMode === 'live' ? 'Amend this one chain in PumpIT?' : 'Record this one chain?' }}"
+                                        data-confirm-text="{{ $first->itemLabel() }} · {{ $writable->count() }} {{ Str::plural('shift', $writable->count()) }} · {{ $chain->moved() < 0.0005 ? 'counts put back' : \App\Support\Format::n($chain->moved(), 3).' units moved' }}.{{ $stampMode === 'live' ? ' Nothing else on this run is written, and it is reversible from this page.' : ' Journal mode: nothing in PumpIT changes.' }}"
+                                        data-confirm-action="{{ $stampMode === 'live' ? 'Amend' : 'Record' }}"
+                                        @if ($stampMode === 'live') data-confirm-danger @endif
+                                        aria-label="Amend {{ $first->StockItemNo }}, this chain only">
+                                    {{ $stampMode === 'live' ? 'Amend' : 'Record' }}
+                                </button>
+                            @endif
+                        </td>
                     @endif
                 </tr>
             {{-- Which shifts balance against which (ZRP, 7 Oct 2026): a rail
@@ -408,11 +432,10 @@
             @php($groups = $chain->balanceGroups())
             @foreach ($chain->lines as $line)
                 @php($group = $groups[$line->Id] ?? null)
-                {{-- Click, or Enter, opens the whole chain behind the row.
-                     Fetched on demand: a branch-month is thousands of shifts. --}}
+                {{-- A shift: the data the filters and the press act on, never
+                     shown (the chain row opens the panel instead). --}}
                 <tr class="{{ $tones[$line->outcomeKey()] ?? '' }}{{ $group ? ' bal-g'.$group['series'] : '' }}"
-                    data-tt-group="{{ $chain->key }}"
-                    data-detail-url="{{ route('app.stockrecon.line', [$run, $line]) }}">
+                    data-tt-group="{{ $chain->key }}">
                     @if ($run->isOpen())
                         <td class="pick">
                             @if ($line->isWritable())
@@ -490,33 +513,7 @@
                     <td class="num">{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::n($line->AmendClose, 3) }}</td>
                     <td class="num">{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($line->QtyVarNew, 3) }}</td>
                     @if ($run->isOpen())
-                        {{-- AMEND THIS ONE SHIFT, without touching the ticks.
-
-                             Every amendable row arrives ticked, so writing a
-                             single shift used to mean unticking everything
-                             else first. The button posts `only` with this
-                             row's id and the commit narrows to it.
-
-                             Same predicate as the tick box beside it and as
-                             StockReconService::select(): a press the commit
-                             would have to refuse is not offered. And it
-                             carries its OWN confirmation, because "amend 24
-                             shifts" is the wrong sentence to read immediately
-                             before writing one. --}}
-                        <td class="fit-min">
-                            @if ($line->isWritable())
-                                <button type="submit" name="only" value="{{ $line->Id }}"
-                                        class="btn-ghost btn-row"
-                                        data-confirm-single
-                                        data-confirm="{{ $stampMode === 'live' ? 'Amend this one shift in PumpIT?' : 'Record this one amendment?' }}"
-                                        data-confirm-text="{{ $line->StockItemDescription ?? $line->StockItemNo }} · {{ $line->TransactionDate->format('d M Y') }} shift {{ $line->ShiftNo }} · closing {{ \App\Support\Format::n($line->QtyClose, 3) }} becomes {{ \App\Support\Format::n($line->QtyCloseNew, 3) }}.{{ $stampMode === 'live' ? ' Nothing else on this run is written, and it is reversible from this page.' : ' Journal mode: nothing in PumpIT changes.' }}"
-                                        data-confirm-action="{{ $stampMode === 'live' ? 'Amend' : 'Record' }}"
-                                        @if ($stampMode === 'live') data-confirm-danger @endif
-                                        aria-label="Amend {{ $line->StockItemNo }} on {{ $line->TransactionDate->toDateString() }} shift {{ $line->ShiftNo }}, this shift only">
-                                    {{ $stampMode === 'live' ? 'Amend' : 'Record' }}
-                                </button>
-                            @endif
-                        </td>
+                        <td class="fit-min"></td>
                     @endif
                 </tr>
             @endforeach

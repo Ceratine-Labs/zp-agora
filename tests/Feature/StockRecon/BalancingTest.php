@@ -710,7 +710,7 @@ class BalancingTest extends TestCase
      * under the first cell — a segment per shift in its outcome's colour. The
      * chain row carries the first opening, the last closing and the sums.
      */
-    public function test_the_proposals_show_one_row_per_chain_that_opens_to_its_shifts(): void
+    public function test_the_proposals_show_one_row_per_chain_that_opens_to_its_panel(): void
     {
         $run = $this->preview();
         $chains = ChainSummary::of($run->lines);
@@ -734,6 +734,47 @@ class BalancingTest extends TestCase
         // chains have no row at all.
         $this->assertSame(substr_count($html, 'class="tt-group"'), substr_count($html, 'data-tt-group-head="'));
         $this->assertGreaterThan(0, substr_count($html, 'class="chain-bar"'));
+
+        // No middle drill (12 Oct 2026): the chain row opens the chain panel,
+        // and the shifts under it open nothing — they are never shown.
+        $this->assertStringContainsString('data-tt-group-detail', $html);
+        $this->assertSame(substr_count($html, 'data-tt-group-head="'), substr_count($html, 'data-detail-url="'),
+            'Only the chain rows open a panel.');
+        $this->assertStringContainsString('data-detail-url="'.route('app.stockrecon.line', [$run, $chain->first()]).'"', $html);
+    }
+
+    /**
+     * The Amend press moved from the shift to the chain (12 Oct 2026): it
+     * posts the chain's writable shifts, and those are written and no other.
+     */
+    public function test_a_chain_amend_writes_that_chains_shifts_and_no_other(): void
+    {
+        $user = User::query()->acrossBranches()->where('EmailAddress', 'ryan@revvtech.co.za')->first();
+
+        if (! $user) {
+            $this->markTestSkipped('No seeded administrator — run db:seed first.');
+        }
+
+        $run = $this->preview();
+        $writable = $run->lines->filter(fn ($l) => $l->isWritable());
+        $chains = $writable->groupBy(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo);
+
+        $target = $chains->first();
+        $this->assertGreaterThan(1, $target->count(), 'This proves nothing unless the press carries more than one shift.');
+
+        $this->actingAs($user)
+            ->get(route('app.stockrecon.run', $run))
+            ->assertSee('name="only" value="'.$target->pluck('Id')->implode(',').'"', false);
+
+        $this->actingAs($user)
+            ->post(route('app.stockrecon.commit', $run), ['only' => $target->pluck('Id')->implode(',')])
+            ->assertRedirect(route('app.stockrecon.run', $run));
+
+        $committed = StockReconRunLine::query()->acrossBranches()->where('RunId', $run->Id)
+            ->where('CommitState', 'committed')->pluck('Id')->sort()->values()->all();
+
+        $this->assertSame($target->pluck('Id')->sort()->values()->all(), $committed,
+            'Exactly the chain whose button was pressed.');
     }
 
     /**

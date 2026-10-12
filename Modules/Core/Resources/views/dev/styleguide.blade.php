@@ -506,6 +506,50 @@
                 </x-table>
             </div>
             <div class="gal-variant">
+                <p class="eyebrow">
+                    <code>data-tt-group-detail</code> with <code>data-row-detail</code> — the head opens the detail
+                    behind it (<code>data-detail-url</code> or <code>data-detail-template</code>) and its members never
+                    show. They stay in the document as the data the filters, pills and ticks act on. The stock
+                    recon proposals: a chain opens straight to its chain panel (12 Oct 2026)
+                </p>
+                <x-table tools id="gal-table-group-detail" data-tt-groups data-tt-group-detail data-row-detail
+                         data-tt-group-noun="site" :procedure="'agora.usp_Cash_GridDailyBanking'"
+                         :count="count($fixtures['pagedRows'])">
+                    <x-slot:head>
+                        <tr>
+                            <th class="pick"><input type="checkbox" data-check-all aria-label="Every row"></th>
+                            <th data-tt-pills data-tt-pill-order="Balanced|Short|Blocked|Unrecorded issue">State</th>
+                            <th>Site</th><th>Reference</th><th class="num">Declared</th>
+                        </tr>
+                    </x-slot:head>
+                    @foreach (collect($fixtures['pagedRows'])->groupBy('site') as $site => $group)
+                        <tr class="tt-group" data-tt-group-head="{{ $site }}" data-detail-template="gal-gd-{{ $loop->index }}">
+                            <td class="pick"><input type="checkbox" data-tt-group-check aria-label="Every row of {{ $site }}"></td>
+                            <td data-sort="{{ $group->count() }}">
+                                <span class="chain-bar" aria-hidden="true">@foreach ($group as $row)<i class="tone-{{ ['Balanced' => 'good', 'Short' => 'warn', 'Blocked' => 'serious', 'Unrecorded issue' => 'crit'][$row['state']] }}"></i>@endforeach</span>
+                            </td>
+                            <td><span class="tt-caret" aria-hidden="true"></span>{{ $site }}</td>
+                            <td class="mono">{{ $group->count() }} rows</td>
+                            <td class="num">{{ \App\Support\Format::r($group->sum('amount')) }}</td>
+                        </tr>
+                        @foreach ($group as $row)
+                            <tr data-tt-group="{{ $site }}">
+                                <td class="pick"><input type="checkbox" name="gal-group-detail[]" value="{{ $row['ref'] }}" data-check checked aria-label="{{ $row['ref'] }}"></td>
+                                <td data-sort="{{ $row['state'] }}">{{ $row['state'] }}</td>
+                                <td>{{ $row['site'] }}</td>
+                                <td class="mono">{{ $row['ref'] }}</td>
+                                <td class="num">{{ \App\Support\Format::r($row['amount']) }}</td>
+                            </tr>
+                        @endforeach
+                    @endforeach
+                </x-table>
+                @foreach (collect($fixtures['pagedRows'])->groupBy('site') as $site => $group)
+                    <template id="gal-gd-{{ $loop->index }}">
+                        <p>{{ $site }} — the detail behind the head: {{ $group->count() }} rows.</p>
+                    </template>
+                @endforeach
+            </div>
+            <div class="gal-variant">
                 <p class="eyebrow">Empty — a designed answer, not a gap</p>
                 <x-table :count="0" empty="The procedure ran and found nothing in this period. That is an answer, not a failure." />
             </div>

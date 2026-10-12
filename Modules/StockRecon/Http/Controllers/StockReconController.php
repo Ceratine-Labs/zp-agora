@@ -266,17 +266,23 @@ class StockReconController extends Controller
          * other row on the screen first. Ryan, 11 Sep 2026: "the user cant
          * select 1 row at a time".
          *
-         * So a per-row button posts `only` with that row's id, and it REPLACES
+         * So a per-row button posts `only` with that row's id (a chain's ids
+         * since 12 Oct 2026), and it REPLACES
          * the ticks rather than adding to them. It is still the same commit,
          * through the same procedure, with the same re-check and the same
          * reversal — the selection is the only thing that differs, which is
          * what keeps this from being a second way to write.
          */
+        // One chain since 12 Oct 2026: the button sits on the chain row and
+        // posts its writable shifts as "12,13,14". A single id still works.
         $only = $request->input('only');
-        $single = is_scalar($only) && (int) $only > 0;
+        $onlyIds = is_scalar($only)
+            ? array_values(array_filter(array_map('intval', explode(',', (string) $only)), fn (int $id) => $id > 0))
+            : [];
+        $single = $onlyIds !== [];
 
         if ($single) {
-            $lineIds = [(int) $only];
+            $lineIds = $onlyIds;
         }
 
         $this->service->select($run, $lineIds);

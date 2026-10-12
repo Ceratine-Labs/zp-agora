@@ -405,3 +405,59 @@ test.describe('grouped rows', () => {
     });
 });
 
+
+/*
+ * A head that opens its detail (`data-tt-group-detail`, 12 Oct 2026): the
+ * stock recon proposals' chain row opens straight to the chain panel, with no
+ * middle layer of shift rows (Ryan: "get rid of the middle drill down").
+ * `#gal-table-group-detail` — the same 64 rows, each site head carrying a
+ * template.
+ */
+test.describe('grouped rows that open a detail', () => {
+    test.use(anonymous);
+
+    const TABLE = '#gal-table-group-detail';
+    const heads = (page) => page.locator(`${TABLE} tbody tr.tt-group:not(.tt-out):not(.tt-page-out)`);
+    const members = (page) => page.locator(`${TABLE} tbody tr[data-tt-group]:not(.tt-out):not(.tt-page-out):not(.tt-collapsed)`);
+    const panels = (page) => page.locator(`${TABLE} tbody tr.row-detail:not([hidden]):not(.tt-out):not(.tt-page-out)`);
+
+    test('a head opens its panel, never its rows, and the rows stay in the submission', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        await expect(heads(page)).toHaveCount(4);
+        const first = heads(page).first();
+        await first.click();
+
+        await expect(panels(page)).toHaveCount(1);
+        await expect(panels(page).first()).toContainText('the detail behind the head: 16 rows');
+        await expect(first).toHaveAttribute('aria-expanded', 'true');
+        await expect(members(page)).toHaveCount(0);
+        await expect(page.locator(`${TABLE} [data-check]:checked:not(:disabled)`)).toHaveCount(64);
+
+        // No expand-all: there is nothing to expand.
+        const block = page.locator(TABLE).locator('xpath=ancestor::div[contains(@class,"table-block")]');
+        await expect(block.locator('.tt-expand-all')).toHaveCount(0);
+
+        await first.click();
+        await expect(panels(page)).toHaveCount(0);
+    });
+
+    test('an open panel moves with its head when the groups are sorted', async ({ page }) => {
+        await page.goto('/dev/components');
+
+        const first = heads(page).first();
+        const site = (await first.locator('td').nth(2).innerText()).trim();
+        await first.click();
+        await expect(panels(page)).toHaveCount(1);
+
+        // Sort by Site twice, so the order is reversed whichever way it began.
+        const sorter = page.locator(`${TABLE} thead th`, { hasText: 'Site' }).locator('button').first();
+        await sorter.click();
+        await sorter.click();
+
+        const head = page.locator(`${TABLE} tbody tr.tt-group`, { hasText: site });
+        const next = head.locator('xpath=following-sibling::tr[1]');
+        await expect(next).toHaveClass(/row-detail/);
+        await expect(next).toContainText(site);
+    });
+});
