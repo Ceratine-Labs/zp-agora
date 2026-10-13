@@ -5,6 +5,7 @@ namespace Modules\Debtors\Http\Controllers;
 use App\Exceptions\AgoraProcException;
 use App\Grid\GridService;
 use App\Http\Controllers\Controller;
+use App\Support\BranchContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -39,6 +40,7 @@ class DebtorStatementController extends Controller
         return view('debtors::index', [
             'grid' => $this->grids->build($grid, $request, $request->user()?->Id),
             'mode' => $this->statements->mode(),
+            'testRecipient' => (string) config('debtors.test_recipient', ''),
         ]);
     }
 
@@ -118,6 +120,54 @@ class DebtorStatementController extends Controller
         return $result['ok']
             ? back()->with('status', $result['message'])
             : back()->withErrors(['refusal' => $result['message']]);
+    }
+
+    /**
+     * Email the statements of the accounts ticked on the list, for the period
+     * the list shows. The mails go AFTER the response: a statement is a PDF and
+     * a round trip to the mail server each, and a hundred of them would outrun
+     * the web server's timeout. Each lands under Last mailed as it goes, and a
+     * failure on the account's own statement page.
+     */
+    public function sendSelected(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'items' => ['required', 'array', 'max:1000'],
+            'items.*' => ['string', 'regex:/^\d+\|.{1,10}\|\d{4}-\d{2}-\d{2}\|\d{4}-\d{2}-\d{2}$/'],
+        ]);
+
+        if ($this->statements->mode() === 'off') {
+            return back()->withErrors(['refusal' => 'Sending is switched off (debtors.send_mode). Nothing was mailed.']);
+        }
+
+        // "branch|account|from|to" — the period is the row's own (DebtorAccountGrid::rowKey).
+        $context = app(BranchContext::class);
+        /** @var array<int, string> $items */
+        $items = $request->input('items', []);
+        $ticked = collect($items)->unique()
+            ->map(function (string $key) {
+                preg_match('/^(\d+)\|(.+)\|(\d{4}-\d{2}-\d{2})\|(\d{4}-\d{2}-\d{2})$/', $key, $m);
+
+                return ['branch' => (int) $m[1], 'account' => $m[2], 'from' => $m[3], 'to' => $m[4]];
+            })
+            ->filter(fn (array $a) => $context->maySee($a['branch']))
+            ->values();
+
+        $mailable = collect($this->statements->withAddress($ticked->map(fn ($a) => [$a['branch'], $a['account']])->all()))
+            ->map(fn ($pair) => $pair[0].'|'.$pair[1])->flip();
+        $batch = $ticked->filter(fn ($a) => $mailable->has($a['branch'].'|'.$a['account']))->values()->all();
+        $skipped = $ticked->count() - count($batch);
+        $userId = $request->user()?->Id;
+        $service = $this->statements;
+
+        if ($batch !== []) {
+            app()->terminating(fn () => $service->sendMany($batch, $userId));
+        }
+
+        $where = $this->statements->mode() === 'test' ? ' to the test address' : '';
+
+        return back()->with('status', count($batch).' statement(s) are being mailed'.$where.'. Each shows under Last mailed once it has gone.'
+            .($skipped > 0 ? " {$skipped} ticked account(s) have no email address and were left out." : ''));
     }
 
     public function saveContact(SaveContactRequest $request, int $branch, string $account): RedirectResponse

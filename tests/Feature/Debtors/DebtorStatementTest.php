@@ -247,6 +247,57 @@ class DebtorStatementTest extends TestCase
         $this->assertSame(0, $this->sends()->count());
     }
 
+    public function test_the_list_ticks_every_account_with_an_address_and_emails_the_ticked_ones(): void
+    {
+        Mail::fake();
+        config(['debtors.send_mode' => 'live']);
+        $this->contact();
+        $this->posting('TEST-D2', 'A', '2026-08-15', 'I', 'D', '21', 120.00, '     140');
+        $sender = $this->person(['statements.view', 'statements.send']);
+        $period = ['from' => '2026-08-01', 'to' => '2026-08-31'];
+
+        $page = $this->actingAs($sender)
+            ->get(route('app.debtors.index', $period + ['branches' => [self::BRANCH]]))
+            ->assertOk()
+            ->assertSee('Email selected')
+            ->getContent();
+
+        $this->assertMatchesRegularExpression('/value="999\|TEST-D1\|2026-08-01\|2026-08-31"\s+checked/', $page,
+            'An account with an address starts ticked.');
+        $this->assertMatchesRegularExpression('/value="999\|TEST-D2\|2026-08-01\|2026-08-31"\s+aria-label/', $page,
+            'An account with no address starts unticked.');
+
+        $this->actingAs($sender)
+            ->post(route('app.debtors.sendSelected'), ['items' => [
+                '999|TEST-D1|2026-08-01|2026-08-31',
+                '999|TEST-D2|2026-08-01|2026-08-31',
+            ]])
+            ->assertRedirect()
+            ->assertSessionHas('status', fn ($s) => str_contains($s, '1 statement(s) are being mailed')
+                && str_contains($s, '1 ticked account(s) have no email address'));
+
+        Mail::assertSentCount(1);
+        Mail::assertSent(DebtorStatementMail::class, fn (DebtorStatementMail $m) => $m->hasTo('debtor@example.test'));
+        $this->assertSame('2026-08-31', substr((string) $this->sends()->value('PeriodTo'), 0, 10));
+    }
+
+    public function test_emailing_the_selected_is_refused_while_sending_is_off_and_for_a_reader(): void
+    {
+        Mail::fake();
+        $this->contact();
+        $items = ['items' => ['999|TEST-D1|2026-08-01|2026-08-31']];
+
+        $this->actingAs($this->person(['statements.view', 'statements.send']))
+            ->post(route('app.debtors.sendSelected'), $items)
+            ->assertSessionHasErrors('refusal');
+
+        $this->actingAs($this->person(['statements.view']))
+            ->post(route('app.debtors.sendSelected'), $items)
+            ->assertForbidden();
+
+        Mail::assertNothingSent();
+    }
+
     public function test_without_view_the_list_is_refused(): void
     {
         $this->actingAs($this->person([]))

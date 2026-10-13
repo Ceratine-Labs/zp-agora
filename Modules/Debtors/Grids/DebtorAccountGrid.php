@@ -8,6 +8,7 @@ use App\Grid\GridFilter;
 use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
 use App\Support\BranchContext;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Debtors statements — one row per account per site (13 Oct 2026).
@@ -107,6 +108,37 @@ class DebtorAccountGrid extends GridDefinition
     public function branchSelector(): bool
     {
         return true;
+    }
+
+    /**
+     * Tick boxes for "Email selected", for whoever may send. Every account
+     * with an address starts ticked — the person takes out the ones they do
+     * not want — and one without stays unticked, because it cannot be mailed.
+     */
+    public function selectable(): bool
+    {
+        return Gate::allows('debtors.statements.send');
+    }
+
+    /**
+     * Site, account and the period the row was stated for. The period travels
+     * with the tick because the grid redraws its rows in place when the date
+     * range changes: a period held anywhere else could be a stale one.
+     */
+    public function rowKey(object $row): string
+    {
+        return $row->BranchId.'|'.$row->AccountNo.'|'.substr((string) $row->PeriodFrom, 0, 10).'|'.substr((string) $row->PeriodTo, 0, 10);
+    }
+
+    public function rowChecked(object $row): bool
+    {
+        return $row->Email !== null && trim((string) $row->Email) !== '';
+    }
+
+    /** A site's debtors on one page where it can be, since the ticks are per page. */
+    public function pageSize(): int
+    {
+        return 200;
     }
 
     /** The account's statement, for the period the grid is showing. */

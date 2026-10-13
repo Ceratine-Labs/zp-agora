@@ -16,6 +16,15 @@ test.describe('debtors statements', () => {
         await expect(page.getByRole('heading', { name: 'Debtors statements', level: 1 })).toBeVisible();
         await page.screenshot({ path: info.outputPath('list.png'), fullPage: true });
 
+        // Email selected: the dialog opens and counts the ticked rows.
+        const bulk = page.getByRole('button', { name: 'Email selected' });
+        if (await bulk.count()) {
+            await bulk.click();
+            await expect(page.getByText(/account\(s\)/).first()).toBeVisible();
+            await page.screenshot({ path: info.outputPath('send-selected.png') });
+            await page.keyboard.press('Escape');
+        }
+
         const first = page.locator('a[href*="/app/debtors/statements/"]:visible').first();
         test.skip(await first.count() === 0, 'No debtor has anything to say for last month in this database.');
         await first.click();

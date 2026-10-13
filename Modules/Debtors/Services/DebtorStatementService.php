@@ -163,8 +163,11 @@ class DebtorStatementService
 
     /**
      * Mail one statement, and record that it went or why it did not.
+     * `logged` is true when the attempt reached the mail server and was
+     * recorded as failed; a refusal before that (no address, sending off) is
+     * not recorded.
      *
-     * @return array{ok: bool, message: string}
+     * @return array{ok: bool, message: string, logged?: bool}
      */
     public function send(int $branchId, string $accountNo, ?string $from, ?string $to, string $trigger, ?int $userId): array
     {
@@ -230,12 +233,64 @@ class DebtorStatementService
         ]);
 
         if ($status !== 'sent') {
-            return ['ok' => false, 'message' => 'The mail server refused it: '.$error];
+            return ['ok' => false, 'logged' => true, 'message' => 'The mail server refused it: '.$error];
         }
 
         return ['ok' => true, 'message' => $mode === 'test'
             ? "Test statement mailed to {$sentTo} — not to the debtor."
             : "Statement mailed to {$sentTo}."];
+    }
+
+    /**
+     * Mail the statements of several accounts, one after another. Each is a
+     * send() of its own — its own envelope, PDF and row in
+     * agora.DebtorStatementSend — so one failure stops nothing else.
+     *
+     * @param  array<int, array{branch: int, account: string, from: string, to: string}>  $accounts
+     * @return array{sent: int, failed: int, skipped: int}
+     */
+    public function sendMany(array $accounts, ?int $userId): array
+    {
+        $tally = ['sent' => 0, 'failed' => 0, 'skipped' => 0];
+
+        foreach ($accounts as ['branch' => $branchId, 'account' => $accountNo, 'from' => $from, 'to' => $to]) {
+            try {
+                $result = $this->send($branchId, $accountNo, $from, $to, 'manual', $userId);
+            } catch (Throwable $e) {
+                Log::error('agora.debtors.bulk-send-refused', ['branch' => $branchId, 'account' => $accountNo, 'error' => $e->getMessage()]);
+                $tally['skipped']++;
+
+                continue;
+            }
+
+            $tally[$result['ok'] ? 'sent' : ($result['logged'] ?? false ? 'failed' : 'skipped')]++;
+        }
+
+        Log::info('agora.debtors.bulk-send', $tally + ['accounts' => count($accounts), 'user' => $userId]);
+
+        return $tally;
+    }
+
+    /**
+     * Of these accounts, the ones with an address to mail.
+     *
+     * @param  array<int, array{0: int, 1: string}>  $accounts
+     * @return array<int, array{0: int, 1: string}>
+     */
+    public function withAddress(array $accounts): array
+    {
+        if ($accounts === []) {
+            return [];
+        }
+
+        $have = $this->db()->table(config('agora.schema').'.DebtorContact')
+            ->whereNotNull('Email')
+            ->whereIn('BranchId', array_unique(array_column($accounts, 0)))
+            ->get(['BranchId', 'AccountNo'])
+            ->map(fn ($r) => $r->BranchId.'|'.$r->AccountNo)
+            ->flip();
+
+        return array_values(array_filter($accounts, fn ($a) => $have->has($a[0].'|'.$a[1])));
     }
 
     /**

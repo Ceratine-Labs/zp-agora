@@ -18,6 +18,9 @@ Route::middleware('auth')->group(function () {
     Route::get('debtors/statements', [DebtorStatementController::class, 'index'])
         ->middleware('can:debtors.statements.view')->name('debtors.index');
 
+    Route::post('debtors/statements/send-selected', [DebtorStatementController::class, 'sendSelected'])
+        ->middleware('can:debtors.statements.send')->name('debtors.sendSelected');
+
     Route::get('debtors/statements/{branch}/{account}', [DebtorStatementController::class, 'show'])
         ->middleware('can:debtors.statements.view')->whereNumber('branch')->name('debtors.show');
 

@@ -216,6 +216,7 @@
                     <td class="pick">
                         <input type="checkbox" data-check
                                value="{{ $definition->rowKey($row) }}"
+                               @checked($definition->rowChecked($row))
                                aria-label="Select this row">
                     </td>
                 @endif

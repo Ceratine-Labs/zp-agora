@@ -234,6 +234,16 @@ abstract class GridDefinition
     }
 
     /**
+     * Whether a row's tick box starts TICKED. For a bulk action whose sensible
+     * default is "all of these, minus the ones you take out" — the debtors
+     * statements send. Unticked unless a grid says otherwise.
+     */
+    public function rowChecked(object $row): bool
+    {
+        return false;
+    }
+
+    /**
      * A head-office grid carries the branches selector (feature-rules §3.3).
      * In the branch workspace BranchContext has already pinned the site, so it
      * does not appear and whatever arrives is ignored.
