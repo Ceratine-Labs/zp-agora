@@ -44,3 +44,15 @@ Schedule::command('agora:refresh-count-stats --if-stale')
     ->hourly()
     ->withoutOverlapping()
     ->runInBackground();
+
+/*
+ * Debtors statements: last month's statement to every account on the monthly
+ * run, on config('debtors.run_day') at 06:00. Whether anything reaches a
+ * debtor is config('debtors.send_mode') — 'off' makes this a no-op that says
+ * so. Re-running it is safe: an account already sent its statement for the
+ * period by the run is skipped.
+ */
+Schedule::command('debtors:send-statements')
+    ->monthlyOn((int) config('debtors.run_day', 1), '06:00')
+    ->timezone('Africa/Johannesburg')
+    ->withoutOverlapping();

@@ -1,0 +1,11 @@
+{
+    "name": "Debtors",
+    "alias": "debtors",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 50,
+    "requires": [],
+    "providers": [
+        "Modules\\Debtors\\Providers\\DebtorsServiceProvider"
+    ]
+}

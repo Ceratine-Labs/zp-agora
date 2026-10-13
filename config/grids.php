@@ -18,6 +18,7 @@ use Modules\Cash\Grids\StaffShortGrid;
 use Modules\Cash\Grids\ZreadGrid;
 use Modules\Cash\Grids\ZreadNoCashupGrid;
 use Modules\Core\Grids\UserGrid;
+use Modules\Debtors\Grids\DebtorAccountGrid;
 use Modules\Product\Grids\CriticalLineGrid;
 use Modules\Product\Grids\StockItemGrid;
 use Modules\Recon\Grids\ReconBankSideGrid;
@@ -186,6 +187,7 @@ return [
         // One row per meter per day off BRN_UtilityTransaction, usage
         // computed once in agora.vw_UtilityReading.
         'app.utilities.index' => UtilityReadingGrid::class,
+        'app.debtors.index' => DebtorAccountGrid::class,
 
         // The asset register at the provisional SARS periods, what has moved
         // (reversed movements stay, marked), and the repair job cards with
