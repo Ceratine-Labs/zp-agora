@@ -26,7 +26,10 @@ async function reset(page, selector) {
 
     if (!(await grid.locator('[data-chooser-reset]').count())) return;
 
-    await grid.locator('.dg-chooser > summary').click();
+    // Open it only if it is shut: a test that left it open would otherwise
+    // have its summary clicked shut again here, and Reset never shows.
+    const chooser = grid.locator('.dg-chooser');
+    if (!(await chooser.evaluate((d) => d.open))) await chooser.locator('> summary').click();
     await grid.locator('[data-chooser-reset]').click();
     // The reset asks first — SweetAlert2, like every confirmation in Agora.
     await page.getByRole('button', { name: 'Reset' }).last().click();
@@ -53,30 +56,37 @@ test.describe('data grid — desktop', () => {
     });
 
     test('clicking a sortable header sorts, and clicking it again flips it', async ({ signedIn }) => {
-        const grid = signedIn.locator(GRID);
-        const header = grid.locator('th[data-column="Name"]');
+        // Name is this grid's default sort, so it arrives ascending and the
+        // first click flips it.
+        const header = () => signedIn.locator(GRID).locator('th[data-column="Name"]');
+        await expect(header()).toHaveAttribute('aria-sort', 'ascending');
 
-        await header.getByRole('link').click();
-        await expect(signedIn.locator(GRID).locator('th[data-column="Name"]'))
-            .toHaveAttribute('aria-sort', 'ascending');
+        await header().getByRole('link').click();
+        await expect(header()).toHaveAttribute('aria-sort', 'descending');
 
-        await signedIn.locator(GRID).locator('th[data-column="Name"]').getByRole('link').click();
-        await expect(signedIn.locator(GRID).locator('th[data-column="Name"]'))
-            .toHaveAttribute('aria-sort', 'descending');
+        await header().getByRole('link').click();
+        await expect(header()).toHaveAttribute('aria-sort', 'ascending');
     });
 
     test('a numeric column sorts as a number, so 10 comes after 9', async ({ signedIn }) => {
         // The classic grid defect. The branch ids run past 9, so a text sort
         // would put 10 immediately after 1.
-        await signedIn.locator(GRID).locator('th[data-column="BranchId"]').getByRole('link').click();
-        await signedIn.waitForURL(/branches_sort=BranchId/);
-
-        const ids = (await signedIn.locator(`${GRID} td[data-column="BranchId"]`).allTextContents())
+        // A number column's first click is largest first (GridResult::sortUrl),
+        // the second smallest first; both must order as numbers.
+        const ids = async () => (await signedIn.locator(`${GRID} td[data-column="BranchId"]`).allTextContents())
             .map((t) => Number(t.trim()))
             .filter((n) => Number.isFinite(n));
 
-        expect(ids.length).toBeGreaterThan(9);
-        expect([...ids]).toEqual([...ids].sort((a, b) => a - b));
+        await signedIn.locator(GRID).locator('th[data-column="BranchId"]').getByRole('link').click();
+        await signedIn.waitForURL(/branches_sort=BranchId.*branches_dir=desc/);
+        const down = await ids();
+        expect(down.length).toBeGreaterThan(9);
+        expect(down).toEqual([...down].sort((a, b) => b - a));
+
+        await signedIn.locator(GRID).locator('th[data-column="BranchId"]').getByRole('link').click();
+        await signedIn.waitForURL(/branches_dir=asc/);
+        const up = await ids();
+        expect(up).toEqual([...up].sort((a, b) => a - b));
     });
 
     test('a header filter narrows the rows and travels in the URL', async ({ signedIn }) => {
@@ -177,7 +187,7 @@ test.describe('data grid — desktop', () => {
 
     test('the extract drawer opens, says what it will produce, and closes on Escape', async ({ signedIn }) => {
         const grid = signedIn.locator(GRID);
-        const drawer = signedIn.locator('#dg-app-dev-grids-branches-extract');
+        const drawer = signedIn.locator('#dg-appdevgridsbranches-extract');
 
         await expect(drawer).toBeHidden();
         await grid.getByRole('button', { name: 'Extract' }).click();
@@ -195,7 +205,7 @@ test.describe('data grid — desktop', () => {
 
         const [download] = await Promise.all([
             signedIn.waitForEvent('download'),
-            signedIn.locator('#dg-app-dev-grids-branches-extract')
+            signedIn.locator('#dg-appdevgridsbranches-extract')
                 .getByRole('link', { name: 'Download .csv' }).click(),
         ]);
 
@@ -284,7 +294,7 @@ test.describe('data grid — mobile', () => {
     test('the extract drawer fits the viewport', async ({ signedIn }) => {
         await signedIn.locator(GRID).getByRole('button', { name: 'Extract' }).click();
 
-        const panel = signedIn.locator('#dg-app-dev-grids-branches-extract .drawer-panel');
+        const panel = signedIn.locator('#dg-appdevgridsbranches-extract .drawer-panel');
         await expect(panel).toBeVisible();
 
         const box = await panel.boundingBox();
