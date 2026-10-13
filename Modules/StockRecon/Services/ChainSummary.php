@@ -131,6 +131,7 @@ final class ChainSummary
             $this->lines->filter(fn ($l) => $l->WouldAmend)->count(),
             $this->lines->contains(fn ($l) => abs((float) $l->QtyCloseNew - (float) $l->QtyClose) > 0.0005
                 || abs((float) $l->QtyOpenNew - (float) $l->QtyOpen) > 0.0005),
+            self::overLeft($this->lines),
         );
 
         return ['label' => $verdict['label'], 'tone' => $verdict['tone'], 'title' => $verdict['note']];
@@ -146,13 +147,23 @@ final class ChainSummary
      *
      * @return array{label: string, tone: string, hint: ?string, note: string}
      */
-    public static function verdict(float $total, int $writes, bool $moves): array
+    public static function verdict(float $total, int $writes, bool $moves, ?float $overLeft = null): array
     {
         $short = $total < -0.0005;
         $over = $total > 0.0005;
         $units = Format::n(abs($total), 3);
+        // The over is CAPTURED as the missing issue (13 Oct 2026) when the run
+        // proposes it: nothing is left over on any shift afterwards. A run
+        // previewed before then left it, and reads as it did.
+        $captured = $over && $overLeft !== null && $overLeft <= 0.0005;
 
         return match (true) {
+            $captured && $writes > 0 => ['label' => 'Balance '.$writes.' '.($writes === 1 ? 'shift' : 'shifts').' · issue of '.$units.' captured',
+                'tone' => 'good', 'hint' => 'the over recorded as issued',
+                'note' => 'Balances to nil: the over of '.$units.' is recorded as the issue the shift never got '
+                    .'(QtyIssued raised, the prior kept, reversible). Amend writes it.'],
+            $captured => ['label' => 'Missing issue already in PumpIT', 'tone' => 'neutral', 'hint' => 'nothing to write',
+                'note' => 'The over of '.$units.' is covered by an issue already keyed in PumpIT. Nothing for Amend to write.'],
             $writes > 0 && $short => ['label' => 'Balance '.$writes.' '.($writes === 1 ? 'shift' : 'shifts').', short remains',
                 'tone' => 'warn', 'hint' => 'a short of '.$units.' stays',
                 'note' => 'Balanced; a real short of '.$units.' stays, on the shifts the counts put it on.'],
@@ -176,6 +187,18 @@ final class ChainSummary
                     .'so each short stays on the shift that counted it. Nothing for Amend to write.'],
             default => ['label' => 'No change', 'tone' => 'neutral', 'hint' => null, 'note' => 'Nothing to balance.'],
         };
+    }
+
+    /**
+     * What is still over on a chain's shifts after the run's proposal.
+     *
+     * @template TShift of object
+     *
+     * @param  Collection<int, TShift>  $shifts  each with QtyVarNew
+     */
+    public static function overLeft(Collection $shifts): float
+    {
+        return (float) $shifts->sum(fn ($s) => max(0.0, (float) $s->QtyVarNew));
     }
 
     /** @return Collection<int, string> one tone per shift, in order — the bar under the first cell */

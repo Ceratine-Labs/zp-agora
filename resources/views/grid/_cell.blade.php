@@ -32,6 +32,10 @@
     {{ \App\Support\Format::rk($value) }}
 @elseif ($column->format === 'lk')
     {{ \App\Support\Format::lk($value) }}
+@elseif ($column->format === 'qty')
+    {{-- A stock quantity: always three places, whole or not, so 1.000 and
+         1.250 line up and never read as 1 beside 1.250 (Ryan, 13 Oct 2026). --}}
+    {{ \App\Support\Format::n($value, 3) }}
 @elseif ($column->format === 'litres')
     {{ \App\Support\Format::litres($value) }}
 @elseif ($column->format === 'cpl')

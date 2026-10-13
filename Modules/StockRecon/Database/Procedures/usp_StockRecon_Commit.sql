@@ -6,9 +6,11 @@
  *           agora.StockReconDuplicateRelease
  * Writes:   agora.StockReconAmendment, agora.StockReconRunLine, agora.StockReconRun
  *           and — in 'live' stamp mode ONLY — QtyOpen / QtyClose on
- *           [PumpIT].dbo.STK_StockReconLine, and QtyIssued = 0 on a CLEAR
- *           DUPLICATE ISSUE (D1) only, when @IssueMode is 'live' too (Ryan's
- *           named go-ahead, 1 Oct 2026, PM decision 01a0f60b-0459).
+ *           [PumpIT].dbo.STK_StockReconLine, and QtyIssued — set to 0 on a
+ *           CLEAR DUPLICATE ISSUE (D1) (Ryan's named go-ahead, 1 Oct 2026, PM
+ *           decision 01a0f60b-0459), or raised by the over on a shift whose
+ *           MISSING ISSUE is captured (Ryan's named go-ahead, 13 Oct 2026:
+ *           "customer wants over to balance") — when @IssueMode is 'live' too.
  *
  * @StampMode  'journal' records every amendment here and writes NOTHING to
  *             PumpIT. The ledger is then the worklist an admin applies, and the
@@ -153,7 +155,7 @@ BEGIN
        With the issue write switched off since, those counts are not the
        answer any more — re-preview rather than write half of it. */
     IF @IssueMode <> 'live' AND EXISTS (SELECT 1 FROM #cand WHERE QtyIssuedNew IS NOT NULL)
-        THROW 51000, 'AGORA:ISSUE_MODE_OFF:This run removes a duplicate issue, and writing issues is switched off. Preview again.', 1;
+        THROW 51000, 'AGORA:ISSUE_MODE_OFF:This run writes an issue (a duplicate removed or a missing issue captured), and writing issues is switched off. Preview again.', 1;
 
     /* ---------------------------------------------------------- the re-check
        The source row still has to be there, and still has to hold the counts
@@ -217,8 +219,8 @@ BEGIN
                           WHERE x.BranchId = a.BranchId AND x.Id = a.RunId AND x.CommitKind = 'reset'));
 
     /* A duplicate is written as 0 because the issue the preview read was
-       keyed twice. If the issue has been changed since, that is no longer
-       what is there. */
+       keyed twice, and a missing issue as that issue plus the over. If the
+       issue has been changed since, that is no longer what is there. */
     UPDATE c SET SkipReason = 'The issue on this shift has changed since the preview.'
     FROM #cand c
     WHERE c.SkipReason IS NULL
@@ -277,6 +279,10 @@ BEGIN
           AND d.AreaNo = c.AreaNo AND d.StockItemNo = c.StockItemNo
           AND d.Id <> c.Id
           AND d.QtyIssuedNew IS NOT NULL
+          /* A DUPLICATE only: the chain's counts were balanced with it gone. A
+             captured missing issue changes no count, so its chain does not
+             wait for it. */
+          AND d.DupTier = 'D1'
           AND (d.ChainBlocked = 0 OR d.RestoresHand = 1)
           AND d.CommitState <> 'committed'
           AND NOT EXISTS (SELECT 1 FROM #cand x WHERE x.Id = d.Id AND x.SkipReason IS NULL));
@@ -333,10 +339,12 @@ BEGIN
        Live mode only, and both columns of the row are named. Balancing amends
        counts; amending an issue changes T itself, which is capturing a missing
        issue, a different act that has to stay visible as one. So QtyIssued is
-       written in ONE case only: a clear duplicate (D1), set to 0 — the issue
-       was keyed twice and the count proves the second never arrived. Its
-       prior is on the amendment above, so usp_StockRecon_Reverse puts it
-       back. @IssueMode is 'live' here or the run was refused above. */
+       written in TWO cases only: a clear duplicate (D1), set to 0 — the issue
+       was keyed twice and the count proves the second never arrived — and a
+       missing issue captured (13 Oct 2026), raised by the over the shift sold
+       or held without it. Each prior is on the amendment above, so
+       usp_StockRecon_Reverse puts it back, and the audit trail names which it
+       was. @IssueMode is 'live' here or the run was refused above. */
     IF @StampMode = 'live'
     BEGIN
         UPDATE l
@@ -372,7 +380,10 @@ BEGIN
 
     DECLARE @Written INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NULL),
             @Skipped INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NOT NULL),
-            @Issues  INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NULL AND QtyIssuedNew IS NOT NULL);
+            @Issues  INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NULL AND QtyIssuedNew IS NOT NULL
+                                                         AND QtyIssuedNew < QtyIssued),
+            @Captured INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NULL AND QtyIssuedNew IS NOT NULL
+                                                          AND QtyIssuedNew > QtyIssued);
 
     DECLARE @Units DECIMAL(18,3) = (
         SELECT ISNULL(SUM(ABS(rl.AmendClose)), 0)
@@ -439,6 +450,9 @@ BEGIN
                 ELSE CONVERT(nvarchar(20), @Written) + ' shift(s) amended'
                      + CASE WHEN @Issues > 0
                             THEN ' (' + CONVERT(nvarchar(20), @Issues) + ' duplicate issue(s) set to 0)'
+                            ELSE '' END
+                     + CASE WHEN @Captured > 0
+                            THEN ' (' + CONVERT(nvarchar(20), @Captured) + ' missing issue(s) captured)'
                             ELSE '' END
                      + CASE WHEN @Skipped > 0
                             /* Not "because they had moved": a skip is also a

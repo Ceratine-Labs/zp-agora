@@ -18,12 +18,9 @@
     $when = fn ($ts) => $ts ? Carbon::parse($ts)->format('j M Y, H:i') : 'an unrecorded time';
     $who = fn ($name) => $name ?: 'somebody';
 
-    /* Whole units read as whole units; a weighed item reads to the gram
-       everywhere in the case, so its figures line up. */
-    $figures = $case->shifts->flatMap(fn ($s) => [$s->QtyOpen, $s->QtyIssued, $s->QtyPOS, $s->QtyClose, $s->QtyVar])
-        ->push($case->IssueKeyed)->filter(fn ($v) => $v !== null);
-    $dp = $figures->contains(fn ($v) => abs((float) $v - round((float) $v)) > 0.0005) ? 3 : 0;
-    $qty = fn ($v) => $v === null ? Format::NOTHING : Format::n($v, $dp);
+    /* Three places always, as everywhere else in stock recon (Ryan, 13 Oct
+       2026: "sometimes 1, sometimes 1.000"). */
+    $qty = fn ($v) => $v === null ? Format::NOTHING : Format::n($v, 3);
 
     $here = $at($case->TransactionDate, $case->ShiftNo);
     $twin = $case->TwinDate ? $at($case->TwinDate, $case->TwinShift) : null;
@@ -180,7 +177,7 @@
                 </td>
                 <td class="num">
                     @if ($s->Role === 'corrected')
-                        <x-reports::before-after :before="$s->IssuedBefore" :after="$s->QtyIssued" :dp="$dp" />
+                        <x-reports::before-after :before="$s->IssuedBefore" :after="$s->QtyIssued" :dp="3" />
                     @else
                         {{ $qty($s->QtyIssued) }}
                     @endif

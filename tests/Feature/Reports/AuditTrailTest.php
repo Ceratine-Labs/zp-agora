@@ -78,7 +78,8 @@ class AuditTrailTest extends TestCase
 
         $row = $this->db()->selectOne("SELECT * FROM agora.vw_PumpItChange WHERE Ledger = 'StockReconAmendment' AND LedgerId = ?", [$a->Id]);
 
-        $closing = sprintf('Closing %d → %d', (int) $a->PriorQtyClose, (int) $a->NewQtyClose);
+        // Three places, whole or not (v1__22h: "sometimes 1, sometimes 1.000").
+        $closing = sprintf('Closing %.3f → %.3f', (float) $a->PriorQtyClose, (float) $a->NewQtyClose);
         $this->assertStringContainsString($closing, $row->Change);
         $this->assertSame($a->Outcome, $row->Reason, 'The reason is the run line\'s own outcome.');
         $this->assertSame("Stock recon run {$a->RunId}", $row->Ref);

@@ -57,7 +57,7 @@ class StockReconRunGrid extends GridDefinition
             new GridColumn(key: 'BlockedChains', label: 'Blocked', format: 'number', sort: 'BlockedChains',
                 title: 'Chains reported rather than balanced — a net over, a broken chain, or a cap'),
             new GridColumn(key: 'AmendedRows', label: 'Shifts to amend', format: 'number', sort: 'AmendedRows'),
-            new GridColumn(key: 'UnitsAmended', label: 'Units moved', format: 'number', visible: false),
+            new GridColumn(key: 'UnitsAmended', label: 'Units moved', format: 'qty', visible: false),
             // The number the whole module exists to surface. Balancing cannot
             // touch it, so it leads the money columns.
             new GridColumn(key: 'NetOverValue', label: 'Unrecorded issue', format: 'money',

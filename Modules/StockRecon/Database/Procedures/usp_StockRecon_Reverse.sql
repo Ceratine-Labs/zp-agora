@@ -73,9 +73,9 @@ BEGIN
                             CASE WHEN l.StockItemNo IS NULL
                                  THEN N' is no longer in PumpIT'
                                  ELSE CONCAT(N' has changed since this run changed its issue (it now holds issue ',
-                                             FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyIssued, 0)), '0.###'),
-                                             N', opening ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyOpen, 0)), '0.###'),
-                                             N', closing ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyClose, 0)), '0.###'), N')') END,
+                                             FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyIssued, 0)), '0.000'),
+                                             N', opening ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyOpen, 0)), '0.000'),
+                                             N', closing ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyClose, 0)), '0.000'), N')') END,
                             N'. Putting the old issue back would write over that change, so nothing was reversed. Correct it in PumpIT first.')
         FROM agora.StockReconAmendment a
         LEFT JOIN agora.StockReconRunLine rl
@@ -107,10 +107,10 @@ BEGIN
                             CASE WHEN l.StockItemNo IS NULL
                                  THEN N' is no longer in PumpIT'
                                  ELSE CONCAT(N' has changed since this run amended its counts (it now holds opening ',
-                                             FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyOpen, 0)), '0.###'),
-                                             N', closing ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyClose, 0)), '0.###'),
-                                             N'; the run left opening ', FORMAT(a.NewQtyOpen, '0.###'),
-                                             N', closing ', FORMAT(a.NewQtyClose, '0.###'), N')') END,
+                                             FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyOpen, 0)), '0.000'),
+                                             N', closing ', FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyClose, 0)), '0.000'),
+                                             N'; the run left opening ', FORMAT(a.NewQtyOpen, '0.000'),
+                                             N', closing ', FORMAT(a.NewQtyClose, '0.000'), N')') END,
                             N'. Putting the old counts back would write over that change, so nothing was reversed. Correct it in PumpIT first.')
         FROM agora.StockReconAmendment a
         LEFT JOIN agora.StockReconRunLine rl
@@ -139,8 +139,8 @@ BEGIN
                             CASE WHEN l.StockItemNo IS NULL
                                  THEN N' is no longer in PumpIT'
                                  ELSE CONCAT(N' has changed since this run put its POS back (it now holds POS ',
-                                             FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyComputer, 0)), '0.###'),
-                                             N'; the run left ', FORMAT(a.NewQtyPOS, '0.###'), N')') END,
+                                             FORMAT(CONVERT(decimal(18,3), ISNULL(l.QtyComputer, 0)), '0.000'),
+                                             N'; the run left ', FORMAT(a.NewQtyPOS, '0.000'), N')') END,
                             N'. Putting the old POS back would write over that change, so nothing was reversed. Correct it in PumpIT first.')
         FROM agora.StockReconAmendment a
         LEFT JOIN agora.StockReconRunLine rl

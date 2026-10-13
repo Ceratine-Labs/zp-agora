@@ -126,6 +126,23 @@ return [
     'issue_mode' => 'live',
 
     /*
+    | A shift left OVER after balancing has its missing issue captured.
+    |
+    | Balancing cannot remove an over: stock was sold or held that the area
+    | was never issued. 'live' proposes that issue on the shift that carries
+    | the over — QtyIssued = the issue + the over — so the chain balances to
+    | nil, and the commit writes it as it writes a duplicate's 0: the prior on
+    | agora.StockReconAmendment, reversible, named in the audit trail. 'off'
+    | leaves the over on the shift as "capture the missing issue". Needs
+    | issue_mode 'live' as well, because that is what lets a commit write
+    | QtyIssued at all.
+    |
+    | Ryan's named go-ahead, 13 Oct 2026 ("customer wants over to balance").
+    | A literal, like the modes.
+    */
+    'missing_issue_mode' => 'live',
+
+    /*
     |--------------------------------------------------------------------------
     | Reset to original — the issue too?
     |--------------------------------------------------------------------------

@@ -36,12 +36,12 @@ namespace App\Grid;
 final class GridColumn
 {
     /** Formats whose values are numbers, and so right-align and sort numerically. */
-    public const NUMERIC_FORMATS = ['number', 'money', 'rk', 'lk', 'litres', 'cpl', 'pct', 'delta'];
+    public const NUMERIC_FORMATS = ['number', 'qty', 'money', 'rk', 'lk', 'litres', 'cpl', 'pct', 'delta'];
 
     /** Every format the cell partial knows how to write. */
     public const FORMATS = [
         'text', 'mono', 'chip', 'bool', 'date', 'datetime', 'instant',
-        'number', 'money', 'rk', 'lk', 'litres', 'cpl', 'pct', 'delta',
+        'number', 'qty', 'money', 'rk', 'lk', 'litres', 'cpl', 'pct', 'delta',
     ];
 
     /**

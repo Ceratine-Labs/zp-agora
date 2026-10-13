@@ -121,8 +121,13 @@ paste.
 | `options` | the tick list for a set filter, capped at 500 |
 | `total` | carried into the footer total row |
 
-**Formats:** `text` `mono` `chip` `bool` `date` `datetime` `number` `money`
+**Formats:** `text` `mono` `chip` `bool` `date` `datetime` `number` `qty` `money`
 `rk` `lk` `litres` `cpl` `pct` `delta`.
+
+`number` keeps a whole value whole and shows three places only when there are
+decimals. `qty` is a stock quantity: always three places, so `1.000` sits
+beside `1.250` and never reads as `1` (13 Oct 2026). Use it for every count,
+issue, POS and variance column.
 
 The shell puts `num`, `mono` and `wide` on the cells — `num` and `mono` are
 `<x-table>`'s own classes, because the grid composes that table rather than

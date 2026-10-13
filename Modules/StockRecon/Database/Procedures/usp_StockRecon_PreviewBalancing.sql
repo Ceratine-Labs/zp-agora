@@ -89,6 +89,12 @@
  * commit writes QtyIssued = 0 with the prior kept. A possible one (D2) is
  * listed with its twin and never changed. Stage 2b has the rule.
  *
+ * AN OVER IS BALANCED BY CAPTURING ITS MISSING ISSUE (13 Oct 2026, Ryan's
+ * named go-ahead: "customer wants over to balance"). What balancing cannot
+ * move — stock sold or held that the area was never issued — is proposed as
+ * the issue it was missing, on the shift that carries it, and the commit
+ * writes QtyIssued up by that much. @CaptureMissingIssues; stage 7g.
+ *
  * A POSSIBLE DUPLICATE HOLDS ITS CHAIN BACK (Ryan, 5 Oct 2026, PM decision
  * 01a10b21). Since 30 Sep a commit reverses the count moves the pack forbids,
  * and 59 of 134 duplicate candidates had been hidden by exactly such moves —
@@ -129,6 +135,12 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_PreviewBalancing]
        duplicate (D1) but leaves it in the basis, so nothing proposes to write
        the issue. */
     @RemoveDuplicates     BIT             = 0,
+    /* config('stockrecon.missing_issue_mode') = 'live' (Ryan's named
+       go-ahead, 13 Oct 2026: "customer wants over to balance"). A shift left
+       over after balancing has its missing issue proposed: QtyIssuedNew =
+       the issue + the over, so it balances to nil. 0 leaves the over on the
+       shift, reported. Stage 7g. */
+    @CaptureMissingIssues BIT             = 0,
     /* config('stockrecon.exceptions.D2.blocks'), ON since 5 Oct 2026 (PM
        decision 01a10b21). A possible duplicate (D2) with no standing release
        holds its whole chain back: nothing on it is written. Off, it is listed
@@ -1138,7 +1150,10 @@ BEGIN
            CONVERT(bit, 0)                                                  AS FlagAuditConflict,
            /* The commit writes this row's issue to 0 — a clear duplicate. Set
               by stage 7f. */
-           CONVERT(bit, 0)                                                  AS IssueWrite
+           CONVERT(bit, 0)                                                  AS IssueWrite,
+           /* The missing issue the commit records on this shift — the over
+              balancing could not move. Set by stage 7g. */
+           CONVERT(decimal(18,4), 0)                                        AS IssueAdd
     INTO #apply
     FROM audited a;
 
@@ -1335,6 +1350,35 @@ BEGIN
     FROM #apply a
     JOIN shorts s ON s.AreaNo = a.AreaNo AND s.StockItemNo = a.StockItemNo;
 
+    /* ------------------------------------------------------------- stage 7g
+       AN OVER BALANCES TOO: THE MISSING ISSUE IS CAPTURED (13 Oct 2026).
+
+       Balancing moves a short onto an over; it cannot remove an over, because
+       no count can — stock was sold or held that the area was never issued.
+       Until now that over stayed on the shift as "capture the missing issue",
+       for somebody to key in PumpIT by hand. The customer wants it balanced
+       (Ryan: "customer wants over to balance"), so on a chain that is not held
+       back, every active shift still over after balancing has its missing
+       issue proposed: the issue + the over, written to QtyIssued by the commit
+       exactly as a clear duplicate is (its prior on agora.StockReconAmendment,
+       usp_StockRecon_Reverse puts it back), and the shift balances to nil.
+
+       The pack accepts an issue captured at balancing (its S4a), so 7e had
+       nothing to say about it. The ExceptionCode stays U1–U4 / S1: what was
+       FOUND is still that the issue was missing — the row now says it was
+       captured.
+
+       Never on a chain held back, nor a possible duplicate's (DupHold): those
+       wait as a whole. Never on a dormant shift: it carries no variance. */
+    IF @CaptureMissingIssues = 1
+        UPDATE #apply
+           SET IssueAdd  = EffVarNew,
+               EffVarNew = 0
+        WHERE ChainBlocked = 0
+          AND DupHold = 0
+          AND IsDormant = 0
+          AND EffVarNew > @eps;
+
     /* ------------------------------------------------------------- stage 7c
        The labels, resolved ONCE. Stored on the line for the reason SellPrice
        is: a run is a record of what was true when it was made. The employee is
@@ -1400,7 +1444,13 @@ BEGIN
         a.PrevClose, a.ChainBreak, a.QtyOpenNow, a.QtyCloseNow, a.QtyIssuedOrig, NULLIF(a.Mult, 0),
         a.FlagPackOver, a.FlagNoPosLink, a.RestoresHand, a.FlagAuditConflict, a.AuditCode, a.BreakKept,
         a.DupTier, a.DupTwinDate, a.DupTwinShift, a.DupTwinVar, a.DupQty, a.DupReason,
-        CASE WHEN a.IssueWrite = 1 THEN CONVERT(decimal(18,4), 0) END,
+        /* 0 on a clear duplicate; the issue + the over on a captured missing
+           issue — unless PumpIT already holds that issue (head office keyed
+           it), when there is nothing to write. */
+        CASE WHEN a.IssueAdd > @eps
+             THEN CASE WHEN ABS(a.QtyIssued + a.IssueAdd - a.QtyIssuedKeyed) > @tol
+                       THEN CONVERT(decimal(18,4), a.QtyIssued + a.IssueAdd) END
+             WHEN a.IssueWrite = 1 THEN CONVERT(decimal(18,4), 0) END,
         a.RowMoves,
         a.DupHold, a.DupReleaseId,
 
@@ -1442,6 +1492,11 @@ BEGIN
             /* This shift's own news first: the issue goes, whatever else the
                chain does. "(D1)" is what the audit trail's reason reads. */
             WHEN a.IssueWrite = 1             THEN 'Duplicate issue removed (D1): captured twice, the issue goes to nil'
+            /* At most 70 characters against the column's 80, the qty leading. */
+            WHEN a.IssueAdd > @eps AND ABS(a.QtyIssued + a.IssueAdd - a.QtyIssuedKeyed) > @tol
+                                              THEN N'Missing issue captured: ' + FORMAT(a.IssueAdd, '0.000')
+                                                   + N' recorded as issued, over to nil'
+            WHEN a.IssueAdd > @eps            THEN 'Missing issue already in PumpIT: the issue keyed there covers the over'
             WHEN a.RestoresHand = 1 AND a.RowMoves = 1
                                               THEN 'Hand amendment reversed: back to the count, the chain is not balanced'
             /* A possible duplicate holding its chain back (PM decision
@@ -1485,7 +1540,7 @@ BEGIN
             WHEN a.EffVarNew > @eps           THEN 'Unrecorded issue, over left: capture the missing issue on this shift'
             /* The qty leads, so it is on the pill and in the extract. At most
                74 characters against the column's 80. */
-            WHEN a.BreakKept = 1              THEN N'Break ' + FORMAT(a.ChainBreak, '+0.###;-0.###')
+            WHEN a.BreakKept = 1              THEN N'Break ' + FORMAT(a.ChainBreak, '+0.000;-0.000')
                                                    + N' kept: opening set to the previous closing, chain runs through'
             WHEN a.ChainBreak < -@tol         THEN 'Opening repaired: raised to the previous closing, this shift carries it'
             WHEN a.ChainBreak >  @tol         THEN 'Opening repaired: lowered to the previous closing'
@@ -1502,8 +1557,12 @@ BEGIN
             ELSE 'No change needed'
         END,
 
-        CONVERT(bit, CASE WHEN a.RowMoves = 1 OR a.IssueWrite = 1 THEN 1 ELSE 0 END),
-        CONVERT(bit, CASE WHEN a.RowMoves = 1 OR a.IssueWrite = 1 THEN 1 ELSE 0 END),
+        CONVERT(bit, CASE WHEN a.RowMoves = 1 OR a.IssueWrite = 1
+                               OR (a.IssueAdd > @eps AND ABS(a.QtyIssued + a.IssueAdd - a.QtyIssuedKeyed) > @tol)
+                          THEN 1 ELSE 0 END),
+        CONVERT(bit, CASE WHEN a.RowMoves = 1 OR a.IssueWrite = 1
+                               OR (a.IssueAdd > @eps AND ABS(a.QtyIssued + a.IssueAdd - a.QtyIssuedKeyed) > @tol)
+                          THEN 1 ELSE 0 END),
         'pending',
 
         m.StockItemDescription,

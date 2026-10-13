@@ -19,6 +19,7 @@
             $shifts->filter(fn ($s) => (bool) $s->WouldAmend)->count(),
             $shifts->contains(fn ($s) => abs((float) $s->QtyCloseNew - (float) $s->QtyClose) > 0.0005
                 || abs((float) $s->QtyOpenNew - (float) $s->QtyOpen) > 0.0005),
+            \Modules\StockRecon\Services\ChainSummary::overLeft($shifts),
         );
 @endphp
 {{-- What holds the chain back, listed only while something does: on a nil
@@ -281,6 +282,13 @@
                                 : 'not removed' }}
                         </x-chip>
                         <a href="{{ $caseUrl($shift) }}">case</a>
+                    @endif
+                    {{-- An over balanced by capturing its missing issue (13 Oct 2026). --}}
+                    @if ($shift->QtyIssuedNew !== null && $shift->DupTier !== 'D1')
+                        <x-chip tone="good" :dot="false"
+                                title="The over this shift sold or held without an issue, recorded as the issue it never got. Reversible from the run.">
+                            missing issue {{ \App\Support\Format::n($shift->QtyIssued, 3) }} → {{ \App\Support\Format::n($shift->QtyIssuedNew, 3) }}
+                        </x-chip>
                     @endif
                     {{-- A possible duplicate: its twin, why it is not clear, and
                          the release it has now — or the press that makes one. --}}

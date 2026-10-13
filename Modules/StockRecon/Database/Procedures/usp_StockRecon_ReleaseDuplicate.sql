@@ -125,8 +125,8 @@ BEGIN
         SELECT TOP 1 CONCAT(N'AGORA:ISSUE_MOVED:', l.Label,
                             CASE WHEN s.StockItemNo IS NULL
                                  THEN N' is no longer in PumpIT'
-                                 ELSE CONCAT(N' now holds issue ', FORMAT(CONVERT(decimal(18,3), ISNULL(s.QtyIssued, 0)), '0.###'),
-                                             N', not the ', FORMAT(l.QtyIssued, '0.###'), N' this run read') END,
+                                 ELSE CONCAT(N' now holds issue ', FORMAT(CONVERT(decimal(18,3), ISNULL(s.QtyIssued, 0)), '0.000'),
+                                             N', not the ', FORMAT(l.QtyIssued, '0.000'), N' this run read') END,
                             N'. Preview again before releasing it. Nothing was released.')
         FROM @Lines l
         OUTER APPLY (SELECT TOP 1 v.StockItemNo, v.QtyIssued
@@ -159,7 +159,7 @@ BEGIN
         UPDATE x SET
             x.WithdrawnAt  = SYSUTCDATETIME(),
             x.WithdrawnBy  = @UserId,
-            x.WithdrawNote = CONCAT(N'Superseded: released again at issue ', FORMAT(l.QtyIssued, '0.###')),
+            x.WithdrawNote = CONCAT(N'Superseded: released again at issue ', FORMAT(l.QtyIssued, '0.000')),
             x.UpdatedAt    = SYSUTCDATETIME(),
             x.UpdatedBy    = @UserId
         FROM agora.StockReconDuplicateRelease x WITH (UPDLOCK, HOLDLOCK)

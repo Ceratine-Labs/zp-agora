@@ -228,7 +228,7 @@ final class XlsxWriter
     {
         return match ($column->format) {
             'number' => self::STYLE_INT,
-            'litres' => self::STYLE_3DP,
+            'litres', 'qty' => self::STYLE_3DP,
             'cpl' => self::STYLE_4DP,
             default => self::STYLE_2DP,
         };

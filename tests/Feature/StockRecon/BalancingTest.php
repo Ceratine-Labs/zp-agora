@@ -361,7 +361,7 @@ class BalancingTest extends TestCase
         $this->assertTrue($broken->BreakKept, 'A two-unit break is kept.');
         $this->assertEqualsWithDelta(-2.0, (float) $broken->ChainBreak, 0.005);
         $this->assertSame('S10a', $broken->ExceptionCode, 'A kept break is still on the exceptions tab.');
-        $this->assertStringStartsWith('Break -2 kept', $broken->Outcome, 'The qty is on the row.');
+        $this->assertStringStartsWith('Break -2.000 kept', $broken->Outcome, 'The qty is on the row.');
         $this->assertNull($broken->AuditCode, 'S13 does not read a break that small.');
 
         $this->assertTrue($lines->every(fn ($l) => ! $l->ChainBlocked), 'The chain is not split, so no stretch of it ends over.');
@@ -944,7 +944,7 @@ class BalancingTest extends TestCase
 
         $change = $this->db()->table('agora.vw_PumpItChange')
             ->where('Ledger', 'StockReconAmendment')->where('LedgerId', $amendment->Id)->first();
-        $this->assertStringContainsString('POS 0 → 1', (string) $change->Change, 'The audit trail shows it.');
+        $this->assertStringContainsString('POS 0.000 → 1.000', (string) $change->Change, 'The audit trail shows it.');
 
         // Somebody keys the POS again: the reversal must not write over it.
         $this->setRow(self::DUP_ITEM, '2026-07-18', 1, ['QtyComputer' => 2]);
@@ -967,6 +967,9 @@ class BalancingTest extends TestCase
      */
     public function test_an_over_no_short_covers_is_still_an_unrecorded_issue(): void
     {
+        // The balancing envelope on its own: the over left, before stage 7g
+        // captures it as the missing issue (13 Oct 2026).
+        config(['stockrecon.missing_issue_mode' => 'off']);
         $this->seedShelfChain([
             '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
             '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 1, 2]],
@@ -1007,15 +1010,82 @@ class BalancingTest extends TestCase
         $this->assertEqualsWithDelta(1.0, (float) $line->ChainNetVar, 0.001);
         $this->assertFalse($line->isEmptyChain(), 'An over of 1 is never hidden.');
 
+        // Since 13 Oct 2026 it balances: the over is captured as the issue
+        // the shift never got (Ryan: "customer wants over to balance").
         $chain = ChainSummary::of($run->lines)->first(fn ($c) => $c->first()->StockItemNo === self::DUP_ITEM);
-        $this->assertSame('Over 1.000 · capture the missing issue', $chain->state()['label']);
+        $this->assertSame('Balance 1 shift · issue of 1.000 captured', $chain->state()['label']);
+        $this->assertTrue($line->capturesIssue() && $line->isWritable(), 'It can be ticked and amended.');
 
         $this->actingAs($this->person('admin'))
             ->get(route('app.stockrecon.line', [$run, $line]), ['X-Requested-With' => 'XMLHttpRequest'])
             ->assertOk()
-            ->assertSee('Over 1.000 · capture the missing issue')
+            ->assertSee('Balance 1 shift · issue of 1.000 captured')
+            ->assertSee('missing issue 0.000 → 1.000')
             ->assertDontSee('Held back')
             ->assertDontSee('Too few active shifts to balance');
+    }
+
+    /**
+     * An over balances by capturing its missing issue (Ryan, 13 Oct 2026:
+     * "if a chain is Over by any amount it should be balancable" … "customer
+     * wants over to balance"). The shift that closed on 6 from an opening of
+     * 5 with nothing issued or sold was given 1 nobody wrote up: the run
+     * proposes QtyIssued 0 → 1, the commit writes it with its prior kept and
+     * the audit trail names it, a re-preview has nothing more to write, and
+     * the reversal puts the 0 back.
+     */
+    public function test_an_over_balances_by_capturing_the_missing_issue_written_and_reversed(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [5, 0, 5, 0], 3 => [5, 0, 5, 0]],
+            '2026-07-18' => [1 => [5, 0, 6, 0], 3 => [6, 0, 6, 0]],
+            '2026-07-19' => [1 => [6, 0, 6, 0], 3 => [6, 0, 6, 0]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($run, '2026-07-18', 1);
+
+        $this->assertEqualsWithDelta(1.0, (float) $line->QtyVar, 0.005, 'As counted, one over.');
+        $this->assertEqualsWithDelta(0.0, (float) $line->QtyVarNew, 0.005, 'Captured, it balances to nil.');
+        $this->assertEqualsWithDelta(1.0, (float) $line->QtyIssuedNew, 0.005, 'The issue it was missing.');
+        $this->assertSame('captured', $line->outcomeKey());
+        $this->assertStringStartsWith('Missing issue captured: 1.000 recorded as issued', $line->Outcome);
+        $this->assertFalse($line->CountsMove, 'No count moves for it.');
+        $this->assertTrue($line->WouldAmend && $line->isWritable());
+        $this->assertSame(0, (int) $run->fresh()->OverRowsAfter, 'Nothing is left over.');
+        $this->assertSame(1, $run->params()['CaptureMissingIssues'], 'The run records the switch it was made under.');
+
+        $result = $this->service->commit($run);
+        $this->assertSame('COMMITTED', $result['status']->Code);
+        $this->assertStringContainsString('1 missing issue(s) captured', $result['status']->Message);
+
+        $after = $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1);
+        $this->assertEqualsWithDelta(1.0, (float) $after->QtyIssued, 0.005, 'QtyIssued is raised in PumpIT.');
+        $this->assertEqualsWithDelta(0.0, (float) $after->QtyIssued_Original, 0.005, 'The _Original issue is never written.');
+        $this->assertEqualsWithDelta(5.0, (float) $after->QtyOpen, 0.005, 'The counts are not touched.');
+        $this->assertEqualsWithDelta(6.0, (float) $after->QtyClose, 0.005);
+
+        $amendment = StockReconAmendment::query()->acrossBranches()
+            ->where('RunId', $run->Id)->where('RunLineId', $line->Id)->firstOrFail();
+        $this->assertEqualsWithDelta(0.0, (float) $amendment->PriorQtyIssued, 0.005);
+        $this->assertEqualsWithDelta(1.0, (float) $amendment->NewQtyIssued, 0.005);
+
+        $change = $this->db()->table('agora.vw_PumpItChange')
+            ->where('Ledger', 'StockReconAmendment')->where('LedgerId', $amendment->Id)->first();
+        $this->assertSame('Missing issue captured', $change->Action);
+        $this->assertSame('Issue 0.000 → 1.000', $change->Change, 'The audit trail names the issue, and only the issue.');
+
+        // Previewed again, PumpIT already holds the issue: nothing to write.
+        $again = $this->previewArea(self::SHELF_AREA);
+        $repeat = $this->lineAt($again, '2026-07-18', 1);
+        $this->assertNull($repeat->QtyIssuedNew, 'Never captured twice.');
+        $this->assertFalse((bool) $repeat->WouldAmend);
+        $this->assertStringStartsWith('Missing issue already in PumpIT', $repeat->Outcome);
+
+        $this->service->reverse($run->fresh(), 'TEST-capture off');
+        $this->assertEqualsWithDelta(0.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.005,
+            'The reversal puts the prior issue back.');
     }
 
     /**
@@ -1024,6 +1094,9 @@ class BalancingTest extends TestCase
      */
     public function test_keeping_breaks_can_be_switched_off(): void
     {
+        // The balancing envelope on its own: the over left, before stage 7g
+        // captures it as the missing issue (13 Oct 2026).
+        config(['stockrecon.missing_issue_mode' => 'off']);
         $this->setCounts('2026-07-19', 3, ['QtyOpen_Original' => 28, 'QtyOpen' => 28]);
 
         $run = $this->service->preview(
@@ -1235,6 +1308,9 @@ class BalancingTest extends TestCase
      */
     public function test_a_net_over_chain_balances_and_the_over_stays_on_its_shift(): void
     {
+        // The balancing envelope on its own: the over left, before stage 7g
+        // captures it as the missing issue (13 Oct 2026).
+        config(['stockrecon.missing_issue_mode' => 'off']);
         // One extra unit sold on the last shift, with nothing issued to cover
         // it, tips the whole window over.
         // The sale as counted — the original column, which every preview
@@ -1286,6 +1362,9 @@ class BalancingTest extends TestCase
      */
     public function test_a_chain_that_ends_over_balances_around_the_missing_issue_and_marks_what_balances_with_what(): void
     {
+        // The balancing envelope on its own: the over left, before stage 7g
+        // captures it as the missing issue (13 Oct 2026).
+        config(['stockrecon.missing_issue_mode' => 'off']);
         $this->seedShelfChain([
             '2026-07-17' => [1 => [56, 0, 52, 3],  3 => [52, 0, 39, 14]],
             '2026-07-18' => [1 => [39, 0, 34, 12], 3 => [34, 0, 27, 1]],
@@ -2096,7 +2175,7 @@ class BalancingTest extends TestCase
         $this->assertSame($amendment->PriorQtyClose, $amendment->NewQtyClose);
 
         $trail = $this->db()->selectOne("SELECT * FROM agora.vw_PumpItChange WHERE Ledger = 'StockReconAmendment' AND LedgerId = ?", [$amendment->Id]);
-        $this->assertSame('Issue 20 → 0', $trail->Change, 'The audit trail names the issue, and only the issue.');
+        $this->assertSame('Issue 20.000 → 0.000', $trail->Change, 'The audit trail names the issue, and only the issue.');
         $this->assertSame('Duplicate issue removed', $trail->Action);
         $this->assertStringContainsString('(D1)', $trail->Reason);
 

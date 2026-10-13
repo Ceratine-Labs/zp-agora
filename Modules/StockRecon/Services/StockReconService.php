@@ -486,12 +486,21 @@ class StockReconService
      *                            written. On since 5 Oct 2026 (PM decision
      *                            01a10b21). The commit takes it too.
      *
-     * @return array{RemoveDuplicates: int, UseOriginalCounts: int, BlockPossibleDuplicates: int}
+     *   CaptureMissingIssues     config('stockrecon.missing_issue_mode') is
+     *                            'live' (and issue_mode): a shift left over
+     *                            after balancing has its missing issue
+     *                            proposed, so the chain balances to nil.
+     *
+     * @return array{RemoveDuplicates: int, CaptureMissingIssues: int, UseOriginalCounts: int, BlockPossibleDuplicates: int}
      */
     protected function duplicateSwitches(): array
     {
         return [
             'RemoveDuplicates' => (int) (config('stockrecon.issue_mode') === 'live'),
+            // An over balances by capturing its missing issue (13 Oct 2026).
+            // Written through the same issue switch, so it needs both.
+            'CaptureMissingIssues' => (int) (config('stockrecon.issue_mode') === 'live'
+                && config('stockrecon.missing_issue_mode') === 'live'),
             // Always the original values (Ryan, 7 Oct 2026: "we must use
             // original"). Recorded on the run, so the commit replays it.
             'UseOriginalCounts' => 1,

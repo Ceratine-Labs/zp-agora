@@ -69,7 +69,7 @@ most of the design:
 |---|---|
 | **T < 0** | Real loss of \|T\| over the window. Balancing decides which shifts carry it; it cannot make it smaller. |
 | **T = 0** | Every variance is a counting artefact. It balances to zero throughout. |
-| **T > 0** | More was sold than the books ever received. **No amendment removes it** — but since 7 Oct 2026 the chain still balances around it: every short goes to nil, and the over stays on the shifts that carry it, reported as the missing issue (see *A stretch that ends over balances too*). |
+| **T > 0** | More was sold than the books ever received. **No count amendment removes it** — since 7 Oct 2026 the chain balances around it (every short goes to nil), and since 13 Oct 2026 the over left on each shift is **captured as its missing issue**: QtyIssued raised by the over, so the chain balances to nil (see *An over balances: the missing issue is captured*). |
 
 ## The algorithm
 
@@ -226,6 +226,23 @@ way is one group and a closing left as counted ends it. Each group gets a
 letter and a colour (a rail down the row, the letter beside the variance, the
 five series tokens in turn); the hover says which shifts it balances with and
 whether together they come to nil, leave a short, or leave the over.
+
+### An over balances: the missing issue is captured — since 13 Oct 2026
+
+Ryan, on a chain reading *Over 1.000 · capture the missing issue* with no tick
+box: *"if a chain is Over by any amount it should be balancable"* — *"customer
+wants over to balance"*. No count can remove an over, so on a chain that is
+not held back the preview (stage 7g) proposes the issue the shift never got:
+`QtyIssuedNew = issue + over`, the shift's variance goes to nil, and the chain
+reads *Balance N shifts · issue of X captured* and can be ticked. The commit
+writes `QtyIssued` exactly as it writes a duplicate's 0 — the prior on
+`agora.StockReconAmendment`, reversed by `usp_StockRecon_Reverse`, named
+*Missing issue captured* in the audit trail — and a re-preview finds PumpIT
+already holding the issue and writes nothing more. The counts do not move for
+it, and the exception code (U1–U4, S1) still says what was found. Switched by
+`missing_issue_mode` in StockRecon config, alongside `issue_mode`. Measured
+locally, branch 23, 23–29 Sep: 20 over chains balance, 42 shifts, 217 units.
+A chain held back for another reason (E1, the caps, D2, F3) keeps its over.
 
 ### Reset to original — since 7 Oct 2026
 

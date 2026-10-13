@@ -172,6 +172,9 @@ class StockReconRunLine extends BaseModel
              * 'possible' whatever it holds back, released or not.
              */
             $this->removesDuplicate() => 'duplicate',
+            // An over balanced by capturing its missing issue (13 Oct 2026):
+            // the issue goes up by the over and the shift reads nil.
+            $this->capturesIssue() => 'captured',
             $this->isPossibleDuplicate() => 'possible',
             $this->IsDormant => 'dormant',
             // Stock arrived with no paperwork. Since 7 Oct 2026 that holds no
@@ -247,6 +250,7 @@ class StockReconRunLine extends BaseModel
             'balanced' => 'good',
             // The tones config('stockrecon.exceptions') gives D1 and D2.
             'duplicate' => 'good',
+            'captured' => 'good',
             'possible' => 'serious',
             'short' => 'warn',
             'unrecorded' => 'crit',
@@ -304,7 +308,17 @@ class StockReconRunLine extends BaseModel
      */
     public function removesDuplicate(): bool
     {
-        return $this->QtyIssuedNew !== null;
+        return $this->QtyIssuedNew !== null && $this->DupTier === 'D1';
+    }
+
+    /**
+     * An over balanced by capturing its missing issue (13 Oct 2026): the
+     * commit raises QtyIssued by the over — usp_StockRecon_PreviewBalancing,
+     * stage 7g. Only ever on a chain that is not held back.
+     */
+    public function capturesIssue(): bool
+    {
+        return $this->QtyIssuedNew !== null && ! $this->removesDuplicate();
     }
 
     public function isCommitted(): bool

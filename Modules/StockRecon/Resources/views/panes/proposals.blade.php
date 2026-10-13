@@ -40,7 +40,7 @@
     request()->attributes->set('loader_hold', 'Laying out the chains…');
 
     $tones = [
-        'balanced' => 'is-matched', 'duplicate' => 'is-matched', 'short' => 'is-warn',
+        'balanced' => 'is-matched', 'duplicate' => 'is-matched', 'captured' => 'is-matched', 'short' => 'is-warn',
         'possible' => 'is-serious', 'blocked' => 'is-serious',
         'restored' => 'is-warn', 'unrecorded' => 'is-crit', 'dormant' => '', 'clean' => '',
     ];
@@ -62,6 +62,8 @@
            as "write that shift with it"), and it used to sit in Dormant, out
            of the press, whenever the shift sold nothing. */
         'duplicate' => 'Duplicate issue removed',
+        /* An over balanced by capturing its missing issue (13 Oct 2026). */
+        'captured' => 'Missing issue captured',
         'short' => 'Short',
         'possible' => 'Possible duplicate',
         'blocked' => 'Blocked',
