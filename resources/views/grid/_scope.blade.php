@@ -26,6 +26,24 @@
         <input type="hidden" name="{{ $name }}" value="{{ $value }}">
     @endforeach
 
+    {{-- A scope the grid reads but does not draw survives its own submit
+         (13 Oct 2026). The bank recon dashboard picks the sites and dates in
+         its own form above the grid; without these, searching the grid would
+         quietly widen it back to every site and every date. --}}
+    @unless ($definition->branchSelector() && $branches !== null && count($branches) > 0)
+        @foreach ($grid->gridQuery->branchIds as $branchId)
+            <input type="hidden" name="{{ $p('branches') }}[]" value="{{ $branchId }}">
+        @endforeach
+    @endunless
+    @unless ($definition->dateRange())
+        @if ($grid->gridQuery->from)
+            <input type="hidden" name="{{ $p('from') }}" value="{{ $grid->gridQuery->from }}">
+        @endif
+        @if ($grid->gridQuery->to)
+            <input type="hidden" name="{{ $p('to') }}" value="{{ $grid->gridQuery->to }}">
+        @endif
+    @endunless
+
     {{-- The sort survives a search: narrowing the rows is not a request to
          re-order them. --}}
     @if ($grid->sort() !== null)

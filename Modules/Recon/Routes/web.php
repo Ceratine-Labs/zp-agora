@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Recon\Http\Controllers\ReconController;
+use Modules\Recon\Http\Controllers\ReconDashboardController;
 use Modules\Recon\Http\Controllers\ReconGroupController;
 use Modules\Recon\Http\Controllers\ReconTraceController;
 
@@ -25,6 +26,13 @@ Route::middleware('auth')->prefix('recon')->name('recon.')->group(function () {
      | sides, and scoping it to one would mean knowing the answer first.
      */
     Route::get('trace', [ReconTraceController::class, 'index'])->middleware('can:recon.runs.view')->name('trace');
+
+    /*
+     | The dashboard: what is still outstanding, per site, per area, per side
+     | (13 Oct 2026). Read-only, so it sits behind the same permission as
+     | looking at a run.
+     */
+    Route::get('dashboard', [ReconDashboardController::class, 'index'])->middleware('can:recon.runs.view')->name('dashboard');
 
     // A run is the record of a preview, addressable on its own so a figure
     // can be sent to someone rather than described to them.

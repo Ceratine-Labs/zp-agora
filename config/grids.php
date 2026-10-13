@@ -23,6 +23,7 @@ use Modules\Product\Grids\StockItemGrid;
 use Modules\Recon\Grids\ReconBankSideGrid;
 use Modules\Recon\Grids\ReconCriteriaGrid;
 use Modules\Recon\Grids\ReconMopsSideGrid;
+use Modules\Recon\Grids\ReconOutstandingGrid;
 use Modules\Recon\Grids\ReconRunGrid;
 use Modules\Recon\Grids\ReconRunLineGrid;
 use Modules\StockRecon\Grids\StockReconExceptionGrid;
@@ -114,6 +115,11 @@ return [
         // the person who made them unless they ask for everyone's, and the
         // area comes off the request the same way the run does below.
         'app.recon.runs' => ReconRunGrid::class,
+
+        // The bank recon dashboard's Items tab: every outstanding bank line
+        // and deposit, a page at a time (13 Oct 2026). No qualifier, so it
+        // shares the dashboard's branches[] / from / to.
+        'app.recon.outstanding' => ReconOutstandingGrid::class,
 
         // The recon run screen keeps its own table — it carries tick boxes, an
         // execute form and a row-expand panel the grid shell cannot express —

@@ -153,6 +153,29 @@ timestamp.
 
 ---
 
+## The dashboard — what is outstanding (13 Oct 2026)
+
+Control → Money → Bank reconciliation → **Dashboard** (`app.recon.dashboard`,
+`recon.runs.view`). Sites default to every site granted, several at once;
+an optional date window. Three views of that one scope: **Summary** (KPIs,
+amount by area, items by age, one row per site), **Per site** (each site's
+areas, bank against PumpIT, in five age buckets) and **Items** (the rows,
+paged, filtered and exported on the server).
+
+- **Outstanding** is the area screens' definition: a bank line with
+  `IDState = 2 AND ReconState = 1` by Type (CashBags reads `CashDeposit`), a
+  deposit with `ReconBatchNoPumpIT = 0`; SmartATM dated by its device row.
+- **Unclassified** bank lines (`IDState = 1`, never given an area) are kept
+  out of the headline figures and shown on their own tile — 86,586 on live
+  back to 2015, debits included, against 49,360 classified lines outstanding.
+- `agora.usp_Recon_DashboardOutstanding` adds up (site × area × side, aged);
+  `agora.usp_Recon_GridOutstanding` pages the rows. The two agree to the cent
+  (`ReconDashboardTest`). Timed read-only on live, 13 Oct: every source under
+  0.5 s; the items grid's worst case (every site, 225,852 rows) 1.9 s.
+- The Items grid has no `:qualifier`, so it reads the dashboard's
+  `branches[]`, `from` and `to`; `grid/_scope` carries a scope the grid reads
+  but does not draw through its own search.
+
 ## The tables
 
 | Table | Migration | Holds |
