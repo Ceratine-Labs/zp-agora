@@ -1056,6 +1056,21 @@ class BalancingTest extends TestCase
         $this->assertSame(0, (int) $run->fresh()->OverRowsAfter, 'Nothing is left over.');
         $this->assertSame(1, $run->params()['CaptureMissingIssues'], 'The run records the switch it was made under.');
 
+        // The chain panel's Amended block carries the Original block's columns
+        // (Ryan, 16 Oct 2026), and its row adds up: it stands on the issue
+        // captured, and its running total ends on what is left — nothing.
+        ['shifts' => $shifts] = $this->service->chain($run, $line);
+        $amended = $shifts->first(fn ($s) => (int) $s->Id === (int) $line->Id);
+        $this->assertEqualsWithDelta(1.0, (float) $amended->QtyIssuedAmended, 0.005);
+        $this->assertTrue($shifts->every(fn ($s) => (int) $s->Id === (int) $line->Id
+            || abs((float) $s->QtyIssuedAmended - (float) $s->QtyIssued) < 0.0005), 'No other issue moves.');
+        $this->assertEqualsWithDelta(0.0, (float) $shifts->last()->CumulativeVarNew, 0.005);
+        $this->actingAs($this->person('admin'))
+            ->get(route('app.stockrecon.line', [$run, $line]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()
+            ->assertSeeInOrder(['Amended — as this run proposes', '>Open<', '>Issued<', '>Close<', '>POS<',
+                '>Variance<', '>Value<', '>Cumulative<', '>Amend<', '>Outcome<'], false);
+
         $result = $this->service->commit($run);
         $this->assertSame('COMMITTED', $result['status']->Code);
         $this->assertStringContainsString('1 missing issue(s) captured', $result['status']->Message);
@@ -1082,6 +1097,9 @@ class BalancingTest extends TestCase
         $this->assertNull($repeat->QtyIssuedNew, 'Never captured twice.');
         $this->assertFalse((bool) $repeat->WouldAmend);
         $this->assertStringStartsWith('Missing issue already in PumpIT', $repeat->Outcome);
+        ['shifts' => $shifts] = $this->service->chain($again, $repeat);
+        $this->assertEqualsWithDelta(1.0, (float) $shifts->first(fn ($s) => (int) $s->Id === (int) $repeat->Id)->QtyIssuedAmended, 0.005,
+            'Nothing to write, but the amended row stands on the issue PumpIT holds, so it still adds up.');
 
         $this->service->reverse($run->fresh(), 'TEST-capture off');
         $this->assertEqualsWithDelta(0.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.005,

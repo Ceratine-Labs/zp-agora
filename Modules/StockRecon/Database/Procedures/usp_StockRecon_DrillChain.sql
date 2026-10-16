@@ -171,6 +171,14 @@ BEGIN
         rl.ActiveSeq,
         rl.QtyOpen, rl.QtyIssued, rl.QtyClose, rl.QtyPOS, rl.QtyVar,
         rl.QtyOpenNew, rl.QtyCloseNew, rl.AmendClose, rl.QtyVarNew,
+        /* The amended block carries the original's columns (Ryan, 16 Oct
+           2026), so it needs its own issue. It is the issue the amended
+           variance stands on: the 0 a clear duplicate writes, the issue + the
+           over a missing issue writes — or a missing issue head office already
+           keyed, which the run does not write and so QtyIssuedNew cannot carry.
+           Read from the row's own figures, the amended row adds up the way the
+           original does. POS needs no column: balancing never moves it. */
+        CONVERT(decimal(18,4), rl.QtyPOS - rl.QtyVarNew - rl.QtyOpenNew + rl.QtyCloseNew) AS QtyIssuedAmended,
         /* The rand beside the quantity, on BOTH sides.
            The legacy Stock Recon Balancing screen puts Qty Var and Value Var
            under each of its two blocks, Original and Amended, and that is the
@@ -236,6 +244,12 @@ BEGIN
             + CASE WHEN ABS(ISNULL(rl.ChainBreak, 0)) > 0.0005 THEN rl.ChainBreak ELSE 0 END
             + CASE WHEN @Removed = 1 AND rl.DupTier = 'D1' THEN rl.QtyIssued ELSE 0 END)
             OVER (ORDER BY rl.[LineNo] ROWS UNBOUNDED PRECEDING)            AS CumulativeVar,
+        /* The same curve on the amended side. Nothing to add to it: every
+           amended opening already is the previous closing, and a duplicate
+           taken out is already out of the issue — so it ends on what is left
+           after balancing. */
+        SUM(rl.QtyVarNew)
+            OVER (ORDER BY rl.[LineNo] ROWS UNBOUNDED PRECEDING)            AS CumulativeVarNew,
         am.[State]                                                          AS AmendmentState,
         am.PriorQtyOpen, am.PriorQtyClose, am.PriorQtyIssued
     FROM agora.StockReconRunLine rl

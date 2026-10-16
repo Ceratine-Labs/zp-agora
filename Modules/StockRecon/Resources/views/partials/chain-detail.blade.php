@@ -186,14 +186,20 @@
          Safe here and NOT in the proposals table: table-tools.js reads
          `head.rows[0]` for its sort and filter row, so a spanning row above
          the real headings would break a table that opts into `tools`. This one
-         does not. --}}
+         does not.
+
+         The Amended block carries the Original block's seven columns in the
+         same order (Ryan, 16 Oct 2026), as the legacy screen does, so a figure
+         is read straight across; Amend, which only the amended side has, sits
+         after them. --}}
+    @php($dash = fn ($v) => abs((float) $v) < 0.0005 ? '—' : \App\Support\Format::n($v, 3))
     <x-table :count="$shifts->count()" dense fit
              empty="This item has no other shift in the window.">
         <x-slot:head>
             <tr class="grp-head">
                 <th class="l fit-min" colspan="3"></th>
                 <th class="num grp" colspan="7">Original — as counted</th>
-                <th class="num grp" colspan="5">Amended — as this run proposes</th>
+                <th class="num grp" colspan="8">Amended — as this run proposes</th>
                 <th class="l"></th>
             </tr>
             <tr>
@@ -201,8 +207,9 @@
                 <th class="num grp">Open</th><th class="num">Issued</th><th class="num">Close</th>
                 <th class="num">POS</th><th class="num">Variance</th><th class="num">Value</th>
                 <th class="num">Cumulative</th>
-                <th class="num grp">Open</th><th class="num">Close</th><th class="num">Amend</th>
-                <th class="num">Variance</th><th class="num">Value</th>
+                <th class="num grp">Open</th><th class="num">Issued</th><th class="num">Close</th>
+                <th class="num">POS</th><th class="num">Variance</th><th class="num">Value</th>
+                <th class="num">Cumulative</th><th class="num">Amend</th>
                 <th class="l">Outcome</th>
             </tr>
         </x-slot:head>
@@ -260,10 +267,13 @@
                      column that was not working (Ryan, 6 Oct 2026). --}}
                 <td class="num muted">{{ abs((float) $shift->CumulativeVar) < 0.0005 ? '—' : \App\Support\Format::n($shift->CumulativeVar, 3) }}</td>
                 <td class="num grp">{{ \App\Support\Format::n($shift->QtyOpenNew, 3) }}</td>
+                <td class="num">{{ $dash($shift->QtyIssuedAmended) }}</td>
                 <td class="num">{{ \App\Support\Format::n($shift->QtyCloseNew, 3) }}</td>
-                <td class="num">{{ abs((float) $shift->AmendClose) < 0.0005 ? '—' : \App\Support\Format::n($shift->AmendClose, 3) }}</td>
+                <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($shift->QtyPOS, 3) }}</td>
                 <td class="num">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($shift->QtyVarNew, 3) }}</td>
                 <td class="num money">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::r($shift->VarValueNew) }}</td>
+                <td class="num muted">{{ $dash($shift->CumulativeVarNew) }}</td>
+                <td class="num">{{ $dash($shift->AmendClose) }}</td>
                 <td class="l muted" style="font-size:12px">
                     {{ $shift->Outcome }}
                     @if ($shift->IsDormant)<x-chip tone="neutral" :dot="false">dormant</x-chip>@endif
