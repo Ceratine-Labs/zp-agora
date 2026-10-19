@@ -368,6 +368,17 @@ class ComponentCatalogue
                 ],
             ],
             [
+                'name' => 'x-tone-value',
+                'group' => 'Data',
+                'summary' => 'A figure washed in its tone, at the size and weight of its neighbours.',
+                'mockup' => 'tone-value',
+                'notes' => 'Built for the original vs amended variance grid (19 Oct 2026), where PumpIT colours a variance CELL red when short and yellow when over. Not `<x-chip>`: a chip is a small bold label, and a column of numbers with some of them chipped stops reading as a column. The slot is the figure, already formatted; an unknown or null tone renders it bare. Negative side margins give the wash room without moving the digits off the column\'s right edge.',
+                'props' => [
+                    ['tone', '?string', 'null', 'good warn serious crit neutral, or null for no wash'],
+                    ['slot', 'slot', '—', 'The figure, already formatted'],
+                ],
+            ],
+            [
                 'name' => 'x-delta',
                 'group' => 'Data',
                 'summary' => 'A movement, with its direction.',

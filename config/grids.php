@@ -30,6 +30,7 @@ use Modules\Recon\Grids\ReconRunLineGrid;
 use Modules\StockRecon\Grids\StockReconExceptionGrid;
 use Modules\StockRecon\Grids\StockReconRunGrid;
 use Modules\StockRecon\Grids\StockReconRunLineGrid;
+use Modules\StockRecon\Grids\StockReconVarianceGrid;
 use Modules\Utilities\Grids\UtilityReadingGrid;
 
 /*
@@ -151,6 +152,10 @@ return [
         // the standard extract endpoint serves it. In journal mode that
         // extract IS the deliverable: the worklist an admin applies by hand.
         'app.stockrecon.run' => StockReconRunLineGrid::class,
+
+        // After balancing: every count line's variance as counted beside its
+        // variance as amended, over any period (ZRP, 19 Oct 2026).
+        'app.stockrecon.variance' => StockReconVarianceGrid::class,
 
         // Z-reads for a site and period with the proposer's call on each —
         // who, which till, which shift — and the clerk's decision beside it.

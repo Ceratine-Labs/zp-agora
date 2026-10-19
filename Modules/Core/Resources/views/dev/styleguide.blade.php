@@ -330,6 +330,21 @@
             </div>
         </x-core::gallery-entry>
 
+        <x-core::gallery-entry name="x-tone-value">
+            <div class="gal-variant">
+                <p class="eyebrow">In a column of figures, as the variance grid uses it — the digits stay on the edge</p>
+                <table class="gal-props">
+                    <thead><tr><th class="num">Variance</th><th>Tone</th></tr></thead>
+                    <tbody>
+                        <tr><td class="num"><x-tone-value tone="crit">-2.000</x-tone-value></td><td class="gal-type">crit — short</td></tr>
+                        <tr><td class="num"><x-tone-value tone="warn">2.000</x-tone-value></td><td class="gal-type">warn — over the allowance</td></tr>
+                        <tr><td class="num"><x-tone-value tone="good">1.000</x-tone-value></td><td class="gal-type">good — within it</td></tr>
+                        <tr><td class="num"><x-tone-value>0.000</x-tone-value></td><td class="gal-type">null — bare</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </x-core::gallery-entry>
+
         <x-core::gallery-entry name="x-delta">
             <div class="gal-variant">
                 <p class="eyebrow">Every case, including the two that are not a trend</p>

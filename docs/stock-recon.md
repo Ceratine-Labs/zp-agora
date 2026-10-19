@@ -794,6 +794,35 @@ cut at the month's edge. It opens on the last full Monday–Sunday week.
 4. **Commit one area, then widen.** The preview is idempotent, so it can be
    re-run safely.
 
+### After balancing: original vs amended variance (19 Oct 2026)
+
+*Control → Stock → Original vs amended variance* (branch: *Stock → Counting*),
+`app.stockrecon.variance` over `agora.usp_StockRecon_GridVariance`. ZRP asked
+for it for the managers: *"view variances based on original and amended
+quantities for an extended period (not locked to a specific number of days)…
+to easily see the difference in figures before and after balancing"*, showing
+PumpIT's Stock Recon Balancing screen as the concept.
+
+It is **not a run**. It reads PumpIT's count lines directly, so it shows any
+period — balanced by Agora, by hand in PumpIT, or not at all — and the
+arithmetic is that screen's own (`dbo.sp_SelectStockReconBalancing`): the
+original variance on the `_Original` columns, the amended one on the current
+columns with good waste set against a short (never making an over), and PumpIT's
+colours per side. The strip above the grid is its corner: value variance, short,
+over, quantity and POS quantity after balancing, each with the figure as counted
+under it, from the procedure's third result set over every matched line.
+*Moved by balancing* is the amended value less the original.
+
+**Proved against the customer's own screenshot**: Ngwenya, Bakery, 5–7 Oct 2026
+reads -13 / -R211.98 / -R940.73 / R728.75 as counted and -5 / -R76.60 / -R76.60 /
+R0.00 amended, line for line with PumpIT's procedure (108 lines). Three
+deliberate differences, in the procedure's header: quantities are read as
+stored (PumpIT rounds each to two places first), amended Issued is the stored
+column the variance is worked from, and the stock master is read once per line.
+
+The period is free; the procedure refuses above 250,000 count lines (one site is
+about 11,000 a month, every site about 175,000 — 1.9 s on live for September).
+
 ### Cautions
 
 * **Widen the window before trusting a flag.** A net over on a short window can

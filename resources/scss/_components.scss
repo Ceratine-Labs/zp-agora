@@ -208,6 +208,18 @@ a.kpi:hover { border-color: var(--brand); }
   &.neutral, &.tone-neutral { background: var(--surface-3);  color: var(--ink-2); }
 }
 
+/* <x-tone-value> — a figure washed in its tone, at the size and weight of the
+   figures around it: the legacy screens colour a variance CELL, and a chip in a
+   column of numbers reads as a label. The negative side margins give the wash
+   room without moving the digits off the column's right edge. */
+.tone-value {
+  display: inline-block; padding: 0 5px; margin: 0 -5px; border-radius: 3px;
+  &.tone-good    { background: var(--good-bg);    color: var(--good-ink); }
+  &.tone-warn    { background: var(--warn-bg);    color: var(--warn-ink); }
+  &.tone-serious { background: var(--serious-bg); color: var(--serious-ink); }
+  &.tone-crit    { background: var(--crit-bg);    color: var(--crit-ink); }
+}
+
 .emptystate, .empty-state {
   color: var(--muted); font-size: 13px; margin: 0;
   .big { font-family: var(--font-display); font-size: 20px; color: var(--ink-2); margin-bottom: 4px; }

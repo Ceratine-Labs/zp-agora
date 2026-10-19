@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\StockRecon\Http\Controllers\StockReconController;
+use Modules\StockRecon\Http\Controllers\StockReconVarianceController;
 
 // Registered under the /app prefix with the web middleware stack by
 // ModuleServiceProvider — do not repeat the prefix here.
@@ -67,4 +68,12 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
 
     Route::post('preview', [StockReconController::class, 'preview'])
         ->middleware('can:stockrecon.runs.create')->name('preview');
+
+    /*
+     | Original vs amended variance (ZRP, 19 Oct 2026): every count line's
+     | variance as counted beside its variance after balancing, over any
+     | period. Read-only, and not a run, so it has its own grant.
+     */
+    Route::get('variance', [StockReconVarianceController::class, 'index'])
+        ->middleware('can:stockrecon.variance.view')->name('variance');
 });
