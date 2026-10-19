@@ -96,3 +96,17 @@ controller, service, a versioned migration, a menu seeder, a view and a lang
 file. Routes land under `/app/cash` with the standard middleware; views resolve
 as `view('cash::index')`. Fill in the migration and the menu seeder — do not
 hand-write a nav link, and do not add a route to `routes/web.php`.
+
+<!-- pm-llm-usage:start -->
+## LLM task usage (all agents)
+
+Claude Code, Codex and other LLM runtimes must follow the shared
+[measured token reporting workflow](<../../LLM-TOKEN-USAGE.md>). Start a task window with the
+PM timer, report measured provider/model usage with stable event IDs, and sync
+before switching tasks or completing work. Missing telemetry is unknown; failed
+reporting stays **PM sync pending**. Use your own surface token and PM session.
+<!-- pm-llm-usage:end -->
+
+## Shared agent collaboration
+
+For occasional PM handoffs between any LLMs, read `/home/ryan/Development/LLM-COLLABORATION.md`. Use your own identity, preserve a concise context note, and keep decisions/approvals with Ryan. The briefing records availability and the API contract.
