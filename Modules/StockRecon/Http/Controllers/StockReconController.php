@@ -18,6 +18,7 @@ use Modules\Core\Models\Branch;
 use Modules\StockRecon\Http\Requests\BalancePreviewRequest;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
+use Modules\StockRecon\Services\ExceptionNavigation;
 use Modules\StockRecon\Services\ReconPeriods;
 use Modules\StockRecon\Services\StockReconService;
 
@@ -195,13 +196,17 @@ class StockReconController extends Controller
     public function exceptions(StockReconRun $run, Request $request): View
     {
         $request->query->set('run', (string) $run->Id);
+        $grid = $this->grids->build(
+            $this->registry->findOrFail('app.stockrecon.exceptions'),
+            $request,
+            $request->user()?->Id,
+        );
 
         return view('stockrecon::run', $this->frame($run, 'exceptions') + [
             'run' => $run,
-            'grid' => $this->grids->build(
-                $this->registry->findOrFail('app.stockrecon.exceptions'),
-                $request,
-                $request->user()?->Id,
+            'grid' => $grid,
+            'exceptionNavigation' => (new ExceptionNavigation)->build(
+                $grid, $this->service->exceptionTypes($run),
             ),
             'classes' => $this->service->exceptionClasses(),
         ]);

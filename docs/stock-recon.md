@@ -700,6 +700,19 @@ by how much, on whose authority, or what they were before.
 
 ## The exception classes
 
+**Type pills on a run (18 Oct 2026).** Above the exceptions grid, `<x-tabs chips>`
+lists only types present in that run, grouped into count exceptions and
+hand-balancing checks. The type picker starts collapsed and remembers the
+reader's open/closed choice. Its heading names the selected type and the
+number of available types; the selected type's guidance stays outside the fold.
+`usp_StockRecon_ExceptionTypes` counts the saved
+item/shift lines across the whole run, independently of grid filters; a line
+with both codes appears in both type counts but only once in All types.
+Choosing a pill replaces the two code filters, resets pagination and keeps
+search, other filters and sorting. All types clears only the code filters.
+The selected type explains what it means and what to do using the existing
+config wording. Links, pagination and exports share the grid's `f` parameters.
+
 **On screen the codes explain themselves (7 Oct 2026).** The people at the
 sites do not know the client's weekly pack, so the run screen carries one
 modal, *What the codes mean* (`partials/codes-modal`), opened from the "i" on

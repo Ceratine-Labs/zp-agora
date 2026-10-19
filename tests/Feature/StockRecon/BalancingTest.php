@@ -800,12 +800,68 @@ class BalancingTest extends TestCase
         $this->assertMatchesRegularExpression('/data-loader-overlay\s+hidden/', $hub);
     }
 
-    /**
-     * Ryan, 7 Oct 2026: the codes explained in a modal, in plain words for the
-     * people at the sites — not "the client's weekly pack" — opened from the
-     * "i" on the exceptions and from any code badge; the badges in their
-     * colours, the rows washed in theirs.
-     */
+    /** Run-wide counts, shared grid filters and a compact type picker. */
+    public function test_exception_type_pills_count_the_run_and_filter_the_grid(): void
+    {
+        $run = $this->preview();
+        $lines = $this->db()->table('agora.StockReconRunLine')->where('RunId', $run->Id);
+        $ids = (clone $lines)->orderBy('Id')->pluck('Id');
+        $lines->update(['ExceptionCode' => null, 'AuditCode' => null]);
+        (clone $lines)->where('Id', $ids[0])->update(['ExceptionCode' => 'U1', 'AuditCode' => 'S7']);
+        (clone $lines)->where('Id', $ids[1])->update(['ExceptionCode' => 'U1']);
+        (clone $lines)->where('Id', $ids[2])->update(['AuditCode' => 'S8']);
+        $this->actingAs($this->person('admin'));
+
+        $response = $this->get(route('app.stockrecon.exceptions', $run))->assertOk()
+            ->assertSee('Filter by exception type')->assertSee('All types · 3 types available')
+            ->assertSee('data-remember="card:stockrecon-exception-types"', false);
+        $nav = $response->viewData('exceptionNavigation');
+        $items = collect($nav['items'])->keyBy('key');
+        $this->assertSame('all', $nav['active']);
+        $this->assertCount(4, $items);
+        $this->assertSame('3', $items['all']['count'], 'A row carrying both codes is counted once in All types.');
+        $this->assertSame('2', $items['ExceptionCode:U1']['count']);
+        $this->assertSame('1', $items['AuditCode:S7']['count']);
+        $this->assertSame('1', $items['AuditCode:S8']['count']);
+
+        $filtered = $this->get($items['ExceptionCode:U1']['href'])->assertOk()
+            ->assertSee('What to do:')->assertSee(config('stockrecon.exceptions.U1.todo'));
+        $this->assertSame(2, $filtered->viewData('grid')->total);
+        $this->assertTrue($filtered->viewData('grid')->rows->every(fn ($row) => $row->ExceptionCode === 'U1'));
+        $this->assertSame('ExceptionCode:U1', $filtered->viewData('exceptionNavigation')['active']);
+        $this->assertSame($nav['items'], $filtered->viewData('exceptionNavigation')['items'], 'Run-wide counts and links stay stable.');
+
+        parse_str(parse_url($filtered->viewData('grid')->extractUrl('csv'), PHP_URL_QUERY), $export);
+        $this->assertSame(['U1'], $export['f']['ExceptionCode']['in']);
+        $audit = $this->get($items['AuditCode:S8']['href'])->assertOk();
+        $this->assertSame(1, $audit->viewData('grid')->total);
+        $this->assertSame('S8', $audit->viewData('grid')->rows->first()->AuditCode);
+
+        $scope = ['q' => 'not a matching item', 'page' => 9, 'sort' => 'ExceptionValue', 'dir' => 'desc',
+            'f' => ['ExceptionCode' => ['in' => ['U1']], 'AuditCode' => ['in' => ['S7']], 'AreaName' => ['q' => 'TEST']]];
+        $scoped = $this->get(route('app.stockrecon.exceptions', ['run' => $run->Id] + $scope))->assertOk();
+        $this->assertSame('custom', $scoped->viewData('exceptionNavigation')['active']);
+        foreach ($scoped->viewData('exceptionNavigation')['items'] as $item) {
+            parse_str(parse_url($item['href'], PHP_URL_QUERY), $query);
+            $this->assertArrayNotHasKey('page', $query);
+            $this->assertSame($scope['q'], $query['q']);
+            $this->assertSame('ExceptionValue', $query['sort']);
+            $this->assertSame('desc', $query['dir']);
+            $this->assertSame(['q' => 'TEST'], $query['f']['AreaName']);
+            $this->assertCount($item['key'] === 'all' ? 1 : 2, $query['f'], 'Changing type replaces both code filters only.');
+        }
+
+        $wrongBranch = clone $run;
+        $wrongBranch->BranchId = 998;
+        $this->assertCount(0, $this->service->exceptionTypes($wrongBranch));
+        $lines->update(['ExceptionCode' => null, 'AuditCode' => null]);
+        $empty = $this->get(route('app.stockrecon.exceptions', $run))->assertOk();
+        $this->assertSame('0', $empty->viewData('exceptionNavigation')['items'][0]['count']);
+        $this->assertCount(1, $empty->viewData('exceptionNavigation')['items']);
+        $this->assertSame(0, $empty->viewData('grid')->total);
+    }
+
+    /** Codes explain themselves in a modal, opened from the info button or a badge. */
     public function test_the_exceptions_explain_every_code_in_a_modal_opened_from_its_badge(): void
     {
         foreach (['exceptions', 'audit'] as $set) {

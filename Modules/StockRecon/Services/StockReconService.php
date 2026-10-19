@@ -59,6 +59,15 @@ class StockReconService
         return config('stockrecon.exceptions');
     }
 
+    /** @return Collection<int, object> */
+    public function exceptionTypes(StockReconRun $run): Collection
+    {
+        return $this->procedures->call('agora.usp_StockRecon_ExceptionTypes', [
+            'BranchId' => $run->BranchId,
+            'RunId' => $run->Id,
+        ]);
+    }
+
     /**
      * The client's audit of hand balancing already in PumpIT (S7, S8, S11,
      * S12, S13, S4 …), in the order a line is given one.
