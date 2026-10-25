@@ -184,6 +184,10 @@
         @endif
     @endcan
 
+    @if ($globalRefusal ?? null)
+        <x-notice tone="warn" title="Global comparison unavailable"><p>{{ $globalRefusal }}</p></x-notice>
+    @endif
+
     <form method="POST" action="{{ route('app.stockrecon.commit', $run) }}" id="commit-{{ $run->Id }}"
           data-loader="{{ $stampMode === 'live' ? 'Amending in PumpIT…' : 'Recording the amendments…' }}"
           {{-- Names the table so the confirmation can say out loud that a
@@ -384,6 +388,12 @@
                     </td>
                     <td class="cell-name">
                         <span class="tt-caret" aria-hidden="true"></span>{{ $first->itemLabel() }}
+                        @if (($globalChains[$chain->key]->GroupRawOffset ?? 0) > 0)
+                            <a class="muted" href="{{ route('app.stockrecon.global', $run) }}#group-{{ $globalChains[$chain->key]->PreProductionTypeNo }}">Group contains raw offsets · {{ $globalChains[$chain->key]->PreProductionTypeNo }} · unconverted</a>
+                        @endif
+                        @if (($globalChains[$chain->key]->CandidateCount ?? 0) > 0)
+                            <a class="muted" href="{{ route('app.stockrecon.global', $run) }}#candidates">Possible linked offset · review</a>
+                        @endif
                         <br><span class="muted mono" style="font-size:11px">{{ $first->StockItemNo }} · {{ $first->areaLabel() }} · {{ $chain->count() }} {{ Str::plural('shift', $chain->count()) }}</span>
                     </td>
                     <td class="num" data-sort="{{ (float) $first->ChainNetVar }}">

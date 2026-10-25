@@ -32,6 +32,8 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
      */
     Route::get('runs/{run}', [StockReconController::class, 'show'])
         ->middleware('can:stockrecon.runs.view')->name('run');
+    Route::get('runs/{run}/global', [StockReconController::class, 'globalOverview'])
+        ->middleware('can:stockrecon.runs.view')->name('global');
     Route::get('runs/{run}/exceptions', [StockReconController::class, 'exceptions'])
         ->middleware('can:stockrecon.exceptions.view')->name('exceptions');
 

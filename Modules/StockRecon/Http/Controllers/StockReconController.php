@@ -19,8 +19,10 @@ use Modules\StockRecon\Http\Requests\BalancePreviewRequest;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
 use Modules\StockRecon\Services\ExceptionNavigation;
+use Modules\StockRecon\Services\GlobalOverviewExport;
 use Modules\StockRecon\Services\ReconPeriods;
 use Modules\StockRecon\Services\StockReconService;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * The stock recon centre.
@@ -139,6 +141,29 @@ class StockReconController extends Controller
         return redirect()->route('app.stockrecon.run', $run);
     }
 
+    public function globalOverview(StockReconRun $run, Request $request): View|StreamedResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'basis' => ['sometimes', 'in:original,balanced'],
+            'export' => ['sometimes', 'in:chains,pairs,production'],
+        ]);
+        $basis = $validated['basis'] ?? 'balanced';
+        try {
+            $global = $this->service->globalOverview($run, $basis);
+        } catch (AgoraProcException $e) {
+            return redirect()->route('app.stockrecon.run', $run)->with('refusal', $e->getMessage());
+        }
+        if (isset($validated['export'])) {
+            return (new GlobalOverviewExport)->download($global[$validated['export']], $validated['export'], $run->Id, $basis);
+        }
+
+        return view('stockrecon::run', $this->frame($run, 'global') + [
+            'run' => $run,
+            'basis' => $basis,
+            'global' => $global,
+        ]);
+    }
+
     /**
      * A run as it was recorded, whether or not anything was ever committed.
      *
@@ -152,6 +177,13 @@ class StockReconController extends Controller
     public function show(StockReconRun $run, Request $request): View
     {
         $request->query->set('run', (string) $run->Id);
+        $globalChains = collect();
+        $globalRefusal = null;
+        try {
+            $globalChains = $this->service->globalOverview($run, 'balanced', false)['chains']->keyBy(fn ($chain) => $chain->AreaNo.'|'.$chain->StockItemNo);
+        } catch (AgoraProcException $e) {
+            $globalRefusal = $e->getMessage();
+        }
 
         return view('stockrecon::run', $this->frame($run, 'proposals') + [
             /*
@@ -165,6 +197,8 @@ class StockReconController extends Controller
              * the hub says so beside the area picker.
              */
             'run' => $run->load('lines'),
+            'globalChains' => $globalChains,
+            'globalRefusal' => $globalRefusal,
             /*
              * Chains that carry nothing are hidden by DEFAULT, and counted out
              * loud rather than dropped.
@@ -466,6 +500,7 @@ class StockReconController extends Controller
 
         $tabs = collect([
             'proposals' => ['label' => 'Proposals', 'route' => 'app.stockrecon.run', 'can' => 'stockrecon.runs.view'],
+            'global' => ['label' => 'Global comparison', 'route' => 'app.stockrecon.global', 'can' => 'stockrecon.runs.view'],
             'exceptions' => ['label' => 'Exceptions', 'route' => 'app.stockrecon.exceptions', 'can' => 'stockrecon.exceptions.view'],
         ])
             ->filter(fn (array $item) => (bool) $user?->can($item['can']))

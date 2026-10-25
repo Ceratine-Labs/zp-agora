@@ -38,6 +38,25 @@ class StockReconService
 {
     public function __construct(protected ProcedureService $procedures) {}
 
+    /** @return array{groups: Collection<int, object>, chains: Collection<int, object>, pairs: Collection<int, object>, summary: object, production: Collection<int, object>} */
+    public function globalOverview(StockReconRun $run, string $basis = 'balanced', bool $includeProduction = true): array
+    {
+        $sets = $this->procedures->callSets('agora.usp_StockRecon_PreviewGlobal', [
+            'BranchId' => $run->BranchId,
+            'RunId' => $run->Id,
+            'Basis' => $basis,
+            'IncludeProduction' => (int) $includeProduction,
+        ]);
+
+        return [
+            'groups' => $sets[0] ?? collect(),
+            'chains' => $sets[1] ?? collect(),
+            'pairs' => $sets[2] ?? collect(),
+            'summary' => ($sets[3] ?? collect())->first() ?? (object) ['ArithmeticPairs' => 0, 'RejectedPairs' => 0, 'LinkedPairs' => 0],
+            'production' => $sets[4] ?? collect(),
+        ];
+    }
+
     /** @return array<string, array<string, mixed>> */
     public function options(): array
     {

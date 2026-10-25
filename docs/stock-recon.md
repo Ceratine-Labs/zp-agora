@@ -863,3 +863,66 @@ about 11,000 a month, every site about 175,000 — 1.9 s on live for September).
   would be dormant as a fact rather than as an inference from three quantities
   being equal, but on this data there is no such shift — coverage is total —
   so there is nothing to test the idea against yet.
+
+## Global comparison of saved chains (25 Oct 2026)
+
+Each run has a **Global comparison** tab. `usp_StockRecon_PreviewGlobal` reads
+that run's exact site, date window and areas; it never previews another window
+or writes a count, issue, amendment or reconciliation state. Its defaults are
+the saved **after proposed balancing** quantities, including proposed missing
+issues and duplicate removals. **As counted** is available separately. Neither
+basis is a claim that the proposal was committed.
+
+The screen expands a production group to its chains, then opens the existing
+shift detail. Quantities are summed once per chain from saved run lines. Product
+groups, ratios and units are current `vw_StockItem` reference data, resolved to
+one master row with area and saved POS preference, never a multiplying join.
+
+Ryan approved **raw, unconverted comparisons** while ZP prepares its ratios and
+issue-multiple spreadsheets. The warning is on the page and CSV exports. The
+raw group gross is the sum of absolute chain residuals; net is their signed
+sum; gross reduction is gross minus absolute net, counting both sides of an
+offset. These are not production yields, confirmed loss reductions or staff
+charges. Mixed/unknown units and ungrouped items have no displayed combined
+quantity. A chain with a raw group offset links to that group with an
+**unconverted** label.
+
+Candidate pairs require an over and a short cancelling within 0.01 raw units,
+with nonblank matching units AND one of: the same nonzero production group,
+the same nonblank POS code within one POS system, or the same area and shared
+first description word (at least three characters, including a letter).
+They are ranked in that order. The name match is explicitly a weak clue.
+Arithmetic-only and incompatible-unit matches are counted as rejected on the
+page. A chain may have several candidates: their quantities cannot be added as
+independent corrections, and no candidate changes or releases a chain.
+
+`vw_StockReconProduction` exposes the existing
+`DBF_P3TRANS_STKRECON_PREPRODUCTION` source read-only. The report shows records
+for the same branch, item, POS system and period, ending at the run's complete
+cutoff. Base code, tracking reference, shift and quantity remain visible.
+Production is context, **not subtracted from variance again**. Establishing
+whether it explains a group's variance still awaits ZP's ratio definitions and
+production mapping; merely showing a matching quantity does not settle that.
+
+The comparison refuses above 5,000 chains, 100,000 arithmetic pairs or
+100,000 matching production records. CSV
+exports have a 100,000-row ceiling and retain the selected basis and quantity
+warning. The normal proposals page skips production retrieval and remains
+usable if the global comparison refuses its size.
+
+### Issue multiples: existing behaviour and pending reference data
+
+The audit verified that `StockIssueMultiple` (the imported head-office
+workbook) takes precedence over the product master's `IssueMultiple`. A master
+edit therefore does not replace an existing workbook override. The next
+spreadsheet import must reconcile that override deliberately and preserve its
+source; no new values have been guessed or imported in this audit.
+
+Pack-sized overs are reported as S1 and can balance. An unblocked remaining
+over generates a missing-issue proposal under the already-authorized live
+missing-issue mode, even when it is not a whole pack. Clear duplicates require
+an identical nearby issue plus independent count evidence and the existing
+ambiguity/food checks; possible duplicates remain held. A pack-sized short
+alone is not proof of a duplicate. Writes still require the existing commit
+confirmation and retain exact priors for reversal. The global comparison does
+not expand that write contract.

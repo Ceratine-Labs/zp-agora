@@ -166,3 +166,15 @@ CREATE TABLE dbo.BRN_MonthlyDOEFuelPricingMatrix (
     Margin                           DECIMAL(18, 6)   NULL,
     FleetMargin                      DECIMAL(18, 6)   NULL
 );
+
+-- Recorded production read by the Stock Recon global comparison.
+IF OBJECT_ID('dbo.DBF_P3TRANS_STKRECON_PREPRODUCTION', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.DBF_P3TRANS_STKRECON_PREPRODUCTION (
+        SSBranchId int NOT NULL, [DATE] datetime, ShiftNo int,
+        StockItemno nvarchar(10), LOCATION varchar(40), basecode nvarchar(50),
+        TransactionTrackingNumber decimal(18,0), TotalQuantity decimal(18,4),
+        LandedCostPrice money
+    );
+END;
+GO
