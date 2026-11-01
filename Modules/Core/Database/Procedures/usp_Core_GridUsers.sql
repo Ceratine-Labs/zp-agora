@@ -2,7 +2,7 @@
  * agora.usp_Core_GridUsers — the people who can sign in, and what they may do.
  *
  * Read by:  Setup -> People and assets -> Users and access (T028)
- * Reads:    agora.User, agora.UserPermission, agora.UserBranch
+ * Reads:    agora.User, direct grants, managed roles and branch grants
  * Writes:   nothing.
  *
  * The grid procedure template (feature-rules §2), nine parameters. @FiltersJson
@@ -37,9 +37,8 @@
  * BranchCount below is that count, not this parameter. Conflating the two is
  * how a head-office administrator would vanish from their own screen.
  *
- * PermissionCount replaced the two role columns when roles were retired, and
- * the primary is named separately: the landing route comes from the primary and
- * a reader needs to see which one that is without opening the row.
+ * PermissionCount counts distinct direct and managed-role grants. RoleNames
+ * lists customer-defined roles only; historical assignments stay inert.
  */
 CREATE OR ALTER PROCEDURE agora.usp_Core_GridUsers
     @BranchIds   NVARCHAR(MAX) = NULL,
@@ -107,12 +106,17 @@ BEGIN
             u.IsLocked,
             u.MustChangePassword,
             u.LastSignInAt,
-            /* Roles were retired on 22 Sep 2026, so "primary role" and "all
-               roles" no longer exist to report. What replaces them is the
-               question those columns were really being read for — how much
-               can this person do — answered by counting what is granted to
-               them by name, which is now the whole of it. */
-            (SELECT COUNT(*) FROM agora.UserPermission up WHERE up.UserId = u.Id) AS PermissionCount,
+            (SELECT COUNT(DISTINCT grants.PermissionId) FROM (
+                SELECT up.PermissionId FROM agora.UserPermission up WHERE up.UserId = u.Id
+                UNION
+                SELECT rp.PermissionId FROM agora.UserRole ur
+                JOIN agora.Role r ON r.Id = ur.RoleId AND r.IsManaged = 1
+                JOIN agora.RolePermission rp ON rp.RoleId = r.Id
+                WHERE ur.UserId = u.Id
+            ) grants) AS PermissionCount,
+            (SELECT STRING_AGG(CONVERT(nvarchar(max), r.Name), ', ') WITHIN GROUP (ORDER BY r.Name)
+             FROM agora.UserRole ur JOIN agora.Role r ON r.Id = ur.RoleId AND r.IsManaged = 1
+             WHERE ur.UserId = u.Id) AS RoleNames,
             (SELECT COUNT(*) FROM agora.UserBranch ub WHERE ub.UserId = u.Id) AS BranchCount
         FROM agora.[User] u
         /* Soft-deleted people are gone from the screens, not from the estate:
@@ -153,6 +157,7 @@ BEGIN
         f.EmailAddress,
         f.UserType,
         f.PermissionCount,
+        f.RoleNames,
         f.BranchCount,
         f.LastSignInAt,
         CASE WHEN f.IsLocked = 1 THEN 'Locked'

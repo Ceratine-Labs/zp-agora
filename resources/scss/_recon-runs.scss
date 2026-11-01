@@ -1,0 +1,44 @@
+// Reconciliation overview only: five compact entry cards and run metadata.
+.area-grid.recon-area-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  .area-card {
+    display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: start;
+    gap: 9px; padding: 10px;
+    .feature-art { width: 46px; height: 46px; }
+    h3 { font-size: 16px; line-height: 1.2; margin-bottom: 4px; }
+    p { font-size: 12px; line-height: 1.35; }
+    &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  }
+}
+.recon-run-type {
+  display: inline-flex; gap: 7px; align-items: center; min-width: 155px;
+  .feature-art { flex: 0 0 34px; width: 34px; height: 34px; }
+}
+.recon-run-validity {
+  display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start;
+  small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+}
+.recon-run-help {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px 0;
+  color: var(--ink-2); font-size: 12px;
+  form { margin-left: auto; }
+  .btn-ghost { white-space: normal; text-align: left; }
+}
+.recon-archive-notice { margin-bottom: 14px; }
+@media (max-width: 1150px) {
+  .area-grid.recon-area-grid { grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); }
+}
+@media (max-width: 480px) {
+  .area-grid.recon-area-grid {
+    grid-template-columns: 1fr;
+    .area-card { padding: 8px 10px; }
+  }
+  .recon-run-help form { margin-left: 0; width: 100%; }
+}
+
+.recon-run-list > .card-h {
+  flex-wrap: wrap;
+  > .right { flex-wrap: wrap; max-width: 100%; min-width: 0; }
+  .tabset { max-width: 100%; min-width: 0; }
+}

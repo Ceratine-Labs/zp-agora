@@ -32,6 +32,8 @@
     {{ \App\Support\Format::rk($value) }}
 @elseif ($column->format === 'lk')
     {{ \App\Support\Format::lk($value) }}
+@elseif ($column->compactQuantity && in_array($column->format, ['qty', 'number'], true))
+    {{ \App\Support\Format::qty($value) }}
 @elseif ($column->format === 'qty')
     {{-- A stock quantity: always three places, whole or not, so 1.000 and
          1.250 line up and never read as 1 beside 1.250 (Ryan, 13 Oct 2026). --}}

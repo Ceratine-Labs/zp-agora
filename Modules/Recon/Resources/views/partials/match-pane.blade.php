@@ -20,6 +20,20 @@
         </x-empty-state>
     </x-card>
 @else
+    @if ($centre ?? null)
+        <nav aria-label="Reconciliation state" style="margin-bottom:16px">
+            @foreach (['outstanding' => 'Still outstanding', 'reconciled' => 'Already reconciled', 'all' => 'Everything'] as $key => $label)
+                <a class="{{ $state === $key ? 'btn-primary' : 'btn-ghost' }}"
+                   @if ($state === $key) aria-current="page" @endif
+                   href="{{ route('app.recon.area', [$area['key'], 'branch_id' => $branchId, 'from' => $from, 'to' => $to, 'tab' => 'match', 'state' => $key]) }}">{{ $label }}</a>
+            @endforeach
+        </nav>
+    @endif
+    @if ($bank->count() >= ($summary->MaxRows ?? 500) || $mops->count() >= ($summary->MaxRows ?? 500))
+        <x-notice tone="warn" title="Narrow the period">
+            <p>Showing up to {{ $summary->MaxRows ?? 500 }} rows per side. More may exist; choose a shorter period to see the remaining entries.</p>
+        </x-notice>
+    @endif
     @if (($summary->HasCriteria ?? 1) == 0)
         {{-- On the live system twenty-four of twenty-six branches have no
              usable rule (finding 1). A preview must refuse in that case; this
@@ -84,7 +98,7 @@
                      lists. --}}
                 <div class="field" data-match-reason hidden>
                     <div class="field-label">
-                        <label for="match-reason">Why are these being matched despite the difference?</label>
+                        <label for="match-reason">Reason for this match or bag adjustment</label>
                         <x-info label="About the reason">
                             <p>Required whenever the two sides do not agree. It is the only record of the
                                decision, and the variance travels with the batch wherever it is shown.</p>

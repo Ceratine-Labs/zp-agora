@@ -17,6 +17,7 @@ use Modules\Cash\Grids\PumpShortageGrid;
 use Modules\Cash\Grids\StaffShortGrid;
 use Modules\Cash\Grids\ZreadGrid;
 use Modules\Cash\Grids\ZreadNoCashupGrid;
+use Modules\Core\Grids\RoleGrid;
 use Modules\Core\Grids\UserGrid;
 use Modules\Debtors\Grids\DebtorAccountGrid;
 use Modules\Product\Grids\CriticalLineGrid;
@@ -27,10 +28,13 @@ use Modules\Recon\Grids\ReconMopsSideGrid;
 use Modules\Recon\Grids\ReconOutstandingGrid;
 use Modules\Recon\Grids\ReconRunGrid;
 use Modules\Recon\Grids\ReconRunLineGrid;
+use Modules\StockRecon\Grids\CountingAreaGrid;
 use Modules\StockRecon\Grids\StockReconExceptionGrid;
 use Modules\StockRecon\Grids\StockReconRunGrid;
 use Modules\StockRecon\Grids\StockReconRunLineGrid;
 use Modules\StockRecon\Grids\StockReconVarianceGrid;
+use Modules\StockRecon\Grids\WaterMeterGrid;
+use Modules\StockRecon\Grids\WeeklyCaseGrid;
 use Modules\Utilities\Grids\UtilityReadingGrid;
 
 /*
@@ -97,6 +101,7 @@ return [
     */
     'grids' => [
         'app.setup.users' => UserGrid::class,
+        'app.setup.roles' => RoleGrid::class,
 
         // The per-branch stock master: the customer's row unless Agora holds
         // a live override for it, with cost, GP, stock on hand and last
@@ -156,6 +161,9 @@ return [
         // After balancing: every count line's variance as counted beside its
         // variance as amended, over any period (ZRP, 19 Oct 2026).
         'app.stockrecon.variance' => StockReconVarianceGrid::class,
+        'app.stockrecon.water' => WaterMeterGrid::class,
+        'app.stockrecon.countingareas' => CountingAreaGrid::class,
+        'app.stockrecon.weekly' => WeeklyCaseGrid::class,
 
         // Z-reads for a site and period with the proposer's call on each —
         // who, which till, which shift — and the clerk's decision beside it.

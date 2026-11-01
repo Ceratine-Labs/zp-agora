@@ -41,10 +41,12 @@ class ReconRunGrid extends GridDefinition
 
     public function blurb(): ?string
     {
-        return (self::wantsOpenOnly()
+        return (self::wantsInvalidOnly()
+                ? 'Invalid previews only. Archive selected runs on this page, or all invalid runs in the filtered view. '
+                : (self::wantsOpenOnly()
                 ? 'Open work only: previews not yet reconciled or marked complete. Committed, reversed, '
                     .'closed and failed runs are under Everything. '
-                : 'Every run, newest first, whatever happened to it. ')
+                : 'Every run, newest first, whatever happened to it. '))
             .'Yours unless you ask for everyone\'s. '
             .'The dates are the PERIOD a run covered, not when it was run — a run of 25 July to '
             .'5 August answers a search for either month.';
@@ -56,7 +58,10 @@ class ReconRunGrid extends GridDefinition
             // link: the run's name IS the run, so it opens it. Unnamed runs
             // come back from the procedure described by their period rather
             // than as a dash, because a column of dashes cannot be navigated.
+            new GridColumn(key: 'Id', label: 'Run #', sort: 'Id', format: 'number', link: true),
             new GridColumn(key: 'Note', label: 'Run', sort: 'Note', wide: true, link: true),
+            new GridColumn(key: 'ReconArea', label: 'Type', link: true),
+            new GridColumn(key: 'Validity', label: 'Validity'),
             new GridColumn(key: 'Status', label: 'Status', sort: 'Status', format: 'chip'),
             new GridColumn(key: 'BranchName', label: 'Site', sort: 'BranchName'),
             new GridColumn(key: 'FromDate', label: 'From', format: 'date', sort: 'FromDate'),
@@ -86,6 +91,7 @@ class ReconRunGrid extends GridDefinition
     public function filters(): array
     {
         return [
+            'Id' => new GridFilter(column: 'Id', type: 'number'),
             'Note' => new GridFilter(column: 'Note', type: 'text'),
             'BranchName' => new GridFilter(column: 'BranchName', type: 'text'),
             'Status' => new GridFilter(column: 'Status', type: 'set',
@@ -103,6 +109,7 @@ class ReconRunGrid extends GridDefinition
                 'ReconArea' => $this->area(),
                 'MineOnly' => (int) self::wantsOwnRunsOnly(),
                 'OpenOnly' => (int) self::wantsOpenOnly(),
+                'InvalidOnly' => (int) self::wantsInvalidOnly(),
                 'UserId' => request()->user()?->Id,
                 // The sites this person may see AT ALL, which is not the same
                 // question as the sites they have selected. @BranchIds is
@@ -111,6 +118,26 @@ class ReconRunGrid extends GridDefinition
                 'AllowedBranchIds' => self::allowedBranchIds(),
             ],
         );
+    }
+
+    public function cellsPartial(): string
+    {
+        return 'recon::grid.run-cells';
+    }
+
+    public function selectable(): bool
+    {
+        return self::wantsInvalidOnly() && (request()->user()?->can('recon.runs.close') ?? false);
+    }
+
+    public function rowKey(object $row): string|int|null
+    {
+        return $row->Id;
+    }
+
+    public static function wantsInvalidOnly(): bool
+    {
+        return request()->query('validity') === 'invalid';
     }
 
     public function defaultSort(): ?string
@@ -209,7 +236,7 @@ class ReconRunGrid extends GridDefinition
      */
     public static function wantsOpenOnly(): bool
     {
-        return request()->query('show', 'open') !== 'all';
+        return ! self::wantsInvalidOnly() && request()->query('show', 'open') !== 'all';
     }
 
     /**

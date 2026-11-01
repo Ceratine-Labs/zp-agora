@@ -5,6 +5,7 @@ namespace Modules\Core\Models;
 use App\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Routing\Exceptions\UrlGenerationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +56,12 @@ class MenuItem extends BaseModel
     /** @var Collection<int, self>|null */
     public ?Collection $childItems = null;
 
+    /** This item's own permitted, implemented destination, set for the app menu. */
+    public ?string $availableHref = null;
+
+    /** This item or one of its descendants has an available destination. */
+    public bool $hasAvailableItems = false;
+
     /** @return BelongsTo<MenuSection, $this> */
     public function section(): BelongsTo
     {
@@ -75,7 +82,13 @@ class MenuItem extends BaseModel
     public function href(): ?string
     {
         if ($this->RouteName && Route::has($this->RouteName)) {
-            return route($this->RouteName);
+            try {
+                return route($this->RouteName);
+            } catch (UrlGenerationException) {
+                // keepMap() checks linked ancestors before availability is
+                // annotated. A record route missing its parameters is inert.
+                return null;
+            }
         }
 
         return $this->Url;

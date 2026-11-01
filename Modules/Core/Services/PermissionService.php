@@ -9,13 +9,8 @@ use Modules\Core\Models\User;
 /**
  * What a person may do.
  *
- * ROLES WERE RETIRED ON 22 SEPTEMBER 2026 (Ryan). Everything a role carried
- * was copied onto the people who held it by RetireRolesSeeder, and from that
- * release this reads agora.UserPermission and nothing else. agora.Role,
- * UserRole and RolePermission still exist in the database, unread — v1__01g
- * says why they were not dropped. The consequence to know about: there is no
- * longer a way to say "everybody who does X may now do Y". A new permission
- * is ticked per person.
+ * Direct permissions and customer-managed role permissions are additive.
+ * Historical roles remain inert.
  *
  * THE WILDCARD IS EXPANDED AT THE GRANT, NOT AT THE CHECK. A person is granted
  * `cash.*.view` once; the service turns their grants into a set of patterns
@@ -41,18 +36,13 @@ use Modules\Core\Models\User;
  */
 class PermissionService
 {
-    private const CACHE_PREFIX = 'agora.permissions.user.';
+    private const CACHE_PREFIX = 'agora.permissions.rbac.user.';
 
     /** @var array<int, array<int, string>> */
     private array $memo = [];
 
     /**
      * Every pattern this user holds.
-     *
-     * One source now — agora.UserPermission — so "what may this person do" is
-     * answered by reading one list against their name, which is the whole
-     * point of retiring roles. Still cached forever and cleared on a grant
-     * change rather than on a TTL.
      *
      * @return array<int, string>
      */
@@ -67,7 +57,7 @@ class PermissionService
         /** @var array<int, string> $patterns */
         $patterns = Cache::rememberForever(
             self::CACHE_PREFIX.$id,
-            fn (): array => array_values(array_unique($this->directPatternsFor($user)))
+            fn (): array => array_values(array_unique(array_merge($this->directPatternsFor($user), app(RoleAccessService::class)->patternsFor($user))))
         );
 
         return $this->memo[$id] = $patterns;
@@ -187,7 +177,7 @@ class PermissionService
 
         $schema = config('agora.schema');
         $ids = DB::connection(config('agora.connections.app'))
-            ->select("SELECT DISTINCT [UserId] FROM [{$schema}].[UserPermission]");
+            ->select("SELECT [Id] AS [UserId] FROM [{$schema}].[User]");
 
         foreach ($ids as $row) {
             Cache::forget(self::CACHE_PREFIX.(int) $row->UserId);

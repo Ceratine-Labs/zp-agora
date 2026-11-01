@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\StockRecon;
 
+use App\Grid\Export\GridExtract;
 use App\Grid\GridResult;
 use App\Grid\GridService;
+use App\Support\ProcedureService;
 use Illuminate\Database\Connection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -129,6 +131,52 @@ class VarianceTest extends TestCase
         $this->assertTrue($grid->rows->every(fn ($r) => $r->Balancing === 'Amended'));
     }
 
+    public function test_scope_filters_match_rows_totals_and_exports(): void
+    {
+        // Leave one real over, and put the second item in a similarly named
+        // historical area. Exact area selection must not match both.
+        $this->db()->table('PumpIT.dbo.STK_StockWasteLine')
+            ->where('SSBranchId', self::BRANCH)->where('ShiftNo', 3)->delete();
+        $this->db()->table('PumpIT.dbo.STK_Area')->insert([
+            'SSBranchId' => self::BRANCH, 'AreaNo' => 2,
+            'AreaDescription' => 'TEST-Bakery annex', 'AreaGroup' => 'Food Items',
+            'DayShift' => 0, 'AfternoonShift' => 0, 'NightShift' => 0,
+            'ShowReport' => 1, 'IsCaptureWaste' => 1,
+        ]);
+        foreach (['STK_StockReconLine', 'STK_StockWasteLine', 'STK_StockMaster'] as $table) {
+            $this->db()->table("PumpIT.dbo.{$table}")
+                ->where('SSBranchId', self::BRANCH)->where('StockItemNo', 'TVAR2')
+                ->update(['AreaNo' => 2]);
+        }
+
+        foreach (['all' => [4, 0], 'lt' => [1, -4], 'gt' => [1, 4], 'eq' => [2, 0]] as $op => [$count, $value]) {
+            $grid = $this->grid(['f' => ['RemainingVariance' => ['op' => $op, 'q' => '0']]]);
+            $this->assertSame($count, $grid->total, $op);
+            $this->assertEquals($count, $grid->totals['Lines'], $op);
+            $this->assertEqualsWithDelta($value, $grid->totals['ValueVar'], 0.001, $op);
+            $extract = GridExtract::run($grid->definition, $grid->gridQuery);
+            $this->assertSame($count, $extract->total, $op);
+            $this->assertEquals($grid->rows->all(), $extract->rows->all(), $op);
+        }
+
+        $area = $this->grid(['f' => ['Area' => ['q' => 'TEST-Bakery', 'eq' => '1']]]);
+        $this->assertSame(2, $area->total);
+        $this->assertTrue($area->rows->every(fn ($r) => $r->AreaDescription === 'TEST-Bakery'));
+        $combined = $this->grid(['f' => [
+            'Area' => ['q' => 'TEST-Bakery', 'eq' => '1'],
+            'RemainingVariance' => ['op' => 'lt', 'q' => '0'],
+        ]]);
+        $this->assertSame(0, $combined->total);
+
+        $lookup = app(ProcedureService::class);
+        $areas = $lookup->call('agora.usp_StockRecon_VarianceAreas', ['BranchIds' => (string) self::BRANCH]);
+        $this->assertSame(['TEST-Bakery', 'TEST-Bakery annex'], $areas->pluck('AreaDescription')->all());
+        $denied = $lookup->call('agora.usp_StockRecon_VarianceAreas', [
+            'BranchIds' => (string) self::BRANCH, 'AllowedBranchIds' => '999',
+        ]);
+        $this->assertCount(0, $denied);
+    }
+
     public function test_the_period_is_bounded_by_lines_not_days(): void
     {
         $wide = $this->grid(['from' => '2023-01-01', 'to' => '2030-12-31']);
@@ -147,8 +195,12 @@ class VarianceTest extends TestCase
 
         $page->assertSeeInOrder(['Value variance', 'Value short', 'Value over', 'Quantity variance', 'POS quantity', 'Lines']);
         $page->assertSee('As counted -R28.00', false);
-        $page->assertSeeInOrder(['>Balancing<', '>Moved by balancing<', '>Original open<', '>Original variance<',
-            '>Original value<', '>Amended open<', '>Amended variance<', '>Amended value<'], false);
+        $page->assertSeeInOrder(['>Balancing<', '>Moved by balancing<', '>Original variance<',
+            '>Original value<', '>Amended variance<', '>Amended value<'], false);
+        $page->assertSee('data-chooser-item="QtyOpenOriginal"', false);
+        $page->assertDontSee('data-column="QtyOpenOriginal"', false);
+        $page->assertSee('Show all')->assertSee('Shorts only')->assertSee('Overs only')->assertSee('Balanced only');
+        $page->assertSee('name="f[Area][q]"', false);
         $page->assertSee('usp_StockRecon_GridVariance');
         $page->assertSee('tone-value tone-crit', false);
     }

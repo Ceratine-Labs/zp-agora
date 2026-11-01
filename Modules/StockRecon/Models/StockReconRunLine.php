@@ -60,6 +60,9 @@ use Illuminate\Support\Carbon;
  * @property string $ChainBreak
  * @property string|null $QtyOpenNow
  * @property string|null $QtyCloseNow
+ * @property string|null $QtyOpenOrig
+ * @property string|null $QtyCloseOrig
+ * @property string|null $CountDriftReason
  * @property string|null $QtyIssuedOrig
  * @property string|null $IssueMultiple
  * @property bool $FlagPackOver

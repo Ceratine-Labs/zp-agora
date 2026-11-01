@@ -58,7 +58,10 @@ BEGIN
         THROW 51000, @noBranch, 1;
     END
 
-    DECLARE @now DATETIME2(0) = SYSDATETIME();
+    /* Agora audit stamps share the application's UTC clock. The SQL Server
+       clock is SAST, so using it here puts imported CreatedAt / UpdatedAt two
+       hours ahead of the same fields written by UserAccessService. */
+    DECLARE @now DATETIME2(0) = SYSUTCDATETIME();
 
     DECLARE @candidate TABLE (
         LegacyUserId   INT           NOT NULL PRIMARY KEY,

@@ -9,6 +9,8 @@
  * ** and, on a cash-bag match with a short due, through
  * ** agora.usp_Cash_RaiseStaffShort (whose header lists it): one
  * ** BRN_StaffShorts row per short and SS_UniqueNumber section 2;
+ * ** CashBags: confirmed bag changes also write CashBagAmount, AdjustedBy
+ * ** and Adjusted in live cash_bag_adjust_mode (Ryan, 25 Oct 2026).
  * ** and, on a FORCED FNB match with @AdjustMode 'live', on each ticked
  * **   PumpIT.dbo.BRN_DailyBankingFNB row: Amount, AdjustedBy, Adjusted
  * ** (see THE FNB ADJUSTMENT below).
@@ -148,7 +150,9 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_ManualMatch]
     @UserId      int           = NULL,
     @Basis       nvarchar(200) = NULL,
     @AllocationJson nvarchar(max) = NULL,
-    @AdjustMode  varchar(10)   = 'off'
+    @AdjustMode  varchar(10)   = 'off',
+    @CashBagAdjustMode varchar(10) = 'off',
+    @BagAdjustmentsJson nvarchar(max) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -275,12 +279,14 @@ BEGIN
           AND d.TransactionDate >= @FromDate AND d.TransactionDate <= @ToDate;
 
     ELSE IF @ReconArea = 'CashBags'
-        INSERT INTO @Avail (SourceId, SourceKey, SourceDate, Amount, Rn, CashierCode, CashierName, DropSafeAmount)
+        INSERT INTO @Avail (SourceId, SourceKey, SourceDate, Amount, Rn, CashierCode, CashierName, DropSafeAmount, Adjusted, AdjustedBy)
         SELECT d.DailyBankingCashBagID, LTRIM(RTRIM(d.CashBagNo)), CONVERT(date, d.TransactionDate), d.CashBagAmount, 1,
                /* NULLIF, as GetSides does: a blank code is "no cashier
                   recorded", the same line as a bag with no drop-safe row. */
-               NULLIF(d.CashierCode, ''), d.CashierName, d.DropSafeAmount
+               NULLIF(d.CashierCode, ''), d.CashierName, d.DropSafeAmount, p.Adjusted, p.AdjustedBy
         FROM agora.vw_DailyBankingCashBags d
+        JOIN [PumpIT].dbo.BRN_DailyBankingCashBags p
+          ON p.SSBranchId = d.BranchId AND p.DailyBankingCashBagID = d.DailyBankingCashBagID
         WHERE d.BranchId = @BranchId AND d.ReconBatchNoPumpIT = 0
           AND d.TransactionDate >= @FromDate AND d.TransactionDate <= @ToDate;
 
@@ -543,6 +549,38 @@ BEGIN
                                          ELSE 'Matched by hand' END;
     DECLARE @RunId bigint, @LineId bigint, @BatchId bigint, @No int;
 
+    /* Ryan, 25 Oct 2026: confirmed bag-level changes write back to PumpIT.
+       The cashier split and the chosen bag split must BOTH account for every
+       cent. Amount is echoed to reject stale forms; no implicit target bag. */
+    DECLARE @CashAdjust bit = CASE WHEN @ReconArea = 'CashBags'
+        AND @StampMode = 'live' AND @CashBagAdjustMode = 'live' THEN 1 ELSE 0 END;
+    IF @CashAdjust = 1
+    BEGIN
+        IF @BagAdjustmentsJson IS NULL OR ISJSON(@BagAdjustmentsJson) <> 1
+           OR LEFT(LTRIM(@BagAdjustmentsJson), 1) <> '['
+            THROW 51000, 'AGORA:BAG_ADJUSTMENT_INVALID:Confirm the amount change for every selected cash bag.', 1;
+        DECLARE @BagChanges TABLE (Id bigint, Amount decimal(19,4), Share decimal(19,4));
+        INSERT INTO @BagChanges
+        SELECT TRY_CONVERT(bigint, JSON_VALUE(value, '$.id')),
+               TRY_CONVERT(decimal(19,4), JSON_VALUE(value, '$.amount')),
+               TRY_CONVERT(decimal(19,4), JSON_VALUE(value, '$.share'))
+        FROM OPENJSON(@BagAdjustmentsJson);
+        IF EXISTS (SELECT 1 FROM @BagChanges WHERE Id IS NULL OR Amount IS NULL OR Share IS NULL
+                   OR Share <> ROUND(Share, 2) OR Amount <> ROUND(Amount, 2))
+           OR EXISTS (SELECT Id FROM @BagChanges GROUP BY Id HAVING COUNT(*) <> 1)
+           OR (SELECT COUNT(*) FROM @BagChanges) <> (SELECT COUNT(*) FROM @Mops)
+           OR EXISTS (SELECT 1 FROM @BagChanges c WHERE NOT EXISTS
+                      (SELECT 1 FROM @Mops m WHERE m.SourceId = c.Id AND m.Amount = c.Amount))
+           OR EXISTS (SELECT 1 FROM @BagChanges WHERE Amount + Share < 0)
+            THROW 51000, 'AGORA:BAG_ADJUSTMENT_INVALID:The bag choices or amounts changed, or a resulting bag amount is negative. Reload and confirm again.', 1;
+        UPDATE m SET Adjustment = c.Share FROM @Mops m JOIN @BagChanges c ON c.Id = m.SourceId;
+        IF EXISTS (SELECT 1 FROM @Mops WHERE Adjustment <> 0) AND NULLIF(LTRIM(RTRIM(@Reason)), '') IS NULL
+            THROW 51000, 'AGORA:FORCE_REASON_REQUIRED:Changing cash bag amounts requires a reason, even when their net change is zero.', 1;
+        IF EXISTS (SELECT 1 FROM @Allocation a WHERE a.Share <>
+                   (SELECT SUM(m.Adjustment) FROM @Mops m WHERE ISNULL(m.CashierCode, '') = ISNULL(a.CashierCode, '')))
+            THROW 51000, 'AGORA:BAG_ADJUSTMENT_INVALID:The chosen bag changes must equal each cashier''s confirmed share.', 1;
+    END
+
     BEGIN TRANSACTION;
 
     INSERT INTO agora.ReconRun
@@ -640,10 +678,10 @@ BEGIN
                    m.BatchNoRaw AS batch, CONVERT(nvarchar(23), m.TxnAt, 126) AS txn
             FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
            m.SourceDate, m.Amount, NULL, 0,
-           CASE WHEN @Adjust = 1 THEN m.Adjustment END,
-           CASE WHEN @Adjust = 1 THEN m.Amount END,
-           CASE WHEN @Adjust = 1 THEN m.Adjusted END,
-           CASE WHEN @Adjust = 1 THEN m.AdjustedBy END,
+           CASE WHEN @Adjust = 1 OR @CashAdjust = 1 THEN m.Adjustment END,
+           CASE WHEN @Adjust = 1 OR @CashAdjust = 1 THEN m.Amount END,
+           CASE WHEN @Adjust = 1 OR @CashAdjust = 1 THEN m.Adjusted END,
+           CASE WHEN @Adjust = 1 OR @CashAdjust = 1 THEN m.AdjustedBy END,
            @Now, @UserId
     FROM @Mops m;
 
@@ -775,13 +813,29 @@ BEGIN
         FROM [PumpIT].dbo.RCN_BankStatementLinesPumpIT l
         WHERE l.SSBranchId = @BranchId
           AND l.ReconState = 1
-          AND l.BankStatementLineID IN (SELECT BankStatementLineID FROM @Bank);
+          AND EXISTS (SELECT 1 FROM @Bank b WHERE b.BankStatementLineID = l.BankStatementLineID
+                      AND b.Amount = l.Amount AND ISNULL(b.PriorBatchNo, 0) = ISNULL(l.ReconBatchNo, 0));
+
+        IF @@ROWCOUNT <> (SELECT COUNT(*) FROM @Bank)
+            THROW 51000, 'AGORA:BANK_ROW_MOVED:A bank line changed while matching. Reload and confirm again. Nothing was written.', 1;
 
         IF @ReconArea = 'CashBags'
-            UPDATE d SET d.ReconBatchNoPumpIT = @No
+        BEGIN
+            UPDATE d SET d.ReconBatchNoPumpIT = @No,
+                d.CashBagAmount = CASE WHEN @CashAdjust = 1 THEN m.Amount + m.Adjustment ELSE d.CashBagAmount END,
+                -- PumpIT cash bags use original = current + AdjustedBy.
+                d.AdjustedBy = CASE WHEN @CashAdjust = 1 AND m.Adjustment <> 0
+                    THEN ISNULL(m.AdjustedBy, 0) - m.Adjustment ELSE d.AdjustedBy END,
+                d.Adjusted = CASE WHEN @CashAdjust = 1 AND m.Adjustment <> 0 THEN 1 ELSE d.Adjusted END
             FROM [PumpIT].dbo.BRN_DailyBankingCashBags d
+            JOIN @Mops m ON m.SourceId = d.DailyBankingCashBagID
             WHERE d.SSBranchId = @BranchId AND d.ReconBatchNoPumpIT = 0
-              AND d.DailyBankingCashBagID IN (SELECT SourceId FROM @Mops WHERE SourceId IS NOT NULL);
+              AND d.CashBagAmount = m.Amount
+              AND (d.Adjusted = m.Adjusted OR (d.Adjusted IS NULL AND m.Adjusted IS NULL))
+              AND (d.AdjustedBy = m.AdjustedBy OR (d.AdjustedBy IS NULL AND m.AdjustedBy IS NULL));
+            IF @@ROWCOUNT <> (SELECT COUNT(*) FROM @Mops)
+                THROW 51000, 'AGORA:MOPS_ROW_MOVED:A cash bag changed while matching. Reload and confirm again. Nothing was written.', 1;
+        END
 
         ELSE IF @ReconArea = 'SmartATM'
             UPDATE d SET d.ReconBatchNoPumpIT = @No
@@ -882,15 +936,16 @@ BEGIN
     SELECT @BranchId, @RunId, m.Id, @No, 'PumpIT', m.SourceTable,
            ISNULL(m.SourceKeyJson, '{"BankStatementLineID":' + CONVERT(nvarchar(20), m.SourceId) + '}'),
            CASE WHEN m.Side = 'bank' THEN 'ReconBatchNo, ReconState'
+                WHEN m.Adjustment IS NOT NULL AND @ReconArea = 'CashBags' THEN 'ReconBatchNoPumpIT, CashBagAmount, AdjustedBy, Adjusted'
                 WHEN m.Adjustment IS NOT NULL THEN 'ReconBatchNoPumpIT, Amount, AdjustedBy, Adjusted'
                 ELSE 'ReconBatchNoPumpIT' END,
            /* The adjustment in words, for the audit trail. */
            CASE WHEN m.Adjustment IS NOT NULL
-                THEN CONCAT(N'Amount ', CONVERT(nvarchar(30), CONVERT(decimal(18,2), m.PriorAmount)),
+                THEN CONCAT(CASE WHEN @ReconArea = 'CashBags' THEN N'CashBagAmount ' ELSE N'Amount ' END, CONVERT(nvarchar(30), CONVERT(decimal(18,2), m.PriorAmount)),
                             N' → ', CONVERT(nvarchar(30), CONVERT(decimal(18,2), m.PriorAmount + m.Adjustment)),
                             N'; AdjustedBy ', CONVERT(nvarchar(30), CONVERT(decimal(18,2), ISNULL(m.PriorAdjustedBy, 0))),
-                            N' → ', CONVERT(nvarchar(30), CONVERT(decimal(18,2), ISNULL(m.PriorAdjustedBy, 0) + m.Adjustment)),
-                            N'; Adjusted ', ISNULL(CONVERT(nvarchar(1), m.PriorAdjusted), N'0'), N' → 1') END,
+                            N' → ', CONVERT(nvarchar(30), CONVERT(decimal(18,2), ISNULL(m.PriorAdjustedBy, 0) + CASE WHEN @ReconArea = 'CashBags' THEN -m.Adjustment ELSE m.Adjustment END)),
+                            N'; Adjusted ', ISNULL(CONVERT(nvarchar(1), m.PriorAdjusted), N'0'), N' → ', CASE WHEN @ReconArea = 'CashBags' AND m.Adjustment = 0 THEN ISNULL(m.PriorAdjusted, 0) ELSE 1 END) END,
            CASE WHEN @StampMode = 'live' THEN 'applied' ELSE 'journal' END,
            CASE WHEN @StampMode = 'live' THEN @Now END,
            CASE WHEN @StampMode = 'live' THEN @UserId END,

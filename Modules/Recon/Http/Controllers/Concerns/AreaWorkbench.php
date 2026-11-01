@@ -42,6 +42,7 @@ trait AreaWorkbench
         'auto' => ['label' => 'Recon centre', 'route' => 'app.recon.area', 'can' => 'recon.runs.view'],
         'all' => ['label' => 'Every site', 'route' => 'app.recon.all', 'can' => 'recon.runs.view', 'ho' => true],
         'runs' => ['label' => 'Runs', 'route' => 'app.recon.runs', 'can' => 'recon.runs.view'],
+        'batch' => ['label' => 'Unreconcile batch', 'route' => 'app.recon.batch', 'can' => 'recon.runs.reverse'],
         'config' => ['label' => 'Configuration', 'route' => 'app.recon.config', 'can' => 'recon.criteria.view'],
     ];
 

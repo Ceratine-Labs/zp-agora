@@ -61,8 +61,8 @@ The frame around a screen. Fed by ShellComposer, so a page using the shell needs
 | Component | Props | What it is | Notes |
 |---|---|---|---|
 | `<x-app-shell>` | `title` `slot` | The whole page: head, app bar, scope bar, main, footer. | Fed by `ShellComposer`, so a page using it needs no nav data of its own. |
-| `<x-app-bar>` | `sections` `workspace` `workspaces` | Brand, workspace switch, section buttons, tools. | Renders one `.mega` panel per section. |
-| `<x-menu-branch>` | `item` `depth` | One menu node, drawn at whatever depth it sits. | **Recursive.** Depth 1 = column heading, 2 = link, 3+ = a `<details>` group that expands in place. No ceiling on depth. |
+| `<x-app-bar>` | `sections` `workspace` `workspaces` | Brand, workspace switch, section buttons, tools. | Renders one `.mega` panel per section, each with a checked-by-default **Show active** checkbox. The choice is shared across panels and remembered in this browser. Off restores the full permitted catalogue; database-retired entries and access restrictions remain excluded. |
+| `<x-menu-branch>` | `item` `depth` | One menu node, drawn at whatever depth it sits. | **Recursive.** Depth 1 = column heading, 2 = link, 3+ = a `<details>` group that expands in place. `MenuAvailability` annotates permitted working links and ancestor visibility before rendering. Filtering hides unavailable nodes without rebuilding the tree or losing disclosure state. |
 | `<x-scope-bar>` | `branches` `branchId` `workspace` `granted` | Branch and "as at" selector, submitted into the URL. | Scope is a parameter, not a report — the URL carries it so a link travels. `branches` arrives already narrowed to the person's grants in `agora.UserBranch`: `ShellComposer` builds it through `Branch::visibleTo()`, the same scope `ResolveBranchContext` picks the pinned site with, so what the bar OFFERS and what a query RETURNS cannot drift apart. `granted` says whether that narrowing happened, so the note can read "2 sites granted to you" rather than a count with no provenance. |
 | `<x-workspace-switch>` | `workspaces` `current` `param` `label` | Head office / Branch, as its own component. | Anchors, not buttons: switching workspace changes what the application is about, so it belongs in the URL and the back button should undo it. `fullUrlWithQuery` keeps the branch and date already in scope. |
 | `<x-crumb>` | `parts` | Where you are. | A real `<nav>` over an `<ol>`, so a screen reader says "breadcrumb, 3 items" instead of reading the separators. The last part is the current page and carries no link. |
@@ -138,7 +138,7 @@ Something the reader has to take in before the figures mean what they look like.
 | `<x-notice>` | `tone` `title` `collapsible` `open` | Something the reader must take in before the figures below mean what they look like. | A refusal, a step deliberately not taken, a count that is evidence. Not an error page. `collapsible` folds the reasoning behind the headline and the headline stays visible, because nobody should have to open something to learn a problem exists. `<details>`, so no JS. The mockup's bare `.note` class is `tone="info"` and is still styled for markup ported from the sheet. |
 | `<x-explainer>` | `summary` `open` `remember` | A **group** of explanatory panels folded behind one line. | `<x-notice collapsible>` folds one panel and keeps its headline visible; that is right for a finding and wrong for a screen that opens with several paragraphs of standing explanation, which the regular reader scrolls past on every visit to reach the work. This folds the GROUP, and the summary line names what is inside, so the existence of what it hides is still on the screen \u{2014} one line instead of three panels. **Closed by default**, because standing explanation is not the answer to anything. Not for a refusal, a result, or anything about the run in hand: those go in their own `<x-notice>` above it, where they cannot be folded away unread. Built for the stock recon centre (Ryan, 22 Sep 2026), whose invariant and commit-warning panels were the whole of its first screen. Behaviour: `disclosure.js`. |
 | `<x-info>` | `label` | Standing explanation behind a small "i" button beside a title or label. | For text people read once and then skip — how a screen works, what an option means, why a rule exists. Built when the stock recon screens moved every such paragraph behind one (ZRP, 4 Oct 2026). A `<details>`, so it opens with no JS; `info.js` closes it on Escape or a click elsewhere, keeps one open at a time and holds the panel inside the viewport. `<x-page-head>` and `<x-card>` take an `info` **slot** and place the button beside the title (`<x-card info-wide>` widens the panel); `<x-field>` takes an `info` **prop** in place of `help`. On a collapsible card the slot leads the body instead, because a button inside a `<summary>` would fold the card. Not for a refusal, a result or a count: those are the answer and stay on the page. Behaviour: `info.js`. |
-| `<x-loader>` | `label` `overlay` `variant` | A wait, drawn as a cup of coffee: it fills, carries the ZRP badge, steams when full and goes round again until the action completes. On the stock recon screens, a shopping cart being loaded with cartons instead. | ZP's ask through Ryan, 23 Sep 2026, replacing the busy states. **One per page**: `<x-app-shell>` renders it once as the `overlay`, hidden, and `loader.js` is the one place that decides when a wait is seen — nothing appears under 300 ms, because a cup that flashes on every quick press teaches people to stop looking at it. A screen never writes a second one: it puts `data-loader="What is happening…"` on a form that navigates (shown on submit, cleared by the next page, taken down on a bfcache `pageshow`), or calls `window.Agora.loader` — `show(label)` returns `{update, hide}` for the page-level overlay, `within(el, label)` puts a cup where a fragment will land (the recon centre's tabs), `beside(el)` puts a small one in front of a status line that already says what is happening (the Every site runner, whose table filling in IS the progress), and `submitting(form)` is for code that submits a form itself (`confirm-form.js`, whose `form.submit()` fires no event). Clones get their clip-path ids renamed, so a cup never depends on one that is hidden. **Reduced motion** gets a full, still cup and the words — the label carries the meaning, the motion only says "still going". Colours are tokens (`--coffee` `--crema` `--steam` `--backdrop` `--badge`), so both themes are the theme's. The badge is `public/images/zrp-logo.png`, copied from ZP-NQL. Behaviour: `loader.js`. |
+| `<x-loader>` | `label` `overlay` `variant` | A wait, drawn as a cup of coffee: it fills, carries the ZRP badge, steams when full and goes round again until the action completes. On the stock recon screens, a shopping cart being loaded with cartons instead. | ZP's ask through Ryan, 23 Sep 2026, replacing the busy states. **One per page**: `<x-app-shell>` renders it once as the `overlay`, visible and opaque during initial page setup; `loader.js` waits for that setup before revealing the view. Later action waits retain a 300 ms delay, because a cup that flashes on every quick press teaches people to stop looking at it. A screen never writes a second one: it puts `data-loader="What is happening…"` on a form that navigates (shown on submit, cleared by the next page, taken down on a bfcache `pageshow`), or calls `window.Agora.loader` — `show(label)` returns `{update, hide}` for the page-level overlay, `within(el, label)` puts a cup where a fragment will land (the recon centre's tabs), `beside(el)` puts a small one in front of a status line that already says what is happening (the Every site runner, whose table filling in IS the progress), and `submitting(form)` is for code that submits a form itself (`confirm-form.js`, whose `form.submit()` fires no event). Clones get their clip-path ids renamed, so a cup never depends on one that is hidden. **Reduced motion** gets a full, still cup and the words — the label carries the meaning, the motion only says "still going". Colours are tokens (`--coffee` `--crema` `--steam` `--backdrop` `--badge`), so both themes are the theme's. The badge is `public/images/zrp-logo.png`, copied from ZP-NQL. Behaviour: `loader.js`. |
 | `<x-tip>` | — | The page's one floating tooltip. | A singleton, because a chart with 31 bars must not mount 31 tooltips and because flipping at the edge needs a measurable element. `data-tip="…"` on anything shows it on hover **and on focus** — the mockup's was hover-only, which no keyboard can reach — and `window.Agora.tip.show(event, html)` is the way a chart draws its own rows into it. Hidden entirely below 720px: a fixed box on a phone covers the answer, and a tooltip only ever repeats something written somewhere permanent. Behaviour: `tip.js`. |
 
 ### Module-scoped
@@ -147,6 +147,10 @@ Lives in a module rather than the shared library, and is used as <x-{alias}::nam
 
 | Component | Props | What it is | Notes |
 |---|---|---|---|
+| `<x-stockrecon::tutorial-deck>` | `content` `lesson` | The stock reconciliation learning chapters with worked examples and clickable event explanations. | Training content only. Manual chapter navigation, accessible disclosures and before/proposal examples; no stock writes. Behaviour: stock-recon-tutorial.js. |
+| `<x-stockrecon::tutorial-scenario>` | `scenario` | A worked stock reconciliation example with original and proposed quantities. | Static teaching cases, not a replacement for the balancing procedure. Held examples have no proposal. |
+| `<x-stockrecon::tutorial-icon>` | `name` | A decorative line icon for the stock reconciliation learning guide. | Inherits theme text colour and accompanies a visible label. |
+| `<x-operations::board>` | `endpoint` `userKey` `sites` `scope` | The live TV wall: rotating exception cards with pause, site selection and detail. | Procedure-backed snapshots, per-TV settings, visible source gaps and stale/error states. Behaviour: operations-wall.js. Screen rotation is independent of data refresh; explicit pause remains paused. |
 | `<x-reports::cell>` | `type` `value` | One table cell, formatted from the column's declared type. | Types: `text number money litres date datetime bool chip`. Every figure goes through `App\Support\Format`, never `number_format`; a missing value is an em dash, never `R0.00`. `chip` maps a procedure's Status wording to a tone by keyword, so a new phrase falls to neutral rather than to a fatal. |
 | `<x-reports::before-after>` | `before` `after` `dp` `signed` | A figure a correction may have changed: the old value struck through beside the new when they differ, the figure alone when not. | Built for the audit trail's correction panel (2 Oct 2026), which reads a correction the way the customer report does — the old figure struck through beside the new — so the eye lands on exactly the cells that moved. `dp` widens to 3 on its own for a weighed figure; `signed` colours a negative short and a positive over, for a variance. Through `App\Support\Format`. |
 
@@ -196,6 +200,11 @@ copied out of a grid pastes into a spreadsheet as a number. Numeric cells carry
 A missing figure is `—`, never `R0.00`.
 
 ## Libraries
+
+The data grid accepts an optional `scope` slot for extra controls inside its
+GET form. Use the grid's `f[...]` inputs and declared `GridFilter` definitions
+so filtering, pagination and extraction share the same query. A filter with
+`op=all` is omitted; this supports All/Shorts/Overs selectors against zero.
 
 All three load on first use, not on every page — the sign-in screen needs none
 of them.
@@ -247,7 +256,7 @@ One module per behaviour under `resources/js/components`, imported by
 |---|---|
 | `format.js` | The number formats, twinned with `App\Support\Format`. Exposed as `window.Agora.format` — **not** loaded per page with `Vite::asset()`, which needs it to be its own build input and therefore threw "Unable to locate file in Vite manifest" against built assets and took `/dev/theme` down with it. The parity table reads the twin off the shipped bundle, which is also the stronger check: it tests the module the application runs |
 | `tabs.js` | Panel-mode tabs only — link mode gets no JavaScript at all. A `group` label in the strip is not a tab and the arrow keys skip it. The panes are already correct from the server (`<x-tab-panel>` ships the inactive ones `hidden`), so this adds the two things the platform does not: memory of the last choice, and arrow-key / Home / End movement with one tab stop for the strip. **Lazy panes** (`<x-tab-panel src>`, 23 Sep 2026): fetched on first open, hydrated, marked stale by a `tabs:changed` from a sibling pane and fetched again on the next open; `data-tabs-query` keeps the open tab in the URL |
-| `loader.js` → `window.Agora.loader` | When a wait is long enough to be seen, and nowhere else. Nothing under 300 ms. `<form data-loader="…">` for a navigation (a prevented submit — a confirmation asking — is not one; `confirm-form.js` calls `submitting(form)` once the answer is yes); `show(label)` → `{update, hide}` for the page overlay (the recon bulk runners, with a live count); `within(el, label)` for a pane being filled (tabs.js); `beside(el)` for a status line that already says what is happening (recon-group.js); runbar.js hands its busy text over as `data-loader`. Taken down on a bfcache `pageshow`, or the back button would land on a page still busy |
+| `loader.js` → `window.Agora.loader` | Holds the initial page overlay until startup is ready; later action waits only appear after 300 ms. `<form data-loader="…">` for a navigation (a prevented submit — a confirmation asking — is not one; `confirm-form.js` calls `submitting(form)` once the answer is yes); `show(label)` → `{update, hide}` for the page overlay (the recon bulk runners, with a live count); `within(el, label)` for a pane being filled (tabs.js); `beside(el)` for a status line that already says what is happening (recon-group.js); runbar.js hands its busy text over as `data-loader`. Taken down on a bfcache `pageshow`, or the back button would land on a page still busy |
 | `app.js` → `window.Agora.hydrate(root)` | Wiring for markup that arrives AFTER load. Everything in app.js runs once over the page the server sent; a lazy tab pane is a fragment fetched later, so each component that can appear in one — `select`, `row-detail`, `check-all`, `tabs`, `disclosure`, `runbar`, `recon-match`, `table-tools`, `confirm-form`, `recon-suggest` — takes a `root`, marks what it has wired (`data-*-ready`) and is run again over just the new markup. **A new component that can sit in a fragment takes a root and a ready mark, and joins the list** — otherwise it works on the page and silently does nothing in a tab |
 | `disclosure.js` | Remembers which `<details data-remember="key">` a person left open. Everything foldable in Agora is a native `<details>`; the one thing that is not free is memory, and a report run every morning should not fold its parameters away again each time. `localStorage`, per browser — it has no business meaning and does not belong beside the theme in `agora.UserPreference` |
 | `runbar.js` | Stops a four-second procedure being run twice: on submit the bar disables its button, marks itself busy and swaps the status. Disabled on the **next tick**, because a submit button disabled inside the handler is dropped from the payload; released again on `pageshow`, or the back button lands on a permanently dead Execute |
@@ -264,3 +273,143 @@ One module per behaviour under `resources/js/components`, imported by
 | `mega-menu.js` | Opens one section panel at a time; Escape, scrim and outside-click close it. Nesting inside a panel is `<details>`, so the browser supplies keyboard behaviour. Hover deliberately does **not** open a panel |
 | `theme.js` | Light/dark toggle. Three states — an unstamped document follows the system. Stored in a cookie so the server can stamp `<html>` and avoid a flash, **and** posted to `agora.UserPreference` so the choice follows the person to their next device |
 | `select.js` · `chart.js` · `notify.js` | The three library wrappers above |
+
+### Landing module menu and artwork
+
+`<x-report-menu-card :report="$report" />` is the compact Reports catalogue
+shortcut: static `<x-report-art :variant="$report['key']" />` artwork, menu title,
+short summary and the existing report link. Its sibling information button keeps
+the full description, previous report names and procedure available without
+lengthening every card. The catalogue uses optional `menu_label` and `summary`
+presentation fields; report definitions and report-page labels stay unchanged.
+
+`<x-module-menu :modules="$modules" />` renders accessible module shortcuts.
+`LandingModules::forUser()` chooses destinations only from the current workspace’s
+permission-filtered database menu. `config('agora.landing_modules')` supplies labels,
+descriptions, route preferences and artwork; it does not grant access. Its artwork
+mapping also generates `agora.loaders`, so menu icons and destination loaders agree.
+
+`<x-module-art variant="utilities" />` is a still decorative SVG. Add `animated` for
+a loader. Variants: cup, cart, bank, utilities, cashup, reports, product, debtors,
+assets, operations and settings. `<x-loader>` uses this same component. Icons remain
+still on the menu; loaders respect reduced-motion preferences.
+
+Module menu links use `data-loader` to display their own artwork during ordinary
+same-origin navigation. Modified clicks, downloads and new windows keep native
+browser behavior; returning through browser history clears the overlay.
+
+### My queue overview
+
+`reports::my-queue` uses the shared report illustrations for six queue shortcuts
+and each site queue, with scoped Review links carrying effective dates and one
+site. Native `<details>` keeps scope compact; its summary shows dates, sites,
+search and order. `ReportsService::parametersFor()` exposes the same normalized
+parameters that run the procedure: My queue defaults to South African today, a
+90-day lookback and oldest work first. Other report defaults are unchanged.
+
+Age badges show 7–29 and 30+ days, not deadlines. The older-work warning counts
+only the returned page; the overview count is the procedure's total site queues.
+Values are never combined across queue types. On mobile the table becomes
+labelled cards, and its clipped sortable header reveals itself on keyboard focus.
+Scope submits and navigation to My queue use its checklist illustration loader. Empty/refused
+results keep the scope open; all data and permissions still come through the
+existing Reports service and branch context.
+
+
+### Shared report scope and queue totals
+
+`<x-reports::scope>` is the same compact disclosure on all 16 report screens.
+Its tags, populated inputs, sorting and paging URLs use the normalized parameters
+actually sent to SQL. Each report keeps its own date defaults, described inside
+the scope; date shortcuts retain the selected sites, search and order. Reset
+restores that report’s defaults. Empty/refused results open the scope. Rejected
+site selections retain the nonmatching sentinel instead of widening the report.
+
+My queue’s six shortcuts show per-type outstanding counts and contextual values
+from the procedure’s third result set, grouped over the full filtered result
+before pagination. Day close has no monetary value. Null values remain absent;
+a missing third result set is unavailable, not zero. Compact money has an exact
+amount in its title and accessible label. Types are never added into a combined
+money total. The landing menu starts with My queue, then Operations wall, subject
+to the same existing route and menu permissions as the remaining modules.
+
+
+### Illustrated titles and menu search
+
+`<x-page-head>` displays the artwork resolved from the current module or report,
+with the ZP logo on the dashboard and in the top-left brand. `NavigationArtwork` resolves presentation
+only: it performs no database queries and never grants or changes a destination.
+`<x-feature-art>` reuses the existing static module/report illustrations.
+
+The top menu uses larger illustrated entries and a search field per section.
+Search matches words in the entry, its hint and its ancestor headings, ignoring
+case and accents. Results remain within the preloaded permitted menu and the
+Show active filter. Matching nested groups open while searching; clearing restores
+their previous state. Queries persist when closing and reopening a section.
+Keyboard opening focuses search; pointer/touch opening does not summon a phone
+keyboard. Escape closes the menu and returns focus to its opener. Searching,
+clearing and active filtering make no requests.
+
+
+### Module groups within the menu
+
+`<x-menu-children>` groups sibling links under explicit module names while leaving
+the database's sections and workflow headings in place. `NavigationModules`
+resolves semantic ownership from existing route metadata and stable menu paths;
+for example, cashup reports and capture screens share the Cashups group. It does
+not query, mutate the tree, add links or change access. Nested headings recurse
+within their existing parent, and their own destination carries a module label.
+Module wrappers participate in existing search and active filtering, so an empty
+group disappears and a module-name search finds its links. Plain Live hints are
+suppressed; useful descriptions remain. `<x-zp-mark>` shares the existing ZP PNG
+between dashboard title and app bar.
+
+
+### Module landing menus and shared tool artwork
+
+`ModuleMenu` builds each module's available tools from the same permitted menu
+as the shell, without running the work screens or their procedures. The module
+route requires a nonempty permitted catalogue. `<x-tool-menu>` renders those
+tools as illustrated cards under their original workflow context, with duplicate
+destinations removed and workspace preserved. Home module cards and the top
+menu's module headings open these hubs; My queue and Operations wall stay direct.
+Existing tool URLs and their permission checks continue to serve the work.
+
+`<x-feature-art>` resolves the same tool identity for page titles, menu entries
+and module cards. `<x-tool-art>` extends the native SVG illustration library so
+individual tools can be recognised separately within a module. The shared loader
+reuses that artwork, including current-tool forms, and respects reduced motion.
+
+
+### Initial page loading
+
+`<x-page-startup>` runs before the external assets in `<x-app-shell>`. It keeps
+the route’s illustration visible on an opaque background while the new view
+initializes. Content retains its layout for measurement but stays hidden until
+the controls, charts and initially selected pane are ready. App initialization
+waits for returned promises, fonts and layout frames; later polling and user
+actions do not extend startup.
+
+The inline guard uses the existing `window.Agora` namespace. Without JavaScript,
+the ordinary server-rendered content remains available. A failed entry script,
+a stalled initialization or a restored history page releases startup protection
+without leaving the user behind a permanent overlay. Action loaders keep their
+existing delay and ownership, independently of this initial page state.
+
+
+### Bank branding
+
+Explicit ABSA and FNB reconciliation areas use the bank’s official logo in the
+shared tool artwork. Cash bags uses a cash-filled bag, Cash machine a banknote
+counter, and Smart ATM an ATM with an information badge. These area identities
+follow actual route parameters through cards, menus, titles and loaders; unknown
+areas retain the general reconciliation illustration. Overview, dashboard and
+reference tracing keep their own distinct artwork.
+The two allowlisted local assets are embedded as data URIs so cards, menus,
+titles and first-paint loaders do not wait for an additional image request.
+Their original proportions and colours are retained on the neutral badge token.
+
+Sources verified on 1 November 2026; original bytes are stored unchanged:
+
+- `public/images/banks/absa.jpg` — [Absa South Africa / Absa Group](https://www.absa.africa/), [official asset](https://www.absa.africa/wp-content/uploads/2024/02/Absa-logo-badge_RGB_Passion_JPG-1.jpg); SHA-256 `9a03fade19cccfef5b79bd09ab4c13375f12e36f2f55b4e85397baf93370909c`.
+- `public/images/banks/fnb.svg` — [First National Bank South Africa](https://www.fnb.co.za/), [official asset](https://www.fnb.co.za/_assets/images/generic/skins/00/navigation/secondary-logo/header-logo_lrg.svg?v=1775959597000); SHA-256 `787e7eb54ab0586c7c38666343be2766e6c69b88358282b63ead8a70adaadf23`.

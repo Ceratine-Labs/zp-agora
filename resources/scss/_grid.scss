@@ -302,6 +302,35 @@ table.dg.is-fixed { table-layout: fixed; }
 
 .data-grid.is-resizing { cursor: col-resize; user-select: none; }
 
+// Give names spare space, keep data rows on one line, and wrap only headings.
+// Saved pixel widths still take priority over these automatic defaults.
+.variance-grid {
+  .dg-scope { max-width: none; }
+  .dg-scope .field-row { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  .dg-scope .field-wide { grid-column: auto; }
+  table.dg {
+    th, td { padding-left: 5px; padding-right: 5px; }
+    td, td.wide { white-space: nowrap; min-width: 0; }
+    thead th { white-space: normal; letter-spacing: .025em; }
+    th.wide { min-width: 180px; }
+    th[data-column="BranchName"] { min-width: 170px; }
+    th[data-column="ShiftNo"] { width: 60px; }
+    th[data-column="TransactionDate"] { width: 100px; }
+    th[data-column="AreaDescription"] { min-width: 90px; }
+    thead tr:first-child th[data-column$="Original"] {
+      color: var(--brand-ink); background: var(--brand-soft);
+      border-top: 3px solid var(--brand);
+    }
+    thead tr:first-child th:is([data-column="QtyOpen"], [data-column="QtyIssued"],
+      [data-column="QtyClose"], [data-column="QtyComputer"], [data-column="QtyVar"], [data-column="ValueVar"]) {
+      color: var(--serious-ink); background: var(--serious-bg);
+      border-top: 3px solid var(--serious);
+    }
+  }
+  .dg-filter select { flex-basis: 28px; padding-left: 2px; padding-right: 0; }
+  .dg-filter input { padding-left: 3px; padding-right: 3px; }
+}
+
 /* -------------------------------------------- the row's own link + actions */
 
 // feature-rules §3.7, for the row's own resource.

@@ -40,6 +40,16 @@ class Format
         return number_format((float) $value, $dp, '.', ' ');
     }
 
+    /** Quantity rounded to three places, without insignificant trailing zeroes. */
+    public static function qty(int|float|string|null $value): string
+    {
+        if (! self::isNumber($value)) {
+            return self::NOTHING;
+        }
+
+        return rtrim(rtrim(self::n($value, 3), '0'), '.');
+    }
+
     /** Money: `R1 234.50`. No space after the R — that is how the estate writes it. */
     public static function r(int|float|string|null $value, int $dp = 2): string
     {

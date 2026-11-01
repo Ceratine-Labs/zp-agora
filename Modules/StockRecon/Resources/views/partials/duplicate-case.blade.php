@@ -14,13 +14,13 @@
     use Illuminate\Support\Str;
 
     $clear = $case->DupTier === 'D1';
-    $at = fn ($date, $shift) => Carbon::parse($date)->format('j M').' shift '.$shift;
+    $at = fn ($date, $shift) => Carbon::parse($date)->format('j M').' shift '.\Modules\StockRecon\Support\ShiftLabel::show($shift);
     $when = fn ($ts) => $ts ? Carbon::parse($ts)->format('j M Y, H:i') : 'an unrecorded time';
     $who = fn ($name) => $name ?: 'somebody';
 
     /* Three places always, as everywhere else in stock recon (Ryan, 13 Oct
        2026: "sometimes 1, sometimes 1.000"). */
-    $qty = fn ($v) => $v === null ? Format::NOTHING : Format::n($v, 3);
+    $qty = fn ($v) => $v === null ? Format::NOTHING : Format::qty($v);
 
     $here = $at($case->TransactionDate, $case->ShiftNo);
     $twin = $case->TwinDate ? $at($case->TwinDate, $case->TwinShift) : null;
@@ -177,7 +177,7 @@
                 </td>
                 <td class="num">
                     @if ($s->Role === 'corrected')
-                        <x-reports::before-after :before="$s->IssuedBefore" :after="$s->QtyIssued" :dp="3" />
+                        <x-reports::before-after :before="$s->IssuedBefore" :after="$s->QtyIssued" :dp="3" :compact-quantity="true" />
                     @else
                         {{ $qty($s->QtyIssued) }}
                     @endif

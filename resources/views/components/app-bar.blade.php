@@ -1,4 +1,8 @@
 @props(['sections' => collect(), 'workspace' => 'ho', 'workspaces' => []])
+@php
+    $navigationArtwork = app(\Modules\Core\Services\NavigationArtwork::class);
+    $navigationModules = app(\Modules\Core\Services\NavigationModules::class);
+@endphp
 
 {{--
     The app bar and the mega panel it opens.
@@ -11,12 +15,7 @@
 --}}
 <header class="appbar" id="appbar">
     <a class="brand" href="{{ route('app.dashboard') }}">
-        <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M3 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16" fill="none" stroke="#e6c15c" stroke-width="1.8" stroke-linejoin="round"/>
-            <path d="M2 21h13" stroke="#e6c15c" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M5.5 6.5h6v3.5h-6z" fill="#e6c15c" opacity=".55"/>
-            <path d="M14 9h3.2a2 2 0 0 1 2 2v6.2a1.8 1.8 0 0 0 3.6 0V12l-2.2-2.6" fill="none" stroke="#8aabb4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <x-zp-mark class="mark" />
         <span class="brand-text">
             <span class="wm">AG<em>O</em>RA</span>
             <span class="sub">Zululand Retail &amp; Petroleum</span>
@@ -79,13 +78,26 @@
 </header>
 
 @foreach ($sections as $section)
-    <div class="mega" id="mega-{{ $section->Code }}" data-panel="{{ $section->Code }}" hidden>
-        <div class="mega-in">
-            @forelse ($section->items as $column)
-                <x-menu-branch :item="$column" :depth="1" />
-            @empty
-                <p class="mega-empty">No entries in {{ $section->Label }} yet.</p>
-            @endforelse
+    <div class="mega" id="mega-{{ $section->Code }}" data-panel="{{ $section->Code }}" data-show-active="true" hidden>
+        <div class="mega-toolbar">
+            <span class="mega-title">{{ $section->Label }}</span>
+            <div class="mega-search" role="search" aria-label="Search {{ $section->Label }} menu">
+                <label class="visually-hidden" for="menu-search-{{ $section->Code }}">Search {{ $section->Label }} menu</label>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+                <input id="menu-search-{{ $section->Code }}" type="search" data-menu-search placeholder="Search this menu…" autocomplete="one-time-code" spellcheck="false" aria-controls="mega-content-{{ $section->Code }}">
+                <button type="button" data-menu-search-clear aria-label="Clear menu search" hidden>×</button>
+            </div>
+            <span class="visually-hidden" data-menu-search-status role="status" aria-live="polite" aria-atomic="true"></span>
+            <label class="mega-filter">
+                <input type="checkbox" data-menu-active-only checked aria-controls="mega-content-{{ $section->Code }}">
+                <span>Show active</span>
+            </label>
+        </div>
+        <div class="mega-in" id="mega-content-{{ $section->Code }}">
+            @foreach ($section->items as $column)
+                <x-menu-branch :item="$column" :depth="1" :artwork="$navigationArtwork" :modules="$navigationModules" />
+            @endforeach
+            <p class="mega-empty" data-menu-search-empty @if ($section->items->contains(fn ($item) => $item->hasAvailableItems)) hidden @endif>No active entries in this menu. Turn off Show active to see all entries.</p>
         </div>
     </div>
 @endforeach

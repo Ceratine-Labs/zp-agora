@@ -88,6 +88,7 @@ BEGIN
 
     DECLARE @fDescription NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'Description'),
             @fPosCode     NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'PosCode'),
+            @fPosCodeOp   NVARCHAR(20) = ISNULL((SELECT TOP 1 [Op] FROM @Filter WHERE [Column] = 'PosCode'), 'contains'),
             @fCategory    NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'Category');
 
     DECLARE @fPosSystemAny bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'PosSystem') THEN 1 ELSE 0 END,
@@ -156,7 +157,9 @@ BEGIN
                OR x.PosCode     LIKE '%' + @Search + '%'
                OR x.Category    LIKE '%' + @Search + '%')
           AND (@fDescription IS NULL OR x.Description LIKE '%' + @fDescription + '%')
-          AND (@fPosCode     IS NULL OR x.PosCode     LIKE '%' + @fPosCode + '%')
+          AND (@fPosCode IS NULL
+               OR (@fPosCodeOp = 'eq' AND x.PosCode = @fPosCode)
+               OR (@fPosCodeOp <> 'eq' AND x.PosCode LIKE '%' + @fPosCode + '%'))
           AND (@fCategory    IS NULL OR x.Category    LIKE '%' + @fCategory + '%')
           AND (@fPosSystemAny = 0 OR x.PosSystem IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'PosSystem'))
           AND (@fStatusAny    = 0 OR x.[Status]  IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'Status'))
@@ -268,7 +271,9 @@ BEGIN
            OR x.PosCode     LIKE '%' + @Search + '%'
            OR x.Category    LIKE '%' + @Search + '%')
       AND (@fDescription IS NULL OR x.Description LIKE '%' + @fDescription + '%')
-      AND (@fPosCode     IS NULL OR x.PosCode     LIKE '%' + @fPosCode + '%')
+      AND (@fPosCode IS NULL
+           OR (@fPosCodeOp = 'eq' AND x.PosCode = @fPosCode)
+           OR (@fPosCodeOp <> 'eq' AND x.PosCode LIKE '%' + @fPosCode + '%'))
       AND (@fCategory    IS NULL OR x.Category    LIKE '%' + @fCategory + '%')
       AND (@fPosSystemAny = 0 OR x.PosSystem IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'PosSystem'))
       AND (@fStatusAny    = 0 OR x.[Status]  IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'Status'))

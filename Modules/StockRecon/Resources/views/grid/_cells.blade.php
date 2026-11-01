@@ -5,6 +5,9 @@
     different codes with their colors"). Everything else is the default.
 --}}
 @switch($column->key)
+    @case('ShiftNo')
+        {{ \Modules\StockRecon\Support\ShiftLabel::show($row->{$column->key} ?? null) }}
+        @break
     @case('ExceptionCode')
     @case('AuditCode')
         @if (($code = (string) ($row->{$column->key} ?? '')) !== '')

@@ -33,7 +33,7 @@
     @page { margin: 18mm 14mm 20mm 14mm; }
     body { font-family: "DejaVu Sans", sans-serif; font-size: 9pt; color: #111; }
     h1 { font-size: 16pt; margin: 0 0 2mm 0; letter-spacing: 0.5pt; }
-    .muted { color: #555; }
+    .muted { color: #000; }
     .small { font-size: 7.5pt; }
     table { border-collapse: collapse; width: 100%; }
     .lines th { border-bottom: 0.8pt solid #111; text-align: left; padding: 1.5mm 1.2mm; font-size: 7.5pt; }

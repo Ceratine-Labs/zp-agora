@@ -1,0 +1,1 @@
+{"name":"Operations","alias":"operations","version":"1.0.0","enabled":true,"order":25,"requires":["Core","Reports","StockRecon","Cash","Product"],"providers":["Modules\\Operations\\Providers\\OperationsServiceProvider"]}

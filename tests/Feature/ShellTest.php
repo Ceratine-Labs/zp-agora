@@ -106,22 +106,35 @@ class ShellTest extends TestCase
     }
 
     /**
-     * ZP, 7 Oct 2026: the stock recon screens wait with a shopping cart being
-     * loaded, everything else with the coffee cup — one overlay per page,
-     * chosen by route from config('agora.loaders').
+     * Each tool keeps the same drawing while waiting; the home page keeps its
+     * coffee cup. Menu illustrations must not add another overlay.
      */
-    public function test_the_stock_recon_screens_wait_with_the_cart_and_the_rest_with_the_cup(): void
+    public function test_the_stock_centre_waits_with_its_tool_art_and_home_keeps_the_cup(): void
     {
         $admin = $this->admin();
 
         $recon = $this->actingAs($admin)->get(route('app.stockrecon.index'))->assertOk()->getContent();
         $this->assertSame(1, substr_count($recon, 'data-loader-overlay'), 'One loader per page.');
-        $this->assertStringContainsString('loader-art loader-cart', $recon);
-        $this->assertStringNotContainsString('loader-art loader-cup', $recon);
+        $reconDocument = new \DOMDocument;
+        @$reconDocument->loadHTML($recon);
+        $reconOverlay = (new \DOMXPath($reconDocument))->query('//*[@data-loader-overlay]')->item(0);
+        $this->assertNotNull($reconOverlay);
+        $reconArt = $reconDocument->saveHTML($reconOverlay);
+        $this->assertStringContainsString('data-tool-art="stock-centre"', $reconArt);
+        $this->assertStringContainsString('data-module-art-animated="true"', $reconArt);
+        $this->assertStringNotContainsString('loader-art loader-cup', $reconArt);
         $this->assertStringContainsString('data-loader="Loading the chains and balancing them…"', $recon);
 
         $home = $this->actingAs($admin)->get('/app')->getContent();
-        $this->assertStringContainsString('loader-art loader-cup', $home);
-        $this->assertStringNotContainsString('loader-cart', $home);
+        $document = new \DOMDocument;
+        $errors = libxml_use_internal_errors(true);
+        $document->loadHTML($home);
+        libxml_clear_errors();
+        libxml_use_internal_errors($errors);
+        $overlays = (new \DOMXPath($document))->query('//*[@data-loader-overlay]');
+        $this->assertSame(1, $overlays->length, 'Module tiles reuse the art, not the page overlay.');
+        $overlay = $document->saveHTML($overlays->item(0));
+        $this->assertStringContainsString('loader-art loader-cup', $overlay);
+        $this->assertStringNotContainsString('loader-cart', $overlay);
     }
 }

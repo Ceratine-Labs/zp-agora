@@ -190,6 +190,18 @@ BEGIN
     FROM STRING_SPLIT(ISNULL(@ExcludedAreaGroups, ''), ',') s
     WHERE LTRIM(RTRIM(s.value)) <> '';
 
+    /* Cumulative meters are measurements, never physical closing stock. Keep
+       an explicit count on the run; their unmodified readings have a separate
+       reconciliation report. This also excludes them from completeness tests. */
+    DECLARE @ExcludedMeterRows int = (
+        SELECT COUNT(*) FROM agora.vw_StockReconLine l
+        WHERE l.BranchId = @BranchId
+          AND l.TransactionDate >= @FromDate AND l.TransactionDate < DATEADD(day, 1, @ToDate)
+          AND (@AreaNo IS NULL OR l.AreaNo = @AreaNo)
+          AND EXISTS (SELECT 1 FROM agora.StockReconMeter meter
+              WHERE meter.BranchId = l.BranchId AND meter.AreaNo = l.AreaNo
+                AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1));
+
     /* ------------------------------------------------------------- stage 0
        Rule 10: the last complete recon day.
 
@@ -233,6 +245,9 @@ BEGIN
           AND l.TransactionDate >= @FromDate
           AND l.TransactionDate <  DATEADD(day, 1, @ToDate)
           AND NOT EXISTS (SELECT 1 FROM @Excluded e WHERE e.AreaGroup = a.AreaGroup)
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter
+              WHERE meter.BranchId = l.BranchId AND meter.AreaNo = l.AreaNo
+                AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1)
         GROUP BY CONVERT(date, l.TransactionDate), l.ShiftNo;
 
         SET @Days = (SELECT COUNT(DISTINCT D) FROM #ds);
@@ -328,7 +343,10 @@ BEGIN
       AND l.TransactionDate >= @FromDate
       AND l.TransactionDate <  DATEADD(day, 1, @ToDate)
       AND (@AreaNo IS NULL OR l.AreaNo = @AreaNo)
-      AND NOT EXISTS (SELECT 1 FROM @Excluded e WHERE e.AreaGroup = a.AreaGroup);
+      AND NOT EXISTS (SELECT 1 FROM @Excluded e WHERE e.AreaGroup = a.AreaGroup)
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter
+              WHERE meter.BranchId = l.BranchId AND meter.AreaNo = l.AreaNo
+                AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1);
 
     DECLARE @HeldBackRows INT = (SELECT COUNT(*) FROM #chain WHERE TransactionDate > @CompleteTo);
 
@@ -339,7 +357,10 @@ BEGIN
        meaningful here when this window reaches that far: a preview of August
        does not end on anybody's latest count. */
     DECLARE @LatestDay DATE = (
-        SELECT MAX(CONVERT(date, l.TransactionDate)) FROM agora.vw_StockReconLine l WHERE l.BranchId = @BranchId);
+        SELECT MAX(CONVERT(date, l.TransactionDate)) FROM agora.vw_StockReconLine l WHERE l.BranchId = @BranchId
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter
+              WHERE meter.BranchId = l.BranchId AND meter.AreaNo = l.AreaNo
+                AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1));
     DECLARE @AtDataEnd BIT = CASE WHEN @CompleteTo < @ToDate OR @ToDate >= @LatestDay THEN 1 ELSE 0 END;
 
     /* The shift BEFORE the window, per item — the previous closing the first
@@ -1417,6 +1438,7 @@ BEGIN
         FlagBigAmendment, FlagPctAmendment, FlagNegativeClose, FlagShortChain,
         FlagDormantMoved, FlagChainBroken, ChainBlocked,
         PrevClose, ChainBreak, QtyOpenNow, QtyCloseNow, QtyIssuedOrig, IssueMultiple,
+        QtyOpenOrig, QtyCloseOrig, CountDriftReason,
         FlagPackOver, FlagNoPosLink, RestoresHand, FlagAuditConflict, AuditCode, BreakKept,
         DupTier, DupTwinDate, DupTwinShift, DupTwinVar, DupQty, DupReason, QtyIssuedNew, CountsMove,
         DupHold, DupReleaseId,
@@ -1442,6 +1464,16 @@ BEGIN
         a.FlagBigAmendment, a.FlagPctAmendment, a.FlagNegativeClose, a.FlagShortChain,
         a.FlagDormantMoved, a.LinkBroken, a.ChainBlocked,
         a.PrevClose, a.ChainBreak, a.QtyOpenNow, a.QtyCloseNow, a.QtyIssuedOrig, NULLIF(a.Mult, 0),
+        a.QtyOpenOrig, a.QtyCloseOrig,
+        /* Informational only, after all balancing/restoration decisions. The
+           pack audit takes precedence. A difference alone proves neither a
+           forbidden amendment nor a reason to block or restore this chain. */
+        CASE WHEN a.AuditCode IS NULL THEN
+            CASE WHEN ABS(a.QtyOpenNow - a.QtyOpenOrig) > @tol
+                       AND ABS(a.QtyCloseNow - a.QtyCloseOrig) > @tol THEN 'Opening and closing'
+                 WHEN ABS(a.QtyOpenNow - a.QtyOpenOrig) > @tol THEN 'Opening'
+                 WHEN ABS(a.QtyCloseNow - a.QtyCloseOrig) > @tol THEN 'Closing' END
+        END,
         a.FlagPackOver, a.FlagNoPosLink, a.RestoresHand, a.FlagAuditConflict, a.AuditCode, a.BreakKept,
         a.DupTier, a.DupTwinDate, a.DupTwinShift, a.DupTwinVar, a.DupQty, a.DupReason,
         /* 0 on a clear duplicate; the issue + the over on a captured missing
@@ -1623,6 +1655,7 @@ BEGIN
         r.ShortValueAfter   = t.ShortValueAfter,
         r.CompleteTo        = @CompleteTo,
         r.HeldBackRows      = @HeldBackRows,
+        r.ExcludedMeterRows = @ExcludedMeterRows,
         r.RepairedOpenings  = t.RepairedOpenings,
         r.KeptBreaks        = t.KeptBreaks,
         r.DuplicatesClear   = t.DuplicatesClear,

@@ -23,9 +23,8 @@ use Modules\Core\Models\UserMenuItem;
  * and the screen says so in words. The moment one entry is ticked for a person
  * the ticks become the whole of what they see.
  *
- * ROLES WERE RETIRED THE SAME DAY (Ryan, 22 Sep 2026), so the role half of
- * this is gone: agora.RoleMenuItem was flattened onto the people who held the
- * role by RetireRolesSeeder and is no longer read. Ticks are per person.
+ * Direct menu ticks and managed-role ticks are combined. An empty combined
+ * set retains the existing unrestricted-menu convention.
  *
  * TWO THINGS CAN HIDE AN ENTRY and they are not the same thing:
  *
@@ -44,7 +43,7 @@ use Modules\Core\Models\UserMenuItem;
  */
 class MenuAccessService
 {
-    private const CACHE_PREFIX = 'agora.menu.grants.user.';
+    private const CACHE_PREFIX = 'agora.menu.grants.rbac.user.';
 
     public function __construct(private PermissionService $permissions) {}
 
@@ -68,7 +67,7 @@ class MenuAccessService
         /** @var array<int, int> $ids */
         $ids = Cache::rememberForever(
             self::CACHE_PREFIX.$id,
-            fn (): array => array_values(array_unique($this->userItemIdsFor($user)))
+            fn (): array => array_values(array_unique(array_merge($this->userItemIdsFor($user), app(RoleAccessService::class)->menuIdsFor($user))))
         );
 
         return $this->memo[$id] = $ids;

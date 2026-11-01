@@ -5,31 +5,23 @@ namespace Modules\Core\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Support\BranchContext;
 use Illuminate\Contracts\View\View;
-use Modules\Core\Models\Branch;
+use Illuminate\Http\Request;
+use Modules\Core\Models\User;
+use Modules\Core\Services\LandingModules;
 
 /**
  * The landing page behind the shell.
  *
- * A placeholder in the sense that it shows no trading figures yet — those
- * arrive with the branch console (T030) and the trading position (T068). What
- * it does prove is real: the shell renders, the menu comes out of the
- * database, and the branch scope resolved to a set of sites this user may see.
+ * The modules this person can open, from the current workspace's menu.
  */
 class DashboardController extends Controller
 {
-    public function __invoke(BranchContext $context): View
+    public function __invoke(Request $request, BranchContext $context, LandingModules $modules): View
     {
+        $user = $request->user();
+
         return view('core::dashboard', [
-            'branchCount' => Branch::query()->trading()->count(),
-            // IsActive as well as IsTrading: the browser-test fixture is a
-            // non-trading branch that is also inactive, and without the second
-            // condition it was counted here — the page reported 7
-            // administrative entities where the estate has 6.
-            'entityCount' => Branch::query()
-                ->acrossBranches()
-                ->where('IsTrading', false)
-                ->where('IsActive', true)
-                ->count(),
+            'modules' => $user instanceof User ? $modules->forUser($user, $context->workspace()) : [],
             'context' => $context,
         ]);
     }

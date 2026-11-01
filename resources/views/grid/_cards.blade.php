@@ -31,10 +31,28 @@
 @endphp
 
 <ul class="dg-cards" data-cards>
+    @if ($definition->selectable() && $grid->rows->isNotEmpty())
+        <li class="dg-card">
+            <label>
+                <input type="checkbox" data-card-check-all>
+                Select every row on this page
+            </label>
+        </li>
+    @endif
     @foreach ($grid->rows as $index => $row)
         @php($rowUrl = $definition->rowUrl($row))
         @php($rowActions = $definition->rowActions($row))
         <li class="dg-card">
+            @if ($definition->selectable())
+                {{-- Mirrors the table's canonical checkbox. A separate
+                     attribute keeps the same row out of the bulk form twice. --}}
+                <label>
+                    <input type="checkbox" data-card-check value="{{ $definition->rowKey($row) }}"
+                           @checked($definition->rowChecked($row))
+                           aria-label="Select row {{ $definition->rowKey($row) }}">
+                    Select
+                </label>
+            @endif
             <div class="dg-card-face">
                 @foreach ($face as $view)
                     @php($column = $view->column)

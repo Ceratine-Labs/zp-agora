@@ -2,17 +2,15 @@
 
 namespace Modules\Product\Services;
 
+use App\Grid\GridQuery;
 use App\Support\ProcedureService;
-use Illuminate\Database\Connection;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use LogicException;
 
 /**
  * The critical list's write path, and the one number the screen leads with.
  *
- * The listing itself comes out of agora.usp_Product_GridCriticalLines, because
- * a grid the customer can change is the rule (feature-rules §2). What is here
- * is the write and a headline count — machinery, not exposure.
+ * Both the listing and its headline count use the same procedure and
+ * validated query, so a drilldown cannot count a different set of lines.
  */
 class CriticalLineService
 {
@@ -47,40 +45,35 @@ class CriticalLineService
     }
 
     /**
-     * How many active critical lines are at or below zero on hand, in the
-     * branches currently in scope.
-     *
-     * The screen leads with this because it is the question people open the
-     * screen holding. Across the estate on 20 September 2026 it was 709 of
-     * 1,677 active lines, which is not a number anybody should have to find
-     * by sorting a grid.
+     * Count out-of-stock lines within the grid's validated scope and filters.
+     * The procedure owns the stock-status rule; this only narrows the query.
      */
-    public function outOfStockCount(Request $request): int
+    public function outOfStockCount(GridQuery $query): int
     {
-        $branches = array_values(array_filter(array_map(
-            intval(...),
-            array_filter(explode(',', (string) $request->query('branches', '')), fn (string $v) => $v !== '')
-        )));
-
-        $sql = '
-            SELECT COUNT_BIG(*) AS n
-            FROM [agora].[vw_StockItemCritical] c
-            LEFT JOIN [agora].[vw_StockItemPos] p
-                   ON p.BranchId = c.BranchId AND p.PosSystem = c.PosSystem AND p.PosCode = c.PosCode
-            WHERE c.IsActive = 1 AND p.QtyOnHand <= 0
-        ';
-
-        if ($branches !== []) {
-            $sql .= ' AND c.BranchId IN ('.implode(',', array_fill(0, count($branches), '?')).')';
+        foreach ($query->filters as $filter) {
+            if (($filter['column'] ?? null) !== 'Status') {
+                continue;
+            }
+            $statuses = is_array($filter['in'] ?? null) ? $filter['in'] : [];
+            if (array_filter($statuses, fn (mixed $value): bool => is_string($value)
+                && strcasecmp($value, 'Out of stock') === 0) === []) {
+                return 0;
+            }
         }
 
-        $row = $this->db()->selectOne($sql, $branches);
+        $summary = $query->onPage(1);
+        $summary->pageSize = 1;
+        $summary->filters = array_values(array_filter($query->filters,
+            fn (array $filter): bool => ($filter['column'] ?? null) !== 'Status'));
+        $summary->filters[] = ['column' => 'Status', 'type' => 'set', 'in' => ['Out of stock']];
 
-        return $row === null ? 0 : (int) $row->n;
-    }
+        $sets = $this->procedures->callSets('agora.usp_Product_GridCriticalLines',
+            $summary->procedureParameters() + ['FiltersJson' => $summary->filtersJson()]);
+        $count = ($sets[1] ?? collect())->first();
+        if ($count === null || ! isset($count->TotalRows)) {
+            throw new LogicException('The critical-line summary did not return its filtered count.');
+        }
 
-    private function db(): Connection
-    {
-        return DB::connection(config('agora.connections.app'));
+        return (int) $count->TotalRows;
     }
 }

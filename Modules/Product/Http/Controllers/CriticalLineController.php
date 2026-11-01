@@ -31,13 +31,15 @@ class CriticalLineController extends Controller
 
     public function index(Request $request): View
     {
+        $grid = $this->grids->build(
+            $this->registry->findOrFail('app.master.critical'),
+            $request,
+            $request->user()?->Id,
+        );
+
         return view('product::critical.index', [
-            'grid' => $this->grids->build(
-                $this->registry->findOrFail('app.master.critical'),
-                $request,
-                $request->user()?->Id,
-            ),
-            'outOfStock' => $this->service->outOfStockCount($request),
+            'grid' => $grid,
+            'outOfStock' => $this->service->outOfStockCount($grid->gridQuery),
         ]);
     }
 

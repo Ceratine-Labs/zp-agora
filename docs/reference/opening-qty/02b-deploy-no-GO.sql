@@ -125,13 +125,19 @@ EXEC PumpIT.sys.sp_executesql N'CREATE OR ALTER PROCEDURE dbo.sp_RebuildStockRec
     @ApplyExclusions                   bit      = 1,   -- q3
     @OnlyWhereOpeningIsZero            bit      = 0,   -- q6 says no staging
     @UseAreaShiftFlags                 bit      = 0,   -- q7 says cover the unflagged areas
-    @Tolerance                         float    = 0.0001,
+    @Tolerance                         float    = 0.0005,
     @RunId                             uniqueidentifier = NULL OUTPUT,
     @Quiet                             bit      = 0    -- driver sets this; suppresses the per-branch detail select
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
+
+    /* Count equality uses Agora @tol (half a 3-decimal ledger unit), not the
+       @eps business-variance cutoff of 0.005. Snapshot protection must remain
+       at least as strict as before, even when a caller widens @Tolerance. */
+    DECLARE @SnapshotTolerance float = CASE WHEN @Tolerance < 0.0001
+                                            THEN @Tolerance ELSE 0.0001 END;
 
     IF @BranchId IS NULL OR @FromDate IS NULL
     BEGIN
@@ -184,13 +190,16 @@ BEGIN
                                                  ORDER BY src.TransactionDate, src.ShiftNo) AS PriorShift
         FROM    src
     ),
+    /* Remove float subtraction noise at the equality boundary. Ten decimal
+       places retain finer precision than the three-decimal source ledger.
+       This affects comparison only; openings keep the original float values. */
     flagged AS (
         SELECT  c.*,
                 CASE WHEN @RepairOriginal = 1
-                      AND ABS(c.PriorCloseOrig - c.QtyOpen_Original) > @Tolerance
+                      AND ABS(CONVERT(decimal(28,10), c.PriorCloseOrig - c.QtyOpen_Original)) > @Tolerance
                      THEN 1 ELSE 0 END AS OrigBroken,
                 CASE WHEN @RepairWorking = 1
-                      AND ABS(c.PriorCloseWork - c.QtyOpen) > @Tolerance
+                      AND ABS(CONVERT(decimal(28,10), c.PriorCloseWork - c.QtyOpen)) > @Tolerance
                      THEN 1 ELSE 0 END AS WorkBroken
         FROM    chained AS c
         WHERE   c.PriorCloseOrig IS NOT NULL
@@ -213,8 +222,8 @@ BEGIN
 
     /* Drop rows where nothing actually moves — possible when a switch is off. */
     DELETE FROM #fix
-    WHERE ABS(NewOpenOrig - QtyOpen_Original) <= @Tolerance
-      AND ABS(NewOpenWork - QtyOpen)          <= @Tolerance;
+    WHERE ABS(CONVERT(decimal(28,10), NewOpenOrig - QtyOpen_Original)) <= @Tolerance
+      AND ABS(CONVERT(decimal(28,10), NewOpenWork - QtyOpen)) <= @Tolerance;
 
     /* ---- the report, always ---- */
     SELECT  @RunId                                    AS RunId,
@@ -298,8 +307,8 @@ BEGIN
             AND f.AreaNo          = l.AreaNo
             AND f.StockItemNo     = l.StockItemNo
     /* the optimistic guard: only if the row is still exactly as we read it */
-    WHERE   ABS(l.QtyOpen_Original - f.QtyOpen_Original) <= @Tolerance
-      AND   ABS(l.QtyOpen          - f.QtyOpen)          <= @Tolerance;
+    WHERE   ABS(l.QtyOpen_Original - f.QtyOpen_Original) <= @SnapshotTolerance
+      AND   ABS(l.QtyOpen          - f.QtyOpen)          <= @SnapshotTolerance;
 
     SET @applied = @@ROWCOUNT;
 

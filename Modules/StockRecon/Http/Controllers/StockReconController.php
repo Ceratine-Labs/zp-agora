@@ -15,11 +15,13 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Branch;
+use Modules\StockRecon\Grids\StockReconExceptionGrid;
 use Modules\StockRecon\Http\Requests\BalancePreviewRequest;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
 use Modules\StockRecon\Services\ExceptionNavigation;
 use Modules\StockRecon\Services\GlobalOverviewExport;
+use Modules\StockRecon\Services\ProposalMetric;
 use Modules\StockRecon\Services\ReconPeriods;
 use Modules\StockRecon\Services\StockReconService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -147,75 +149,58 @@ class StockReconController extends Controller
             'basis' => ['sometimes', 'in:original,balanced'],
             'export' => ['sometimes', 'in:chains,pairs,production'],
         ]);
-        $basis = $validated['basis'] ?? 'balanced';
-        try {
-            $global = $this->service->globalOverview($run, $basis);
-        } catch (AgoraProcException $e) {
-            return redirect()->route('app.stockrecon.run', $run)->with('refusal', $e->getMessage());
-        }
         if (isset($validated['export'])) {
+            // Binding can precede resolution of branch grants, including exports.
+            $run = StockReconRun::query()->findOrFail($run->getKey());
+            $basis = $validated['basis'] ?? 'balanced';
+            try {
+                $global = $this->service->globalOverview($run, $basis);
+            } catch (AgoraProcException $e) {
+                return redirect()->route('app.stockrecon.run', $run)->with('refusal', $e->getMessage());
+            }
+
             return (new GlobalOverviewExport)->download($global[$validated['export']], $validated['export'], $run->Id, $basis);
         }
 
-        return view('stockrecon::run', $this->frame($run, 'global') + [
-            'run' => $run,
-            'basis' => $basis,
-            'global' => $global,
-        ]);
+        return $this->runPage($run, $request, 'global');
     }
 
-    /**
-     * A run as it was recorded, whether or not anything was ever committed.
-     *
-     * The extract is a second read of the same rows, purely to power the
-     * drawer. The table stays as it is — it carries tick boxes that decide what
-     * a commit writes, it lives inside the commit form, and a row opens the
-     * chain behind it, none of which the grid shell can express. But "how do I
-     * get this into Excel" should not depend on which component a screen uses,
-     * and in journal mode that extract IS the deliverable.
-     */
+    /** The proposals open first; every permitted run pane arrives with them. */
     public function show(StockReconRun $run, Request $request): View
     {
-        $request->query->set('run', (string) $run->Id);
-        $globalChains = collect();
-        $globalRefusal = null;
-        try {
-            $globalChains = $this->service->globalOverview($run, 'balanced', false)['chains']->keyBy(fn ($chain) => $chain->AreaNo.'|'.$chain->StockItemNo);
-        } catch (AgoraProcException $e) {
-            $globalRefusal = $e->getMessage();
-        }
+        return $this->runPage($run, $request, 'proposals');
+    }
 
-        return view('stockrecon::run', $this->frame($run, 'proposals') + [
-            /*
-             * The chain is the unit of judgement, so the table is loaded whole
-             * and ordered by it. A branch-month is thousands of lines and this
-             * screen deliberately does not page: the tick boxes decide what a
-             * commit writes, and a paged commit form is a form that stamps rows
-             * nobody looked at.
-             *
-             * That is also why the form is normally run one area at a time —
-             * the hub says so beside the area picker.
-             */
-            'run' => $run->load('lines'),
-            'globalChains' => $globalChains,
-            'globalRefusal' => $globalRefusal,
-            /*
-             * Chains that carry nothing are hidden by DEFAULT, and counted out
-             * loud rather than dropped.
-             *
-             * A fully dormant chain with a nil total is fourteen identical
-             * rows saying an item did not move — true, and not a finding. On a
-             * branch-month there are enough of them to bury the chains that
-             * are. `?empty=show` puts them back, and the count is always on
-             * screen, because a screen that silently decides what you are not
-             * allowed to see is worse than a long one.
-             */
-            'hideEmpty' => $request->query('empty') !== 'show',
-            'extract' => $this->grids->build(
-                $this->registry->findOrFail('app.stockrecon.run'),
-                $request,
-                $request->user()?->Id,
-            ),
+    /** The same complete run page, opened on its recorded totals and context. */
+    public function overview(StockReconRun $run, Request $request): View
+    {
+        return $this->runPage($run, $request, 'overview');
+    }
+
+    /** Records behind an overview figure, scoped by the same run binding as the overview page. */
+    public function proposalMetric(StockReconRun $run, string $metric): View
+    {
+        // Route binding can run before ResolveBranchContext. Re-read after the
+        // middleware has resolved the current workspace and branch grants.
+        $run = StockReconRun::query()->findOrFail($run->getKey());
+        abort_unless(array_key_exists($metric, ProposalMetric::LABELS), 404);
+
+        $selector = new ProposalMetric;
+        $run->load('lines');
+
+        return view('stockrecon::proposal-metric', [
+            'run' => $run,
+            'metric' => $metric,
+            'label' => $selector::LABELS[$metric],
+            'chainMetric' => $selector->isChain($metric),
+            'records' => $selector->records($run->lines, $metric),
+            'recordedCount' => match ($metric) {
+                'amended' => $run->AmendedRows, 'reported' => $run->BlockedChains,
+                'over-before' => $run->OverRowsBefore, 'over-after' => $run->OverRowsAfter,
+                'short-before' => $run->ShortRowsBefore, 'short-after' => $run->ShortRowsAfter,
+                'dormant' => $run->DormantRows, 'openings' => $run->RepairedOpenings,
+                'audit' => $run->AuditRows, default => null,
+            },
         ]);
     }
 
@@ -229,21 +214,128 @@ class StockReconController extends Controller
      */
     public function exceptions(StockReconRun $run, Request $request): View
     {
-        $request->query->set('run', (string) $run->Id);
-        $grid = $this->grids->build(
-            $this->registry->findOrFail('app.stockrecon.exceptions'),
-            $request,
-            $request->user()?->Id,
-        );
+        return $this->runPage($run, $request, 'exceptions');
+    }
 
-        return view('stockrecon::run', $this->frame($run, 'exceptions') + [
-            'run' => $run,
-            'grid' => $grid,
-            'exceptionNavigation' => (new ExceptionNavigation)->build(
-                $grid, $this->service->exceptionTypes($run),
-            ),
-            'classes' => $this->service->exceptionClasses(),
-        ]);
+    /**
+     * Load the permitted panes once, before the browser switches between them.
+     *
+     * Each pane owns its variables, particularly its grid and URL state. The
+     * run's lines and global comparison are shared rather than read again for
+     * every tab. A direct entry URL still chooses the initial pane; `tab`
+     * records local switches so refreshing restores that choice.
+     */
+    protected function runPage(StockReconRun $run, Request $request, string $entryTab): View
+    {
+        // Re-read after branch middleware has resolved the current grants.
+        $run = StockReconRun::query()->findOrFail($run->getKey());
+        $request->query->set('run', (string) $run->Id);
+        $frame = $this->frame($run, $entryTab);
+        $permitted = array_column($frame['tabs'], 'key');
+        $selected = $request->query('tab');
+        $duplicate = $request->query('dup');
+        if (is_string($selected) && in_array($selected, $permitted, true)) {
+            $frame['tab'] = $selected;
+        } elseif (is_scalar($duplicate) && (string) $duplicate !== '' && in_array('overview', $permitted, true)) {
+            $frame['tab'] = 'overview';
+        }
+
+        $panes = [];
+        if (in_array('proposals', $permitted, true)) {
+            $run->load('lines');
+            $validated = $request->validate(['basis' => ['sometimes', 'in:original,balanced']]);
+            $basis = $validated['basis'] ?? 'balanced';
+            $global = null;
+            $globalRefusal = null;
+            try {
+                $global = $this->service->globalOverview($run, $basis);
+            } catch (AgoraProcException $e) {
+                $globalRefusal = $e->getMessage();
+            }
+
+            $proposalGlobal = $global;
+            $proposalGlobalRefusal = $globalRefusal;
+            if ($basis === 'original') {
+                // Proposal hints describe balanced quantities. Original-basis
+                // candidate matches cannot be reused as balanced evidence.
+                $proposalGlobal = null;
+                $proposalGlobalRefusal = null;
+                try {
+                    $proposalGlobal = $this->service->globalOverview($run, 'balanced', false);
+                } catch (AgoraProcException $e) {
+                    $proposalGlobalRefusal = $e->getMessage();
+                }
+            }
+
+            $panes['proposals'] = [
+                'globalChains' => ($proposalGlobal['chains'] ?? collect())->keyBy(fn ($chain) => $chain->AreaNo.'|'.$chain->StockItemNo),
+                'globalRefusal' => $proposalGlobalRefusal,
+                // These hidden empty chains remain counted, with a visible way
+                // to include them. The complete amendable set stays in the form.
+                'hideEmpty' => $request->query('empty') !== 'show',
+                'extract' => $this->grids->build(
+                    $this->registry->findOrFail('app.stockrecon.run'),
+                    $this->paneGridRequest($request, $run, 'proposals', $entryTab),
+                    $request->user()?->Id,
+                ),
+            ];
+            $panes['overview'] = [
+                'duplicates' => $this->service->duplicates($run),
+                'dupCase' => is_scalar($duplicate) ? (string) $duplicate : null,
+            ];
+            $panes['global'] = [
+                'basis' => $basis,
+                'global' => $global,
+                'globalRefusal' => $globalRefusal,
+            ];
+        }
+
+        if (in_array('exceptions', $permitted, true)) {
+            $grid = $this->grids->build(
+                $this->registry->findOrFail('app.stockrecon.exceptions'),
+                $this->paneGridRequest($request, $run, 'exceptions', $entryTab),
+                $request->user()?->Id,
+            );
+            $group = StockReconExceptionGrid::rowGroup();
+            $counts = $this->service->exceptionTypes($run, $group);
+            $panes['exceptions'] = [
+                'grid' => $grid,
+                'exceptionNavigation' => (new ExceptionNavigation)->build($grid, $counts),
+                'rowGroup' => $group,
+                'groupCounts' => $counts->where('Kind', 'group')->keyBy('Code'),
+            ];
+        }
+
+        return view('stockrecon::run', $frame + ['run' => $run, 'panes' => $panes]);
+    }
+
+    /**
+     * Grid controls navigate to their own pane and keep only its filter state.
+     *
+     * The main tabs change `tab` locally while retaining the entry pathname.
+     * Therefore unprefixed grid parameters belong to that entry route, not the
+     * currently visible tab; otherwise refreshing after a tab switch would
+     * apply an exception filter to the proposals extract, or vice versa.
+     */
+    protected function paneGridRequest(Request $request, StockReconRun $run, string $pane, string $entryTab): Request
+    {
+        $query = $request->query();
+        unset($query['export']);
+        if ($pane !== $entryTab) {
+            foreach (['q', 'sort', 'dir', 'page', 'size', 'f', 'columns', 'format', 'from', 'to', 'branches'] as $key) {
+                unset($query[$key]);
+            }
+        }
+        if ($pane !== 'exceptions') {
+            unset($query['group']);
+        }
+        $query['run'] = (string) $run->Id;
+        $query['tab'] = $pane;
+        $route = $pane === 'exceptions' ? 'app.stockrecon.exceptions' : 'app.stockrecon.run';
+        $paneRequest = Request::create(route($route, $run), 'GET', $query);
+        $paneRequest->setUserResolver($request->getUserResolver());
+
+        return $paneRequest;
     }
 
     /**
@@ -268,7 +360,11 @@ class StockReconController extends Controller
      */
     public function line(StockReconRun $run, StockReconRunLine $line, Request $request): View
     {
-        abort_unless($line->RunId === $run->Id, 404);
+        // Binding may precede branch-context middleware; reapply the scope to
+        // both records before exposing the linked chain.
+        $run = StockReconRun::query()->findOrFail($run->getKey());
+        $line = StockReconRunLine::query()->findOrFail($line->getKey());
+        abort_unless($line->RunId === $run->Id && $line->BranchId === $run->BranchId, 404);
 
         $data = [
             'run' => $run,
@@ -500,6 +596,7 @@ class StockReconController extends Controller
 
         $tabs = collect([
             'proposals' => ['label' => 'Proposals', 'route' => 'app.stockrecon.run', 'can' => 'stockrecon.runs.view'],
+            'overview' => ['label' => 'Overview', 'route' => 'app.stockrecon.overview', 'can' => 'stockrecon.runs.view'],
             'global' => ['label' => 'Global comparison', 'route' => 'app.stockrecon.global', 'can' => 'stockrecon.runs.view'],
             'exceptions' => ['label' => 'Exceptions', 'route' => 'app.stockrecon.exceptions', 'can' => 'stockrecon.exceptions.view'],
         ])
@@ -507,7 +604,6 @@ class StockReconController extends Controller
             ->map(fn (array $item, string $key) => [
                 'key' => $key,
                 'label' => $item['label'],
-                'href' => route($item['route'], $run),
             ])
             ->values()
             ->all();
@@ -519,15 +615,6 @@ class StockReconController extends Controller
             'branch' => Branch::query()->where('BranchId', $run->BranchId)->first(),
             'classes' => $this->service->exceptionClasses(),
             'audit' => $this->service->auditChecks(),
-            /*
-             * The duplicate issues on this run, on both faces of it (Ryan,
-             * 1 Oct 2026): what is clear, what is possible, and what is being
-             * done about each. `dup` is the case left open — the panel's tabs
-             * write it into the address, so a release, which redirects back,
-             * lands on the same case.
-             */
-            'duplicates' => $this->service->duplicates($run),
-            'dupCase' => is_scalar($dup = request()->query('dup')) ? (string) $dup : null,
         ];
     }
 

@@ -135,7 +135,7 @@ final class GridService
     private function branchIds(GridDefinition $definition, Request $request): array
     {
         if ($this->context->workspace() === 'branch') {
-            return array_values(array_filter([$this->context->id()]));
+            return [$this->context->id() ?? -1];
         }
 
         if (! $definition->branchSelector()) {
@@ -150,17 +150,34 @@ final class GridService
             default => explode(',', (string) $given),
         };
 
-        return collect($ids)
-            // A nested array is not a branch id, and array_map('intval', …)
-            // over one is an "Array to string conversion" in a different
-            // costume — the exact 500 the Reports selector shipped with.
-            ->reject(fn (mixed $id) => is_array($id) || is_object($id))
-            ->map(fn (mixed $id) => (int) trim((string) $id))
-            ->filter()
-            ->unique()
-            ->filter(fn (int $id) => $this->context->maySee($id))
-            ->values()
-            ->all();
+        $selected = [];
+        $hasSelection = false;
+
+        foreach ($ids as $id) {
+            if ($id === null || (is_string($id) && trim($id) === '')) {
+                continue;
+            }
+
+            $hasSelection = true;
+            if (! is_int($id) && ! is_string($id)) {
+                continue;
+            }
+
+            $id = filter_var(trim((string) $id), FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1, 'max_range' => 2147483647],
+            ]);
+            if ($id !== false && $this->context->maySee($id)) {
+                $selected[] = $id;
+            }
+        }
+
+        if (! $hasSelection) {
+            return $this->context->allowed();
+        }
+
+        // [] becomes SQL NULL/all branches. A rejected selection must remain
+        // a nonmatching filter; omitted selection means the caller's grants.
+        return $selected === [] ? [-1] : array_values(array_unique($selected));
     }
 
     /**

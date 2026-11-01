@@ -131,6 +131,28 @@ class UserAdminScreenTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_view_and_edit_share_sections_and_failed_empty_grants_stay_empty(): void
+    {
+        $this->skipUnlessLocalStub();
+        $admin = $this->person('admin');
+        $subject = $this->person('operations');
+        $sections = ['id="details"', 'id="roles"', 'id="branches"', 'id="permissions"', 'id="menu"', 'id="password"'];
+
+        foreach (['show', 'edit'] as $mode) {
+            $this->actingAs($admin)->get(route('app.setup.users.'.$mode, ['user' => $subject->Id]))
+                ->assertOk()->assertSeeInOrder($sections, false)
+                ->assertSee('Back to the list');
+        }
+
+        $html = $this->actingAs($admin)->withSession(['_old_input' => ['_section' => 'permissions']])
+            ->get(route('app.setup.users.edit', ['user' => $subject->Id]))->assertOk()->getContent();
+        $document = new \DOMDocument;
+        @$document->loadHTML($html);
+        $xpath = new \DOMXPath($document);
+        $this->assertSame(0, $xpath->query('//input[@name="permissions[]" and @checked]')->length);
+        $this->assertGreaterThan(0, $xpath->query('//input[@name="permissions[]"]')->length);
+    }
+
     public function test_granting_sites_replaces_the_set_and_settles_what_the_person_is(): void
     {
         $admin = $this->person('admin');

@@ -10,7 +10,7 @@
     pass 3 for weighed stock), signed (colour a negative red, a positive amber:
     for a variance, where negative is short).
 --}}
-@props(['before' => null, 'after' => null, 'dp' => 0, 'signed' => false])
+@props(['before' => null, 'after' => null, 'dp' => 0, 'signed' => false, 'compactQuantity' => false])
 
 @php
     use App\Support\Format;
@@ -23,7 +23,7 @@
 
         return (float) $v < -0.0005 ? 'ba-short' : ((float) $v > 0.0005 ? 'ba-over' : '');
     };
-    $fmt = fn ($v) => Format::n($v, (abs((float) $v - round((float) $v)) > 0.0005) ? max($dp, 3) : $dp);
+    $fmt = fn ($v) => $compactQuantity ? Format::qty($v) : Format::n($v, (abs((float) $v - round((float) $v)) > 0.0005) ? max($dp, 3) : $dp);
 @endphp
 
 <span {{ $attributes->merge(['class' => 'ba'.($changed ? ' ba-changed' : '')]) }}>

@@ -47,11 +47,12 @@
      ordinary balanced or dormant shift. Each links to its case on the run's
      duplicate-issues panel, which says where it stands. --}}
 @php($clearDups = $shifts->filter(fn ($s) => $s->DupTier === 'D1'))
-@php($caseUrl = fn ($s) => route('app.stockrecon.run', [$run, 'dup' => 'dup-'.$s->Id]).'#duplicates')
-@php($twinOf = fn ($s) => $s->DupTwinDate ? \Illuminate\Support\Carbon::parse($s->DupTwinDate)->format('d M').' shift '.$s->DupTwinShift : 'a neighbouring shift')
+@php($caseUrl = fn ($s) => route('app.stockrecon.overview', [$run, 'dup' => 'dup-'.$s->Id]).'#duplicates')
+@php($twinOf = fn ($s) => $s->DupTwinDate ? \Illuminate\Support\Carbon::parse($s->DupTwinDate)->format('d M').' shift '.\Modules\StockRecon\Support\ShiftLabel::show($s->DupTwinShift) : 'a neighbouring shift')
 
 <div class="drill-chain">
     <header>
+        <a class="btn-ghost" href="{{ route('app.stockrecon.helper', [$run, 'line' => $line->Id]) }}">Explain this chain</a>
         <div class="card-t">
             <h4>{{ $item->StockItemDescription ?? $line->StockItemNo }}</h4>
             {{-- The reading notes, behind a button (ZRP, 4 Oct 2026). --}}
@@ -75,7 +76,7 @@
     </header>
 
     <x-statstrip :stats="[
-        ['label' => 'Chain total (T)', 'value' => \App\Support\Format::n($item?->ChainNetVar, 3),
+        ['label' => 'Chain total (T)', 'value' => \App\Support\Format::qty($item?->ChainNetVar),
          'note' => \App\Support\Format::r($item?->ChainNetVarValue),
          'tone' => (float) ($item?->ChainNetVar ?? 0) > 0.005 ? 'warn' : 'neutral'],
         ['label' => 'Shifts', 'value' => \App\Support\Format::n($item?->ChainShifts),
@@ -135,8 +136,8 @@
                     'lines' => $unreleased->pluck('Id')->map(fn ($id) => (int) $id)->all(),
                     'label' => $unreleased->count() > 1 ? 'Release all '.$unreleased->count().'…' : 'Release…',
                     'summary' => ($item->StockItemDescription ?? $line->StockItemNo).': '
-                        .$unreleased->map(fn ($s) => \Illuminate\Support\Carbon::parse($s->TransactionDate)->format('d M').' shift '.$s->ShiftNo
-                            .', issue '.\App\Support\Format::n($s->QtyIssued, 3))->implode('; ').'.',
+                        .$unreleased->map(fn ($s) => \Illuminate\Support\Carbon::parse($s->TransactionDate)->format('d M').' shift '.\Modules\StockRecon\Support\ShiftLabel::show($s->ShiftNo)
+                            .', issue '.\App\Support\Format::qty($s->QtyIssued))->implode('; ').'.',
                 ])
             @endif
             @if ($releasedSince->isNotEmpty())
@@ -149,8 +150,8 @@
         <x-notice tone="info"
                   :title="$clearDups->count() === 1 ? 'A duplicate issue on this chain' : $clearDups->count().' duplicate issues on this chain'">
             @foreach ($clearDups as $dup)
-                <p>{{ \Illuminate\Support\Carbon::parse($dup->TransactionDate)->format('d M') }} shift {{ $dup->ShiftNo }}:
-                   the issue of {{ \App\Support\Format::n($dup->QtyIssued, 3) }} was keyed twice — the identical issue on
+                <p>{{ \Illuminate\Support\Carbon::parse($dup->TransactionDate)->format('d M') }} shift {{ \Modules\StockRecon\Support\ShiftLabel::show($dup->ShiftNo) }}:
+                   the issue of {{ \App\Support\Format::qty($dup->QtyIssued) }} was keyed twice — the identical issue on
                    {{ $twinOf($dup) }} arrived.
                    @if ($dup->QtyIssuedNew !== null)
                        It is taken out of the balancing and set to 0 by the commit, and the chain is written with it.
@@ -192,7 +193,7 @@
          same order (Ryan, 16 Oct 2026), as the legacy screen does, so a figure
          is read straight across; Amend, which only the amended side has, sits
          after them. --}}
-    @php($dash = fn ($v) => abs((float) $v) < 0.0005 ? '—' : \App\Support\Format::n($v, 3))
+    @php($dash = fn ($v) => abs((float) $v) < 0.0005 ? '—' : \App\Support\Format::qty($v))
     <x-table :count="$shifts->count()" dense fit
              empty="This item has no other shift in the window.">
         <x-slot:head>
@@ -219,7 +220,7 @@
             @php($group = $groups[(int) $shift->Id] ?? null)
             <tr @class(['is-matched' => (bool) $shift->IsClicked, 'bal-g'.($group['series'] ?? 0) => $group !== null])>
                 <td class="l fit-min">{{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }}</td>
-                <td class="num">{{ $shift->ShiftNo }}</td>
+                <td class="num">{{ \Modules\StockRecon\Support\ShiftLabel::show($shift->ShiftNo) }}</td>
                 {{-- Who was signed on to this counting area for this shift.
                      The method note listed this as the second thing the
                      algorithm could not see; the estate records it after all,
@@ -235,24 +236,24 @@
                     @endif
                 </td>
                 <td class="num grp">
-                    {{ \App\Support\Format::n($shift->QtyOpen, 3) }}
+                    {{ \App\Support\Format::qty($shift->QtyOpen) }}
                     @if (abs((float) $shift->ChainBreak) > 0.0005)
                         <x-chip :tone="(float) $shift->ChainBreak < 0 ? 'crit' : 'warn'" :dot="false"
-                                :title="'Previous closing '.\App\Support\Format::n($shift->PrevClose, 3)
+                                :title="'Previous closing '.\App\Support\Format::qty($shift->PrevClose)
                                     .($shift->BreakKept ? ' — small, the chain runs through it' : ' — the chain is split here')">
                             {{ (float) $shift->ChainBreak < 0 ? 'S10a' : 'S10b' }}
-                            {{ \App\Support\Format::n($shift->ChainBreak, 3) }}{{ $shift->BreakKept ? ' kept' : '' }}
+                            {{ \App\Support\Format::qty($shift->ChainBreak) }}{{ $shift->BreakKept ? ' kept' : '' }}
                         </x-chip>
                     @endif
                 </td>
-                <td class="num">{{ (float) $shift->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($shift->QtyIssued, 3) }}</td>
-                <td class="num">{{ \App\Support\Format::n($shift->QtyClose, 3) }}</td>
-                <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($shift->QtyPOS, 3) }}</td>
+                <td class="num">{{ (float) $shift->QtyIssued === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyIssued) }}</td>
+                <td class="num">{{ \App\Support\Format::qty($shift->QtyClose) }}</td>
+                <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyPOS) }}</td>
                 <td class="num">
                     @if ($group)
                         <span class="bal-tag" title="{{ \Modules\StockRecon\Services\ChainSummary::balanceNote($group) }}">{{ $group['letter'] }}</span>
                     @endif
-                    {{ (float) $shift->QtyVar === 0.0 ? '—' : \App\Support\Format::n($shift->QtyVar, 3) }}
+                    {{ (float) $shift->QtyVar === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyVar) }}
                 </td>
                 {{-- The rand behind the quantity. A variance is read as a pair
                      on the legacy screen and it should be read as a pair here:
@@ -265,12 +266,12 @@
                      as in every other figure column: a chain where every shift
                      balanced read 0.000 all the way down, which looked like a
                      column that was not working (Ryan, 6 Oct 2026). --}}
-                <td class="num muted">{{ abs((float) $shift->CumulativeVar) < 0.0005 ? '—' : \App\Support\Format::n($shift->CumulativeVar, 3) }}</td>
-                <td class="num grp">{{ \App\Support\Format::n($shift->QtyOpenNew, 3) }}</td>
+                <td class="num muted">{{ abs((float) $shift->CumulativeVar) < 0.0005 ? '—' : \App\Support\Format::qty($shift->CumulativeVar) }}</td>
+                <td class="num grp">{{ \App\Support\Format::qty($shift->QtyOpenNew) }}</td>
                 <td class="num">{{ $dash($shift->QtyIssuedAmended) }}</td>
-                <td class="num">{{ \App\Support\Format::n($shift->QtyCloseNew, 3) }}</td>
-                <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($shift->QtyPOS, 3) }}</td>
-                <td class="num">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($shift->QtyVarNew, 3) }}</td>
+                <td class="num">{{ \App\Support\Format::qty($shift->QtyCloseNew) }}</td>
+                <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyPOS) }}</td>
+                <td class="num">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyVarNew) }}</td>
                 <td class="num money">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::r($shift->VarValueNew) }}</td>
                 <td class="num muted">{{ $dash($shift->CumulativeVarNew) }}</td>
                 <td class="num">{{ $dash($shift->AmendClose) }}</td>
@@ -280,7 +281,7 @@
                     @if ($shift->AmendmentState === 'active')<x-chip tone="good" :dot="false">amended</x-chip>@endif
                     @if ($shift->AuditCode)
                         @include('stockrecon::partials.code', ['code' => $shift->AuditCode,
-                            'title' => 'PumpIT holds '.\App\Support\Format::n($shift->QtyOpenNow, 3).' / '.\App\Support\Format::n($shift->QtyCloseNow, 3)])
+                            'title' => 'PumpIT holds '.\App\Support\Format::qty($shift->QtyOpenNow).' / '.\App\Support\Format::qty($shift->QtyCloseNow)])
                     @endif
                     {{-- A clear duplicate: the issue it takes out, or why it
                          does not — and its case on the run's panel. --}}
@@ -288,7 +289,7 @@
                         <x-chip :tone="$shift->QtyIssuedNew !== null ? 'good' : 'warn'" :dot="false"
                                 :title="'Clear duplicate issue: the identical issue on '.$twinOf($shift).' arrived. '.($shift->DupReason ?? '')">
                             D1 {{ $shift->QtyIssuedNew !== null
-                                ? 'issue '.\App\Support\Format::n($shift->QtyIssued, 3).' → '.\App\Support\Format::n($shift->QtyIssuedNew, 3)
+                                ? 'issue '.\App\Support\Format::qty($shift->QtyIssued).' → '.\App\Support\Format::qty($shift->QtyIssuedNew)
                                 : 'not removed' }}
                         </x-chip>
                         <a href="{{ $caseUrl($shift) }}">case</a>
@@ -297,16 +298,16 @@
                     @if ($shift->QtyIssuedNew !== null && $shift->DupTier !== 'D1')
                         <x-chip tone="good" :dot="false"
                                 title="The over this shift sold or held without an issue, recorded as the issue it never got. Reversible from the run.">
-                            missing issue {{ \App\Support\Format::n($shift->QtyIssued, 3) }} → {{ \App\Support\Format::n($shift->QtyIssuedNew, 3) }}
+                            missing issue {{ \App\Support\Format::qty($shift->QtyIssued) }} → {{ \App\Support\Format::qty($shift->QtyIssuedNew) }}
                         </x-chip>
                     @endif
                     {{-- A possible duplicate: its twin, why it is not clear, and
                          the release it has now — or the press that makes one. --}}
                     @if ($shift->DupTier === 'D2')
-                        @php($twin = $shift->DupTwinDate ? \Illuminate\Support\Carbon::parse($shift->DupTwinDate)->format('d M').' shift '.$shift->DupTwinShift : 'not found')
+                        @php($twin = $shift->DupTwinDate ? \Illuminate\Support\Carbon::parse($shift->DupTwinDate)->format('d M').' shift '.\Modules\StockRecon\Support\ShiftLabel::show($shift->DupTwinShift) : 'not found')
                         @php($what = ($item->StockItemDescription ?? $line->StockItemNo).', '
-                            .\Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M').' shift '.$shift->ShiftNo
-                            .', issue '.\App\Support\Format::n($shift->QtyIssued, 3).' — the same issue on '.$twin.'.')
+                            .\Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M').' shift '.\Modules\StockRecon\Support\ShiftLabel::show($shift->ShiftNo)
+                            .', issue '.\App\Support\Format::qty($shift->QtyIssued).' — the same issue on '.$twin.'.')
                         <x-chip :tone="$shift->ReleaseId ? 'neutral' : 'serious'" :dot="false"
                                 :title="'Possible duplicate issue: the same issue on '.$twin.'. '.($shift->DupReason ?? '')">
                             D2{{ $shift->ReleaseId ? ' released' : '' }}
@@ -338,7 +339,7 @@
          usp_StockRecon_DrillChain, which also says whether they add up: a run
          made before the method settled on 30 Sep 2026 was totalled another way,
          and gets a plain sentence instead of a sum that does not hold. --}}
-    @php($signed = fn ($v) => ((float) $v > 0.0005 ? '+' : '').\App\Support\Format::n($v, 3))
+    @php($signed = fn ($v) => ((float) $v > 0.0005 ? '+' : '').\App\Support\Format::qty($v))
     @php($openings = (int) ($item?->OpeningsCount ?? 0))
     @php($dups = (int) ($item?->DuplicatesCount ?? 0))
     @if ($item && ! $item->TotalReconciles)
@@ -348,7 +349,7 @@
         </p>
     @elseif ($item && ($openings > 0 || $dups > 0))
         <p class="muted">
-            Cumulative ends on the chain total, {{ \App\Support\Format::n($item->ChainNetVar, 3) }}. Besides each
+            Cumulative ends on the chain total, {{ \App\Support\Format::qty($item->ChainNetVar) }}. Besides each
             shift's variance it steps
             @if ($openings > 0)
                 {{ $signed($item->OpeningsMoved) }} where {{ $openings === 1 ? '1 opening was' : $openings.' openings were' }}

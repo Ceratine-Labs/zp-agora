@@ -4,6 +4,26 @@ Prepared 21 Sep 2026 after the customer said they want to proceed; revised the
 same day once their answers came back. Every figure below was measured
 read-only against live PumpIT on 21 Sep 2026 at 07:00 UTC (09:00 SAST).
 
+## Source revision, 25 October 2026 — not deployed
+
+Both worker packages (`02-proposed-proc.sql` and `02b-deploy-no-GO.sql`) now
+default to `@Tolerance = 0.0005`, matching Agora's count-equality `@tol` (half
+of a three-decimal ledger unit). The historical comparison with `@eps = 0.005`
+below concerns the business-variance cutoff; **0.005 is not the count-repair
+threshold**. The optimistic update guard remains at most `0.0001`, or tighter
+when explicitly requested, so widening repair tolerance cannot overwrite an
+intervening edit that the previous guard would have rejected. Repair comparisons
+normalize float subtraction noise to ten decimal places, so an exact `0.0005`
+gap is equal to the threshold; the stored quantities retain their float values.
+
+Read-only verification on 25 October found the installed customer worker still
+at `0.0001`, last modified on 21 September. The opening-fix log contains only
+branch 9's two runs (2,153 and 7 rows); the other sixteen sites remain unrun.
+The deployment statements and measured figures below describe the historical
+revision, not deployment of this source update. Local regression coverage is
+in `tests/Feature/StockRecon/OpeningQuantityToleranceTest.php`; it extracts each
+worker into a disposable local schema and rolls back its fixtures and procedure.
+
 > ## ⚠ THIS HAS RUN. ONE SITE. READ THIS BEFORE ANYTHING ELSE.
 >
 > The line that used to sit here said *"Nothing has been run against the

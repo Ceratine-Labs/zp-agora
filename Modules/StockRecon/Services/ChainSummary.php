@@ -151,7 +151,7 @@ final class ChainSummary
     {
         $short = $total < -0.0005;
         $over = $total > 0.0005;
-        $units = Format::n(abs($total), 3);
+        $units = self::quantity(abs($total));
         // The over is CAPTURED as the missing issue (13 Oct 2026) when the run
         // proposes it: nothing is left over on any shift afterwards. A run
         // previewed before then left it, and reads as it did.
@@ -290,7 +290,7 @@ final class ChainSummary
      */
     public static function balanceNote(array $group): string
     {
-        $units = Format::n(abs($group['net']), 3);
+        $units = self::quantity(abs($group['net']));
 
         return 'Group '.$group['letter'].' — balances with '.($group['with'] !== '' ? $group['with'] : 'the shifts beside it').'. '
             .match (true) {
@@ -298,5 +298,11 @@ final class ChainSummary
                 $group['net'] < -0.0005 => 'Together they leave a short of '.$units.'.',
                 default => 'Together they come to nil.',
             };
+    }
+
+    /** Format a quantity in a status sentence, keeping up to three decimal places. */
+    private static function quantity(float $value): string
+    {
+        return rtrim(rtrim(Format::n($value, 3), '0'), '.');
     }
 }

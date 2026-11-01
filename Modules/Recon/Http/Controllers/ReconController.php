@@ -15,12 +15,14 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Modules\Recon\Grids\ReconCriteriaGrid;
 use Modules\Recon\Http\Controllers\Concerns\AreaWorkbench;
+use Modules\Recon\Http\Requests\ArchiveRunsRequest;
 use Modules\Recon\Http\Requests\PreviewRequest;
 use Modules\Recon\Models\ReconRun;
 use Modules\Recon\Models\ReconRunLine;
 use Modules\Recon\Services\ReconCriteriaService;
 use Modules\Recon\Services\ReconMatchService;
 use Modules\Recon\Services\ReconPreviewRefused;
+use Modules\Recon\Services\ReconRunArchiveService;
 use Modules\Recon\Services\ReconService;
 
 /**
@@ -69,14 +71,17 @@ class ReconController extends Controller
      */
     public function index(Request $request, BranchContext $context): View
     {
+        $grid = $this->grids->build(
+            $this->registry->findOrFail('app.recon.runs'),
+            $request,
+            $request->user()?->Id,
+        );
+
         return view('recon::index', [
             'areas' => $this->service->areas(),
             'open' => ReconRun::openFor(auth()->id()),
-            'grid' => $this->grids->build(
-                $this->registry->findOrFail('app.recon.runs'),
-                $request,
-                $request->user()?->Id,
-            ),
+            'grid' => $grid,
+            'archiveScope' => app(ReconRunArchiveService::class)->scope($grid, $request, $context),
             'branches' => $context->isBranchWorkspace() ? null : $this->branches(),
             'context' => $context,
             'stampMode' => config('recon.stamp_mode'),
@@ -143,17 +148,19 @@ class ReconController extends Controller
                 ->first();
         }
 
+        $state = in_array($request->query('state'), ['reconciled', 'all'], true) ? (string) $request->query('state') : 'outstanding';
         $centreScope = ['branch_id' => $branchId, 'from' => $frame['from'], 'to' => $frame['to']];
         $tabs = $this->centreTabs($area);
         $active = collect($tabs)->pluck('key')->contains($request->query('tab'))
             ? (string) $request->query('tab')
-            : 'auto';
+            : ($request->filled('run') ? 'auto' : 'match');
 
         return view('recon::area', $frame + [
             'pane' => 'centre',
             'scoped' => $scoped,
             'run' => $run,
             'centreScope' => $centreScope,
+            'state' => $state,
             'centreTabs' => $tabs,
             'centreTab' => $active,
             'options' => $this->service->optionsFor($area),
@@ -175,6 +182,7 @@ class ReconController extends Controller
     {
         return view('recon::partials.run-panel', [
             'run' => $run->load('lines'),
+            'siteName' => $this->branch((int) $run->BranchId)->Name ?? 'Site '.$run->BranchId,
             'area' => $this->service->area($run->ReconArea),
             'freshness' => $this->service->freshness($run),
             'centre' => $this->centreBack($request, 'auto', $run),
@@ -329,6 +337,7 @@ class ReconController extends Controller
                 trim((string) $request->input('reason')) ?: null,
                 $basis,
                 $this->allocation($request->input('allocation')),
+                $this->bagAdjustments($request->input('bag_adjustments')),
             );
         } catch (AgoraProcException $e) {
             if ($request->expectsJson()) {
@@ -421,6 +430,24 @@ class ReconController extends Controller
         ));
     }
 
+    /** @return array<int, array{id: int|null, amount: string|null, share: string|null}>|null */
+    protected function bagAdjustments(mixed $posted): ?array
+    {
+        $lines = is_string($posted) ? json_decode($posted, true) : null;
+        if (! is_array($lines) || ! array_is_list($lines)) {
+            return null;
+        }
+        $amount = fn (mixed $value): ?string => is_scalar($value)
+            && preg_match('/^-?\d+(\.\d{1,2})?$/', trim((string) $value)) === 1
+                ? trim((string) $value) : null;
+
+        return array_map(fn (mixed $line): array => [
+            'id' => is_array($line) && is_scalar($line['id'] ?? null) ? (int) $line['id'] : null,
+            'amount' => is_array($line) ? $amount($line['amount'] ?? null) : null,
+            'share' => is_array($line) ? $amount($line['share'] ?? null) : null,
+        ], $lines);
+    }
+
     /** The runs made in this area — the person's own first, everyone's on request. */
     public function runList(string $area, Request $request, BranchContext $context): View
     {
@@ -429,12 +456,32 @@ class ReconController extends Controller
         // being asked of it rather than by a second registration per area.
         $request->query->set('area', $area);
 
+        $grid = $this->grids->build(
+            $this->registry->findOrFail('app.recon.runs'),
+            $request,
+            $request->user()?->Id,
+        );
+
         return view('recon::area', $this->workbench($area, 'runs', $context) + [
-            'grid' => $this->grids->build(
-                $this->registry->findOrFail('app.recon.runs'),
-                $request,
-                $request->user()?->Id,
-            ),
+            'grid' => $grid,
+            'archiveScope' => app(ReconRunArchiveService::class)->scope($grid, $request, $context),
+        ]);
+    }
+
+    /** Archive only freshly verified invalid previews in the displayed scope. */
+    public function archive(ArchiveRunsRequest $request, BranchContext $context, ReconRunArchiveService $archives): RedirectResponse
+    {
+        $data = $request->validated();
+
+        try {
+            $outcome = $archives->archive($data['scope_token'], $data['mode'], $data['items'] ?? [], $request, $context);
+        } catch (AgoraProcException $e) {
+            return back()->with('refusal', $e->getMessage());
+        }
+
+        return redirect()->to($outcome['redirect'])->with('archiveOutcome', [
+            'archived' => $outcome['archived'],
+            'skipped' => $outcome['skipped'],
         ]);
     }
 
@@ -696,6 +743,7 @@ class ReconController extends Controller
 
         return view('recon::run', [
             'run' => $run->load('lines'),
+            'siteName' => $this->branch((int) $run->BranchId)->Name ?? 'Site '.$run->BranchId,
             'area' => $this->service->area($run->ReconArea),
             'extract' => $this->grids->build(
                 $this->registry->findOrFail('app.recon.run'),
@@ -858,6 +906,44 @@ class ReconController extends Controller
             ->with('executedLines', $result['lines']->toArray());
     }
 
+    public function batch(Request $request, string $area, BranchContext $context): View
+    {
+        $frame = $this->workbench($area, 'batch', $context);
+        $batch = null;
+        $lines = $allocations = collect();
+        $refusal = null;
+        $branchId = $context->isBranchWorkspace() ? (int) $context->id() : $request->integer('branch_id');
+        $batchNo = $request->integer('batch_no');
+        if ($branchId > 0 && $batchNo > 0) {
+            $branchId = $this->resolveBranch($branchId, $context);
+            try {
+                ['batch' => $batch, 'lines' => $lines, 'allocations' => $allocations] = $this->service->batch($area, $branchId, $batchNo);
+            } catch (AgoraProcException $e) {
+                $refusal = $e->getMessage();
+            }
+        }
+
+        return view('recon::area', array_merge($frame, compact('batch', 'lines', 'allocations', 'refusal', 'branchId', 'batchNo')));
+    }
+
+    public function reverseBatch(Request $request, string $area, BranchContext $context): RedirectResponse
+    {
+        $this->service->area($area);
+        // These values are from the signed preview URL, never the POST body.
+        $branchId = $this->resolveBranch((int) $request->query('branch_id'), $context);
+        abort_unless($branchId === (int) $request->query('branch_id'), 403);
+        $batchNo = (int) $request->query('batch_no');
+        $back = redirect()->route('app.recon.batch', [$area, 'branch_id' => $branchId, 'batch_no' => $batchNo]);
+        try {
+            $status = $this->service->reverseBatch($area, $branchId, (int) $request->query('batch_id'), $batchNo,
+                trim((string) $request->input('reason')));
+        } catch (AgoraProcException $e) {
+            return $back->with('refusal', $e->getMessage());
+        }
+
+        return $back->with('batchDone', $status->Message);
+    }
+
     /**
      * Reverse: put back exactly what this run stamped.
      *
@@ -907,6 +993,7 @@ class ReconController extends Controller
             'period_from' => (string) $request->query('from', $run?->FromDate?->toDateString()),
             'period_to' => (string) $request->query('to', $run?->ToDate?->toDateString()),
             'run' => (int) $request->query('run', $run?->Id),
+            'state' => in_array($request->query('state'), ['reconciled', 'all'], true) ? $request->query('state') : null,
         ]);
     }
 
@@ -919,6 +1006,7 @@ class ReconController extends Controller
             'from' => (string) $request->input('period_from', $run?->FromDate?->toDateString()),
             'to' => (string) $request->input('period_to', $run?->ToDate?->toDateString()),
             'run' => $request->integer('run') ?: $run?->Id,
+            'state' => in_array($request->input('state'), ['reconciled', 'all'], true) ? $request->input('state') : null,
             'tab' => in_array($request->input('tab'), ['auto', 'suggest', 'match'], true) ? $request->input('tab') : null,
         ]));
     }

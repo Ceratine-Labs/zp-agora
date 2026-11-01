@@ -251,3 +251,54 @@ guards finding 2: if `MatchedRows` is ever 2 there, the NULL comparison is back.
 These tests write to the stub through the **app** connection by three-part
 name, never through `pumpit`, which in a working development `.env` points at
 105.247.172.179, the customer's live instance.
+
+## Confirmed cash-bag writeback and single-batch reversal — 25 October 2026
+
+Ryan explicitly authorised confirmed cash-bag changes to write back to PumpIT.
+`cash_bag_adjust_mode = live` applies each cashier's confirmed share to an
+explicitly chosen selected bag. For multiple bags the operator must choose;
+no bag is silently selected. The confirmation names the bag, its old/new
+amount and the opposite change in `AdjustedBy`. The procedure independently
+checks every selected ID, echoed amount, whole-cent share and cashier total,
+and refuses a negative resulting bag amount. It stamps the match and updates
+`CashBagAmount`, `AdjustedBy` and `Adjusted` in one transaction. Cash bags use
+`original = CashBagAmount + AdjustedBy`, unlike FNB's adjustment sign.
+
+`ReconMatch` stores exact prior values, including nulls. Reversal locks and
+checks the amount, adjustment fields and batch before restoring those priors;
+any later change refuses the whole reversal. Existing staff-short approval
+and withdrawal protections remain in force. `ReconStamp` names the cash-bag
+columns and changes in the audit trail.
+
+The **Unreconcile batch** tab previews a displayed batch number for one site
+and area through `usp_Recon_GetBatch`. Only Agora-recorded batches qualify;
+PumpIT-only and ambiguous numbers are refused. The preview's signed URL binds
+confirmation to the internal batch ID, displayed number, area and site. The
+write requires reversal permission and a reason, and reverses only that
+batch. Other batches in the same run are untouched.
+
+The recon centre now opens site/period browsing before any preview is created.
+Outstanding, reconciled and all states are selectable; reconciled rows show
+their batch number and cannot be selected for a new match. The Runs grid has a
+sortable/filterable Run #, run detail names the site, and changing a header
+filter submits it immediately.
+
+These changes deploy with `v1__13pzc_recon_procs` and the rebuilt assets. Local
+verification used the local PumpIT stub only. No historical run was repaired
+or production procedure changed as part of implementation.
+
+### Run validity and reversible bulk archive (1 November 2026)
+
+The runs overview and each area's Runs tab now share **Open work / Invalid / Everything** views. The five overview cards and each run's type use the existing bank logo or area illustration; the bound run model supplies the same artwork to its heading and startup loader.
+
+`usp_Recon_RunScope` is the common SQL scope for the grid and archive action: allowed and selected sites, overlapping statement period, mine/everyone, area, search and existing header filters. The normal grid checks validity only for its displayed page; Invalid checks every scoped candidate before paging so the count and “all filtered” action cover every page.
+
+`usp_Recon_RunValidity` does not use reference-only `RunFreshness` hints as proof. An invalid preview must have no own batch/match/stamp/allocation evidence, a nonempty and complete original proposal set, and every proposal's current matching bank rows must still match the saved count, amount, ABSA legs and extraction provenance while all have reconciled state 2. Selection ticks cannot hide a remaining proposal. Empty, changed, missing, unknown or incompletely mapped evidence remains **Needs review**; partial supersession remains visible and cannot be bulk archived. **Current** means the matching bank rows remain outstanding, not that deposit or execution checks are guaranteed. Aggregate previews did not save every source row ID, so this is explicitly current matching evidence, not a claim of historical row identity.
+
+Archiving uses the existing `closed` status with `UpdatedAt`/`UpdatedBy`; it retains original lines and audit history and can be reopened. `POST /app/recon/runs/archive-invalid` requires both `recon.runs.view` and `recon.runs.close`, CSRF protection, and an encrypted one-hour scope bound to the signed-in user and workspace. Selected mode accepts only the chosen page IDs; all mode has no page/export ceiling. Current grants narrow the signed scope again. SQL locks run rows in stable order and repeats scope/proof under SERIALIZABLE before closing, retaining source locks through the update. Commit rechecks preview status under the same run-row lock after its preliminary drills. Archiving writes no PumpIT or reconciliation ledger rows.
+
+The scoped migration `v1__13pzd_recon_run_validity` atomically installs the shared inline bank extraction function and six named procedures. `usp_Recon_DrillBank` remains an ordered wrapper with its original signature and columns. Targeted tests cover SQL extraction/grid parity, uncertain and processed previews, archive across pages, scope tampering and narrowed grants, archive/commit and source-restoration races, desktop/mobile selection, and matching title/loader artwork. Production validation is read-only; no real runs are archived during deployment.
+
+`v1__13pze_recon_validity_scan` adds an optional Invalid-only reader mode used by the filter and both archive proof passes. It excludes whole runs with any ineligible saved proposal before source extraction, then applies the unchanged live proof to the remaining candidates. Ordinary pages still receive complete partial/current/history classifications. Live metadata profiling reduced the all-site candidate bank reads from 2,089 proposals to 12; the deployed result count must remain unchanged.
+
+Live verification after the scan optimization retained the same invalid counts (Mine 5, Everyone 7). Mine Invalid improved from 6,858 ms to 862 ms; Everyone Invalid improved from 16,097 ms to 4,340 ms across 3,452 open runs. Ordinary Mine remained about 6.5 seconds because it still computes partial/current counts for the visible proposals; no rejected plan hint or deduplication experiment was deployed. Run 260 remained Invalid with two superseded proposals and no remaining proposals. Guarded live checks executed no archive/business writes; both releases reported zero new log bytes and healthy HTTP responses.

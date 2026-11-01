@@ -57,6 +57,7 @@ final class GridColumn
      * @param  bool  $total  carried into the footer total row
      * @param  string|null  $title  the header's tooltip, where the label alone is not enough
      * @param  bool  $link  this column's value opens the row's own resource, via GridDefinition::rowUrl()
+     * @param  bool  $compactQuantity  show up to three decimals without trailing zeroes
      */
     public function __construct(
         public string $key,
@@ -71,6 +72,7 @@ final class GridColumn
         public bool $total = false,
         public ?string $title = null,
         public bool $link = false,
+        public bool $compactQuantity = false,
     ) {
         if (! in_array($format, self::FORMATS, true)) {
             throw new \InvalidArgumentException(

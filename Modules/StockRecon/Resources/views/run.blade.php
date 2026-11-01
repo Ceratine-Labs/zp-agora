@@ -1,16 +1,12 @@
 {{--
-    One run, two faces.
-
-    The tabs are LINKS, not panels: each is its own result set with its own
-    scope, so a tab is somewhere you can send someone — the rule everywhere else
-    in Agora and the reason <x-tabs> has the mode at all. No JavaScript.
-
-    The strip is built in the controller so it can drop a tab the person may not
-    open, rather than offering a door that answers 403.
+    The run loads every permitted panel once. The shared tabs component switches
+    the panels locally and remembers the active panel in the tab query string.
+    The existing app loader covers the initial table setup on every entry route.
 --}}
-{{-- BOTH tabs are wide, not just exceptions. The proposals table carries
+{{-- Every run tab is wide. The proposals table carries
      fifteen columns — one more than the exceptions grid — and was the one
      left on the reading measure; see `table.dt.fit` for what that cost. --}}
+@php(request()->attributes->set('loader_hold', 'Preparing the run…'))
 <x-app-shell :title="'Run #'.$run->Id" wide>
     <x-page-head
         eyebrow="Stock recon centre"
@@ -19,6 +15,8 @@
                 .' · '.$run->days().' '.Str::plural('day', $run->days())
                 .' · '.($run->AreaNo === null ? 'every counting area' : 'one counting area')">
         <x-slot:actions>
+            <a class="btn-ghost" href="{{ route('app.stockrecon.helper', $run) }}">Explain this run</a>
+            <a class="btn-ghost" href="{{ route('app.stockrecon.tutorial') }}">Tutorial</a>
             <a class="btn-ghost" href="{{ route('app.stockrecon.index') }}">Run another</a>
             @unless ($run->isCommitted())
                 <form method="POST" action="{{ route('app.stockrecon.discard', $run) }}" data-loader="Discarding…"
@@ -49,7 +47,7 @@
                 <ul>
                     @foreach ($skipped->take(12) as $row)
                         <li><code>{{ $row['StockItemNo'] ?? '—' }}</code>
-                            {{ $row['TransactionDate'] ?? '' }} shift {{ $row['ShiftNo'] ?? '' }}
+                            {{ $row['TransactionDate'] ?? '' }} shift {{ \Modules\StockRecon\Support\ShiftLabel::show($row['ShiftNo'] ?? null) }}
                             — {{ $row['SkipReason'] }}</li>
                     @endforeach
                     @if ($skipped->count() > 12)<li>… and {{ $skipped->count() - 12 }} more.</li>@endif
@@ -66,31 +64,13 @@
 
     @include('stockrecon::partials.released-notice')
 
-    {{-- Provenance, not the answer: it has to be on the page and it should not
-         be the first thing between the reader and the run. --}}
-    <x-card title="What this run was given" collapsible flush>
-        <x-table dense :count="count($run->params()) + 4">
-            <x-slot:head>
-                <tr><th class="l">Argument</th><th class="l">Value</th></tr>
-            </x-slot:head>
-            <tr><td class="mono">Procedure</td><td class="mono">{{ $run->ProcedureName }}</td></tr>
-            <tr><td class="mono">Replaces</td><td class="mono">dbo.sp_UpdateAUTOStockReconBalancing</td></tr>
-            <tr><td class="mono">Stamp mode</td><td>{{ $run->StampMode }}</td></tr>
-            <tr><td class="mono">Counting area</td><td>{{ $run->AreaNo === null ? 'every area' : $run->AreaNo }}</td></tr>
-            @foreach ($run->params() as $name => $value)
-                <tr><td class="mono">{{ '@'.$name }}</td><td class="mono">{{ $value }}</td></tr>
-            @endforeach
-        </x-table>
-    </x-card>
-
-    {{-- Above the two faces, because it is about the run rather than either
-         list: a clear duplicate is a row the commit writes, a possible one a
-         chain it will not. --}}
-    @include('stockrecon::partials.duplicates')
-
-    <x-tabs :items="$tabs" :active="$tab" label="Run" style="margin:16px 0" />
-
-    @include('stockrecon::panes.'.$tab)
+    <x-tabs :items="$tabs" :active="$tab" query="tab" label="Run" style="margin:16px 0">
+        @foreach ($panes as $key => $pane)
+            <x-tab-panel :key="$key">
+                @include('stockrecon::panes.'.$key, $pane)
+            </x-tab-panel>
+        @endforeach
+    </x-tabs>
 {{-- What every code means, opened from the "i" on the exceptions and from
      any code badge on this page (7 Oct 2026). --}}
 @include('stockrecon::partials.codes-modal')

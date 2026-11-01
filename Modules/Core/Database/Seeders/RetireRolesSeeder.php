@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
  * Copy everything a role was carrying onto the people who held it
  * (Ryan, 22 Sep 2026).
  *
- * THIS SEEDER IS THE CUTOVER. From the release it ships in, nothing reads
+ * Managed roles added on 23 Oct 2026 are excluded, including on an explicit
+ * rerun: their grants must never become permanent direct grants.
+ *
+ * THIS SEEDER IS THE HISTORICAL CUTOVER. From the release it ships in, nothing reads
  * agora.UserRole or agora.RolePermission — so if this has not run, the 88
  * people in agora.User hold whatever was granted to them BY NAME, which for
  * most of them is nothing at all. It is not a tidy-up that can follow later.
@@ -51,6 +54,7 @@ class RetireRolesSeeder extends Seeder
             INSERT INTO [{$schema}].[UserPermission] ([BranchId], [UserId], [PermissionId], [CreatedAt])
             SELECT DISTINCT ?, ur.[UserId], rp.[PermissionId], SYSDATETIME()
             FROM [{$schema}].[UserRole] ur
+            JOIN [{$schema}].[Role] historical ON historical.[Id] = ur.[RoleId] AND historical.[IsManaged] = 0
             JOIN [{$schema}].[RolePermission] rp ON rp.[RoleId] = ur.[RoleId]
             WHERE NOT EXISTS (
                 SELECT 1 FROM [{$schema}].[UserPermission] up
@@ -69,6 +73,7 @@ class RetireRolesSeeder extends Seeder
             INSERT INTO [{$schema}].[UserMenuItem] ([BranchId], [UserId], [MenuItemId], [CreatedAt])
             SELECT DISTINCT ?, ur.[UserId], rmi.[MenuItemId], SYSDATETIME()
             FROM [{$schema}].[UserRole] ur
+            JOIN [{$schema}].[Role] historical ON historical.[Id] = ur.[RoleId] AND historical.[IsManaged] = 0
             JOIN [{$schema}].[RoleMenuItem] rmi ON rmi.[RoleId] = ur.[RoleId]
             WHERE NOT EXISTS (
                 SELECT 1 FROM [{$schema}].[UserMenuItem] umi
@@ -89,7 +94,7 @@ class RetireRolesSeeder extends Seeder
                 u.[UpdatedAt] = SYSDATETIME()
             FROM [{$schema}].[User] u
             JOIN [{$schema}].[Role] r ON r.[Id] = u.[RoleId]
-            WHERE u.[LandingRoute] IS NULL AND r.[LandingRoute] IS NOT NULL;
+            WHERE r.[IsManaged] = 0 AND u.[LandingRoute] IS NULL AND r.[LandingRoute] IS NOT NULL;
         ");
 
         $workspace = DB::connection($connection)->affectingStatement("
@@ -98,7 +103,7 @@ class RetireRolesSeeder extends Seeder
                 u.[UpdatedAt] = SYSDATETIME()
             FROM [{$schema}].[User] u
             JOIN [{$schema}].[Role] r ON r.[Id] = u.[RoleId]
-            WHERE u.[Workspace] IS NULL AND r.[Workspace] IS NOT NULL;
+            WHERE r.[IsManaged] = 0 AND u.[Workspace] IS NULL AND r.[Workspace] IS NOT NULL;
         ");
 
         $this->command?->info(

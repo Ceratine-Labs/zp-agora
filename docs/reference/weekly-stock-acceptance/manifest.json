@@ -1,0 +1,89 @@
+{
+  "workbook": "/home/ryan/Downloads/ZRP_Stock_Recon_Pack_for_Sabrina_2/ZRP_Stock_Recon_Master_Book_14Sep-20Sep2026.xlsx",
+  "workbook_sha256": "070610a4d976256db3a80b6ff74059a03ebbb62df098b85662017fe07441fdbe",
+  "created_utc": "2026-10-26T19:45:28.145098+00:00",
+  "baseline_week": [
+    "2026-09-14",
+    "2026-09-20"
+  ],
+  "control_period": [
+    "2026-09-01",
+    "2026-09-21"
+  ],
+  "reporting_as_of": "2026-09-23",
+  "scope": {
+    "23": "Engen Bethlehem One Plus",
+    "13": "Baobab Convenience Centre"
+  },
+  "limitations": [
+    "Current customer reads, not immutable September exports.",
+    "Branch 13 contains only B1, SBBB and V7; it is not a whole-site scorecard.",
+    "Original exported nil-count proofs and all-site cross-pattern baseline not replayed.",
+    "All-site policy actions are instantiated per site; the historical aggregate action list is not an identical one-for-one register."
+  ],
+  "results": {
+    "Item Register / Match": 515,
+    "Item Register / Difference": 305,
+    "Period Items 1-21 Sep / Match": 444,
+    "Period Items 1-21 Sep / Difference": 84,
+    "Recipe vs Recon / Match": 133,
+    "Recipe vs Recon / Difference": 7,
+    "Opening vs Closing / Match": 179,
+    "Opening vs Closing / Difference": 8,
+    "Balancing Breaches / Match": 68,
+    "Balancing Breaches / Difference": 24,
+    "Issue Sheet Failures / Match": 489,
+    "Site Scorecard / Difference": 4,
+    "Control Actions / Difference": 4,
+    "Control Actions / Match": 6,
+    "Potatoes & Buns / Match": 12,
+    "Potatoes & Buns delivery detail / Match": 78
+  },
+  "inputs": [
+    {
+      "file": "/home/ryan/Development/ZP/Agora/storage/app/weekly-workbook-evidence/2026-10-26/workbook.json",
+      "sha256": "aa35cfbd52869b062eb4f85ddee324e235b858adc7eb4367ac113d79d3518880",
+      "bytes": 3349745
+    },
+    {
+      "file": "/home/ryan/Development/ZP/Agora/storage/app/weekly-workbook-evidence/2026-10-26/current-source-23.json",
+      "sha256": "72ef873c548eb7804282447c3c47e258ce31bd693d14519d49f4f28b3372527b",
+      "bytes": 7871035
+    },
+    {
+      "file": "/home/ryan/Development/ZP/Agora/storage/app/weekly-workbook-evidence/2026-10-26/current-source-13.json",
+      "sha256": "65a2c275b33c0fb6472fdc6fe10e27c17a717c974e304f328e70d4cc14ea302a",
+      "bytes": 99443
+    },
+    {
+      "file": "/home/ryan/Development/ZP/Agora/storage/app/weekly-workbook-evidence/2026-10-26/actual-cases-23.json",
+      "sha256": "9a95f9b39ec44d7ec387cc2fcf307e52266ac4dc2b9b355fe9ffd0265edc618f",
+      "bytes": 2101933
+    },
+    {
+      "file": "/home/ryan/Development/ZP/Agora/storage/app/weekly-workbook-evidence/2026-10-26/actual-cases-13.json",
+      "sha256": "e2f35a59b3837aec3308b511d2f494495cfa31780195c2ba7ae39ed95c6364ab",
+      "bytes": 94893
+    },
+    {
+      "file": "/home/ryan/Development/ZP/Agora/storage/app/weekly-workbook-evidence/2026-10-26/actual-overview-23.json",
+      "sha256": "af1dd0abfe2deddfbc5967c17d7476ffe75ed0debfb5129b9c49ed011018b328",
+      "bytes": 5783
+    },
+    {
+      "file": "/home/ryan/Development/ZP/Agora/storage/app/weekly-workbook-evidence/2026-10-26/actual-overview-13.json",
+      "sha256": "e0f581c7d63195fd41fbd9587743c02ea5e01edd5537824199645abf101bfb98",
+      "bytes": 4429
+    },
+    {
+      "file": "/home/ryan/Development/ZP/Agora/storage/app/weekly-workbook-evidence/2026-10-26/actual-snapshot-23.json",
+      "sha256": "beebcf289f8d77ba0aedf89b9dc979e6f34177c1de4691ddedcaacfa5cc92018",
+      "bytes": 807
+    },
+    {
+      "file": "/home/ryan/Development/ZP/Agora/storage/app/weekly-workbook-evidence/2026-10-26/actual-snapshot-13.json",
+      "sha256": "7e69bb26402e33a4fd0da8c69eebd6d51b0b7fad5bd9ad15cb5efb0f9b9cf7f3",
+      "bytes": 807
+    }
+  ]
+}

@@ -137,6 +137,10 @@ class GlobalOverviewTest extends TestCase
         $this->actingAs($user)->get(route('app.stockrecon.global', $this->run))
             ->assertOk()->assertSee('Raw quantities')->assertSee('TEST Beef')->assertSee('Linked candidates')
             ->assertSee('Production group 7')->assertSee('ratios are still being prepared')
+            ->assertViewHas('tab', 'global')
+            ->assertViewHas('panes', fn ($panes) => array_keys($panes) === ['proposals', 'overview', 'global', 'exceptions'])
+            ->assertSeeInOrder(['data-tab="proposals"', 'data-tab="overview"', 'data-tab="global"', 'data-tab="exceptions"'], false)
+            ->assertDontSee('data-tab-src=', false)
             ->assertDontSee('data-confirm-action="Amend"', false);
         $csv = $this->get(route('app.stockrecon.global', [$this->run, 'basis' => 'original', 'export' => 'pairs']))
             ->assertOk()->assertDownload('stock-recon-'.$this->run->Id.'-original-pairs.csv')->streamedContent();

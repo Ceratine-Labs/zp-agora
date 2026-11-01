@@ -246,7 +246,7 @@ class DuplicatesPanelTest extends TestCase
     }
 
     /**
-     * The panel on the run and on its exceptions, as somebody who may release
+     * The panel on the overview, as somebody who may release
      * and somebody who may only look: the case reads the same, the press is
      * there for one and absent for the other (feature-rules §4).
      */
@@ -281,13 +281,24 @@ class DuplicatesPanelTest extends TestCase
             ->assertSee('usp_StockRecon_GetDuplicates')
             ->assertSee(route('app.stockrecon.line', [$run, $night]), false);
 
-        $panel($finance, 'app.stockrecon.run')
+        $panel($finance, 'app.stockrecon.overview')
             ->assertSee('data-dup-release="'.route('app.stockrecon.duplicates.release', $run).'"', false)
             ->assertSee('data-dup-lines="'.$night->Id.'"', false);
-        $panel($finance, 'app.stockrecon.exceptions')->assertSee('data-dup-release=', false);
+        $proposals = $panel($finance, 'app.stockrecon.run')->assertViewHas('tab', 'proposals')->getContent();
+        $this->assertStringNotContainsString('id="duplicates"', $this->panelHtml($proposals, 'proposals'));
+        $this->assertStringContainsString('id="duplicates"', $this->panelHtml($proposals, 'overview'));
 
-        $panel($operations, 'app.stockrecon.run')->assertDontSee('data-dup-release=', false);
-        $panel($operations, 'app.stockrecon.exceptions')->assertDontSee('data-dup-release=', false);
+        $panel($operations, 'app.stockrecon.overview')->assertDontSee('data-dup-release=', false);
+        $exceptions = $panel($operations, 'app.stockrecon.exceptions')->assertViewHas('tab', 'exceptions')
+            ->assertDontSee('data-dup-release=', false)->getContent();
+        $this->assertStringNotContainsString('id="duplicates"', $this->panelHtml($exceptions, 'exceptions'));
+        $this->assertStringContainsString('id="duplicates"', $this->panelHtml($exceptions, 'overview'));
+
+        // Old case links open the loaded Overview panel without a second request.
+        $this->actingAs($finance)->get(route('app.stockrecon.run', [$run, 'dup' => 'dup-'.$night->Id]))
+            ->assertOk()->assertViewHas('tab', 'overview')
+            ->assertViewHas('panes', fn ($panes) => $panes['overview']['dupCase'] === 'dup-'.$night->Id)
+            ->assertDontSee('data-tab-src=', false);
 
         // Released: the case says by whom and why, and offers the withdraw —
         // to the one who may, and not to the one who may not.
@@ -296,7 +307,7 @@ class DuplicatesPanelTest extends TestCase
         $release = (int) $this->db()->table('agora.StockReconDuplicateRelease')
             ->where('BranchId', self::BRANCH)->where('ShiftNo', 3)->whereNull('WithdrawnAt')->value('Id');
 
-        $page = $this->actingAs($finance)->get(route('app.stockrecon.run', [$run, 'dup' => 'dup-'.$night->Id]))->assertOk()
+        $page = $this->actingAs($finance)->get(route('app.stockrecon.overview', [$run, 'dup' => 'dup-'.$night->Id]))->assertOk()
             ->assertSee('Released since this preview')
             ->assertSee('TEST-issue book shows one delivery each')
             ->assertSee('preview again to let it commit')
@@ -308,7 +319,7 @@ class DuplicatesPanelTest extends TestCase
         $this->assertMatchesRegularExpression('/data-tab="dup-'.$night->Id.'"\s+aria-selected="true"/', $page);
         $this->assertMatchesRegularExpression('/data-tab-panel="dup-'.$night->Id.'"\s+role="tabpanel"\s*>/', $page);
 
-        $this->actingAs($operations)->get(route('app.stockrecon.run', $run))->assertOk()
+        $this->actingAs($operations)->get(route('app.stockrecon.overview', $run))->assertOk()
             ->assertSee('Released since this preview')
             ->assertDontSee('data-dup-withdraw=', false);
     }
@@ -324,10 +335,11 @@ class DuplicatesPanelTest extends TestCase
         $this->assertTrue($panel['cases']->isEmpty());
         $this->assertSame(0, (int) $panel['totals']->Clear + (int) $panel['totals']->Possible);
 
-        $this->actingAs($this->person('operations'))->get(route('app.stockrecon.run', $run))->assertOk()
+        $page = $this->actingAs($this->person('operations'))->get(route('app.stockrecon.overview', $run))->assertOk()
             ->assertSee('None on this run')
             ->assertSee('No duplicate issues on this run')
-            ->assertDontSee('role="tablist"', false);
+            ->getContent();
+        $this->assertStringNotContainsString('role="tablist"', $this->panelHtml($page, 'overview'));
     }
 
     /** The chain panel names a clear duplicate on its chain and links to its case. */
@@ -342,10 +354,23 @@ class DuplicatesPanelTest extends TestCase
             ->assertSee('A duplicate issue on this chain')
             ->assertSee('D1 issue 1.000 → 0.000')
             ->assertSee('It is taken out of the balancing and set to 0 by the commit')
-            ->assertSee(route('app.stockrecon.run', [$run, 'dup' => 'dup-'.$charcoal->Id]).'#duplicates', false);
+            ->assertSee(route('app.stockrecon.overview', [$run, 'dup' => 'dup-'.$charcoal->Id]).'#duplicates', false);
     }
 
     // ------------------------------------------------------------------ helpers
+
+    private function panelHtml(string $html, string $key): string
+    {
+        $document = new \DOMDocument;
+        $errors = libxml_use_internal_errors(true);
+        $document->loadHTML($html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($errors);
+        $panel = (new \DOMXPath($document))->query('//*[@data-tab-panel="'.$key.'"]')->item(0);
+        $this->assertInstanceOf(\DOMElement::class, $panel);
+
+        return $document->saveHTML($panel);
+    }
 
     private function preview(): StockReconRun
     {

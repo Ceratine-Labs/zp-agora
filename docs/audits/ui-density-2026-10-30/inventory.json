@@ -1,0 +1,2587 @@
+{
+  "date": "2026-10-30",
+  "scope": "Current working tree including uncommitted and untracked views; lexical inventory, not route or live-page count. Blade comments excluded from component counts. Review territory assigned for every file.",
+  "template_count": 207,
+  "counts": {
+    "Assets": 10,
+    "Cash": 37,
+    "Core": 22,
+    "Debtors": 5,
+    "Operations": 2,
+    "Product": 3,
+    "Recon": 28,
+    "Reports": 6,
+    "StockRecon": 36,
+    "Utilities": 1,
+    "shared": 57
+  },
+  "files": [
+    {
+      "path": "Modules/Assets/Resources/views/grid/_cells.blade.php",
+      "module": "Assets",
+      "kind": "grid partial",
+      "sha256": "ff954198408bb04b7cf336b26bbaa3a46c30d174acc1e70193f31108f76e5b2d",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Assets/Resources/views/masters/index.blade.php",
+      "module": "Assets",
+      "kind": "screen or fragment",
+      "sha256": "b4b35df64c7f8a1ca3c72cf5586318b26bf5cb645b4625015c4f8f28015a1b27",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 4
+        },
+        {
+          "component": "x-card",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "path": "Modules/Assets/Resources/views/movement/index.blade.php",
+      "module": "Assets",
+      "kind": "screen or fragment",
+      "sha256": "db19102bc6ae823bde0f227d6f830df60f347df893b1df73e658fa375490ba4b",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Assets/Resources/views/movement/partials/form.blade.php",
+      "module": "Assets",
+      "kind": "screen or fragment",
+      "sha256": "e852ad7979b66347c58d5854e5be7f8ece45a3d797a4c8220346c7961bafeb4a",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Assets/Resources/views/register/index.blade.php",
+      "module": "Assets",
+      "kind": "screen or fragment",
+      "sha256": "b6aecf0481ec17b92b1b5773de700c2da4dbd619f53565e7de6e653644f7dac5",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Assets/Resources/views/register/partials/form.blade.php",
+      "module": "Assets",
+      "kind": "screen or fragment",
+      "sha256": "ffdea87dfd2162654a7eae7fb139ba970a4839357054eafecc6377331ee9b1c1",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Assets/Resources/views/register/show.blade.php",
+      "module": "Assets",
+      "kind": "screen or fragment",
+      "sha256": "3261b0b00ca063ee7605117d02e95904935e0def3d7117972d4a08678a8c691e",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-kpi-strip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 3
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "path": "Modules/Assets/Resources/views/repairs/index.blade.php",
+      "module": "Assets",
+      "kind": "screen or fragment",
+      "sha256": "4a3ef33e2714064fa5e82550761f1f1b7017a7c363db7f215f4a164d258eb7b1",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Assets/Resources/views/repairs/partials/form.blade.php",
+      "module": "Assets",
+      "kind": "screen or fragment",
+      "sha256": "6e4464df87089411310ebb497e70d18c4424924c2593c73abacda09ea68d5e53",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Assets/Resources/views/repairs/show.blade.php",
+      "module": "Assets",
+      "kind": "screen or fragment",
+      "sha256": "179663cc68c364f2f3f9633d9a7e4e0ecf291319e368de80693c6ba9428be66e",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-kpi-strip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/banking/index.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "e011cea907b14cf7b92127559522185a48047d4d404def35242188c55e070c26",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 3
+        },
+        {
+          "component": "x-card",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/banking/partials/actions.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "f45c18b7feb5e365f1b49a08ca052bc9b5e8f354395bcf21580109aa42bb824a",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/banking/partials/cards.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "291bcd53c04fe187adb8b283b65f648f3cedef7fb09ef3f6fa511b51b0c6e71e",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/banking/partials/facts.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "266afd084c7e57a4d576982fc6274a75fc6262f37a8b33d5017cd72c5c9a5058",
+      "component_uses": [
+        {
+          "component": "x-facts",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/banking/partials/key-inputs.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "e582fc691e0b82ec097735f77571bf2aebf24a99113a0396b004837b6c14d50e",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/banking/partials/legs.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "53e07c249bd9503cf04ae957b39ebd704ba08dc54e1970d21a68aebecf07ec4a",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/banking/partials/pool.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "7c7a84a4fc694b4d01777dbb7792ba0c5856b7db23fee1eeb0e1804ecdc475a3",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/cashups/index.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "d504b27e037fac1935d8d380dcc21403aa146de3d4345b8ed5f2afdaa091bd21",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/cashups/nocashup.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "ec9cb27a9546e8fbe2dc5d548f5d983786197d44182405e53e7eef699c3208c2",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/cashups/partials/tabs.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "1667dd272c52eda344617b9cef90fed1544e34eb842e87e22d85bfd76e8f4e22",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/cashups/row.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "38fa0c4b002d5f5e78c431f9547ef9322e07e8294b17cd89c4c3a8f7e5490faf",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/deductions/index.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "7d32c38a1738db7ea7250965e653d0beacf51ff15c0ba475b8bcaa50bac0a439",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 3
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/dropsafe/bags.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "ca6461583f6586592924498f9f2754108316ef9c4898e8e95e962cec40ea0dde",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/dropsafe/index.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "084fe2814ccc66db12345af1566fc7ce9ff3700843e1d51057e6f12a16007026",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 2
+        },
+        {
+          "component": "x-card",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/dropsafe/partials/drop-form.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "7d85d3becd1c380562e9d4bdc2e17b5336d746295b0316ffffcf3038d809087f",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/dropsafe/partials/outcome.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "5758432b6128e1c9688de36d69be63014d88a6d857d8aec906ea63c3ba885ad8",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/grid/_cashup-cells.blade.php",
+      "module": "Cash",
+      "kind": "grid partial",
+      "sha256": "2b8131ea462315562aba4b0eebc680842e1e8f6719cf7075681400e17f571aca",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/grid/_cells.blade.php",
+      "module": "Cash",
+      "kind": "grid partial",
+      "sha256": "f7dc83a7bea5cb8ea1adf2bf67a5a9b5038a829e7b691ff54849369695dfdcbc",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/grid/_dropsafe-cells.blade.php",
+      "module": "Cash",
+      "kind": "grid partial",
+      "sha256": "514d93067367186723dbf03aaf50cc8b0a0df9562cbf8811983cda303211bada",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/grid/_staffshort-cells.blade.php",
+      "module": "Cash",
+      "kind": "grid partial",
+      "sha256": "f95c8c59b3f25b5d8d4d425d8a495d8fdb7e9715fc2de8c5e708ac8ec59a96e1",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/mail/staff_short_decided.blade.php",
+      "module": "Cash",
+      "kind": "mail",
+      "sha256": "91d771db7142425f61f5570a10a7f70e1c1d7547dbd7c41ec3a3db47e4328c9f",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/mail/staff_short_raised.blade.php",
+      "module": "Cash",
+      "kind": "mail",
+      "sha256": "19ada3abaeeae12bc2d82d40b764b53937b7c522a4abc9516fc6e477e8c97708",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/mobile/banking/index.blade.php",
+      "module": "Cash",
+      "kind": "mobile",
+      "sha256": "548b17b3f250705f97d210d63869a14ffe946be56fe4877054b059c474fcf3ba",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/mobile/dropsafe/index.blade.php",
+      "module": "Cash",
+      "kind": "mobile",
+      "sha256": "d84a568fbd5f0f20f37d9b2264e0f91251e6de2f2a25581e81312ebd4ce11575",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/mobile/staffshorts/index.blade.php",
+      "module": "Cash",
+      "kind": "mobile",
+      "sha256": "8619c4ce0b42a2e94ef251c88bc2b018be64d3657cd24cacbbd3e3f754c6720f",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/mobile/zread/index.blade.php",
+      "module": "Cash",
+      "kind": "mobile",
+      "sha256": "a64e3efcec44497ac4217c1a86018bf7afd4334b0461b74924ad20473dac655a",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/pumpshortages/index.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "fe8e2c5893acd09dbb413c794ca434cf53c9076ac8cb27f9caa162b645373c4f",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/staffshorts/index.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "883c567486de80aa2dbb91248ccd97b3111342f10f89efd18612629a21213191",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/staffshorts/list.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "3716d4e1042d7693772609666b00a6dd6ac135d788ba094aba5ec29409d6355a",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/staffshorts/partials/decide.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "ad16c6ee26fb3f497af3b34d25441d72c454fd2cbcfa807b6448aef655852b32",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/staffshorts/partials/outcome.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "a5c47f946ca43d0ea08417f632fd17cf3273fc50fb6fe485296dc50c5f1cd90e",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/staffshorts/partials/raise-form.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "3caed547f01d38a7cd1573382ef04e51bb08340c56d23782e606c36592ea9587",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/tillbalance/index.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "a1b1608a82ad0d7ae8b633af1ff6cdf097414d93c067ccc42221fff729944168",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 2
+        },
+        {
+          "component": "x-card",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/zread/index.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "951b81a0d2dae268177ab10ef7ce071fc199f07582dd3ed84e9e06667be275c7",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/zread/partials/row.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "dd86144b5b0ddc8337c725ec9078dd53660885a83a4326098273536fa910b06d",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Cash/Resources/views/zread/partials/scope-inputs.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "7b89265e5c623f9b12690eceadf5c3daa1f763af6535213777585099123c9958",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Cash/Resources/views/zread/row.blade.php",
+      "module": "Cash",
+      "kind": "screen or fragment",
+      "sha256": "7d90e56bb804377f068e246b6ae8d3fa44a45264c765e8e40b939150affaa02c",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/auth/change-password.blade.php",
+      "module": "Core",
+      "kind": "auth",
+      "sha256": "6032a328ada5197720459e45865534b948d1848e7de34a36d04d9db5ab3f3db1",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/auth/forgot.blade.php",
+      "module": "Core",
+      "kind": "auth",
+      "sha256": "15423f0b34191a03c301742cb534cb0ee0d682bee9b578a3fc694be82f59a0ff",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Core/Resources/views/auth/login.blade.php",
+      "module": "Core",
+      "kind": "auth",
+      "sha256": "46901ec472e7b5f637fef0224e22ecdb2bcd02a2800ca784458f83526eeb1e39",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Core/Resources/views/auth/otp.blade.php",
+      "module": "Core",
+      "kind": "auth",
+      "sha256": "70bf2a110665a839dc39f24f73c2ef612593bac2fe018585c056a49718c31761",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Core/Resources/views/auth/reset.blade.php",
+      "module": "Core",
+      "kind": "auth",
+      "sha256": "d7c6a2ab105b19e753a2ac4ea9b1e4825fc2532f92e85a6f69f19619cc481034",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Core/Resources/views/components/gallery-entry.blade.php",
+      "module": "Core",
+      "kind": "gallery",
+      "sha256": "f7910c5ff36074a50fc474747a3e4e67d0036fcb21b8a34b11627b99608b439c",
+      "component_uses": [
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/components/signin-hero.blade.php",
+      "module": "Core",
+      "kind": "auth",
+      "sha256": "0dd194eef446e715c6a4b40556cdf5313cbd5e7692b976d498f4d4938664dbb0",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Core/Resources/views/components/signin-layout.blade.php",
+      "module": "Core",
+      "kind": "auth",
+      "sha256": "6e04d0af2cc7fe1e5f79b4211ebd0fd712d544cacbdb36033496901806257700",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Core/Resources/views/dashboard.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "fcc3d1e5d8e5e536c033c7c01e710edd2088f84a43eb6753c8dda6f46f334d9b",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-kpi-strip",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/dev/charts.blade.php",
+      "module": "Core",
+      "kind": "gallery",
+      "sha256": "9434aa9bf3ee77ab1ef2f459eef7c2239182e4ee50e81ac40cdc062e2fea86de",
+      "component_uses": [
+        {
+          "component": "x-kpi-strip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 9
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/dev/grids.blade.php",
+      "module": "Core",
+      "kind": "gallery",
+      "sha256": "c079774af3106663002a9f2e993215b365cfa953fde6ae7d508dde80c6798317",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/dev/styleguide.blade.php",
+      "module": "Core",
+      "kind": "gallery",
+      "sha256": "7b126c0a95722f7a535eafebec2d6eea3611f96095953b7f9a30f49cfa11186e",
+      "component_uses": [
+        {
+          "component": "x-kpi-strip",
+          "count": 2
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 8
+        },
+        {
+          "component": "x-facts",
+          "count": 2
+        },
+        {
+          "component": "x-scope-line",
+          "count": 2
+        },
+        {
+          "component": "x-card",
+          "count": 28
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/landing-stub.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "7009cd6672acd9bee34f765f22cfd08f836acb56e001a0d4556e06a6fd2fc315",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/mail/password_reset.blade.php",
+      "module": "Core",
+      "kind": "mail",
+      "sha256": "7345ed50e327a98730cf38c93c6bdfa59073bf8786af1f9a85a564ec6ec1ac65",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Core/Resources/views/setup/roles/edit.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "abd460a82103027fe66daf936d018f745fc89be523947a18ee30f46152e55b00",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/setup/roles/index.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "74c62a455a491a1f2b63239602b81d086889b3c817f8c3c59a77054f3f100768",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/setup/roles/show.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "44dc3ea2d9caa842e54de35b4f28cec6b19e122a27479e589a50fbfe26d22b5a",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/setup/users/_page.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "fde05da190c786f057de68717552bfd1a9f58f78c39cb49e3f018fa709004954",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/setup/users/_sections.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "44bb29228f8ffd3520f32bc396d586c76cd42c8121bb88ab212629c8a5918439",
+      "component_uses": [
+        {
+          "component": "x-card",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/setup/users/edit.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "40cba46b7f169ed84f47cf35de965e9fc5a0282c04768bb9bb67270b5e005225",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Core/Resources/views/setup/users/index.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "10619234762abdd3cbcde9814dbf8a0a187cced1d30495f94248c1fa3270035e",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Core/Resources/views/setup/users/show.blade.php",
+      "module": "Core",
+      "kind": "screen or fragment",
+      "sha256": "d19b25723338673a3f9cba4a88955ff9d42a3f8df2e6d54dd8ce69960e116131",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Debtors/Resources/views/index.blade.php",
+      "module": "Debtors",
+      "kind": "screen or fragment",
+      "sha256": "b05bb6dca5f990d9e1dc7d1a189b3116df981a05d778e78f06bc2bb656cf16a5",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Debtors/Resources/views/mail/statement.blade.php",
+      "module": "Debtors",
+      "kind": "mail",
+      "sha256": "7f6a42ca3e4a35328599e735d6f214a1d649c545e7703c60ac2698a08d055902",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Debtors/Resources/views/pdf/statement.blade.php",
+      "module": "Debtors",
+      "kind": "pdf",
+      "sha256": "78129059a788f7e4b3341981235ea04755a33c58b500979f6ffeb8fbde71db73",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Debtors/Resources/views/preview.blade.php",
+      "module": "Debtors",
+      "kind": "screen or fragment",
+      "sha256": "40f85d5fb4208810fce9bd1377ca2607d4f4f79254c30028f7c0a861d8f9254f",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/Debtors/Resources/views/show.blade.php",
+      "module": "Debtors",
+      "kind": "screen or fragment",
+      "sha256": "269c63078962345f27f75a73c68929adb014bfa588ba1ebf41bf54e0c8187b61",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-kpi-strip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 2
+        },
+        {
+          "component": "x-facts",
+          "count": 2
+        },
+        {
+          "component": "x-card",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "path": "Modules/Operations/Resources/views/components/board.blade.php",
+      "module": "Operations",
+      "kind": "component",
+      "sha256": "f00aac7fd42d51855d8096917bc9d62436fe830d74acf403bd81a6388b7684b1",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Operations/Resources/views/index.blade.php",
+      "module": "Operations",
+      "kind": "screen or fragment",
+      "sha256": "b5de17e81789e0275104d9d16bd73a6a275460be833986ed324e913a77dbb6c4",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Product/Resources/views/critical/index.blade.php",
+      "module": "Product",
+      "kind": "screen or fragment",
+      "sha256": "348353edf5c1bb23532691ecb3dd03abdbda91fa6a81730b7f5f7ee2e7fef139",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-kpi-strip",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Product/Resources/views/stock/index.blade.php",
+      "module": "Product",
+      "kind": "screen or fragment",
+      "sha256": "50450b38cb162728f0caa0fdfdbcbee1fc719abfb085c2796d60571d411d6043",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Product/Resources/views/stock/show.blade.php",
+      "module": "Product",
+      "kind": "screen or fragment",
+      "sha256": "41077852445ba9735d6b99c9a137eb54dcf1d24b8e17dfb95500410296e57f9a",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-kpi-strip",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 3
+        },
+        {
+          "component": "x-card",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/area.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "11f8096d7443147df57bafaa15b54cdaa01512f06e077f398ecbc1dbe97d9fda",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/criteria-rule.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "129fa3c41be9e998e3562499684f726be727884254ea06ad14ea6c2966307f11",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/dashboard.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "dee82ebf4bd30579ce9ee4ed0923162bf924061ebae1a081962124a9c2324766",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-kpi-strip",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 2
+        },
+        {
+          "component": "x-card",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/group.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "188b82b8d053990475d87b34c91d185c4e546603bba0cefb2df16ff861ffd324",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/index.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "58af80ef79a584e2e55dda2bb0852455c3905f1e2eccba814283e449e2041cdf",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/panes/all.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "79e86f28cc166b3dd4940f00a67d0745ac20160a590e9b3ba1ff18cd7a063459",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/panes/batch.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "41246af4524d086220d90bca4b89fc4c6d96a989ef99a7774b7cf9ca28b4f2e7",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/panes/centre.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "87b746422fd9237b45875502f47f3a363ab3f5f77b88b505f6c8f353ec725b7b",
+      "component_uses": [
+        {
+          "component": "x-scope-line",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/panes/config.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "a911fb0e4cd08c25a76372fd24d443046e6724ad06e2b934d06940608af6c192",
+      "component_uses": [
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/panes/match.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "70c834b63b2eda29be40cbcf82fa58d3449b320bc2e8f3264016d76a9aa5728e",
+      "component_uses": [
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/panes/runs.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "7daa220e6d00e82388b4529d390d9e532cc0a67bfdfec4cf996db50e74dc9e7a",
+      "component_uses": [
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/panes/suggest.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "31c4fdae9a84be90b312a820848f87e41d0d24be03856d765a0d4767e3237da3",
+      "component_uses": [
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/bag-cashier.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "1b7736224584407f1e73f707447171238097ff0f57efcadb7b03e1e59f256428",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/centre-back.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "cc13dcb05b65de4a4ceb14b3e50d81c0b7824d788f52a1c42c247735ad93f277",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/centre-scope-form.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "035dcd2b5b925390158e4f648036649d75aed964f72f512f8c0e1f3c076a230d",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/criteria-edit.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "df9094fa233ce5c39892a7a545766e401a30bacc158359e542e85cc3c8427fd2",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/group-row.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "6c1b2341f3a6f9430b33a3ab1e0f3536b0926fd1952be03ba09827de9bb66766",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/line-detail.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "aafb9224008c439e4d9567647989da37e8bf7debf06d93c07c4b1685039eefac",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/match-pane.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "14a6d0f0a412334538362ca66329b389ae34ec92d77c0c684829fe95ccf73d87",
+      "component_uses": [
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/open-run.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "e9f5cd6b1af853c1a9a9d9a20c0d6783bc607a79584d911a531d511802475b2d",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/result.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "e184652803d16fb264646e632709648af03c66f1d8f703fddd9c361abcbc51aa",
+      "component_uses": [
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/run-allocation.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "9abf163aaf4184821e6a15a28f6ff45ffb192ee16b38301b296727acc640e62b",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/run-panel.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "1f897f9ee52f4a8493bf6d9ae5e66c1623e871febdffc1625e2c6693f28411c2",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/suggest-results.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "6f310adafd88b84517bb91af9f95aac1cdd771bfbfeb44ccd8317f40fa1e7112",
+      "component_uses": [
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/trace-sets.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "7498ee104ca966d23b633b8e5b7f0aac6b227108be932de5879e0e878e1ae82f",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 8
+        },
+        {
+          "component": "x-card",
+          "count": 8
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/partials/unconfigured-sites.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "f5ac7f419af11c6cf92d7cd2c25116c0a87eca55e97191fffb1cab256057c4fa",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Recon/Resources/views/run.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "df82e66a8e0cf757d18736eaefb25f9ab67541e37aa2b155f2880a957457e6c4",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Recon/Resources/views/trace.blade.php",
+      "module": "Recon",
+      "kind": "screen or fragment",
+      "sha256": "5b4dc2c6984c6120c723c2f4b13a435bfb1f63043d113c25e8c293d30df93d2f",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/Reports/Resources/views/audit/change.blade.php",
+      "module": "Reports",
+      "kind": "screen or fragment",
+      "sha256": "658e69f386f35308c13009fb8415d9a755d6b23ebcee06b7d3e824685df641cf",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 2
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Reports/Resources/views/audit/page.blade.php",
+      "module": "Reports",
+      "kind": "screen or fragment",
+      "sha256": "933494315791fa8e6ad8ab223566a161b7996e834fd8e8cd13259885933e2ae9",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Reports/Resources/views/components/before-after.blade.php",
+      "module": "Reports",
+      "kind": "component",
+      "sha256": "57b889a05b5ddeff15318374a6ea5e1a44a90473f8c7768c3c68e472128cc553",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Reports/Resources/views/components/cell.blade.php",
+      "module": "Reports",
+      "kind": "component",
+      "sha256": "b67d6b5116c02b3db8a79f134b5cbe79e5b0001e7b0588bd394f3f44adb353cc",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/Reports/Resources/views/index.blade.php",
+      "module": "Reports",
+      "kind": "screen or fragment",
+      "sha256": "cc64347ab0341d3abb22ae7d95c3cd46a57fb7dcaff6da56b3bdfe73326d6a8f",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Reports/Resources/views/show.blade.php",
+      "module": "Reports",
+      "kind": "screen or fragment",
+      "sha256": "43438cc581d691fae1e068422ed53b67fa851ecf07a0ababc42edb525488476c",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/chain.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "ac053c9835e7df691135815276ef62e88957d5ddc9fe681837b4ec76e7835df7",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/components/tutorial-deck.blade.php",
+      "module": "StockRecon",
+      "kind": "component",
+      "sha256": "4a59aea34c64f9142497ab13718daf31ccd09ee25bcb45efbfac3ea68128d100",
+      "component_uses": [
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/components/tutorial-icon.blade.php",
+      "module": "StockRecon",
+      "kind": "component",
+      "sha256": "31a8e1cab58983f3475d87494c9dacd39c9ba24610eb2762e31f7497b371ca1a",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/components/tutorial-scenario.blade.php",
+      "module": "StockRecon",
+      "kind": "component",
+      "sha256": "72bd635fd65188c9789daa3393529f3196a38537ea96b7dd93a2d869f426c636",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/counting-areas/detail.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "5999201f21f79db40469913c681206fd1b6a6ee496c57c5daadf527d1299e0af",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/counting-areas/edit.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "1699f74eeea51f8497f543e3748de19becf9eab76f2cf53e990d53b40b324381",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/counting-areas/index.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "bff9ff4b7239cbc78fdd2a20f157a604b715bc26d6be76ec3c59b2b81441c3a4",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/counting-areas/show.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "d44a6a1893649d13cbe1bf75578443e0b28165be9f6213b28d555a2c56ea167c",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/grid/_cells.blade.php",
+      "module": "StockRecon",
+      "kind": "grid partial",
+      "sha256": "55b394f49a53b9a7caa43752539f441280ec98395bce1d62880634166e12b3c0",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/grid/_variance-cells.blade.php",
+      "module": "StockRecon",
+      "kind": "grid partial",
+      "sha256": "6950d1a66cf447ae2e30281ce6d5931ee18aff1dc2b3e52c7f3fb8411297db33",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/grid/_water-cells.blade.php",
+      "module": "StockRecon",
+      "kind": "grid partial",
+      "sha256": "2294e89d6bdbb8f9a16bad7e29e2912410ccd378235feb39cde6d4f69ee0eb14",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/group-form.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "fa39c8efd410279f09baca78e5651d2f6202123062cafc2bac93ce044563c14c",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/group.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "263a71b1af0de0c08f3b636c98ef2da9c4bb7563b8789e962c02c3847b01aabe",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/helper.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "61bc9a7ca46e8e217f02416fc6a7768188cd50d6b7e64faffef96380c6735939",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 2
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/index.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "c786f32bd1cedef5e8902d91031d01d26eeeb963a77c3eeaa8e51b06d63644f6",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/panes/exceptions.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "3b5fb182a62d2295e7261c9ddd84d673a22aacc059faf0e23090d9e3aceb4aa1",
+      "component_uses": [
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/panes/global.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "588332252e45324100e5cd89f23be7429ca7db998ed5e2cffabb730e9f7aef0b",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 3
+        },
+        {
+          "component": "x-card",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/panes/proposals.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "25d9495edc2de4daa0d6ddd2948af6b5cb3984962c44b27535b2d4c1fca927a1",
+      "component_uses": [
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/partials/chain-detail.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "ec777beba1fd839e8be7e2f68e3d6476c4c1967891d8dde181c60a08233bf217",
+      "component_uses": [
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/partials/code.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "3c6d20b3198b7997f563d4f2e245a2ef8331dc3a1915126101696e59f313213e",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/partials/codes-modal.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "c85a68aaeadbd72a5927b08563b28d116eb9ac55ed1582a85ed720d13b66a746",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/partials/duplicate-case.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "e8b3f458fb8f06cc54cd13957b1d56c5ba10bd58ada8630d022ea615c61155df",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/partials/duplicate-release.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "ba05cb5e8edcfdd814f8e1f3c79beaac88f1de5a461a652bddd1541eef14378e",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/partials/duplicates.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "fdd34e9e0e721b83ef4e111fa21f796d9cc5e62c6050c440bd76280947174ef8",
+      "component_uses": [
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/partials/open-run.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "08efb12d0b72fe3f0b1d4794e30262b2f17ab223de4ba4d982d9faed74e621f4",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/partials/released-notice.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "6fe46a607e7600e94e4eddd4503b1e7c8ded072dcdc6323bb4e7a046ae0fd4eb",
+      "component_uses": []
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/proposal-metric.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "98cc0aabd7b7471b422bdc07873271ebb061b03cb2366cc01e9c58d1a6b5db0a",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/run.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "350316a1875f4891c8985a5ade92527157643a3d2e2f75c6609969ddc28759e3",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/tutorial.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "11f9ff8194488b2ebde2a5aadcbfe7d7564e57fb9623abe5e5ad773cb5f7359f",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/variance.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "9a196a28dae40c1128626d614d17b03614e0b31ee3e343309a0f6052e513bfa1",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/water-meters.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "7cc7a4d98868993ec5d2c1f38b95e8f6c2b52ea8ec0aefb7997dc725783643ef",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-statstrip",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/weekly/create.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "d5aacc687b3b18a2ac01c500abcdd8172f4068dcddd432c349883f2266fc5f90",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/weekly/detail.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "a9e5014330ed37a878100526ac1832b8fc25fe8c726363c8b5f81373eb565cc6",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 7
+        },
+        {
+          "component": "x-facts",
+          "count": 2
+        },
+        {
+          "component": "x-card",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/weekly/edit.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "e3bfd43fa264ce1182391d9b9c55dbfe27a4fc4d82108fd5014de1179c1cc29c",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/weekly/index.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "05998baae686f5e584c10df620580b491b5ef25d9f9b6af1693387fe23e08afa",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 3
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "path": "Modules/StockRecon/Resources/views/weekly/show.blade.php",
+      "module": "StockRecon",
+      "kind": "screen or fragment",
+      "sha256": "e55557ab3fbc85a3b01752e2de4158104369d32862beff3f7f89c4da75edb6fb",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "Modules/Utilities/Resources/views/index.blade.php",
+      "module": "Utilities",
+      "kind": "screen or fragment",
+      "sha256": "f83d4959a313d6a80fab684712d32bad7dd6034b6c71c21d49cc9cfcfa14c121",
+      "component_uses": [
+        {
+          "component": "x-app-shell",
+          "count": 1
+        },
+        {
+          "component": "x-kpi-strip",
+          "count": 1
+        },
+        {
+          "component": "x-data-grid",
+          "count": 1
+        },
+        {
+          "component": "x-table",
+          "count": 1
+        },
+        {
+          "component": "x-facts",
+          "count": 1
+        },
+        {
+          "component": "x-scope-line",
+          "count": 1
+        },
+        {
+          "component": "x-card",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "path": "resources/views/components/action-bar.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "3d10ff37d12a85e223f8d6dffdbdf47c1db38c3d6fe53f86c99d370cd08b79cc",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/app-bar.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "f85b7bad2cbaa669cad4395367278171443c82b2b23796355b6db3d5c663cb61",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/app-shell.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "8bf85883d9f016a41e3562c1e839ce0fea8d5cf85ef5c97db9d54ab2a3c658cc",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/card.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "a40371bedc3cff8ed29a8ad81603537a68162bbba8c0bf8ca5bc46367ba23fbe",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/case.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "3dd80d5138033a21a4e9f0d58189de178e21e61b159b388614f722d0c9d9c18d",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/chart.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "23da8104c833bb58fd20da9b91d3599e53e77b6d55232d189e49a394b9f06e4d",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/checklist.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "312011e0799f1b79540f0a1e7dc231e2ae6b8411d97ca39349874967729cf6de",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/chip.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "2f12f8c8f74d075b6ec335e0ec2b6c8f315e43dc69223c41078478d1ff837bf7",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/compare.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "93fc2ebc28d3604b780bf45acc7c6dc3e4020b51cb051af938a379acde0a3e7a",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/crumb.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "6ad31b5286067ff2f21e5ef685946b989f9efe9443fe36995227d61735c9d63c",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/data-grid.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "889e8f14a0d7a258c2948cc8ae4ef17f6bb626999b0b6dbb8c189ea54440b636",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "resources/views/components/decision-list.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "db35f8ad46014767d7089829fca16d3731115a6c750ef830490ae5c29a39eb22",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/delta.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "5799fb0408601f6d635101f52248272f993d279760737ba016c55c3a4bbf6c42",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/drawer.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "d7c08be67455f4e8b02ab9f255d66403d230d22fd0dec8d13b8a60563ac967f2",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/empty-state.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "76ea9f6c5143ab915114aa40711f7902f8af6ce2867297fb41abe59b840fccc4",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/exception-list.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "db236f0a66e438a7e260d6dd5bc68f4e3b1876de390b30d2be58d27d41ee3ea3",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/exception-row.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "0d830f305a0d84d10c66cfc4e6951ac93a1efdfc8d421f44472296f1538f6289",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/explainer.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "19158db6dabb92f850eb49d17586fbfbd9345206aa7536ba639ebef748d68434",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/fact.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "40b23baabfa7152ece8a527afad4119b471fc2aa4a0502012a6473f2446c5713",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/facts.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "b1f9fcd151412334abb5ef46ad14ddbd0b76684700e09a3a9c93d2df43b32843",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/field.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "fdc700df8a71344e05ec7ea25df6465da081507ca2cc48b0581c4cc69250fa29",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/info.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "512a635ea74b0fb9f6fd3863d1a7aa03b81373a6d4ac45fe1a275189f181e0eb",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/kpi-strip.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "08144363e5b651a7fcee5c7b621d5ebce45bedd681f4779a87b2c966f250c260",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/kpi.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "02ef952a8db9f2ebca527ff31b14aa0eae71063bfbc7eaed411384e5dcf42075",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/lib-card.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "082ace6700210dc4af23b0a58ebeaa4445a1566eb891cba8d47a33e64c4640b9",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/loader.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "161464d517cb6f8e119d4990caac9335af550414e5e38defc6aa22e631ff7c3e",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/menu-branch.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "986f701acfb9433e3cfb062f9c001f27c022d743939d2ffe5ae06cb6dabdc581",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/mini-bar.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "227d7e59a5391fb0db4f13a5f93b6929bbd735569cef4e0507e427780dde2bee",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/modal.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "93b90c21614ea0c172dad4498efb1240da002be59b0769b6f66b2483f9353735",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/notice.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "591830ff2e4f0cd71961a774252e4f65827c0ef87dddca5e70ca676c0467dc4d",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/page-head.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "82b1238b2db09c95c2a79569bf431184cadb1468127e115c53d188e132752194",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/param.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "fc4ee8a575676e4615eae07c8868f8d6fe319b7263160795f1084d6856c56199",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/params.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "b7c54c0c04c79a38000013ce1d19b83ad170fe5b639eb32118c6b2bac0cbbbb9",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/proposal.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "886f023dc505e19552e7face0b9fccd168e4df99a03be42bb131bde8e6bacd6b",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/role-card.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "92c6f7c8ba9c883465baeeacce8da4e040378b66614d1b055e6437a019795310",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/runbar.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "05ee122c971016ec9f60f4b5e7000a18ca04b8bd67ffa387ea83e9298e030624",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/scope-bar.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "da72ddc6dd787db83f02e2c14e80fea06b0ec005f76d9547fa59436a8e7fe23e",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/scope-line.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "23c12ce0c675edb6855fc9a3200cbac48652cf44c5466eefc0d27a027c3816e9",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/sparkline.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "b7d6cc1080f041168d6b820ff474b9ff65e07ecb40da71f8ef3fe977b4adc400",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/sqlbox.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "06496d690ed2a3d0e19a216c8a6d540dd33b82230c63f452d43fe9b53e3a842d",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/statstrip.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "3c96bcd8f4f3b6d215c1bb08d6ff50bf5bbeddc5c20b1916ee35344b00600405",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/system-state.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "8d44b48fc9913862d7863f51614c31f6a1c74691ca3e5715e61d35891eb57ac9",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/tab-panel.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "420d9fdf6c4286fa609870736476df22214ddc01e051eea905ca11700f42e9ab",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/table.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "68bf8bb8a451a983befa2d10bba0d1b900123be77491af8f9659294061235e15",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/tabs.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "83c68052df949e0e9eb1cd4842a6627631518af66b627e9d170f3cee075a141b",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/tip.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "14a306092edfcbfdbf387886061e5202c95ca0cb91bba4af40887db631661a5b",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/tone-value.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "0de2be6786a3bd62b05e3dcd5526b9394d3aad5e7ac68f7a3f7f2f56b7b916d0",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/components/two-pane-recon.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "420565baacc7d768f5d8f4a90fc9057943e522671292ccfe6c0d8aa8c4c4f9df",
+      "component_uses": [
+        {
+          "component": "x-table",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "path": "resources/views/components/workspace-switch.blade.php",
+      "module": "shared",
+      "kind": "component",
+      "sha256": "cd8b79e886c9814c2aa68825d28d9ae2a2d1ba10cff49b00960d2693364c02fe",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/grid/_cards.blade.php",
+      "module": "shared",
+      "kind": "grid partial",
+      "sha256": "eb01f09295b6af3a018b486c54a624e6bee6ce43ecc7414e04705b5a674d0dca",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/grid/_cell.blade.php",
+      "module": "shared",
+      "kind": "grid partial",
+      "sha256": "149298e1b75a2d8aac2cad90a39b9a36cae8e796b39389b25307aa4fdae687c2",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/grid/_cells.blade.php",
+      "module": "shared",
+      "kind": "grid partial",
+      "sha256": "3ee9c0a893baa54adc7311ee578faac8b98b48971131cd05615a944d6ad12b76",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/grid/_chooser.blade.php",
+      "module": "shared",
+      "kind": "grid partial",
+      "sha256": "9f11aa35854d38dc4161a6d638e7a579540ea60f9f0c3d676a7c2d070c0b17fd",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/grid/_extract.blade.php",
+      "module": "shared",
+      "kind": "grid partial",
+      "sha256": "069aafaed293e3f091d305040730c5b3039f6732ff9eea187026d09b30eee5b5",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/grid/_filters.blade.php",
+      "module": "shared",
+      "kind": "grid partial",
+      "sha256": "03430cacf6f29ae5546a8879c28dc920b5d74fac32dc0c0f21618ee30750e326",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/grid/_pager.blade.php",
+      "module": "shared",
+      "kind": "grid partial",
+      "sha256": "8d8ee5a84354c4b4ed505646cba16bca1ee9d160a24181d57423e5a54cc8fe32",
+      "component_uses": []
+    },
+    {
+      "path": "resources/views/grid/_scope.blade.php",
+      "module": "shared",
+      "kind": "grid partial",
+      "sha256": "200064d947a5ee7ac04a2848190af1c6232310261fe1e0a382fc43e4d6cd41bc",
+      "component_uses": []
+    }
+  ]
+}

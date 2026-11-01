@@ -24,12 +24,14 @@
          pairs against what. The rest of the blurb is behind the info button on
          the area's own page. --}}
     <x-card title="The five areas">
-        <div class="area-grid">
+        <div class="area-grid recon-area-grid">
             @foreach ($areas as $key => $area)
-                <a class="area-card" href="{{ route('app.recon.area', $key) }}">
-                    <h3>{{ $area['label'] }}</h3>
-                    <p>{{ Str::finish(Str::before($area['blurb'], '. '), '.') }}</p>
-                    <span class="area-proc">agora.{{ $area['procedure'] }}</span>
+                <a class="area-card" href="{{ route('app.recon.area', $key) }}" data-loader="Opening {{ $area['label'] }}…">
+                    <x-feature-art :art="app(\Modules\Core\Services\NavigationArtwork::class)->forRoute('app.recon.area', ['area' => $key])" />
+                    <div>
+                        <h3>{{ $area['label'] }}</h3>
+                        <p>{{ Str::finish(Str::before($area['blurb'], '. '), '.') }}</p>
+                    </div>
                 </a>
             @endforeach
         </div>
@@ -46,16 +48,16 @@
     --}}
     @php($mine = \Modules\Recon\Grids\ReconRunGrid::wantsOwnRunsOnly())
     @php($openOnly = \Modules\Recon\Grids\ReconRunGrid::wantsOpenOnly())
-    <x-card title="Runs"
-            :sub="($openOnly ? 'Open work' : 'Every run').' across the five areas, '.($mine ? 'yours' : 'everyone\'s').', newest first'"
+    @php($invalidOnly = \Modules\Recon\Grids\ReconRunGrid::wantsInvalidOnly())
+    @include('recon::partials.run-archive-outcome')
+    @if (session('refusal'))
+        <x-notice tone="stop" title="That did not go through" class="recon-archive-notice">{{ session('refusal') }}</x-notice>
+    @endif
+    <x-card title="Runs" class="recon-run-list"
+            :sub="($invalidOnly ? 'Invalid runs' : ($openOnly ? 'Open work' : 'Every run')).' across the five areas, '.($mine ? 'yours' : 'everyone\'s').', newest first'"
             flush>
         <x-slot:actions>
-            <x-tabs label="Which runs"
-                    :active="$openOnly ? 'open' : 'all'"
-                    :items="[
-                        ['key' => 'open', 'label' => 'Open work', 'href' => route('app.recon.index', array_filter(['scope' => $mine ? null : 'all']))],
-                        ['key' => 'all', 'label' => 'Everything', 'href' => route('app.recon.index', array_filter(['scope' => $mine ? null : 'all', 'show' => 'all']))],
-                    ]" />
+            @include('recon::partials.run-switches')
             {{-- Scoped like the list beside it: this site, and only your own
                  runs while the list shows only yours. It used to take
                  everybody's. A sweep never takes a run marked complete. --}}
@@ -72,6 +74,6 @@
             @endif
         </x-slot:actions>
 
-        <x-data-grid :grid="$grid" :branches="$branches" />
+        @include('recon::partials.run-grid')
     </x-card>
 </x-app-shell>

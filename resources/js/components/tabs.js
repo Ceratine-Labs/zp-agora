@@ -37,6 +37,7 @@
  * page down with it because a preference could not be saved.
  */
 export default function tabs(root = document) {
+    const initial = [];
     root.querySelectorAll('[data-tabs]:not([data-tabs-ready])').forEach((set) => {
         set.setAttribute('data-tabs-ready', '');
 
@@ -60,7 +61,7 @@ export default function tabs(root = document) {
             panel.setAttribute('aria-labelledby', button.id);
         });
 
-        function show(want, remember) {
+        function show(want, remember, starting = false) {
             if (! buttons.some((b) => b.dataset.tab === want)) return false;
 
             buttons.forEach((button) => {
@@ -75,7 +76,10 @@ export default function tabs(root = document) {
             });
 
             const panel = panels.find((p) => p.dataset.tabPanel === want);
-            if (panel && panel.dataset.tabSrc) load(panel, button(want));
+            if (panel && panel.dataset.tabSrc) {
+                const loaded = load(panel, button(want));
+                if (starting) initial.push(loaded);
+            }
 
             if (remember && store) {
                 try { localStorage.setItem(store, want); } catch { /* storage blocked */ }
@@ -121,9 +125,9 @@ export default function tabs(root = document) {
         // Falling back to the button the server marked also repairs the one
         // mistake a view can make here — panel mode with no `active`, which
         // renders every pane — rather than leaving a page of stacked panes.
-        if (! remembered || ! show(remembered, false)) {
+        if (! remembered || ! show(remembered, false, true)) {
             const current = buttons.find((b) => b.classList.contains('on')) || buttons[0];
-            show(current.dataset.tab, false);
+            show(current.dataset.tab, false, true);
         }
 
         strip.addEventListener('click', (event) => {
@@ -148,6 +152,7 @@ export default function tabs(root = document) {
             show(buttons[next].dataset.tab, true);
         });
     });
+    return Promise.all(initial);
 }
 
 /**
@@ -185,7 +190,7 @@ async function load(panel, label, force = false) {
         panel.innerHTML = html;
         panel.dataset.tabLoaded = 'yes';
         delete panel.dataset.tabStale;
-        window.Agora?.hydrate?.(panel);
+        await window.Agora?.hydrate?.(panel);
     } catch (error) {
         done();
         panel.innerHTML = '<p class="tabpane-error">This tab could not be read — '

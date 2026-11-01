@@ -54,6 +54,50 @@ class ComponentCatalogue
 
         $components = [
             [
+                'name' => 'x-stockrecon::tutorial-deck',
+                'group' => 'Module-scoped',
+                'summary' => 'The stock reconciliation learning chapters with worked examples and clickable event explanations.',
+                'notes' => 'Training content only. Manual chapter navigation, accessible disclosures and before/proposal examples; no stock writes. Behaviour: stock-recon-tutorial.js.',
+                'gallery' => false,
+                'props' => [
+                    ['content', 'array', 'required', 'Lessons, scenarios and event explanations'],
+                    ['lesson', 'string', 'required', 'The active lesson id'],
+                ],
+            ],
+            [
+                'name' => 'x-stockrecon::tutorial-scenario',
+                'group' => 'Module-scoped',
+                'summary' => 'A worked stock reconciliation example with original and proposed quantities.',
+                'notes' => 'Static teaching cases, not a replacement for the balancing procedure. Held examples have no proposal.',
+                'gallery' => false,
+                'props' => [
+                    ['scenario', 'array', 'required', 'The labelled teaching case and its quantities'],
+                ],
+            ],
+            [
+                'name' => 'x-stockrecon::tutorial-icon',
+                'group' => 'Module-scoped',
+                'summary' => 'A decorative line icon for the stock reconciliation learning guide.',
+                'notes' => 'Inherits theme text colour and accompanies a visible label.',
+                'gallery' => false,
+                'props' => [
+                    ['name', 'string', 'required', 'The supported icon name'],
+                ],
+            ],
+            [
+                'name' => 'x-operations::board',
+                'group' => 'Module-scoped',
+                'summary' => 'The live TV wall: rotating exception cards with pause, site selection and detail.',
+                'notes' => 'Procedure-backed snapshots, per-TV settings, visible source gaps and stale/error states. Behaviour: operations-wall.js. Screen rotation is independent of data refresh; explicit pause remains paused.',
+                'gallery' => false,
+                'props' => [
+                    ['endpoint', 'string', 'required', 'Authenticated snapshot endpoint'],
+                    ['userKey', 'string', 'required', 'Account namespace for this TV settings'],
+                    ['sites', 'array', '[]', 'Permitted site ids and names'],
+                    ['scope', 'array', '[]', 'Selected branch ids'],
+                ],
+            ],
+            [
                 'name' => 'x-app-shell',
                 'group' => 'Chrome',
                 'summary' => 'The whole page: head, app bar, scope bar, main, footer.',

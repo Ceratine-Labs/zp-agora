@@ -86,8 +86,9 @@
          draws one line per cashier among the ticked bags and keeps the hidden
          field below in step with what is on screen. It lives inside the
          page's form like everything else here, so it posts with the match. --}}
-    <div data-match-allocation hidden>
+    <div data-match-allocation data-bag-writes="{{ config('recon.stamp_mode') === 'live' && config('recon.cash_bag_adjust_mode') === 'live' ? '1' : '0' }}" hidden>
         <input type="hidden" name="allocation" value="" data-alloc-json>
+        <input type="hidden" name="bag_adjustments" value="" data-bag-adjust-json>
 
         <div class="twopane" style="grid-template-columns:1fr">
             <div class="twopane-side">
@@ -104,6 +105,7 @@
                             <th class="num">Banked</th>
                             <th class="num">Drop safe</th>
                             <th class="num">Share of the variance</th>
+                            <th>Bag to adjust in PumpIT</th>
                             <th class="num">Accountable</th>
                         </tr>
                     </x-slot:head>
@@ -134,7 +136,7 @@
              the running totals above and the match itself only ever count
              what is on screen. --}}
         <x-table dense :count="$bank->count()" id="match-bank" tools
-                 empty="Nothing on the statement is outstanding for this site and period.">
+                 empty="No bank lines match this site, period and state.">
             <x-slot:head>
                 <tr>
                     <th class="pick"><input type="checkbox" data-pane-all="bank" aria-label="Select every bank line"></th>
@@ -142,6 +144,7 @@
                     <th>Narrative</th>
                     <th>{{ $keyLabel }}</th>
                     <th class="num">Amount</th>
+                    <th>Recon batch</th>
                 </tr>
             </x-slot:head>
 
@@ -152,6 +155,8 @@
                     <td class="pick">
                         <input type="checkbox" name="bank[]" value="{{ $row->BankStatementLineID }}"
                                data-pane-pick="bank"
+                               @disabled(! ($row->IsOutstanding ?? false))
+                               @if (! ($row->IsOutstanding ?? false)) data-reconciled @endif
                                aria-label="Bank line {{ $row->BankStatementLineID }}">
                     </td>
                     <td class="mono">{{ substr((string) $row->LineDate, 0, 10) }}</td>
@@ -167,6 +172,7 @@
                         @endif
                     </td>
                     <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>
+                    <td class="mono">{{ $row->ReconBatchNo ?: '—' }}</td>
                 </tr>
             @endforeach
         </x-table>
@@ -186,7 +192,7 @@
              to their content, so the surplus goes to the cashier's name. The
              other areas render as they always have. --}}
         <x-table dense :fit="$cashier" :count="$mops->count()" id="match-mops" tools
-                 empty="Nothing on the deposit side is outstanding for this site and period.">
+                 empty="No deposits match this site, period and state.">
             <x-slot:head>
                 <tr>
                     <th class="pick"><input type="checkbox" data-pane-all="mops" aria-label="Select every deposit"></th>
@@ -199,6 +205,7 @@
                         <th>Second</th>
                     @endif
                     <th class="num">Amount</th>
+                    <th>Recon batch</th>
                 </tr>
             </x-slot:head>
 
@@ -220,6 +227,8 @@
                              which two settlements sharing a batch, date and
                              amount differ by (5 Oct 2026). --}}
                         <input type="checkbox" name="mops[]" data-pane-pick="mops"
+                               @disabled(! ($row->IsOutstanding ?? false))
+                               @if (! ($row->IsOutstanding ?? false)) data-reconciled @endif
                                value="{{ json_encode([
                                    'id' => $row->SourceId,
                                    'key' => $row->SourceKey,
@@ -291,6 +300,7 @@
                         @endif
                     @endif
                     <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>
+                    <td class="mono">{{ $row->ReconBatchNoPumpIT ?: '—' }}</td>
                 </tr>
             @endforeach
         </x-table>

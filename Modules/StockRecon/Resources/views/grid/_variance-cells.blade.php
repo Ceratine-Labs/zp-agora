@@ -7,6 +7,9 @@
     default.
 --}}
 @switch($column->key)
+    @case('ShiftNo')
+        {{ \Modules\StockRecon\Support\ShiftLabel::show($row->{$column->key} ?? null) }}
+        @break
     @case('QtyVarOriginal')
     @case('ValueVarOriginal')
         <x-tone-value :tone="$row->OriginalTone ?? null">@include('grid._cell', ['row' => $row, 'column' => $column])</x-tone-value>

@@ -13,7 +13,7 @@
    the branch workspace passes a single @BranchIds.
 
    WHERE THE NUMBERS COME FROM
-   Five queues, each the same rule its own report uses:
+   Six queues, each the same rule its own report uses:
 
      day-close            a trading day whose DayBalance bit is still 0
      unallocated-zreads   a till reading with no till, no shift and no employee
@@ -32,6 +32,10 @@
    ceiling. Sorting is done with three typed sort keys computed alongside the
    columns — no dynamic SQL, so the procedure can be granted EXECUTE without
    granting anything underneath it.
+
+   My queue also returns a third result set: totals per queue type across the
+   full filtered scope, before paging. These are separate queue totals, never
+   a combined count or value across types; day-close has no monetary value.
 
    READ-ONLY. Nothing in this module writes to any database. The temp table is
    in tempdb; the customer's estate is not touched.
@@ -215,4 +219,14 @@ BEGIN
     OFFSET (@Page - 1) * @PageSize ROWS FETCH NEXT @PageSize ROWS ONLY;
 
     SELECT @Total AS TotalRows;
+
+    /* Full-scope shortcut totals use the same branch, date and search filters
+       as the rows. SUM keeps an entirely absent value NULL (day-close).
+       Widen before summing so totals across sites cannot overflow int/money. */
+    SELECT QueueKey,
+           SUM(CONVERT(bigint, OpenItems)) AS OpenItems,
+           SUM(CONVERT(decimal(38,4), Value)) AS Value,
+           COUNT_BIG(*) AS SiteQueues
+    FROM #Rows
+    GROUP BY QueueKey;
 END

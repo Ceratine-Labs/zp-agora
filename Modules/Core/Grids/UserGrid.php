@@ -44,9 +44,7 @@ class UserGrid extends GridDefinition
             new GridColumn(key: 'UserName', label: 'Name', sort: 'UserName', wide: true, link: true),
             new GridColumn(key: 'EmailAddress', label: 'Email', sort: 'EmailAddress', wide: true),
             new GridColumn(key: 'UserType', label: 'Type', sort: 'UserType'),
-            // Roles were retired on 22 Sep 2026. What the two role columns
-            // were read for — how much can this person do — is now one number
-            // over agora.UserPermission, which is the whole of their access.
+            new GridColumn(key: 'RoleNames', label: 'Roles', filter: 'none'),
             new GridColumn(key: 'PermissionCount', label: 'Permissions', format: 'number', sort: 'PermissionCount'),
             new GridColumn(key: 'BranchCount', label: 'Branches', format: 'number', sort: 'BranchCount'),
             new GridColumn(key: 'LastSignInAt', label: 'Last sign-in', format: 'instant', sort: 'LastSignInAt'),
@@ -93,6 +91,16 @@ class UserGrid extends GridDefinition
     public function branchSelector(): bool
     {
         return false;
+    }
+
+    public function selectable(): bool
+    {
+        return Gate::allows('setup.users.edit');
+    }
+
+    public function rowKey(object $row): string|int|null
+    {
+        return (int) $row->Id;
     }
 
     public function rowUrl(object $row): ?string

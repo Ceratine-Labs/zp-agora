@@ -34,6 +34,11 @@ Route::middleware('auth')->prefix('recon')->name('recon.')->group(function () {
      */
     Route::get('dashboard', [ReconDashboardController::class, 'index'])->middleware('can:recon.runs.view')->name('dashboard');
 
+    // Scope is signed from the displayed list; SQL rechecks invalidity while
+    // archiving. This keeps history, using the existing close permission.
+    Route::post('runs/archive-invalid', [ReconController::class, 'archive'])
+        ->middleware(['can:recon.runs.view', 'can:recon.runs.close'])->name('archive');
+
     // A run is the record of a preview, addressable on its own so a figure
     // can be sent to someone rather than described to them.
     Route::get('runs/{run}', [ReconController::class, 'show'])->middleware('can:recon.runs.view')->name('run');
@@ -86,6 +91,10 @@ Route::middleware('auth')->prefix('recon')->name('recon.')->group(function () {
     Route::post('auto/{area}/match', [ReconController::class, 'match'])
         ->middleware('can:recon.runs.execute')->name('match.save');
     Route::get('auto/{area}/runs', [ReconController::class, 'runList'])->middleware('can:recon.runs.view')->name('runs');
+    Route::get('auto/{area}/batch', [ReconController::class, 'batch'])
+        ->middleware('can:recon.runs.reverse')->name('batch');
+    Route::post('auto/{area}/batch/reverse', [ReconController::class, 'reverseBatch'])
+        ->middleware(['can:recon.runs.reverse', 'signed'])->name('batch.reverse');
     Route::get('auto/{area}/config', [ReconController::class, 'configuration'])->middleware('can:recon.criteria.view')->name('config');
     // One rule's edit form, as the fragment the modal opens onto. Looking is
     // `view`; the form inside it renders its controls only for `edit`.

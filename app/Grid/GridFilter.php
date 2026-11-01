@@ -69,6 +69,11 @@ final class GridFilter
             $input = ['q' => $input];
         }
 
+        // Scope selectors can offer All alongside comparisons against zero.
+        if (($input['op'] ?? null) === 'all') {
+            return null;
+        }
+
         if ($this->type === 'set') {
             /** @var array<int, mixed> $values */
             $values = is_array($input['in'] ?? null) ? $input['in'] : [];

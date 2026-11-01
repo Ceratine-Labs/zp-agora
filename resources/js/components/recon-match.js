@@ -1,3 +1,5 @@
+import reconRunFilters from './recon-run-filters.js';
+
 /**
  * The manual reconcile workbench — the live half of <x-two-pane-recon>.
  *
@@ -44,6 +46,7 @@
  * App\Support\Format — rebuilding the number format here is how the two drift.
  */
 export default function reconMatch(root = document) {
+    reconRunFilters(root);
     // `root` is the recon centre's Manual tab when the pane arrives as a
     // fragment; the whole document on the standalone page.
     const pane = root.querySelector('[data-two-pane]:not([data-two-pane-ready])');
@@ -107,6 +110,10 @@ export default function reconMatch(root = document) {
             if (event.target.matches('[data-alloc-share]')) recount();
         });
 
+        panel.addEventListener('change', (event) => {
+            if (event.target.matches('[data-alloc-target]')) recount();
+        });
+
         panel.querySelector('[data-alloc-reset]')?.addEventListener('click', () => {
             split.reset();
             recount();
@@ -142,20 +149,21 @@ function report(pane, strip, reason, submit, split) {
         write(cells[2], money(difference), off ? 'a reason is required' : 'the two sides agree');
     }
 
+    const splitAddsUp = split ? split.update(bags(pane), bank.cents - mops.cents) : true;
+    const needsReason = off || Boolean(split?.hasChanges());
+
     if (reason) {
-        reason.hidden = !off;
+        reason.hidden = !needsReason;
 
         const field = reason.querySelector('input');
 
         // Only required while it is on screen — a hidden required field is a
         // form that cannot be submitted and does not say why.
-        if (field) field.required = off;
+        if (field) field.required = needsReason;
     }
 
     // The variance the split shares out is bank less bags: what the bank
     // credited beyond (or short of) what the bags were banked as.
-    const splitAddsUp = split ? split.update(bags(pane), bank.cents - mops.cents) : true;
-
     if (submit) submit.disabled = bank.count === 0 || mops.count === 0 || !splitAddsUp;
 }
 
@@ -181,6 +189,7 @@ function bags(pane) {
         .map((pick) => pick.closest('tr'))
         .filter((row) => row && row.hasAttribute('data-cashier-code'))
         .map((row) => ({
+            ...JSON.parse(row.querySelector('[data-pane-pick]').value),
             code: row.dataset.cashierCode ?? '',
             name: row.dataset.cashierName || null,
             cents: toCents(row.dataset.amount),
@@ -200,6 +209,8 @@ function bags(pane) {
  */
 function splitPanel(panel, form) {
     const json = panel.querySelector('[data-alloc-json]');
+    const bagJson = panel.querySelector('[data-bag-adjust-json]');
+    const writesBags = panel.dataset.bagWrites === '1';
     const body = panel.querySelector('tbody');
     const head = panel.querySelector('[data-alloc-head]');
     const state = panel.querySelector('[data-alloc-state]');
@@ -216,7 +227,7 @@ function splitPanel(panel, form) {
     let variance = 0;
 
     const draw = () => {
-        body.replaceChildren(...lines.map((line, i) => lineRow(line, i)), totalRow(lines));
+        body.replaceChildren(...lines.map((line, i) => lineRow(line, i, writesBags)), totalRow(lines));
     };
 
     const settle = () => {
@@ -230,7 +241,18 @@ function splitPanel(panel, form) {
 
         const missing = lines.some((line) => line.share === null);
         const shares = missing ? null : lines.reduce((t, line) => t + line.share, 0);
-        const addsUp = !missing && shares === variance;
+        let bagChoicesValid = true;
+        const changes = lines.flatMap((line, i) => {
+            const target = body.querySelector(`[data-alloc-target="${i}"]`)?.value;
+            if (writesBags && line.share && !target) bagChoicesValid = false;
+            return line.members.map((bag) => {
+                const share = String(bag.id) === target ? (line.share ?? 0) : 0;
+                if (writesBags && bag.cents + share < 0) bagChoicesValid = false;
+                return { id: bag.id, key: bag.key, amount: plain(bag.cents), share: plain(share) };
+            });
+        });
+        const addsUp = !missing && shares === variance && bagChoicesValid;
+        if (bagJson) bagJson.value = JSON.stringify(changes);
         const byHand = lines.some((line) => line.share !== line.derived);
 
         const shareTotal = body.querySelector('[data-alloc-share-total]');
@@ -243,7 +265,9 @@ function splitPanel(panel, form) {
         if (resetButton) resetButton.hidden = !byHand;
 
         if (state) {
-            state.replaceChildren(stateLine(addsUp, missing, shares, variance, byHand));
+            state.replaceChildren(!bagChoicesValid
+                ? chip('crit', 'Choose a bag for every nonzero share; its resulting amount cannot be negative')
+                : stateLine(addsUp, missing, shares, variance, byHand));
         }
 
         if (head) head.textContent = headLine(lines);
@@ -255,7 +279,9 @@ function splitPanel(panel, form) {
         })));
 
         if (form) {
-            form.dataset.confirmText = [form.dataset.confirmTextBase, dialogLine(lines, byHand)]
+            form.dataset.confirmText = [form.dataset.confirmTextBase, dialogLine(lines, byHand),
+                writesBags && changes.some(bag => Number(bag.share) !== 0) ? 'PumpIT bag changes:\n' + changes.filter((bag) => Number(bag.share) !== 0)
+                    .map((bag) => `Bag ${bag.key} (ID ${bag.id}): ${money(Number(bag.amount))} → ${money(Number(bag.amount) + Number(bag.share))}; AdjustedBy changes by ${money(-Number(bag.share))}`).join('\n') : '']
                 .filter(Boolean)
                 .join('\n\n');
         }
@@ -264,10 +290,12 @@ function splitPanel(panel, form) {
     };
 
     return {
+        hasChanges: () => lines.some(line => line.share !== null && line.share !== 0),
         update(ticked, varianceCents) {
             if (ticked.length === 0) {
                 panel.hidden = true;
                 json.value = '';
+                if (bagJson) bagJson.value = '';
                 signature = null;
                 lines = [];
 
@@ -278,7 +306,7 @@ function splitPanel(panel, form) {
 
             panel.hidden = false;
 
-            const now = JSON.stringify([varianceCents, ticked.map((b) => [b.code, b.cents, b.drop]).sort()]);
+            const now = JSON.stringify([varianceCents, ticked.map((b) => [b.id, b.code, b.cents, b.drop]).sort()]);
 
             if (now !== signature) {
                 signature = now;
@@ -314,8 +342,9 @@ function derive(ticked, varianceCents) {
 
     ticked.forEach((bag) => {
         const line = byCode.get(bag.code)
-            ?? { code: bag.code, name: null, bags: 0, banked: 0, drop: 0, dropBags: 0 };
+            ?? { code: bag.code, name: null, bags: 0, banked: 0, drop: 0, dropBags: 0, members: [] };
 
+        line.members.push(bag);
         line.bags += 1;
         line.banked += bag.cents;
         if (bag.drop !== null) {
@@ -368,7 +397,7 @@ function ordinal(a, b) {
     return a > b ? 1 : 0;
 }
 
-function lineRow(line, i) {
+function lineRow(line, i, writesBags) {
     const tr = document.createElement('tr');
 
     tr.append(
@@ -377,10 +406,26 @@ function lineRow(line, i) {
         cell(money(line.banked / 100), 'num'),
         dropCell(line),
         shareCell(line, i),
+        writesBags ? targetCell(line, i) : cell('—', ''),
         cell(money((line.banked + line.share) / 100), 'num', { allocAccountable: String(i) }),
     );
 
     return tr;
+}
+
+function targetCell(line, i) {
+    const td = cell('', '');
+    const select = document.createElement('select');
+    select.dataset.allocTarget = String(i);
+    select.setAttribute('aria-label', `Bag to adjust for ${label(line)}`);
+    select.append(new Option('Choose bag…', ''));
+    line.members.forEach((bag) => select.append(new Option(`${bag.key} · ${money(bag.cents / 100)}`, String(bag.id))));
+    if (line.members.length === 1) select.value = String(line.members[0].id);
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    wrap.append(select);
+    td.append(wrap);
+    return td;
 }
 
 function totalRow(lines) {
@@ -398,6 +443,7 @@ function totalRow(lines) {
         strongCell(money(banked / 100), 'num'),
         dropTotal(dropBags, bagCount, drop),
         strongCell('', 'num', { allocShareTotal: '' }),
+        cell('', ''),
         strongCell('', 'num', { allocAccountableTotal: '' }),
     );
 

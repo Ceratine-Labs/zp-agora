@@ -126,6 +126,7 @@ class GridDefinitionTest extends TestCase
         // A nested array is not a value; casting one to a string is the "Array
         // to string conversion" that 500'd the Reports branch selector.
         $this->assertNull($filter->normalise(['q' => ['a' => 'b']]));
+        $this->assertNull($filter->normalise(['q' => '0', 'op' => 'all']));
     }
 
     public function test_a_set_filter_takes_only_its_in_list(): void

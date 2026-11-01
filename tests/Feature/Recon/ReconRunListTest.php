@@ -40,7 +40,8 @@ class ReconRunListTest extends TestCase
             // Typed header filters, which is the half that has to reach the
             // procedure in the shape it parses (§3.1).
             ->assertSee('Would reconcile')
-            ->assertSee('Run by');
+            ->assertSee('Run by')
+            ->assertSee('Run #');
     }
 
     /**
@@ -96,7 +97,7 @@ class ReconRunListTest extends TestCase
     /** A run can be given a name on the way in, so it can be found by one. */
     public function test_the_preview_form_offers_a_name_for_the_run(): void
     {
-        $this->actingAs($this->admin())->get('/app/recon/auto/ABSA')
+        $this->actingAs($this->admin())->get('/app/recon/auto/ABSA?branch_id=18&from=2026-08-01&to=2026-08-02&tab=auto')
             ->assertOk()
             ->assertSee('Name this run')
             ->assertSee('name="note"', false);

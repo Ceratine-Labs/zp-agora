@@ -1,8 +1,17 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\StockRecon\Http\Controllers\CountingAreaController;
 use Modules\StockRecon\Http\Controllers\StockReconController;
+use Modules\StockRecon\Http\Controllers\StockReconGroupController;
+use Modules\StockRecon\Http\Controllers\StockReconHelperController;
+use Modules\StockRecon\Http\Controllers\StockReconTutorialController;
 use Modules\StockRecon\Http\Controllers\StockReconVarianceController;
+use Modules\StockRecon\Http\Controllers\WaterMeterController;
+use Modules\StockRecon\Http\Controllers\WeeklyStockController;
+use Modules\StockRecon\Http\Middleware\CountingAreaAccess;
+use Modules\StockRecon\Http\Middleware\WaterMeterAccess;
+use Modules\StockRecon\Http\Middleware\WeeklyStockAccess;
 
 // Registered under the /app prefix with the web middleware stack by
 // ModuleServiceProvider — do not repeat the prefix here.
@@ -15,6 +24,44 @@ use Modules\StockRecon\Http\Controllers\StockReconVarianceController;
  | Operations can preview and discard; the Auditor can only look.
  */
 Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(function () {
+    Route::get('tutorial', StockReconTutorialController::class)
+        ->middleware('can:stockrecon.runs.view')->name('tutorial');
+    Route::get('runs/{run}/helper', [StockReconHelperController::class, 'show'])
+        ->middleware('can:stockrecon.runs.view')->name('helper');
+
+    Route::prefix('weekly')->middleware(WeeklyStockAccess::class)->group(function () {
+        Route::get('/', [WeeklyStockController::class, 'index'])->name('weekly');
+        Route::get('create', [WeeklyStockController::class, 'create'])->middleware('can:stockrecon.weekly.create')->name('weekly.create');
+        Route::post('/', [WeeklyStockController::class, 'store'])->middleware('can:stockrecon.weekly.create')->name('weekly.store');
+        Route::get('{branch}/{case}', [WeeklyStockController::class, 'show'])->whereNumber(['branch', 'case'])->name('weekly.show');
+        Route::get('{branch}/{case}/edit', [WeeklyStockController::class, 'edit'])->whereNumber(['branch', 'case'])
+            ->middleware('can:stockrecon.weekly.edit')->name('weekly.edit');
+        Route::put('{branch}/{case}', [WeeklyStockController::class, 'update'])->whereNumber(['branch', 'case'])
+            ->middleware(['can:stockrecon.weekly.edit', 'can:stockrecon.weekly.save'])->name('weekly.update');
+    });
+    Route::get('groups', [StockReconGroupController::class, 'form'])
+        ->middleware('can:stockrecon.runs.view')->name('groups.form');
+    Route::post('groups', [StockReconGroupController::class, 'start'])
+        ->middleware(['can:stockrecon.runs.view', 'can:stockrecon.runs.create'])->name('groups.start');
+    Route::get('groups/{group}', [StockReconGroupController::class, 'show'])
+        ->whereUuid('group')->middleware('can:stockrecon.runs.view')->name('group');
+    Route::post('groups/{group}/branches/{branch}', [StockReconGroupController::class, 'runBranch'])
+        ->whereUuid('group')->whereNumber('branch')
+        ->middleware(['can:stockrecon.runs.view', 'can:stockrecon.runs.create'])->name('groups.branch');
+    Route::prefix('counting-areas')->middleware(CountingAreaAccess::class)->group(function () {
+        Route::get('/', [CountingAreaController::class, 'index'])->name('countingareas');
+        Route::get('{branch}/{area}', [CountingAreaController::class, 'show'])->whereNumber(['branch', 'area'])->name('countingareas.show');
+        Route::get('{branch}/{area}/edit', [CountingAreaController::class, 'edit'])->whereNumber(['branch', 'area'])
+            ->middleware('can:stockrecon.countingareas.edit')->name('countingareas.edit');
+        Route::put('{branch}/{area}', [CountingAreaController::class, 'update'])->whereNumber(['branch', 'area'])
+            ->middleware(['can:stockrecon.countingareas.edit', 'can:stockrecon.countingareas.save'])->name('countingareas.update');
+    });
+
+    Route::put('weekly/{branch}/{case}/approve', [WeeklyStockController::class, 'update'])->whereNumber(['branch', 'case'])
+        ->middleware([WeeklyStockAccess::class, 'can:stockrecon.weekly.approve'])->name('weekly.approve');
+    Route::put('weekly/{branch}/{case}/reopen', [WeeklyStockController::class, 'reopen'])->whereNumber(['branch', 'case'])
+        ->middleware([WeeklyStockAccess::class, 'can:stockrecon.weekly.reopen'])->name('weekly.reopen');
+
     Route::get('/', [StockReconController::class, 'index'])
         ->middleware('can:stockrecon.runs.view')->name('index');
 
@@ -32,6 +79,10 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
      */
     Route::get('runs/{run}', [StockReconController::class, 'show'])
         ->middleware('can:stockrecon.runs.view')->name('run');
+    Route::get('runs/{run}/overview', [StockReconController::class, 'overview'])
+        ->middleware('can:stockrecon.runs.view')->name('overview');
+    Route::get('runs/{run}/proposals/{metric}', [StockReconController::class, 'proposalMetric'])
+        ->middleware('can:stockrecon.runs.view')->name('proposal-metric');
     Route::get('runs/{run}/global', [StockReconController::class, 'globalOverview'])
         ->middleware('can:stockrecon.runs.view')->name('global');
     Route::get('runs/{run}/exceptions', [StockReconController::class, 'exceptions'])
@@ -78,4 +129,6 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
      */
     Route::get('variance', [StockReconVarianceController::class, 'index'])
         ->middleware('can:stockrecon.variance.view')->name('variance');
+    Route::get('water-meters', [WaterMeterController::class, 'index'])
+        ->middleware(WaterMeterAccess::class)->name('water');
 });

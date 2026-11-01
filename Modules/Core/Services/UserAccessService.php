@@ -16,16 +16,12 @@ use Throwable;
 /**
  * Who someone is, what they may do, and which sites they may see.
  *
- * ROLES WERE RETIRED ON 22 SEPTEMBER 2026 (Ryan). setRoles() is gone with
- * them and agora.UserRole is no longer read; RetireRolesSeeder copied what
- * every role carried onto the people who held it. What is left is three
- * cards, each owning one complete set.
+ * Direct permissions are independent of the additive managed-role grants.
  *
  * EVERY SET IS REPLACED, NEVER DIFFED. The screen submits the whole set it
  * owns, and this writes exactly that. A grant REMOVED is the change that
  * matters, and a diff that only ever adds is the classic way access
- * accumulates until everybody is an administrator. With roles gone this is
- * the only mechanism by which anybody loses access at all.
+ * accumulates until everybody is an administrator.
  *
  * WHY PHP AND NOT A PROCEDURE. The rulebook puts business logic in
  * `agora.usp_*` and it is right to; this is master CRUD over a few grant
@@ -48,10 +44,7 @@ class UserAccessService
     /**
      * What this person may do.
      *
-     * Since roles were retired (22 Sep 2026) this is the WHOLE of their
-     * access rather than the exceptions beside it, so a permission taken away
-     * here is taken away — there is no role underneath still carrying it. That
-     * makes the replace-don't-diff rule above load-bearing rather than tidy.
+     * Replaces direct permissions only. Role grants remain independent.
      *
      * @param  array<int, int>  $permissionIds
      * @return array<int, int>

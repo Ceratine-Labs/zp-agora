@@ -1,0 +1,23 @@
+/* Report illustrations remain still and inherit the same palette as module art. */
+.report-art {
+  display: block;
+  flex: none;
+  width: 3.5rem;
+  height: 3.5rem;
+  overflow: visible;
+}
+
+.report-art-shadow { fill: var(--line); }
+.report-art-fill { fill: var(--brand); }
+.report-art-gold { fill: var(--sand); }
+.report-art-surface { fill: var(--surface); }
+.report-art-ink { fill: var(--ink-2); }
+.report-art-outline, .report-art-line, .report-art-gold-line, .report-art-light-line {
+  stroke: var(--ink-2);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.report-art-line, .report-art-gold-line, .report-art-light-line { fill: none; }
+.report-art-gold-line { stroke: var(--sand); stroke-width: 5; }
+.report-art-light-line { stroke: var(--surface); }

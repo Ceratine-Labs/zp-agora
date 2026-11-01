@@ -311,6 +311,23 @@ BEGIN
 
     BEGIN TRANSACTION;
 
+    /* The initial status check precedes the drill reads. An archive, close or
+       another commit may finish during those reads. Serialize on this run
+       before the first ledger/counter/PumpIT write, and keep the lock through
+       commit. ArchiveInvalidRuns takes the same lock before its recheck. */
+    SET @Status = NULL;
+    SELECT @Status = r.Status
+    FROM agora.ReconRun r WITH (UPDLOCK, HOLDLOCK)
+    WHERE r.Id = @RunId AND r.BranchId = @BranchId;
+
+    IF @Status IS NULL OR @Status <> 'previewed'
+    BEGIN
+        ROLLBACK TRANSACTION;
+        IF @Status = 'committed'
+            THROW 51000, 'AGORA:RUN_ALREADY_COMMITTED:This run has already been executed. Preview again to reconcile anything further.', 1;
+        THROW 51000, 'AGORA:RUN_NOT_PREVIEWED:Only a completed preview can be executed. This run changed while its proposals were being checked.', 1;
+    END;
+
     /* UTC, the application's clock (config app.timezone), so CommittedAt sits
        on the same clock as the CreatedAt the preview wrote. SYSDATETIME() is
        the server's wall clock, +02:00 on ZP-MIST-SVR, and put "Committed"

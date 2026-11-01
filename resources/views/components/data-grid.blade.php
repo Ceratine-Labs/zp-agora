@@ -49,6 +49,7 @@
       branches  the sites the selector offers, or null for none (branch
                 workspace, or a grid that is not branch-scoped).
       actions   slot: buttons for the toolbar, right of the extract.
+      scope     slot: additional filter controls inside the scope GET form.
       bulk      slot: what to offer when rows are ticked. Rendered inside the
                 selection bar, which is hidden until something is ticked.
       surface   draw the grid as a panel rather than bare on the page.
@@ -99,7 +100,7 @@
      data-grid-slug="{{ $slug }}"
      data-state-url="{{ $grid->stateUrl() }}">
 
-    @include('grid._scope', ['grid' => $grid, 'branches' => $branches, 'formId' => $formId])
+    @include('grid._scope', ['grid' => $grid, 'branches' => $branches, 'formId' => $formId, 'scope' => $scope ?? null])
 
     {{-- The error state (feature-rules, proposed §C). A procedure that REFUSES
          — a range it cannot usefully answer — is a message to the person, not a
@@ -269,7 +270,7 @@
                 @if ($selectable)<td class="pick"></td>@endif
                 @foreach ($columns as $view)
                     @php($column = $view->column)
-                    <td @class($column->cellClasses())>
+                    <td @class($column->cellClasses()) data-column="{{ $column->key }}">
                         @if (array_key_exists($column->key, $grid->totals))
                             @include('grid._cell', [
                                 'column' => $column,

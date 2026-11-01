@@ -1,0 +1,171 @@
+{
+  "scope": "Named weekly-workflow/source methods only, run individually against disposable local SQL fixtures. Source comparison snapshots rolled back.",
+  "tests": 15,
+  "assertions": 374,
+  "results": [
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 101,
+      "duration_ms": 3068,
+      "test_method": "test_classifications_use_real_snapshot_sql_preserve_unknown_counts_and_ignore_virtual_losses",
+      "command": "php artisan test --compact --filter=test_classifications_use_real_snapshot_sql_preserve_unknown_counts_and_ignore_virtual_losses"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 40,
+      "duration_ms": 8132,
+      "test_method": "test_closure_requires_evidence_head_office_permission_and_reopening_preserves_signed_history",
+      "command": "php artisan test --compact --filter=test_closure_requires_evidence_head_office_permission_and_reopening_preserves_signed_history"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 39,
+      "duration_ms": 3991,
+      "test_method": "test_control_period_windows_cost_basis_actions_and_exports_are_separate_from_weekly_exposure",
+      "command": "php artisan test --compact --filter=test_control_period_windows_cost_basis_actions_and_exports_are_separate_from_weekly_exposure"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 9,
+      "duration_ms": 2374,
+      "test_method": "test_missing_day_holds_later_rows_and_count_dates_and_null_count_operands_stay_unknown",
+      "command": "php artisan test --compact --filter=test_missing_day_holds_later_rows_and_count_dates_and_null_count_operands_stay_unknown"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 20,
+      "duration_ms": 3252,
+      "test_method": "test_permissions_and_current_branch_grants_guard_screen_direct_export_actions_and_procedures",
+      "command": "php artisan test --compact --filter=test_permissions_and_current_branch_grants_guard_screen_direct_export_actions_and_procedures"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 16,
+      "duration_ms": 4424,
+      "test_method": "test_receipt_control_keeps_period_totals_next_day_fallback_and_issues_without_delivery",
+      "command": "php artisan test --compact --filter=test_receipt_control_keeps_period_totals_next_day_fallback_and_issues_without_delivery"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 15,
+      "duration_ms": 2707,
+      "test_method": "test_receipt_issue_recipe_and_shared_count_evidence_is_kept_without_double_counting_scorecard",
+      "command": "php artisan test --compact --filter=test_receipt_issue_recipe_and_shared_count_evidence_is_kept_without_double_counting_scorecard"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 16,
+      "duration_ms": 3023,
+      "test_method": "test_recipe_daily_product_comparison_keeps_cancelling_gaps_visible_and_e1_respects_issue_multiple",
+      "command": "php artisan test --compact --filter=test_recipe_daily_product_comparison_keeps_cancelling_gaps_visible_and_e1_respects_issue_multiple"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 26,
+      "duration_ms": 2243,
+      "test_method": "test_source_dates_branch_and_extended_window_preserve_signed_units_without_source_writes",
+      "command": "php artisan test --compact --filter=test_source_dates_branch_and_extended_window_preserve_signed_units_without_source_writes"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 23,
+      "duration_ms": 7815,
+      "test_method": "test_http_creation_with_unavailable_sources_flows_through_review_action_closure_and_export",
+      "command": "php artisan test --compact --filter=test_http_creation_with_unavailable_sources_flows_through_review_action_closure_and_export"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 18,
+      "duration_ms": 2603,
+      "test_method": "test_aura_preserves_location_cycles_and_unknown_prior_count_and_pilot_matches_actual_report_arithmetic",
+      "command": "php artisan test --compact --filter=test_aura_preserves_location_cycles_and_unknown_prior_count_and_pilot_matches_actual_report_arithmetic"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 18,
+      "duration_ms": 2633,
+      "test_method": "test_real_grid_filters_export_and_detail_use_same_scope_and_never_modify_snapshots",
+      "command": "php artisan test --compact --filter=test_real_grid_filters_export_and_detail_use_same_scope_and_never_modify_snapshots"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 13,
+      "duration_ms": 7146,
+      "test_method": "test_cross_site_patterns_use_whole_product_original_quantities_and_current_branch_grants",
+      "command": "php artisan test --compact --filter=test_cross_site_patterns_use_whole_product_original_quantities_and_current_branch_grants"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 5,
+      "duration_ms": 2208,
+      "test_method": "test_det_fallback_preserves_export_branch_period_and_category_boundaries",
+      "command": "php artisan test --compact --filter=test_det_fallback_preserves_export_branch_period_and_category_boundaries"
+    },
+    {
+      "tool": "phpunit",
+      "result": "passed",
+      "tests": 1,
+      "passed": 1,
+      "assertions": 15,
+      "duration_ms": 7897,
+      "test_method": "test_management_approval_requires_corrected_children_and_reopening_invalidates_both_approvals",
+      "command": "php artisan test --compact --filter=test_management_approval_requires_corrected_children_and_reopening_invalidates_both_approvals"
+    }
+  ],
+  "static_checks": {
+    "pint": "passed: explicit weekly PHP/test file list",
+    "phpstan": "passed: explicit weekly PHP/tests; repaired test types rechecked; grid separately rechecked",
+    "guards": "check-migrations: 5 migration(s) OK.\n check-procs: 12 procedure(s) OK.\n check-components: 5 view(s) OK \u2014 no hand-written component markup.\n check-blades: 0 Format:: call(s) in views, all real.\n check-business-date: every business date is South African.\n Scope: weekly PHP/views/procedures and five added migration files only; original guard rules; component catalogue freshness excluded because no components changed.\n",
+    "reconciliation": "Archived-input rerun reproduces comparison.csv byte for byte"
+  },
+  "not_run": [
+    "Full test suite",
+    "Whole-tree static analysis",
+    "Production smoke/deployment",
+    "Browser interaction/visual QA",
+    "All-nine-site saved cross-pattern replay"
+  ],
+  "source_fixture_environment": "PUMPIT_DB_HOST=127.0.0.1 MIST_DB_HOST=127.0.0.1 ALTERYX_DB_HOST=127.0.0.1 for source adapter safety checks; WeeklyStockTest remaps source connections to the local app config. No test customer writes."
+}

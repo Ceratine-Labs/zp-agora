@@ -29,14 +29,14 @@
            the prior state recorded per row.</p>
     </x-slot:info>
     <x-statstrip :stats="[
-        ['label' => 'Would reconcile', 'value' => \App\Support\Format::n($run->MatchedRows),
+        ['icon' => 'match', 'label' => 'Would reconcile', 'value' => \App\Support\Format::n($run->MatchedRows),
          'note' => \App\Support\Format::r($run->MatchedTotal), 'tone' => 'good'],
-        ['label' => 'Amount mismatch', 'value' => \App\Support\Format::n($run->MismatchRows), 'tone' => 'warn'],
-        ['label' => 'Bank only', 'value' => \App\Support\Format::n($run->BankOnlyRows), 'tone' => 'serious'],
-        ['label' => 'Deposit only', 'value' => \App\Support\Format::n($run->DepositOnlyRows), 'tone' => 'neutral'],
-        ['label' => 'Other', 'value' => \App\Support\Format::n($run->OtherRows), 'tone' => 'neutral'],
-        ['label' => 'Bank side', 'value' => \App\Support\Format::r($run->BankTotal)],
-        ['label' => 'Deposit side', 'value' => \App\Support\Format::r($run->MopsTotal)],
+        ['icon' => 'compare', 'label' => 'Amount mismatch', 'value' => \App\Support\Format::n($run->MismatchRows), 'tone' => 'warn'],
+        ['icon' => 'bank', 'label' => 'Bank only', 'value' => \App\Support\Format::n($run->BankOnlyRows), 'tone' => 'serious'],
+        ['icon' => 'deposit', 'label' => 'Deposit only', 'value' => \App\Support\Format::n($run->DepositOnlyRows), 'tone' => 'neutral'],
+        ['icon' => 'other', 'label' => 'Other', 'value' => \App\Support\Format::n($run->OtherRows), 'tone' => 'neutral'],
+        ['icon' => 'bank', 'label' => 'Bank side', 'value' => \App\Support\Format::r($run->BankTotal)],
+        ['icon' => 'deposit', 'label' => 'Deposit side', 'value' => \App\Support\Format::r($run->MopsTotal)],
     ]" />
 
     @php($paired = $run->lines->filter->hasNearReference())

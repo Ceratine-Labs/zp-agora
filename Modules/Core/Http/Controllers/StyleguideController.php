@@ -112,18 +112,18 @@ class StyleguideController extends Controller
 
             'recon' => [
                 'bank' => collect([
-                    (object) ['BankStatementLineID' => 4101, 'LineDate' => '2026-08-08', 'Description' => 'CF NPF CREDIT ABSA BANK CCB125', 'Amount' => 14937.40, 'PairKey' => '125', 'ColourIndex' => 1],
-                    (object) ['BankStatementLineID' => 4102, 'LineDate' => '2026-08-08', 'Description' => 'CF NPF CREDIT ABSA BANK CCB125', 'Amount' => 200.00, 'PairKey' => '125', 'ColourIndex' => 1],
-                    (object) ['BankStatementLineID' => 4108, 'LineDate' => '2026-08-09', 'Description' => 'CF NPF CREDIT ABSA BANK CCB200', 'Amount' => 500.00, 'PairKey' => '200', 'ColourIndex' => 2],
-                    (object) ['BankStatementLineID' => 4115, 'LineDate' => '2026-08-10', 'Description' => 'CF NPF CREDIT ABSA BANK CCB300', 'Amount' => 900.00, 'PairKey' => '300', 'ColourIndex' => 0],
+                    (object) ['BankStatementLineID' => 4101, 'LineDate' => '2026-08-08', 'Description' => 'CF NPF CREDIT ABSA BANK CCB125', 'Amount' => 14937.40, 'ReconBatchNo' => 0, 'IsOutstanding' => true, 'PairKey' => '125', 'ColourIndex' => 1],
+                    (object) ['BankStatementLineID' => 4102, 'LineDate' => '2026-08-08', 'Description' => 'CF NPF CREDIT ABSA BANK CCB125', 'Amount' => 200.00, 'ReconBatchNo' => 0, 'IsOutstanding' => true, 'PairKey' => '125', 'ColourIndex' => 1],
+                    (object) ['BankStatementLineID' => 4108, 'LineDate' => '2026-08-09', 'Description' => 'CF NPF CREDIT ABSA BANK CCB200', 'Amount' => 500.00, 'ReconBatchNo' => 0, 'IsOutstanding' => true, 'PairKey' => '200', 'ColourIndex' => 2],
+                    (object) ['BankStatementLineID' => 4115, 'LineDate' => '2026-08-10', 'Description' => 'CF NPF CREDIT ABSA BANK CCB300', 'Amount' => 900.00, 'ReconBatchNo' => 0, 'IsOutstanding' => true, 'PairKey' => '300', 'ColourIndex' => 0],
                     // No rule reached this one at all — the row the manual
                     // workbench exists for.
-                    (object) ['BankStatementLineID' => 4121, 'LineDate' => '2026-08-11', 'Description' => 'TRANSFER FROM PETTY CASH', 'Amount' => 1250.00, 'PairKey' => null, 'ColourIndex' => 0],
+                    (object) ['BankStatementLineID' => 4121, 'LineDate' => '2026-08-11', 'Description' => 'TRANSFER FROM PETTY CASH', 'Amount' => 1250.00, 'ReconBatchNo' => 0, 'IsOutstanding' => true, 'PairKey' => null, 'ColourIndex' => 0],
                 ]),
                 'mops' => collect([
-                    (object) ['SourceId' => null, 'SourceKey' => '125', 'SourceRef' => '125', 'SourceRef2' => '4512001', 'SourceDate' => '2026-08-08', 'Amount' => 15137.40, 'PairKey' => '125', 'ColourIndex' => 1],
-                    (object) ['SourceId' => null, 'SourceKey' => '200', 'SourceRef' => '200', 'SourceRef2' => '4512001', 'SourceDate' => '2026-08-09', 'Amount' => 450.00, 'PairKey' => '200', 'ColourIndex' => 2],
-                    (object) ['SourceId' => null, 'SourceKey' => '400', 'SourceRef' => '400', 'SourceRef2' => null, 'SourceDate' => '2026-08-11', 'Amount' => 750.00, 'PairKey' => '400', 'ColourIndex' => 0],
+                    (object) ['SourceId' => null, 'SourceKey' => '125', 'SourceRef' => '125', 'SourceRef2' => '4512001', 'SourceDate' => '2026-08-08', 'Amount' => 15137.40, 'ReconBatchNoPumpIT' => 0, 'IsOutstanding' => true, 'PairKey' => '125', 'ColourIndex' => 1],
+                    (object) ['SourceId' => null, 'SourceKey' => '200', 'SourceRef' => '200', 'SourceRef2' => '4512001', 'SourceDate' => '2026-08-09', 'Amount' => 450.00, 'ReconBatchNoPumpIT' => 0, 'IsOutstanding' => true, 'PairKey' => '200', 'ColourIndex' => 2],
+                    (object) ['SourceId' => null, 'SourceKey' => '400', 'SourceRef' => '400', 'SourceRef2' => null, 'SourceDate' => '2026-08-11', 'Amount' => 750.00, 'ReconBatchNoPumpIT' => 0, 'IsOutstanding' => true, 'PairKey' => '400', 'ColourIndex' => 0],
                 ]),
                 'summary' => (object) ['BankTotal' => 17787.40, 'MopsTotal' => 16337.40, 'ColouredKeys' => 2, 'HasCriteria' => 1],
             ],

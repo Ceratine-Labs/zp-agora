@@ -462,7 +462,8 @@ class ReconAllocationTest extends TestCase
         $this->actingAs($clerk);
         $status = app(ReconMatchService::class)->match('CashBags', self::BRANCH, Carbon::parse(self::FROM), Carbon::parse(self::TO),
             [$this->bankLine(590.00)], [$bag], 'TEST-A4 bank short', null,
-            [['code' => 'TEST-A4C1', 'banked' => '600.00', 'share' => '-10.00']]);
+            [['code' => 'TEST-A4C1', 'banked' => '600.00', 'share' => '-10.00']],
+            [['id' => $bag['id'], 'amount' => '600.00', 'share' => '-10.00']]);
 
         $raised = (int) $this->lines()->first()->StaffShortsNo;
         Mail::assertSent(StaffShortRaisedMail::class, fn (StaffShortRaisedMail $m) => $m->hasTo($approver->EmailAddress)
@@ -471,6 +472,8 @@ class ReconAllocationTest extends TestCase
 
         app(ReconService::class)->reverse(ReconRun::query()->acrossBranches()->findOrFail((int) $status->Id), 'TEST-A4 wrong bags');
 
+        $this->assertEquals(600, $this->db()->table('PumpIT.dbo.BRN_DailyBankingCashBags')->where('DailyBankingCashBagID', $bag['id'])->value('CashBagAmount'));
+        $this->assertSame(1, $this->shorts()->count(), 'Reversal declines the original short; it does not create another.');
         Mail::assertSent(StaffShortDecidedMail::class, fn (StaffShortDecidedMail $m) => $m->hasTo($clerk->EmailAddress)
             && $m->short['no'] === $raised && $m->short['decision'] === 'declined');
     }
@@ -484,9 +487,11 @@ class ReconAllocationTest extends TestCase
         $this->actingAs($this->admin());
         $this->employee('TEST-A4C1', 'Nokuthula', 'TEST-A4 Champion');
 
+        $bag = $this->bag('TEST-A4-B1', 600.00, 'TEST-A4C1');
         $status = app(ReconMatchService::class)->match('CashBags', self::BRANCH, Carbon::parse(self::FROM), Carbon::parse(self::TO),
-            [$this->bankLine(590.00)], [$this->bag('TEST-A4-B1', 600.00, 'TEST-A4C1')], 'TEST-A4 bank short', null,
-            [['code' => 'TEST-A4C1', 'banked' => '600.00', 'share' => '-10.00']]);
+            [$this->bankLine(590.00)], [$bag], 'TEST-A4 bank short', null,
+            [['code' => 'TEST-A4C1', 'banked' => '600.00', 'share' => '-10.00']],
+            [['id' => $bag['id'], 'amount' => '600.00', 'share' => '-10.00']]);
 
         $this->assertSame('MATCHED_FORCED', $status->Code);
         $raised = (int) $this->lines()->first()->StaffShortsNo;

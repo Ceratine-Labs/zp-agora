@@ -698,7 +698,58 @@ by how much, on whose authority, or what they were before.
 
 ---
 
+## Cumulative water meters
+
+Ryan confirmed on 25 Oct 2026 that refill-water captures are cumulative readings
+in litres. `agora.StockReconMeter` explicitly maps area 25 at branch/item pairs
+3/346, 9/378, 15/297 and 24/312. Product UOM and descriptions remain visible but
+are not measurement classification: a renamed item remains a meter through its
+key. The mapping is Agora metadata; this does not change the customer's source.
+
+Stock → Original vs amended variance links to Water meter reconciliation. It
+reads the original captured closing and the previous scheduled shift's original
+closing, including a predecessor before the chosen period. Unique, adjacent,
+nonnegative, nondecreasing readings with valid original POS yield dispensed
+litres and dispensed less POS. First captures, missing/negative readings, resets,
+backward readings, duplicate shifts, missing shifts and invalid POS remain
+explicitly unresolved; no signs/decimal places are corrected and no monetary
+loss is assigned. Summary totals use only comparable intervals. Current area
+shift flags determine adjacency; historical schedule changes require source
+review rather than an assumed multi-shift comparison.
+
+Mapped readings are excluded from physical variance quantities/money and new
+balancing chains, with visible counts and a report link. They cannot generate
+stock amendments or hand-count restorations, including when the readings are
+positive. They also do not determine physical-stock completeness. Existing
+preview history is unchanged. Commit and Reset to original refuse saved runs
+that still contain newly mapped meter keys; a fresh preview is required.
+Reversal of historical amendments remains available. The report preserves original and working raw
+values; historical source correction remains a separate customer write gate.
+
 ## The exception classes
+
+**Original/live count drift (25 Oct 2026).** New previews save `QtyOpenOrig`,
+`QtyCloseOrig` and `CountDriftReason` alongside the live pair already recorded.
+The reason is Opening, Closing or Opening and closing, using the audit's
+0.0005 count tolerance, and only where no pack `AuditCode` applies. The
+Exceptions grid exposes both pairs and a reason filter. C1 is its display-only
+fallback when no existing count class applies; existing count classes and pack
+checks sort ahead of generic drift. It is not a stored `ExceptionCode`, does
+not alter eligibility or restore counts, and assigns no loss value. The run
+preview links to all its drift rows, including those with another count class.
+Old runs remain unknown; their original pair is not inferred from today's
+source. A fresh preview captures the evidence without writing to PumpIT.
+
+**Exceptions and review (27 Oct 2026).** Exceptions opens first. A saved count
+class or hand-balancing audit always stays there, as do accountable shorts and
+any unfamiliar outcome. Only drift-only rows with a known routine outcome
+(balanced to zero, no change, opening only, or dormant) go into Review. This
+uses the saved outcome and does not change the balancing class or eligibility.
+All rows combines both sections; the proposal's drift link uses it so drift
+attached to an exception is still included. Section counts cover the whole run;
+type counts cover the chosen section, before search and column filters.
+Switching sections clears code filters and the page but keeps other filters and
+sorting. The export follows the section and checks the same access as the page.
 
 **Type pills on a run (18 Oct 2026).** Above the exceptions grid, `<x-tabs chips>`
 lists only types present in that run, grouped into count exceptions and
@@ -706,7 +757,7 @@ hand-balancing checks. The type picker starts collapsed and remembers the
 reader's open/closed choice. Its heading names the selected type and the
 number of available types; the selected type's guidance stays outside the fold.
 `usp_StockRecon_ExceptionTypes` counts the saved
-item/shift lines across the whole run, independently of grid filters; a line
+item/shift lines in the selected section, independently of grid filters; a line
 with both codes appears in both type counts but only once in All types.
 Choosing a pill replaces the two code filters, resets pagination and keeps
 search, other filters and sorting. All types clears only the code filters.
@@ -822,6 +873,20 @@ column the variance is worked from, and the stock master is read once per line.
 
 The period is free; the procedure refuses above 250,000 count lines (one site is
 about 11,000 a month, every site about 175,000 — 1.9 s on live for September).
+
+The default comparison layout keeps date, shift, site, area, item, balancing,
+movement and both variance quantities/values visible. Raw open/issued/close/POS
+quantities and POS codes remain available under **Columns**; existing saved
+layouts are respected (Columns → Reset restores the comparison). Data rows
+stay on one line, with teal Original and orange Amended headings in both themes.
+
+The **Area** selector reads `agora.usp_StockRecon_VarianceAreas` for the selected
+and granted sites, including historical areas, and matches the description
+exactly. **Amended variance** offers All, Shorts (`QtyVar < 0`), Overs
+(`QtyVar > 0`, including within allowance) and Balanced (`QtyVar = 0`).
+Both use the existing grid procedure filters, so totals, pages and extracts
+share the same selection. Header filters remain independent and intersect
+these scope filters. No balancing or stock quantities are written.
 
 ### Cautions
 

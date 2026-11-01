@@ -35,11 +35,18 @@ const SAVE_AFTER_MS = 500;
 const WIDTH_MIN = 60;
 const WIDTH_MAX = 640;
 
-export default function dataGrid() {
-    document.querySelectorAll('[data-grid]').forEach((root) => new Grid(root));
-    document.querySelectorAll('[data-drawer]').forEach((panel) => drawer(panel));
-    document.querySelectorAll('[data-drawer-open]').forEach((trigger) => {
+export default function dataGrid(scope = document) {
+    scope.querySelectorAll('[data-grid]:not([data-grid-ready])').forEach((root) => {
+        new Grid(root);
+        root.setAttribute('data-grid-ready', '');
+    });
+    scope.querySelectorAll('[data-drawer]:not([data-drawer-ready])').forEach((panel) => {
+        drawer(panel);
+        panel.setAttribute('data-drawer-ready', '');
+    });
+    scope.querySelectorAll('[data-drawer-open]:not([data-drawer-open-ready])').forEach((trigger) => {
         trigger.addEventListener('click', () => open(document.getElementById(trigger.dataset.drawerOpen), trigger));
+        trigger.setAttribute('data-drawer-open-ready', '');
     });
 }
 
@@ -109,9 +116,15 @@ class Grid {
         if (!list) return;
 
         list.querySelectorAll('[data-chooser-visible]').forEach((box) => {
-            box.addEventListener('change', () => {
+            box.addEventListener('change', async () => {
+                // Fetch the chosen columns after saving: hidden cells are not
+                // rendered, and the cards and extract also need the new layout.
                 this.showColumn(box.value, box.checked);
-                this.save();
+                if (await this.save(true)) window.location.reload();
+                else {
+                    box.checked = !box.checked;
+                    this.showColumn(box.value, box.checked);
+                }
             });
         });
 
@@ -261,26 +274,62 @@ class Grid {
 
         const count = bar.querySelector('[data-selection-count]');
         const boxes = () => Array.from(this.table.querySelectorAll('[data-check]'));
+        const master = this.table.querySelector('[data-check-all]');
+        const cardMaster = this.root.querySelector('[data-card-check-all]');
 
         const sync = () => {
-            const ticked = boxes().filter((b) => b.checked).length;
+            const available = boxes().filter((box) => !box.disabled);
+            const ticked = available.filter((box) => box.checked).length;
             bar.hidden = ticked === 0;
             if (count) count.textContent = String(ticked);
+
+            // Cards mirror the table rather than adding a second set of
+            // selected IDs to bulk-selection.js, which reads data-check.
+            const byKey = new Map(boxes().map((box) => [box.value, box]));
+            this.root.querySelectorAll('[data-card-check]').forEach((mirror) => {
+                const box = byKey.get(mirror.value);
+                mirror.disabled = !box || box.disabled;
+                mirror.checked = !!box && !box.disabled && box.checked;
+            });
+            if (cardMaster) {
+                cardMaster.checked = ticked > 0 && ticked === available.length;
+                cardMaster.indeterminate = ticked > 0 && ticked < available.length;
+                cardMaster.disabled = available.length === 0;
+            }
         };
 
         // check-all.js owns the header box and the indeterminate state; this
         // listens rather than binding its own, so there is one implementation
-        // of "everything on this page" and this only ever counts.
+        // of "everything on this page". Its table event also follows changes
+        // made in script, while the native header event follows a real click.
         this.table.addEventListener('change', (event) => {
-            if (event.target.matches('[data-check], [data-check-all]')) sync();
+            if (event.target === this.table || event.target.matches('[data-check], [data-check-all]')) sync();
+        });
+        this.table.addEventListener('table-tools:change', sync);
+
+        this.root.addEventListener('change', (event) => {
+            if (event.target.matches('[data-card-check]')) {
+                const box = boxes().find((candidate) => candidate.value === event.target.value);
+                if (box && !box.disabled) {
+                    box.checked = event.target.checked;
+                    box.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            } else if (event.target.matches('[data-card-check-all]') && master) {
+                master.checked = event.target.checked;
+                master.indeterminate = false;
+                master.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         });
 
         const clear = bar.querySelector('[data-selection-clear]');
         if (clear) {
             clear.addEventListener('click', () => {
                 boxes().forEach((b) => { b.checked = false; });
-                const master = this.table.querySelector('[data-check-all]');
-                if (master) { master.checked = false; master.indeterminate = false; }
+                if (master) {
+                    master.checked = false;
+                    master.indeterminate = false;
+                    master.dispatchEvent(new Event('change', { bubbles: true }));
+                }
                 sync();
             });
         }
@@ -361,6 +410,7 @@ class Grid {
             });
 
             if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+            return true;
         } catch (error) {
             // Said out loud, once. A layout that silently stops persisting is
             // a user who rearranges the same grid every morning and assumes
@@ -368,6 +418,7 @@ class Grid {
             if (window.Agora && window.Agora.notify) {
                 window.Agora.notify.toast('Your column layout could not be saved', 'error');
             }
+            return false;
         }
     }
 

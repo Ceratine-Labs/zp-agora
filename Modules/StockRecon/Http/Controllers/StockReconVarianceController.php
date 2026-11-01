@@ -6,6 +6,7 @@ use App\Grid\GridService;
 use App\Http\Controllers\Controller;
 use App\Support\BranchContext;
 use App\Support\BusinessDate;
+use App\Support\ProcedureService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Modules\Core\Models\Branch;
@@ -32,8 +33,14 @@ class StockReconVarianceController extends Controller
             ]);
         }
 
+        $result = $this->grids->build($grid, $request, $request->user()?->Id);
+
         return view('stockrecon::variance', [
-            'grid' => $this->grids->build($grid, $request, $request->user()?->Id),
+            'grid' => $result,
+            'areas' => app(ProcedureService::class)->call('agora.usp_StockRecon_VarianceAreas', [
+                'BranchIds' => implode(',', $result->gridQuery->branchIds) ?: null,
+                'AllowedBranchIds' => implode(',', $context->allowed()) ?: null,
+            ]),
             // The grid's branches selector belongs to head office (feature-rules
             // §3.3); in the branch workspace the site is pinned. Trading sites
             // only: the group and property entities count no stock.

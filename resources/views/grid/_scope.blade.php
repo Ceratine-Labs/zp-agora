@@ -80,6 +80,7 @@
                 </select>
             </div>
         @endif
+        {{ $scope ?? '' }}
     </div>
 
     {{-- The label and the emphasis both come from the definition. This form

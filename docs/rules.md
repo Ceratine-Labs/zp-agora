@@ -153,17 +153,15 @@ Driver 18 validates by default and the instance's certificates are self-signed.
 - **Navigation is database-driven** (`agora.MenuSection` / `agora.MenuItem`,
   nested to any depth through `ParentId`). Each module ships a `MenuSeeder`
   calling `MenuService::item()`. **Never list a link in a blade file.**
-- **There are no roles.** Retired 22 Sep 2026 (Ryan). Every person's access is
-  granted to them by name in `agora.UserPermission`, set on Setup → Users and
-  access and nowhere else; `agora.Role`, `UserRole`, `RolePermission` and
-  `RoleMenuItem` still exist but **nothing reads them**, and
-  `scripts/check-roles.sh` fails the build if anything starts to.
-  `RetireRolesSeeder` copied what each role carried onto the people who held it,
-  and `agora.User.LandingRoute` / `.Workspace` carry the two facts a role held
-  that were not permissions. **The consequence is real and was accepted
-  knowingly: there is no way to grant a permission to a group.** A new screen is
-  ticked for each person who needs it, so a module permission seeder now
-  creates the permission and stops there.
+- **Customer-defined roles** (Ryan, 23 Oct 2026) group permissions and menu
+  entries through `RoleAccessService`. Only roles with `IsManaged = 1` count;
+  historical role rows and assignments remain inert. User grants and all
+  assigned roles combine; removing a role never removes direct grants.
+  Branch access, workspace and landing stay per user. Assigned roles cannot
+  be deleted, and changes that remove the acting administrator's own access
+  roll back. The menu retains its existing rule: no direct or role ticks means
+  unrestricted navigation, subject to each entry's permission.
+
 - **The menu is ticked per entry, per person** (`agora.UserMenuItem`, on one
   person's screen). `MenuAccessService` answers it, `MenuService::tree()`
   filters by it and `EnforceMenuAccess` puts the same answer in front of the

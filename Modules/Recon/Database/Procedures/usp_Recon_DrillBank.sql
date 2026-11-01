@@ -14,7 +14,7 @@
    reference even slightly differently would stamp lines nobody ever saw, which
    is the failure mode the whole rebuild exists to remove.
 
-   READ-ONLY. Table variables only.
+   READ-ONLY. Uses the shared inline fn_Recon_DrillBank extraction.
 
    @BatchKey, @MatchMode and @MopsConvention must be the values the RUN used —
    ReconRun.ParamsJson stores them for exactly this. The criteria resolution
@@ -50,180 +50,14 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    /*
-     * THE AREA IS NOT THE BANK STATEMENT'S TYPE, and for one area they differ.
-     *
-     * RCN_BankStatementLinesPumpIT.Type carries the customer's own vocabulary,
-     * and usp_Recon_PreviewCashBags filters it on 'CashDeposit' — not on
-     * 'CashBags', which is what Agora calls the area. Every other area happens
-     * to use the same word for both, which is exactly why this went unnoticed:
-     * `l.Type = @ReconArea` is right four times out of five.
-     *
-     * The fifth cost more than a wrong drill. This procedure is also how
-     * usp_Recon_Commit re-reads the bank side, so for CashBags it found no
-     * lines and every batch was skipped as "no longer on the statement in this
-     * period". agora.ReconRun showed it plainly: five CashBags runs, all still
-     * `previewed`, not one committed row — against 187 for ABSA and 191 for
-     * FNB. The area could not be reconciled at all, and nothing said so.
-     *
-     * Reported by Ryan on 7 September 2026 as "run 53 exported no bank rows".
-     */
-    DECLARE @BankType nvarchar(50) =
-        CASE WHEN @ReconArea = 'CashBags' THEN 'CashDeposit' ELSE @ReconArea END;
-
-    /* ---- 1. Criteria, resolved exactly as the previews resolve them -------- */
-
-    DECLARE @Crit TABLE (
-        ProcessOrder int, AutoReconId int,
-        FilterStart int, FilterLen int, FilterValue nvarchar(50),
-        BankStart int, BankLen int, BankStart2 int, BankLen2 int,
-        MopsStart int, MopsLen int, Specificity int
-    );
-
-    INSERT INTO @Crit (ProcessOrder, AutoReconId, FilterStart, FilterLen, FilterValue,
-                       BankStart, BankLen, BankStart2, BankLen2, MopsStart, MopsLen, Specificity)
-    SELECT ProcessOrder, AutoReconId,
-           FILTER_StartPosition,
-           CASE WHEN FILTER_EndPosition >= FILTER_StartPosition AND FILTER_StartPosition > 0
-                THEN FILTER_EndPosition - FILTER_StartPosition + 1
-                ELSE FILTER_EndPosition END,
-           FILTER_Value,
-           ISNULL(@BankStartOverride, BANK_StartPosition),
-           /* BANK_EndPosition is a LENGTH in ABSA/FNB/SmartATM and an END
-              POSITION in CashMachine/CashBags (finding 9). Read as an end
-              position when that is arithmetically possible, as a length
-              otherwise — the same test the previews make. */
-           ISNULL(@BankLenOverride,
-                  CASE WHEN BANK_EndPosition >= BANK_StartPosition
-                       THEN BANK_EndPosition - BANK_StartPosition + 1
-                       ELSE BANK_EndPosition END),
-           BANK_StartPosition2,
-           CASE WHEN BANK_StartPosition2 > 0 AND BANK_EndPosition2 >= BANK_StartPosition2
-                THEN BANK_EndPosition2 - BANK_StartPosition2 + 1
-                ELSE BANK_EndPosition2 END,
-           MOPS_StartPosition,
-           CASE WHEN @MopsConvention = 'endpos' AND MOPS_EndPosition >= MOPS_StartPosition
-                THEN MOPS_EndPosition - MOPS_StartPosition + 1
-                ELSE MOPS_EndPosition END,
-           LEN(ISNULL(FILTER_Value, ''))
-    FROM agora.vw_AutoReconCriteria
-    WHERE BranchId = @BranchId AND BankReconArea = @ReconArea;
-
-    /* ---- 2. Bank side ------------------------------------------------------ */
-
-    DECLARE @Bank TABLE (
-        BankStatementLineID bigint,
-        LineDate            datetime,
-        Description         nvarchar(400),
-        Amount              money,
-        ExtractedRef        nvarchar(50),
-        ExtractedRef2       nvarchar(50),
-        Leg                 nvarchar(2),
-        NarrKey             nvarchar(255),
-        ProcessOrder        int,
-        UsedStart           int,
-        UsedLen             int,
-        ReconState          int,
-        ReconBatchNo        int
-    );
-
-    INSERT INTO @Bank
-    SELECT l.BankStatementLineID,
-           l.LineDate,
-           l.Description,
-           l.Amount,
-           /* FNB's batched population keys on the whole value read as a
-              number, not on the configured slice, when the run said so. */
-           CASE WHEN @ReconArea = 'FNB' AND @BatchKey = 'numeric'
-                THEN CONVERT(nvarchar(50), TRY_CONVERT(bigint,
-                         LTRIM(RTRIM(SUBSTRING(l.Description, x.BankStart, x.BankLen)))))
-                ELSE LTRIM(RTRIM(SUBSTRING(l.Description, x.BankStart, x.BankLen))) END,
-           LTRIM(RTRIM(SUBSTRING(l.Description, x.BankStart2, x.BankLen2))),
-           /* ABSA settles a batch as the sum of its credit and debit legs; the
-              leg is the last two characters of the narrative. */
-           CASE WHEN @ReconArea = 'ABSA' THEN RIGHT(RTRIM(l.Description), 2) END,
-           /* CashBags 'contains' matches a bag reference anywhere in the
-              narrative once separators are stripped. */
-           REPLACE(REPLACE(REPLACE(REPLACE(RTRIM(l.Description), '-', ''), '/', ''), ' ', ''), '_', ''),
-           x.ProcessOrder, x.BankStart, x.BankLen,
-           l.ReconState, l.ReconBatchNo
-    FROM agora.vw_BankStatementLine l
-    OUTER APPLY (
-        SELECT TOP 1 c.ProcessOrder, c.BankStart, c.BankLen, c.BankStart2, c.BankLen2
-        FROM @Crit c
-        WHERE c.FilterValue IS NULL
-           OR SUBSTRING(l.Description, c.FilterStart, c.FilterLen) = LTRIM(RTRIM(c.FilterValue))
-        ORDER BY CASE WHEN @RuleOrder = 'specific' THEN c.Specificity END DESC,
-                 c.ProcessOrder ASC,
-                 c.AutoReconId ASC
-    ) x
-    WHERE l.BranchId = @BranchId
-      AND l.Type = @BankType AND l.IDState = 2
-      AND (@IncludeReconciled = 1 OR l.ReconState = 1)
-      AND l.LineDate >= @FromDate AND l.LineDate <= @ToDate
-      AND (@BankLineId IS NULL OR l.BankStatementLineID = @BankLineId);
-
-    SELECT b.BankStatementLineID,
-           b.LineDate,
-           b.Description,
-           b.Amount,
-           b.ExtractedRef,
-           b.ExtractedRef2,
-           b.Leg,
-           b.ProcessOrder AS UsedProcessOrder,
-           b.UsedStart    AS UsedBankStart,
-           b.UsedLen      AS UsedBankLen,
-           b.ReconState   AS ReconState,
-           b.ReconBatchNo AS ReconBatchNo
-    FROM @Bank b
-    WHERE
-        /* One exact line — CashBags in 'contains' mode. */
-        (@BankLineId IS NOT NULL)
-        /* SMARTATM IS FOUND BY ITS NARRATIVE DATE, NEVER BY LineDate.
-           
-           The window on a SmartATM row describes the DEPOSIT side — it is
-           derived FROM the MM/DD in the bank narrative and is what
-           usp_Recon_DrillMops scopes the device timestamps by. The bank line
-           that carries that narrative is posted by the bank on the FOLLOWING
-           calendar day, so it lies outside its own window by construction.
-
-           Matching it here on b.LineDate therefore never returned the line the
-           preview grouped: it returned the PREVIOUS day's line, or nothing.
-           Every Smart ATM commit consequently stamped zero and reported it as
-           'reconciled by something else' or 'no longer balances' — all of them
-           untrue. Found 16 Sep 2026 on run 999 branch 9: the preview's line
-           ATMH0130|0828, 26,800.00, LineDate 2026-08-29, ReconState 1, was
-           still outstanding while the drill returned ATMH0130|0827 from
-           2026-08-28, already reconciled.
-
-           So it is matched the way the preview grouped it — terminal plus the
-           MM/DD read out of the narrative, which is exactly ExtractedRef and
-           ExtractedRef2. @Bank is already scoped to the run's date range, so
-           this cannot reach outside the period.
-
-           KeyRef2 is REQUIRED. A SmartATM run line previewed before the fix
-           that persisted it has none, and matching on the terminal alone would
-           return every line for that ATM in the period — a far worse answer
-           than nothing. usp_Recon_Commit refuses such a run by name instead. */
-        OR (@BankLineId IS NULL AND @ReconArea = 'SmartATM'
-            AND @KeyRef IS NOT NULL AND @KeyRef2 IS NOT NULL
-            AND b.ExtractedRef = @KeyRef AND b.ExtractedRef2 = @KeyRef2)
-        /* A trading-day window — FNB's standalone population, which carries no
-           batch reference at all (58% of FNB lines). SmartATM is excluded
-           above: its window is a deposit window, not a statement window. */
-        OR (@BankLineId IS NULL AND @ReconArea <> 'SmartATM' AND @WindowFrom IS NOT NULL
-            AND b.LineDate >= @WindowFrom AND b.LineDate <= @WindowTo
-            AND (@KeyRef IS NULL OR b.ExtractedRef = @KeyRef))
-        /* By reference, narrowed by merchant where the area has one. ABSA and
-           FNB compare merchants differently and the previews are deliberately
-           unlike each other there — ABSA numerically, because the narrative
-           carries a leading zero the deposit table does not; FNB as a string,
-           because its live procedure does. */
-        OR (@BankLineId IS NULL AND @WindowFrom IS NULL AND @KeyRef IS NOT NULL
-            AND b.ExtractedRef = @KeyRef
-            AND (@KeyRef2 IS NULL
-                 OR (@ReconArea = 'ABSA' AND TRY_CONVERT(int, b.ExtractedRef2) = TRY_CONVERT(int, @KeyRef2))
-                 OR (@ReconArea <> 'ABSA' AND b.ExtractedRef2 = @KeyRef2)))
-    ORDER BY b.LineDate, b.BankStatementLineID;
-
+    /* The canonical inline extraction is shared with run validity. Column
+       order and ordering stay identical for existing INSERT EXEC callers. */
+    SELECT BankStatementLineID, LineDate, Description, Amount, ExtractedRef, ExtractedRef2,
+           Leg, UsedProcessOrder, UsedBankStart, UsedBankLen, ReconState, ReconBatchNo
+    FROM agora.fn_Recon_DrillBank(
+        @ReconArea, @BranchId, @FromDate, @ToDate, @KeyRef, @KeyRef2,
+        @BankLineId, @WindowFrom, @WindowTo, @RuleOrder, @BatchKey, @MatchMode,
+        @MopsConvention, @BankStartOverride, @BankLenOverride, @IncludeReconciled
+    )
+    ORDER BY LineDate, BankStatementLineID;
 END

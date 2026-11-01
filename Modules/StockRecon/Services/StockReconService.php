@@ -79,11 +79,12 @@ class StockReconService
     }
 
     /** @return Collection<int, object> */
-    public function exceptionTypes(StockReconRun $run): Collection
+    public function exceptionTypes(StockReconRun $run, string $group = 'all'): Collection
     {
         return $this->procedures->call('agora.usp_StockRecon_ExceptionTypes', [
             'BranchId' => $run->BranchId,
             'RunId' => $run->Id,
+            'RowGroup' => $group,
         ]);
     }
 

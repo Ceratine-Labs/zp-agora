@@ -60,6 +60,93 @@ class CashBagAllocationTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_confirmed_cash_bag_change_writes_pumpit_and_reverses_exact_prior_values(): void
+    {
+        $bags = [$this->bag('TEST-A3-B1', 592, null), $this->bag('TEST-A3-B2', 368, null)];
+        $bank = $this->bankLine(895);
+        $this->db()->table('PumpIT.dbo.BRN_DailyBankingCashBags')->where('DailyBankingCashBagID', $bags[0]['id'])
+            ->update(['Adjusted' => 1, 'AdjustedBy' => -12.50]);
+        $status = $this->adjustedMatch($bank, $bags, [
+            ['id' => $bags[0]['id'], 'amount' => '592.00', 'share' => '-65.00'],
+            ['id' => $bags[1]['id'], 'amount' => '368.00', 'share' => '0.00'],
+        ]);
+        $bag = $this->db()->table('PumpIT.dbo.BRN_DailyBankingCashBags')->where('DailyBankingCashBagID', $bags[0]['id'])->first();
+        $this->assertEquals(527, $bag->CashBagAmount);
+        $this->assertEquals(52.50, $bag->AdjustedBy);
+        $this->assertEquals(1, $bag->Adjusted);
+        $this->assertEquals($status->BatchNo, $bag->ReconBatchNoPumpIT);
+        $this->assertEquals(368, $this->db()->table('PumpIT.dbo.BRN_DailyBankingCashBags')->where('DailyBankingCashBagID', $bags[1]['id'])->value('CashBagAmount'));
+        $stamp = $this->db()->table('agora.ReconStamp')->where('RunId', $status->Id)->where('TargetTable', 'BRN_DailyBankingCashBags')->first();
+        $this->assertStringContainsString('CashBagAmount', $stamp->SetColumns);
+        $this->assertStringContainsString('52.50', $stamp->Detail);
+        $this->procedures->write('usp_Recon_Reverse', ['BranchId' => self::BRANCH, 'RunId' => $status->Id, 'Reason' => 'TEST-A3 undo']);
+        $bag = $this->db()->table('PumpIT.dbo.BRN_DailyBankingCashBags')->where('DailyBankingCashBagID', $bags[0]['id'])->first();
+        $this->assertEquals(592, $bag->CashBagAmount);
+        $this->assertEquals(-12.50, $bag->AdjustedBy);
+        $this->assertEquals(1, $bag->Adjusted);
+        $this->assertEquals(0, $bag->ReconBatchNoPumpIT);
+        $this->assertEquals(1, $this->db()->table('PumpIT.dbo.RCN_BankStatementLinesPumpIT')->where('BankStatementLineID', $bank)->value('ReconState'));
+    }
+
+    public function test_cash_bag_reversal_refuses_later_changes_without_clearing_the_bank(): void
+    {
+        $bags = [$this->bag('TEST-A3-B1', 592, null), $this->bag('TEST-A3-B2', 368, null)];
+        $bank = $this->bankLine(895);
+        $status = $this->adjustedMatch($bank, $bags, [
+            ['id' => $bags[0]['id'], 'amount' => '592.00', 'share' => '-65.00'],
+            ['id' => $bags[1]['id'], 'amount' => '368.00', 'share' => '0.00'],
+        ]);
+        $table = $this->db()->table('PumpIT.dbo.BRN_DailyBankingCashBags')->where('DailyBankingCashBagID', $bags[0]['id']);
+        foreach ([['CashBagAmount' => 526], ['AdjustedBy' => 66], ['Adjusted' => 0], ['ReconBatchNoPumpIT' => 123]] as $change) {
+            (clone $table)->update(['CashBagAmount' => 527, 'AdjustedBy' => 65, 'Adjusted' => 1, 'ReconBatchNoPumpIT' => $status->BatchNo]);
+            (clone $table)->update($change);
+            $this->assertRefused('ADJUST_MOVED', 'Nothing was reversed', fn () => $this->procedures->write('usp_Recon_Reverse', ['BranchId' => self::BRANCH, 'RunId' => $status->Id, 'Reason' => 'TEST-A3 undo']));
+            $this->assertEquals($status->BatchNo, $this->db()->table('PumpIT.dbo.RCN_BankStatementLinesPumpIT')->where('BankStatementLineID', $bank)->value('ReconBatchNo'));
+            $this->assertSame('committed', $this->db()->table('agora.ReconBatch')->where('RunId', $status->Id)->value('State'));
+        }
+    }
+
+    public function test_cash_bag_changes_require_complete_current_choices_and_exact_cashier_share(): void
+    {
+        $bags = [$this->bag('TEST-A3-B1', 592, null), $this->bag('TEST-A3-B2', 368, null)];
+        $bank = $this->bankLine(895);
+        $good = [['id' => $bags[0]['id'], 'amount' => '592.00', 'share' => '-65.00'], ['id' => $bags[1]['id'], 'amount' => '368.00', 'share' => '0.00']];
+        foreach ([null, [], [$good[0]], [$good[0], $good[0]], [array_replace($good[0], ['amount' => '593.00']), $good[1]],
+            [array_replace($good[0], ['share' => '-64.00']), $good[1]],
+            [array_replace($good[0], ['share' => '-600.00']), array_replace($good[1], ['share' => '535.00'])]] as $changes) {
+            $this->assertRefused('BAG_ADJUSTMENT_INVALID', '', fn () => $this->adjustedMatch($bank, $bags, $changes));
+            $this->assertNothingWritten();
+            $this->assertEquals(592, $this->db()->table('PumpIT.dbo.BRN_DailyBankingCashBags')->where('DailyBankingCashBagID', $bags[0]['id'])->value('CashBagAmount'));
+        }
+    }
+
+    /** @param array<int, array<string, mixed>> $bags
+     * @param array<int, array<string, mixed>>|null $changes */
+    private function adjustedMatch(int $bank, array $bags, ?array $changes): object
+    {
+        return $this->procedures->write('usp_Recon_ManualMatch', [
+            'BranchId' => self::BRANCH, 'ReconArea' => 'CashBags', 'FromDate' => self::FROM, 'ToDate' => self::TO.' 23:59:59',
+            'BankLineIds' => (string) $bank, 'MopsJson' => json_encode($bags), 'Reason' => 'TEST-A3 confirmed R65 difference',
+            'StampMode' => 'live', 'CashBagAdjustMode' => 'live', 'BagAdjustmentsJson' => $changes === null ? null : json_encode($changes),
+            'AllocationJson' => json_encode([['code' => null, 'banked' => '960.00', 'share' => '-65.00']]),
+        ]);
+    }
+
+    public function test_cash_bag_adjustments_cannot_move_a_share_to_another_cashier(): void
+    {
+        $bags = [$this->bag('TEST-A3-B1', 600, 'TEST-A3C1'), $this->bag('TEST-A3-B2', 400, 'TEST-A3C2')];
+        $bank = $this->bankLine(1000);
+        $params = [
+            'BranchId' => self::BRANCH, 'ReconArea' => 'CashBags', 'FromDate' => self::FROM, 'ToDate' => self::TO,
+            'BankLineIds' => (string) $bank, 'MopsJson' => json_encode($bags), 'StampMode' => 'live', 'CashBagAdjustMode' => 'live',
+            'AllocationJson' => json_encode([['code' => 'TEST-A3C1', 'banked' => '600', 'share' => '-10'], ['code' => 'TEST-A3C2', 'banked' => '400', 'share' => '10']]),
+            'BagAdjustmentsJson' => json_encode([['id' => $bags[0]['id'], 'amount' => '600', 'share' => '10'], ['id' => $bags[1]['id'], 'amount' => '400', 'share' => '-10']]),
+        ];
+        $this->assertRefused('FORCE_REASON_REQUIRED', 'net change is zero', fn () => $this->procedures->write('usp_Recon_ManualMatch', $params));
+        $this->assertRefused('BAG_ADJUSTMENT_INVALID', 'cashier', fn () => $this->procedures->write('usp_Recon_ManualMatch', $params + ['Reason' => 'TEST-A3 invalid transfer']));
+        $this->assertNothingWritten();
+    }
+
     /** One cashier: named, and carrying the whole variance. */
     public function test_one_cashier_is_named_and_carries_the_whole_variance(): void
     {

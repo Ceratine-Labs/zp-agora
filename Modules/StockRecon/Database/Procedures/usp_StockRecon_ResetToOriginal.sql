@@ -71,6 +71,15 @@ BEGIN
     IF @Status NOT IN ('previewed', 'reversed')
         THROW 51000, 'AGORA:RUN_NOT_READY:Only a previewed run can be reset.', 1;
 
+    /* A saved preview predating the explicit measurement mapping may still
+       contain meter proposals. Refuse BEFORE any run/source mutation. A new
+       preview excludes those keys; reversal of historic amendments is separate. */
+    IF EXISTS (SELECT 1 FROM agora.StockReconRunLine rl
+        JOIN agora.StockReconMeter meter ON meter.BranchId = rl.BranchId AND meter.AreaNo = rl.AreaNo
+            AND meter.StockItemNo = rl.StockItemNo AND meter.IsActive = 1
+        WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId)
+        THROW 51000, 'AGORA:CUMULATIVE_METER:This saved run includes cumulative water-meter readings. Preview again; review these readings in Water meter reconciliation.', 1;
+
     /* The shifts: on this run, not on a held chain, with a recorded original
        that PumpIT no longer holds. */
     IF OBJECT_ID('tempdb..#reset') IS NOT NULL DROP TABLE #reset;

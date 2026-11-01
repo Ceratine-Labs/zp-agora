@@ -7,7 +7,7 @@
      */
     $url = fn (array $changes) => route('app.reports.show', array_merge(
         ['report' => $report['key']],
-        array_filter(array_merge(request()->query(), $changes), fn ($v) => $v !== null && $v !== ''),
+        array_filter(array_merge(\Modules\Reports\Services\ReportScope::query($params), $changes), fn ($v) => $v !== null && $v !== ''),
     ));
 
     $sort = $params['SortColumn'] ?? null;
@@ -15,9 +15,6 @@
     $page = (int) ($params['Page'] ?? 1);
     $pageSize = (int) ($params['PageSize'] ?? 50);
     $pages = $pageSize > 0 ? (int) ceil($total / $pageSize) : 1;
-    // The selector posts branches[], so this arrives as an array; a pasted
-    // short link sends a comma-separated string. One helper reads both.
-    $selected = \Modules\Reports\Services\ReportsService::branchIds(request()->query('branches'));
 @endphp
 
 <x-app-shell :title="$report['label']">
@@ -29,7 +26,7 @@
             <p>{{ $report['blurb'] }}</p>
         </x-slot:info>
         <x-slot:actions>
-            <a class="btn-ghost" href="{{ route('app.reports.index') }}">All reports</a>
+            <a data-loader="Loading report…" class="btn-ghost" href="{{ route('app.reports.index') }}">All reports</a>
         </x-slot:actions>
     </x-page-head>
 
@@ -45,41 +42,7 @@
         </x-notice>
     @endif
 
-    <x-card title="Scope">
-        <x-slot:info>
-            <p>{{ __('reports::reports.read_only') }}</p>
-        </x-slot:info>
-        <form method="GET">
-            <div class="field-row">
-            <x-field name="from" label="From" type="date" :value="request('from')"
-                     info="Leave empty and the procedure applies its own default window." />
-            <x-field name="to" label="To" type="date" :value="request('to')" />
-            <x-field name="q" label="Search" :value="request('q')" placeholder="Site, reference, name…" />
-
-            {{-- Rule 3.3: the branches selector belongs to head office. In the
-                 branch workspace BranchContext has already pinned the site and
-                 the controller ignores whatever arrives here. --}}
-            @if ($context->workspace() !== 'branch')
-                <div class="field field-wide">
-                    <label for="f-branches">Sites</label>
-                    <select id="f-branches" name="branches[]" multiple data-select
-                            data-placeholder="Every site you are granted">
-                        @foreach ($branches as $branch)
-                            <option value="{{ $branch->BranchId }}"
-                                @selected(in_array((int) $branch->BranchId, $selected, true))>{{ $branch->Name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            @endif
-
-            </div>
-
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Run</button>
-                <a class="btn-ghost" href="{{ route('app.reports.show', $report['key']) }}">Reset</a>
-            </div>
-        </form>
-    </x-card>
+    <x-reports::scope :report="$report" :params="$params" :context="$context" :branches="$branches" :open="$refusal || $rows->isEmpty()" />
 
     <x-card :title="$report['label']" flush>
         @if ($total > $ceiling)
@@ -104,7 +67,7 @@
                         <th @class(['num' => $numeric])>
                             @if (! empty($column['sort']))
                                 {{-- Clicking the column that is already sorted flips it. --}}
-                                <a href="{{ $url(['sort' => $column['sort'], 'dir' => ($sort === $column['sort'] && $asc) ? 'desc' : 'asc', 'page' => null]) }}">
+                                <a data-loader="Loading report…" href="{{ $url(['sort' => $column['sort'], 'dir' => ($sort === $column['sort'] && $asc) ? 'desc' : 'asc', 'page' => null]) }}">
                                     {{ $column['label'] }}@if ($sort === $column['sort'])<span class="sort-arrow">{{ $asc ? '▲' : '▼' }}</span>@endif
                                 </a>
                             @else
@@ -133,13 +96,13 @@
                      nowhere: rule 3.7 says a reference that leads nowhere
                      should not be a link. --}}
                 @if ($page > 1)
-                    <a class="btn-ghost" href="{{ $url(['page' => $page - 1]) }}">Previous</a>
+                    <a data-loader="Loading report…" class="btn-ghost" href="{{ $url(['page' => $page - 1]) }}">Previous</a>
                 @else
                     <span class="btn-ghost is-off">Previous</span>
                 @endif
                 <span class="pager-at">Page {{ number_format($page) }} of {{ number_format($pages) }}</span>
                 @if ($page < $pages)
-                    <a class="btn-ghost" href="{{ $url(['page' => $page + 1]) }}">Next</a>
+                    <a data-loader="Loading report…" class="btn-ghost" href="{{ $url(['page' => $page + 1]) }}">Next</a>
                 @else
                     <span class="btn-ghost is-off">Next</span>
                 @endif

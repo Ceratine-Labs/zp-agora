@@ -87,6 +87,9 @@ return [
     */
     'fnb_adjust_mode' => 'live',
 
+    // Ryan, 25 Oct 2026: confirmed bag changes must write back to PumpIT.
+    'cash_bag_adjust_mode' => 'live',
+
     'areas' => [
 
         'ABSA' => [

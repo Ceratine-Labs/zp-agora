@@ -26,6 +26,9 @@
  * PumpIT did to the shift, measured against the client's rules (config
  * 'stockrecon.audit' — the pack's S7, S8, S11, S12, S13, S4, S4a, S4b). A line
  * is on this report if either is set, and each has its own tick-list filter.
+ * CountDriftReason adds otherwise-unreported original/live count differences
+ * without a pack audit. C1 is a display-only fallback below those classes;
+ * the saved pairs and reason use the preview snapshot, never today's source.
  *
  * THE DENOMINATORS EXCLUDE DORMANT SHIFTS. N1, N2 and L1 all count against
  * ACTIVE shifts, never raw line count. A chain where nine of twelve shifts
@@ -45,7 +48,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_GridExceptions]
     @Page        INT           = 1,
     @PageSize    INT           = 50,
     @FiltersJson NVARCHAR(MAX) = NULL,
-    @RunId       INT           = NULL
+    @RunId       INT           = NULL,
+    @RowGroup    NVARCHAR(20)  = 'all'
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -101,7 +105,8 @@ BEGIN
             @fValOp   NVARCHAR(20)  = (SELECT TOP 1 [Op]                                FROM @Filter WHERE [Column] = 'ExceptionValue');
 
     DECLARE @fCodeAny  bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'ExceptionCode') THEN 1 ELSE 0 END,
-            @fAuditAny bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'AuditCode')     THEN 1 ELSE 0 END;
+            @fAuditAny bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'AuditCode')     THEN 1 ELSE 0 END,
+            @fDriftAny bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'CountDriftReason') THEN 1 ELSE 0 END;
 
     ;WITH base AS (
         SELECT
@@ -135,8 +140,11 @@ BEGIN
                  ELSE ISNULL(se.EmployeeCount, 0) END                     AS EmployeeCount,
             rl.TransactionDate,
             rl.ShiftNo,
-            rl.ExceptionCode,
+            /* C1 is a report fallback, never a balancing/commit class. */
+            COALESCE(rl.ExceptionCode, CASE WHEN rl.CountDriftReason IS NOT NULL THEN 'C1' END) AS ExceptionCode,
             rl.AuditCode,
+            rl.CountDriftReason,
+            rl.QtyOpenOrig, rl.QtyOpenNow, rl.QtyCloseOrig, rl.QtyCloseNow,
             /* The rank of the class, so the default order is worst first
                whatever letters the codes happen to use. Same order as config
                'stockrecon.exceptions'. */
@@ -146,7 +154,7 @@ BEGIN
                 WHEN 'U3'   THEN 8  WHEN 'U4' THEN 9   WHEN 'S10b' THEN 10
                 WHEN 'F1'   THEN 11 WHEN 'F2' THEN 12  WHEN 'F3' THEN 13  WHEN 'S3' THEN 14
                 WHEN 'S5'   THEN 15 WHEN 'N1' THEN 16  WHEN 'N2' THEN 17  WHEN 'L1' THEN 18
-                ELSE 99 END                                                   AS ClassRank,
+                ELSE CASE WHEN rl.ExceptionCode IS NOT NULL OR rl.AuditCode IS NOT NULL THEN 99 ELSE 100 END END AS ClassRank,
             rl.Outcome,
             rl.IsDormant,
             rl.ActiveLen,
@@ -181,6 +189,7 @@ BEGIN
                 WHEN rl.AuditCode IN ('S4a', 'S4b') THEN ABS(rl.QtyIssued - ISNULL(rl.QtyIssuedOrig, rl.QtyIssued))
                 ELSE 0 END)                                                   AS ExceptionValue
         FROM agora.StockReconRunLine rl
+        INNER JOIN agora.vw_StockReconExceptionGroups rg ON rg.BranchId = rl.BranchId AND rg.Id = rl.Id
         LEFT JOIN agora.vw_StockArea   a ON a.BranchId = rl.BranchId AND a.AreaNo = rl.AreaNo
         /* OUTER APPLY, not a join: the master is keyed by branch AND
            Location, and a join on the item alone duplicates every exception
@@ -194,7 +203,7 @@ BEGIN
               AND se.TransactionDate = rl.TransactionDate
               AND se.ShiftNo         = rl.ShiftNo
               AND se.AreaNo          = rl.AreaNo
-        WHERE (rl.ExceptionCode IS NOT NULL OR rl.AuditCode IS NOT NULL)
+        WHERE (@RowGroup NOT IN ('exceptions', 'review') OR rg.RowGroup = @RowGroup)
           AND (@RunId IS NULL OR rl.RunId = @RunId)
           AND (@AllBranches = 1 OR rl.BranchId IN (SELECT BranchId FROM @Branch))
           AND (@DateFrom IS NULL OR rl.TransactionDate >= @DateFrom)
@@ -218,6 +227,7 @@ BEGIN
                                    ELSE                      CASE WHEN base.EmployeeNames   LIKE '%'+@fEmp +'%' THEN 1 ELSE 0 END END) = 1)
       AND (@fCodeAny  = 0 OR base.ExceptionCode IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'ExceptionCode'))
       AND (@fAuditAny = 0 OR base.AuditCode     IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'AuditCode'))
+      AND (@fDriftAny = 0 OR base.CountDriftReason IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'CountDriftReason'))
       AND (@fDate IS NULL OR 1 = CASE ISNULL(@fDateOp, 'eq')
                 WHEN 'ne'  THEN CASE WHEN base.TransactionDate <> @fDate THEN 1 ELSE 0 END
                 WHEN 'gt'  THEN CASE WHEN base.TransactionDate >  @fDate THEN 1 ELSE 0 END
@@ -237,6 +247,7 @@ BEGIN
         Id, RunId, BranchId, AreaNo, AreaName, StockItemNo, ItemDescription, POSCode, StockLocation,
         EmployeeNames, EmployeeCount,
         TransactionDate, ShiftNo, ExceptionCode, AuditCode, Outcome, IsDormant, ActiveLen,
+        CountDriftReason, QtyOpenOrig, QtyOpenNow, QtyCloseOrig, QtyCloseNow,
         QtyOpen, QtyIssued, QtyClose, QtyPOS, QtyVar, ChainBreak, BreakKept, ChainNetVar, SellPrice, ExceptionValue
     FROM #Rows
     ORDER BY
@@ -244,6 +255,7 @@ BEGIN
             CASE @SortColumn
                 WHEN 'ExceptionCode'   THEN ExceptionCode
                 WHEN 'AuditCode'       THEN AuditCode
+                WHEN 'CountDriftReason' THEN CountDriftReason
                 WHEN 'AreaName'        THEN AreaName
                 WHEN 'ItemDescription' THEN ItemDescription
                 WHEN 'POSCode'         THEN POSCode
@@ -255,6 +267,7 @@ BEGIN
             CASE @SortColumn
                 WHEN 'ExceptionCode'   THEN ExceptionCode
                 WHEN 'AuditCode'       THEN AuditCode
+                WHEN 'CountDriftReason' THEN CountDriftReason
                 WHEN 'AreaName'        THEN AreaName
                 WHEN 'ItemDescription' THEN ItemDescription
                 WHEN 'POSCode'         THEN POSCode
@@ -270,7 +283,7 @@ BEGIN
         CASE WHEN @SortAsc = 0 AND @SortColumn = 'ExceptionValue'  THEN ExceptionValue END DESC,
         /* The default: worst class first, and inside a class the biggest money
            first — which is the order somebody works the list in. Audit-only
-           lines follow the classed ones. */
+           lines follow the classed ones; generic drift follows both. */
         ClassRank ASC, AuditCode ASC, ExceptionValue DESC, AreaName, ItemDescription, TransactionDate, ShiftNo
     OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 

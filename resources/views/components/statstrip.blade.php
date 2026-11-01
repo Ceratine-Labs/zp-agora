@@ -20,8 +20,30 @@
 <div {{ $attributes->merge(['class' => 'statstrip']) }}>
     @foreach ($stats as $stat)
         <div class="s stat tone-{{ $stat['tone'] ?? 'neutral' }}">
+            @if (isset($stat['icon']))
+                <svg class="stat-illustration" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                    <rect x="3" y="5" width="26" height="22" rx="4" fill="var(--brand-soft)" />
+                    @switch($stat['icon'])
+                        @case('match') <path d="m9 16 4 4 10-10" /> @break
+                        @case('compare') <path d="M9 12h14M9 20h14M16 8v16" /> @break
+                        @case('bank') <path d="m7 13 9-5 9 5M9 14v8m5-8v8m4-8v8m5-8v8M7 24h18" /> @break
+                        @case('deposit') <path d="M8 18v6h16v-6M16 8v12m-4-4 4 4 4-4" /> @break
+                        @default <path d="M16 9v8m0 5h.01" />
+                    @endswitch
+                </svg>
+            @endif
             <div class="l stat-label">{{ $stat['label'] ?? '' }}</div>
-            <div class="v stat-value">{{ $stat['value'] ?? \App\Support\Format::NOTHING }}</div>
+            <div class="v stat-value">
+                @if (isset($stat['links']))
+                    @foreach ($stat['links'] as $link)
+                        @if (! $loop->first) → @endif<a href="{{ $link['href'] }}" aria-label="{{ $link['label'] }}">{{ $link['value'] }}</a>
+                    @endforeach
+                @elseif (isset($stat['href']))
+                    <a href="{{ $stat['href'] }}" aria-label="{{ $stat['label'] }}: show records">{{ $stat['value'] ?? \App\Support\Format::NOTHING }}</a>
+                @else
+                    {{ $stat['value'] ?? \App\Support\Format::NOTHING }}
+                @endif
+            </div>
             @if (! empty($stat['note']))<div class="n stat-note">{{ $stat['note'] }}</div>@endif
         </div>
     @endforeach

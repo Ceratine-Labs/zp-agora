@@ -60,8 +60,8 @@
 
     <x-card title="What to reconcile">
         <x-slot:info>
-            <p>Choose the site and the period once. The automatic balancing runs as a preview, and the
-               suggestions and the manual match open beside it over the same site and dates.</p>
+            <p>Choose the site and period to read both sides. Run auto balancing when ready,
+               then match the remaining entries by hand.</p>
             <p><strong>Rules and readings</strong> settle what the customer's configuration leaves ambiguous;
                the defaults are the reading the live system uses.</p>
             <p>Everything previewed in this area is on
@@ -90,16 +90,9 @@
                     <div class="tabpane-pad">
                         <x-empty-state title="Not balanced yet">
                             <p>This site and period have no open preview of yours.</p>
-                            <form method="POST" action="{{ route('app.recon.preview') }}" style="margin-top:12px"
-                                  data-loader="Balancing {{ $area['label'] }}…">
-                                @csrf
-                                <input type="hidden" name="area" value="{{ $area['key'] }}">
-                                <input type="hidden" name="centre" value="1">
-                                <input type="hidden" name="branch_id" value="{{ $branchId }}">
-                                <input type="hidden" name="from" value="{{ $from }}">
-                                <input type="hidden" name="to" value="{{ $to }}">
-                                <button type="submit" class="btn-primary">Run auto balancing</button>
-                            </form>
+                            @can('recon.runs.create')
+                                @include('recon::partials.centre-scope-form', ['preview' => true])
+                            @endcan
                         </x-empty-state>
                     </div>
                 @endif
@@ -113,7 +106,7 @@
                 </x-tab-panel>
             @endif
 
-            <x-tab-panel key="match" :src="route('app.recon.match', [$area['key']] + $query)">
+            <x-tab-panel key="match" :src="route('app.recon.match', [$area['key']] + $query + ($state !== 'outstanding' ? ['state' => $state] : []))">
                 <p class="tabpane-fallback">
                     <a href="{{ route('app.recon.match', [$area['key']] + $centreScope) }}">Open the manual match</a>
                 </p>

@@ -154,6 +154,27 @@ class ReconService
         return ['status' => $status, 'lines' => $sets[1] ?? collect()];
     }
 
+    /** @return array{batch: object|null, lines: Collection<int, object>, allocations: Collection<int, object>} */
+    public function batch(string $area, int $branchId, int $batchNo): array
+    {
+        $sets = $this->procedures->callSets('usp_Recon_GetBatch', [
+            'BranchId' => $branchId, 'ReconArea' => $area, 'BatchNo' => $batchNo,
+        ]);
+
+        return ['batch' => ($sets[0] ?? collect())->first(), 'lines' => $sets[1] ?? collect(), 'allocations' => $sets[2] ?? collect()];
+    }
+
+    public function reverseBatch(string $area, int $branchId, int $batchId, int $batchNo, string $reason): object
+    {
+        $status = $this->procedures->write('usp_Recon_Reverse', [
+            'BranchId' => $branchId, 'BatchId' => $batchId, 'ExpectedBatchNo' => $batchNo,
+            'ReconArea' => $area, 'Reason' => $reason, 'UserId' => auth()->id(),
+        ]);
+        ReconMatchService::tellStaffShortApprovers('reverse batch');
+
+        return $status;
+    }
+
     /**
      * Undo a reconciliation Agora executed — exactly, and nothing else.
      *

@@ -1,47 +1,17 @@
-{{--
-    Tab three: the runs made in this area.
-
-    Two switches, both <x-tabs> in link mode rather than hand-written anchors,
-    and both carried in the query string so a particular view of the list is
-    something you can send to somebody. ReconRunGrid reads the same two
-    parameters, so the grid and the switches cannot disagree about which way
-    they are set.
-
-      Mine / Everyone     `?scope=`  — yours unless you ask.
-      Open work / All     `?show=`   — open work unless you ask (23 Sep 2026).
-                          On live that morning the clerks' own lists held
-                          1,136 open previews and 236 failed runs; history is
-                          one switch away rather than in the way.
-
-    Each switch keeps the other's setting, so flipping one never quietly resets
-    the other.
---}}
+{{-- The hub and area use the same scope switches, validity cells and archive forms. --}}
 @php($mine = \Modules\Recon\Grids\ReconRunGrid::wantsOwnRunsOnly())
 @php($openOnly = \Modules\Recon\Grids\ReconRunGrid::wantsOpenOnly())
-@php($runsUrl = fn (bool $m, bool $o) => route('app.recon.runs', array_filter([
-    'area' => $area['key'],
-    'scope' => $m ? null : 'all',
-    'show' => $o ? null : 'all',
-])))
+@php($invalidOnly = \Modules\Recon\Grids\ReconRunGrid::wantsInvalidOnly())
 @php($site = app(\App\Support\BranchContext::class)->id())
 
-<x-card title="Runs"
-        :sub="($openOnly ? 'Open work — ' : 'Every run — ')
+@include('recon::partials.run-archive-outcome')
+
+<x-card title="Runs" class="recon-run-list"
+        :sub="($invalidOnly ? 'Invalid runs — ' : ($openOnly ? 'Open work — ' : 'Every run — '))
               .($mine ? 'the previews you have made in this area' : 'everyone\'s, in this area')"
         flush>
     <x-slot:actions>
-        <x-tabs label="Which runs"
-                :active="$openOnly ? 'open' : 'all'"
-                :items="[
-                    ['key' => 'open', 'label' => 'Open work', 'href' => $runsUrl($mine, true)],
-                    ['key' => 'all', 'label' => 'Everything', 'href' => $runsUrl($mine, false)],
-                ]" />
-        <x-tabs label="Whose runs"
-                :active="$mine ? 'mine' : 'all'"
-                :items="[
-                    ['key' => 'mine', 'label' => 'Mine', 'href' => $runsUrl(true, $openOnly)],
-                    ['key' => 'all', 'label' => 'Everyone', 'href' => $runsUrl(false, $openOnly)],
-                ]" />
+        @include('recon::partials.run-switches')
     </x-slot:actions>
 
     {{-- Clear previews, scoped the way the list above it is scoped: this area,
@@ -72,5 +42,5 @@
     {{-- The branch selector belongs on the result set (feature-rules §3.3),
          and only where there is a choice: in the branch workspace the scope
          bar has already said which site. --}}
-    <x-data-grid :grid="$grid" :branches="$pinned ? null : $branches" />
+    @include('recon::partials.run-grid', ['branches' => $pinned ? null : $branches])
 </x-card>

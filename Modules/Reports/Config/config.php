@@ -13,9 +13,9 @@
 | comes out of `procedure`, and the screen puts that name on the grid so they
 | can open it in SSMS and change it (§3.4).
 |
-| Every procedure takes the same eight parameters and returns the same two
-| result sets, so the grid does not branch on which report it is showing. What
-| differs is declared here.
+| Every procedure takes the same eight parameters and returns page rows and
+| a total. My queue also returns per-type full-scope totals as a third result
+| set. Presentation differences are declared here.
 |
 | Column definitions:
 |   key    the column in the result set
@@ -25,6 +25,11 @@
 |          of the header filter (§3.1)
 |   sort   the value to pass as @SortColumn; absent means the column is not
 |          sortable, because the procedure has no sort key for it
+|
+| Scope metadata mirrors the configured procedure's date defaults so controls
+| and links show the scope actually used. lookback_days is subtracted from To
+| (both dates are inclusive); month_start uses the first of To's month.
+| Explicit dates still reach SQL unchanged, including its range refusals.
 |
 */
 
@@ -45,9 +50,15 @@ return [
 
         'my-queue' => [
             'label' => 'My queue',
+            'summary' => 'Outstanding work by site, with counts, age and value.',
             'group' => 'The day',
             'menu' => 'the-day/my-queue',
             'procedure' => 'usp_Reports_GridMyQueue',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 90,
+                'help' => 'Defaults to today with a 90-day lookback. Dates limit the records shown; their outstanding status is current.',
+                'search_placeholder' => 'Site or queue name…',
+            ],
             'blurb' => 'Every queue with something outstanding in it, by site. A directory of the '
                 .'other reports, not a second opinion — the counts are the same rules those reports apply.',
             'was' => [],
@@ -63,9 +74,15 @@ return [
 
         'day-close' => [
             'label' => 'Day close status',
+            'summary' => 'Sites still open and what is delaying each close.',
             'group' => 'The day',
             'menu' => 'the-day/day-close',
             'procedure' => 'usp_Reports_GridDayClose',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 6,
+                'help' => 'Defaults to seven calendar days through today. From and To may be at most 92 days apart.',
+                'search_placeholder' => 'Site or EOD number…',
+            ],
             'blurb' => 'Which sites have finished the day, which are still open, and what is holding '
                 .'each one up. Built from every active site, not from the ledger — a site that never '
                 .'started its close has no ledger row and would otherwise be invisible.',
@@ -88,9 +105,15 @@ return [
 
         'overnight-loads' => [
             'label' => 'Overnight loads',
+            'summary' => 'Overnight feed results by site, including feeds that never ran.',
             'group' => 'The day',
             'menu' => 'the-day/overnight-loads',
             'procedure' => 'usp_Reports_GridOvernightLoads',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 0,
+                'help' => 'Defaults to today. From and To may be at most 92 days apart.',
+                'search_placeholder' => 'Site or feed…',
+            ],
             'blurb' => 'What landed last night, by site and feed. A feed that did not run shows as a '
                 .'row saying zero rather than as an absence nobody notices.',
             'was' => [],
@@ -107,9 +130,15 @@ return [
 
         'unallocated-zreads' => [
             'label' => 'Unallocated Z-reads',
+            'summary' => 'Till readings still missing a shift or staff assignment.',
             'group' => 'The day',
             'menu' => 'the-day/unallocated-zreads',
             'procedure' => 'usp_Reports_GridUnallocatedZReads',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 90,
+                'help' => 'Defaults to today with a 90-day lookback. Allocation status is current.',
+                'search_placeholder' => 'Site, location, terminal or log file…',
+            ],
             'blurb' => 'Till readings the system has, that nobody has claimed a shift or a person for.',
             'was' => ['ZReadings Not Allocated'],
             'columns' => [
@@ -127,9 +156,15 @@ return [
 
         'open-cashups' => [
             'label' => 'Open cashups',
+            'summary' => 'Cashups still open, with variances and reasons for delay.',
             'group' => 'The day',
             'menu' => 'the-day/open-cashups',
             'procedure' => 'usp_Reports_GridOpenCashups',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 90,
+                'help' => 'Defaults to today with a 90-day lookback. Cashup closure status is current.',
+                'search_placeholder' => 'Site, cashier or day-end number…',
+            ],
             'blurb' => 'Cashups nobody has signed off — not closed by a manager in Agora, and not on a day PumpIT '
                 .'has balanced.',
             'was' => ['Cashups Not Closed 2024 FY', 'Cashups Not Closed 2025 FY', 'Cashups Not Closed 2026 FY'],
@@ -151,9 +186,15 @@ return [
 
         'purchase-approvals' => [
             'label' => 'Purchase approvals',
+            'summary' => 'Pending purchase requests, totals and the people needed to approve.',
             'group' => 'Waiting on a decision',
             'menu' => 'decisions/purchase-approvals',
             'procedure' => 'usp_Reports_GridPurchaseApprovals',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 90,
+                'help' => 'Defaults to today with a 90-day lookback. Approval status is current.',
+                'search_placeholder' => 'Site, supplier, request or description…',
+            ],
             'blurb' => 'Purchase requests still waiting on somebody. One row per request with its line '
                 .'total — the approver is a property of the expense code on each line, so a request '
                 .'with two expense codes is waiting on two people.',
@@ -173,9 +214,15 @@ return [
 
         'staff-shorts' => [
             'label' => 'Staff shorts',
+            'summary' => 'Employee cash shorts awaiting an approval or decline.',
             'group' => 'Waiting on a decision',
             'menu' => 'decisions/staff-shorts',
             'procedure' => 'usp_Reports_GridStaffShorts',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 90,
+                'help' => 'Defaults to today with a 90-day lookback. Approval status is current.',
+                'search_placeholder' => 'Site, employee or reason…',
+            ],
             'blurb' => 'Cash shorts raised against an employee that nobody has approved or declined. '
                 .'Until one is decided it is neither a deduction nor a write-off.',
             'was' => [],
@@ -194,9 +241,15 @@ return [
 
         'drop-safe' => [
             'label' => 'Drop safe collections',
+            'summary' => 'Security collections compared with till drops, including uncollected bags.',
             'group' => 'Waiting on a decision',
             'menu' => 'decisions/drop-safe',
             'procedure' => 'usp_Reports_GridDropSafe',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 30,
+                'help' => 'Defaults to today with a 30-day lookback, by collection or drop date.',
+                'search_placeholder' => 'Site, reference, collector or cashier…',
+            ],
             'blurb' => 'What the security company took, against what the tills dropped — and, in the '
                 .'same grid, the bags that were dropped and never collected at all.',
             'was' => [],
@@ -217,9 +270,16 @@ return [
 
         'waste' => [
             'label' => 'Waste to approve',
+            'menu_label' => 'Captured waste',
+            'summary' => 'Captured waste quantities and selling value by site and item.',
             'group' => 'Waiting on a decision',
             'menu' => 'decisions/waste',
             'procedure' => 'usp_Reports_GridWaste',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 30,
+                'help' => 'Defaults to today with a 30-day lookback, by captured waste date.',
+                'search_placeholder' => 'Site, area or item…',
+            ],
             'blurb' => 'Waste captured at a branch, by area, shift and item, with what it would have '
                 .'sold for. PumpIT records no approval state for waste, so this is captured waste, not '
                 .'a queue.',
@@ -242,9 +302,15 @@ return [
 
         'pump-readings' => [
             'label' => 'Pump readings',
+            'summary' => 'Compare mechanical and electronic pump readings with POS sales.',
             'group' => 'Capture',
             'menu' => 'capture/pump-readings',
             'procedure' => 'usp_Reports_GridPumpReadings',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 6,
+                'help' => 'Defaults to seven calendar days through today, by reading date.',
+                'search_placeholder' => 'Site, pump or fuel grade…',
+            ],
             'blurb' => 'The readings as captured, with what each implies in litres, and the three '
                 .'figures that should agree: mechanical meter, electronic meter, and what the POS rang up.',
             'was' => ['Pump Readings date range', 'Pump Readings Capture', 'Pump Readings Sum per day'],
@@ -263,9 +329,15 @@ return [
 
         'fuel-input' => [
             'label' => 'Fuel input',
+            'summary' => 'Tank dips, deliveries and sales compared with pump totals.',
             'group' => 'Capture',
             'menu' => 'capture/fuel-input',
             'procedure' => 'usp_Reports_GridFuelInput',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 6,
+                'help' => 'Defaults to seven calendar days through today. Earlier dips can supply the opening reading.',
+                'search_placeholder' => 'Site or fuel grade…',
+            ],
             'blurb' => 'The tank side of the forecourt: opening dip, deliveries, closing dip, what the '
                 .'tank sold, and how that compares with the pumps. Valued at the cost price in force '
                 .'on the day.',
@@ -287,12 +359,19 @@ return [
 
         'daily-banking' => [
             'label' => 'Daily banking — manager\'s view',
+            'menu_label' => 'Daily banking',
+            'summary' => 'Cashup declarations, Z-reads, variances and current status by site.',
             'group' => 'Capture',
             // No `menu`: head office's Today → Capture → Daily banking opens the
             // Daily Banking screen (Cash, app.cash.banking), where a cashup is
             // opened, confirmed and closed. This is the same rows as a report in
             // the library, and Cash → Cashups is the same rows as a working grid.
             'procedure' => 'usp_Reports_GridDailyBanking',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 6,
+                'help' => 'Defaults to seven calendar days through today, by cashup date.',
+                'search_placeholder' => 'Site, cashier or day-end number…',
+            ],
             'blurb' => 'Every cashup with its Z read, what was actually declared across its legs and the variance '
                 .'— the same figures PumpIT\'s Daily Banking shows — and where it stands.',
             'was' => ['Daily Banking - Managers View'],
@@ -315,9 +394,15 @@ return [
 
         'stock-count' => [
             'label' => 'Stock count',
+            'summary' => 'Original stock counts, variances and the changes made by balancing.',
             'group' => 'Capture',
             'menu' => 'capture/stock-count',
             'procedure' => 'usp_Reports_GridStockCount',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 0,
+                'help' => 'Defaults to today. From and To may be at most 92 days apart.',
+                'search_placeholder' => 'Site, area or item…',
+            ],
             'blurb' => 'The count itself: opening, issued, closing, what the computer expected, and the '
                 .'variance. Read from the ORIGINAL captured quantities, with what balancing has amended '
                 .'shown beside them.',
@@ -348,8 +433,15 @@ return [
          */
         'utility-meters' => [
             'label' => 'Utility meter readings',
+            'menu_label' => 'Utility readings',
+            'summary' => 'Meter readings, prepaid units and calculated usage by site.',
             'group' => 'Capture',
             'procedure' => 'usp_Utilities_GridReadings',
+            'scope' => [
+                'date_mode' => 'range', 'month_start' => true,
+                'help' => 'Defaults to month to date. Earlier readings can supply the opening reading.',
+                'search_placeholder' => 'Site, meter or utility type…',
+            ],
             'blurb' => 'Every meter reading by site and meter, with the usage each implies: the closing, less '
                 .'the previous reading whenever it was taken, less prepaid units. A day PumpIT holds as 0 / 0 '
                 .'has not been read and shows as No reading, with no usage. The same procedure as the grid on '
@@ -371,9 +463,16 @@ return [
 
         'import-pos' => [
             'label' => 'Import POS files',
+            'menu_label' => 'POS imports',
+            'summary' => 'POS import settings and the data received at each site.',
             'group' => 'Capture',
             'menu' => 'capture/import-pos',
             'procedure' => 'usp_Reports_GridImportPosFiles',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 0,
+                'help' => 'Defaults to today. Dates limit received feed counts; import setup details remain current.',
+                'search_placeholder' => 'Site, POS type, import type or drive…',
+            ],
             'blurb' => 'What each site is configured to import, from which POS system and drive, and '
                 .'whether that configuration produced anything. PumpIT keeps no per-file log — '
                 .'BRN_POSImportedFiles is empty — so this is configuration against outcome.',
@@ -405,8 +504,14 @@ return [
          */
         'audit-trail' => [
             'label' => 'Audit trail',
+            'summary' => 'Agora changes in PumpIT, with before/after values, people and reversals.',
             'group' => 'Governance',
             'procedure' => 'usp_Reports_GridAuditTrail',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 7,
+                'help' => 'Defaults to today with a seven-day lookback, by change date.',
+                'search_placeholder' => 'Site, user, table or change…',
+            ],
             // Click a row: the correction opened, the way the customer report
             // reads one (usp_Reports_GetAuditChange, 2 Oct 2026).
             'detail' => ['route' => 'app.reports.audit.change', 'params' => ['ledger' => 'Ledger', 'id' => 'LedgerId']],

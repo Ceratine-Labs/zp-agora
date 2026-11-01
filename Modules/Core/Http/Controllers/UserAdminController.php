@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\MenuItem;
 use Modules\Core\Models\MenuSection;
@@ -21,7 +22,9 @@ use Modules\Core\Services\MenuAccessService;
 use Modules\Core\Services\MenuService;
 use Modules\Core\Services\PasswordResetService;
 use Modules\Core\Services\PermissionService;
+use Modules\Core\Services\RoleAccessService;
 use Modules\Core\Services\UserAccessService;
+use Modules\Core\Services\UserBulkAccessService;
 use RuntimeException;
 
 /**
@@ -41,11 +44,6 @@ use RuntimeException;
  * the other cards' work, and it would make "absent means empty" ambiguous the
  * moment one card fails validation.
  *
- * ROLES WERE RETIRED ON 22 SEPTEMBER 2026 (Ryan). The Roles card and the role
- * matrix screen are gone, agora.UserRole is no longer read, and everything a
- * role carried was copied onto the people who held it by RetireRolesSeeder.
- * Access is granted to a person by name, here, and nowhere else.
- *
  * WHAT THIS DELIBERATELY DOES NOT DO. It does not create a user: the 88 people
  * come from PumpIT through usp_Core_MigrateUsers, and a hand-made 89th before
  * that migration has run would collide with it on email address. It does not
@@ -64,16 +62,63 @@ class UserAdminController extends Controller
         private MenuService $menus,
     ) {}
 
+    public function updateRoles(Request $request, int $user, RoleAccessService $roles): RedirectResponse
+    {
+        $person = $this->person($user);
+        $data = $request->validate(['roles' => ['sometimes', 'array'], 'roles.*' => ['required', 'integer', 'distinct']]);
+
+        return $this->save($person, 'roles', function () use ($person, $request, $data, $roles): string {
+            $roles->assign($person, array_map('intval', $data['roles'] ?? []), $request->user());
+
+            return 'Roles saved. Direct permissions and site access are unchanged.';
+        });
+    }
+
     /** The user list. */
     public function index(Request $request): View
     {
         return view('core::setup.users.index', [
+            'allRoles' => app(RoleAccessService::class)->roles()->orderBy('Name')->get(),
             'grid' => $this->grids->build(
                 $this->registry->findOrFail('app.setup.users'),
                 $request,
                 $request->user()?->Id,
             ),
         ]);
+    }
+
+    public function updateBulk(Request $request, UserBulkAccessService $bulk): RedirectResponse
+    {
+        $back = route('app.setup.users.index');
+
+        try {
+            $data = $request->validate([
+                'items' => ['required', 'array', 'min:1', 'max:200'],
+                'items.*' => ['required', 'integer', 'min:1', 'max:2147483647', 'distinct'],
+                'action' => ['required', 'string', 'in:add_roles,activate,deactivate,unlock'],
+                'roles' => ['required_if:action,add_roles', 'array', 'min:1', 'max:200'],
+                'roles.*' => ['required', 'integer', 'min:1', 'max:2147483647', 'distinct'],
+            ], [
+                'items.required' => 'Select at least one user.',
+                'items.max' => 'Select no more than 200 users at a time.',
+                'roles.required_if' => 'Choose at least one role to add.',
+            ]);
+            $count = $bulk->apply(array_map('intval', $data['items']), $data['action'],
+                array_map('intval', $data['roles'] ?? []), $request->user());
+        } catch (ValidationException $e) {
+            return redirect($back)->withInput()->withErrors(['bulk' => array_merge(...array_values($e->errors()))]);
+        } catch (RuntimeException $e) {
+            return redirect($back)->withInput()->withErrors(['bulk' => $e->getMessage()]);
+        }
+
+        $verb = match ($data['action']) {
+            'add_roles' => 'Roles added for',
+            'activate' => 'Activated',
+            'deactivate' => 'Deactivated',
+            default => 'Unlocked',
+        };
+
+        return redirect($back)->with('status', $verb.' '.$count.' selected user'.($count === 1 ? '' : 's').'.');
     }
 
     /** One person, read only: what they may do, which sites, and which menu. */
@@ -404,6 +449,9 @@ class UserAdminController extends Controller
     private function accessState(User $person): array
     {
         $menuDirectIds = $this->menuAccess->userItemIdsFor($person);
+        $roles = app(RoleAccessService::class);
+        $rolePatterns = $roles->patternsFor($person);
+        $effectiveMenuIds = $this->menuAccess->grantedItemIds($person);
 
         $grantedBranchIds = UserBranch::query()->acrossBranches()
             ->where('UserId', $person->Id)
@@ -421,6 +469,8 @@ class UserAdminController extends Controller
         $permissions = Permission::query()->acrossBranches()->orderBy('SortOrder')->get();
 
         return [
+            'homeBranchName' => $person->HomeBranchId === null ? null : Branch::query()->acrossBranches()
+                ->where('BranchId', $person->HomeBranchId)->value('Name'),
             'grantedBranches' => Branch::query()->acrossBranches()
                 ->whereIn('BranchId', $grantedBranchIds ?: [0])
                 ->ordered()
@@ -428,17 +478,16 @@ class UserAdminController extends Controller
             'grantedBranchIds' => $grantedBranchIds,
             'branchCount' => count($grantedBranchIds),
 
-            /*
-             * Every permission, and whether this person holds it. There is one
-             * answer now rather than two — before roles were retired a grant
-             * could be held directly, via a role, or both, and the screen had
-             * to say which so a redundant tick was not mistaken for the only
-             * thing keeping the door open.
-             */
+            'allRoles' => $roles->roles()->orderBy('Name')->get(),
+            'grantedRoleIds' => $roles->roleIdsFor($person),
+            'effectiveMenuIds' => $effectiveMenuIds,
+            'roleMenuIds' => $roles->menuIdsFor($person),
             'permissionRows' => $permissions
                 ->map(fn (Permission $p) => [
                     'permission' => $p,
                     'direct' => in_array((int) $p->Id, $directIds, true),
+                    'inherited' => $this->permissions->anyMatches($rolePatterns, $p->Code),
+                    'effective' => $this->permissions->userHas($person, $p->Code),
                 ])
                 ->groupBy(fn (array $row) => $row['permission']->Module),
             'directCount' => count($directIds),
@@ -449,7 +498,7 @@ class UserAdminController extends Controller
              */
             'menuWorkspaces' => $this->menuWorkspaces(),
             'menuDirectIds' => $menuDirectIds,
-            'menuRestricted' => $menuDirectIds !== [],
+            'menuRestricted' => $effectiveMenuIds !== [],
             'menuDirectCount' => count($menuDirectIds),
             'effective' => $permissions
                 ->filter(fn (Permission $p) => $this->permissions->userHas($person, $p->Code))

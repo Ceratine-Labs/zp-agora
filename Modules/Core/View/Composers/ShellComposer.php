@@ -5,6 +5,8 @@ namespace Modules\Core\View\Composers;
 use App\Support\BranchContext;
 use Illuminate\View\View;
 use Modules\Core\Models\Branch;
+use Modules\Core\Models\User;
+use Modules\Core\Services\MenuAvailability;
 use Modules\Core\Services\MenuService;
 
 /**
@@ -20,12 +22,19 @@ class ShellComposer
     public function __construct(
         protected MenuService $menu,
         protected BranchContext $context,
+        protected MenuAvailability $availability,
     ) {}
 
     public function compose(View $view): void
     {
+        $sections = $this->menu->tree();
+        $user = auth()->user();
+        if ($user instanceof User) {
+            $this->availability->annotate($sections, $user);
+        }
+
         $view->with([
-            'shellSections' => $this->menu->tree(),
+            'shellSections' => $sections,
             'shellWorkspace' => $this->context->workspace(),
             'shellWorkspaces' => config('core.workspaces'),
             'shellBranchId' => $this->context->id(),

@@ -7,12 +7,16 @@ use Modules\Core\Http\Controllers\GridDemoController;
 use Modules\Core\Http\Controllers\GridExtractController;
 use Modules\Core\Http\Controllers\GridStateController;
 use Modules\Core\Http\Controllers\LandingStubController;
+use Modules\Core\Http\Controllers\ModuleMenuController;
 use Modules\Core\Http\Controllers\PreferenceController;
+use Modules\Core\Http\Controllers\RoleAdminController;
 use Modules\Core\Http\Controllers\UserAdminController;
+use Modules\Core\Http\Middleware\AuthorizeAccessGrid;
 
 // Registered under /app with the web stack by ModuleServiceProvider.
 Route::middleware('auth')->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
+    Route::get('modules/{module}', ModuleMenuController::class)->where('module', '[a-z][a-z0-9-]*')->name('modules.show');
     Route::post('preferences/theme', [PreferenceController::class, 'theme'])->name('preferences.theme');
 
     /*
@@ -34,13 +38,19 @@ Route::middleware('auth')->group(function () {
      | own permission: `view` reads the list and one person's access, `edit`
      | changes it.
      |
-     | The roles matrix that used to live at setup/roles is GONE — roles were
-     | retired on 22 Sep 2026 and everything they carried was copied onto the
-     | people who held them. `setup.roles.view` and `setup.roles.edit` stay in
-     | the permission catalogue rather than being deleted under grants that
-     | reference them; nothing routes to them.
      */
     Route::prefix('setup')->name('setup.')->group(function () {
+        Route::get('roles', [RoleAdminController::class, 'index'])->middleware('can:setup.roles.view')->name('roles.index');
+        Route::get('roles/create', [RoleAdminController::class, 'create'])->middleware('can:setup.roles.create')->name('roles.create');
+        Route::post('roles', [RoleAdminController::class, 'store'])->middleware('can:setup.roles.create')->name('roles.store');
+        Route::get('roles/{role}', [RoleAdminController::class, 'show'])->whereNumber('role')->middleware('can:setup.roles.view')->name('roles.show');
+        Route::get('roles/{role}/edit', [RoleAdminController::class, 'edit'])->whereNumber('role')->middleware('can:setup.roles.edit')->name('roles.edit');
+        Route::put('roles/{role}', [RoleAdminController::class, 'update'])->whereNumber('role')->middleware('can:setup.roles.edit')->name('roles.update');
+        Route::delete('roles/{role}', [RoleAdminController::class, 'destroy'])->whereNumber('role')->middleware('can:setup.roles.delete')->name('roles.destroy');
+        Route::post('users/bulk', [UserAdminController::class, 'updateBulk'])
+            ->middleware('can:setup.users.edit')->name('users.bulk.update');
+        Route::put('users/{user}/roles', [UserAdminController::class, 'updateRoles'])->whereNumber('user')->middleware('can:setup.users.edit')->name('users.roles.update');
+
         Route::get('users', [UserAdminController::class, 'index'])
             ->middleware('can:setup.users.view')->name('users.index');
         Route::get('users/{user}', [UserAdminController::class, 'show'])
@@ -88,7 +98,7 @@ Route::middleware('auth')->group(function () {
      | the qualified form and the second grid on a screen would silently stop
      | persisting.
      */
-    Route::prefix('grids/{grid}')->name('grids.')->where(['grid' => '[A-Za-z0-9._:-]+'])->group(function () {
+    Route::prefix('grids/{grid}')->name('grids.')->middleware(AuthorizeAccessGrid::class)->where(['grid' => '[A-Za-z0-9._:-]+'])->group(function () {
         Route::post('columns', [GridStateController::class, 'store'])->name('columns.store');
         Route::delete('columns', [GridStateController::class, 'destroy'])->name('columns.destroy');
         Route::get('extract', GridExtractController::class)->name('extract');

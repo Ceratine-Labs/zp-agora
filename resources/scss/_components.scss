@@ -1,5 +1,13 @@
 /* ============================================================ page head */
 
+.feature-art {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: var(--feature-art-size, 56px); height: var(--feature-art-size, 56px);
+  > svg, > img { display: block; width: 100%; height: 100%; }
+  > svg { overflow: visible; }
+  > img { overflow: hidden; }
+}
+.zp-mark { display: block; object-fit: contain; border-radius: 50%; background: #fff; }
 .page-head {
   display: flex; align-items: flex-end; gap: 20px; margin-bottom: 18px;
   .eyebrow { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
@@ -8,6 +16,13 @@
        letter-spacing: .01em; margin: 0; text-wrap: balance; }
   .blurb { color: var(--ink-2); margin: 5px 0 0; max-width: 68ch; }
   .page-actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+}
+.page-heading { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.page-heading-copy { min-width: 0; }
+.page-head-art { --feature-art-size: 72px; }
+@media (max-width: 760px) {
+  .page-heading { gap: 10px; }
+  .page-head-art { --feature-art-size: 48px; }
 }
 
 /* ============================================================ card
@@ -343,9 +358,14 @@ div.emptystate { padding: 44px 20px; text-align: center; }
   border-bottom: 1px solid var(--line-soft);
 
   .s, .stat {
-    padding: 11px 14px; display: flex; flex-direction: column; gap: 2px;
+    position: relative; padding: 9px 12px; display: flex; flex-direction: column; gap: 2px;
     border-right: 1px solid var(--line-soft);
     &:last-child { border-right: 0; }
+  }
+  .stat-illustration {
+    position: absolute; top: 8px; right: 8px; width: 24px; height: 24px;
+    path { fill: none; stroke: var(--brand-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    + .stat-label { padding-right: 27px; }
   }
   .l, .stat-label {
     font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
@@ -913,7 +933,7 @@ table.dt tr[class*="bal-g"] td:first-child { box-shadow: inset 4px 0 0 var(--bal
     > label { margin-bottom: 0; }
     .info-btn { width: 16px; height: 16px; font-size: 10px; }
   }
-  input[type="text"], input[type="date"], input[type="number"], select {
+  input[type="text"], input[type="email"], input[type="date"], input[type="number"], select {
     background: var(--surface); color: var(--ink);
     border: 1px solid var(--line); border-radius: var(--r);
     padding: 7px 9px; font: inherit; font-size: 13px; width: 100%;
@@ -1416,6 +1436,21 @@ table.dt.fit {
 .role-primary {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+
+// User access keeps long permission names readable when its sections expand.
+.user-access-section {
+  scroll-margin-top: calc(var(--sticky-top, 80px) + 12px);
+  .perm-list { overflow-wrap: anywhere; }
+}
+@media (max-width: 640px) {
+  .user-access-section {
+    .role-row { grid-template-columns: auto minmax(0, 1fr); }
+    .role-name { min-width: 0; flex-wrap: wrap; overflow-wrap: anywhere; }
+    .role-name code { white-space: normal; overflow-wrap: anywhere; }
+    .role-primary { grid-column: 2; min-width: 0; flex-wrap: wrap; white-space: normal; }
+    .menu-ticks-bulk { flex-wrap: wrap; }
+  }
 }
 
 /* The three ways into an account, side by side — each a button with the one

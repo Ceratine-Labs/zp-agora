@@ -30,6 +30,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }} · Agora</title>
+    <x-page-startup />
     @vite(['resources/scss/app.scss', 'resources/js/app.js'])
 </head>
 {{-- The wide mode belongs on the BODY, not on <main>.
@@ -41,18 +42,23 @@
      moves down the page is worse than either width on its own. --}}
 <body class="{{ $wide ? 'is-wide' : '' }}">
 
-{{-- The page's one loader, hidden until a wait is long enough to show
-     (loader.js). Every other one on the page is a clone of it. The coffee cup,
-     or the variant config('agora.loaders') names for this route — the stock
-     recon screens load a shopping cart (ZP, 7 Oct 2026).
-
-     FIRST in the body, so it can paint before a long page has finished
-     arriving: a page that holds it (the request attribute `loader_hold`, set
-     by the page — the stock recon proposals) gets it already showing, and loader.js takes it
-     down once every `table[data-loader-hold]` has been laid out (Ryan, 7 Oct
-     2026: "show the loader until the grid has been initialized"). --}}
-@php($loaderVariant = collect(config('agora.loaders', []))->first(fn ($variant, $pattern) => request()->routeIs($pattern), 'cup'))
-<x-loader overlay :variant="$loaderVariant" :hold="request()->attributes->get('loader_hold')" />
+{{-- The matching loader is first in the body on every view. The startup guard
+     keeps it opaque until initial controls, tables, charts and panes are ready.
+     Later waits still use the same overlay through Agora.loader. --}}
+@php
+    $routeLoader = collect(config('agora.route_loaders', []))->first(fn ($loader) =>
+        request()->routeIs($loader['route']) && collect($loader['parameters'])->every(fn ($value, $parameter) =>
+            (string) request()->route($parameter) === $value));
+    $loaderVariant = $routeLoader['art'] ?? collect(config('agora.loaders', []))->first(fn ($variant, $pattern) => request()->routeIs($pattern), 'cup');
+    $currentArt = app(\Modules\Core\Services\NavigationArtwork::class)->current();
+    $loaderTool = $currentArt['kind'] === 'tool' ? $currentArt['variant'] : null;
+    $loaderReport = $currentArt['kind'] === 'report' ? $currentArt['variant'] : null;
+    if (request()->routeIs('app.modules.show') && $currentArt['kind'] === 'module') {
+        $loaderVariant = $currentArt['variant'];
+    }
+@endphp
+<x-loader overlay startup :variant="$loaderVariant" :tool="$loaderTool" :report="$loaderReport"
+          :label="'Opening '.$title.'…'" :hold="request()->attributes->get('loader_hold')" />
 
 <x-app-bar
     :sections="$shellSections"

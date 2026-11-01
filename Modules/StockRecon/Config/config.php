@@ -483,6 +483,16 @@ return [
             'blurb' => 'After balancing, still short on most of its real shifts. The pack\'s rule stands: a '
                 .'consistent short is not a "wrong count" until a recount proves it. This is the class '
                 .'that carries a charge.'],
+        'C1' => ['plain' => 'The live opening or closing differs from the original count sheet, without a hand-balancing rule breach recorded on this line. It may be a permitted correction; the difference alone does not establish a breach or a loss.',
+            'todo' => 'Compare the original and live counts saved with this preview and check the supporting count sheet. This finding does not restore counts or change balancing eligibility.',
+            'who' => 'Site manager / stock controller',
+            'tone' => 'neutral', 'label' => 'Original/live count drift',
+            'test' => 'Opening or closing differs by more than 0.0005, with no pack audit code',
+            'blocks' => false,
+            'effect' => ['Information only', 'neutral'],
+            'blurb' => 'The original and live counts differed when this run was previewed. Existing count '
+                .'exceptions and hand-balancing checks take priority. This is evidence for review, not '
+                .'a new balancing rule or a reason to restore counts.'],
     ],
 
     /*

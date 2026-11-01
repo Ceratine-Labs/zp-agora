@@ -75,6 +75,8 @@ class StockReconExceptionGrid extends GridDefinition
             new GridColumn(key: 'ExceptionCode', label: 'Class', sort: 'ExceptionCode', format: 'chip'),
             new GridColumn(key: 'AuditCode', label: 'Audit', sort: 'AuditCode', format: 'chip',
                 title: 'The client\'s check on the hand balancing already in PumpIT: S7, S8, S11, S12, S13, S4'),
+            new GridColumn(key: 'CountDriftReason', label: 'Count drift', sort: 'CountDriftReason',
+                title: 'Original/live counts differed at preview, with no pack audit code. Information only.'),
             new GridColumn(key: 'Outcome', label: 'What it is', sort: 'Outcome', wide: true),
             new GridColumn(key: 'AreaName', label: 'Area', sort: 'AreaName'),
             new GridColumn(key: 'ItemDescription', label: 'Item', sort: 'ItemDescription', wide: true, link: true),
@@ -94,14 +96,20 @@ class StockReconExceptionGrid extends GridDefinition
             new GridColumn(key: 'StockLocation', label: 'Location', visible: false),
             new GridColumn(key: 'TransactionDate', label: 'Date', format: 'date', sort: 'TransactionDate'),
             new GridColumn(key: 'ShiftNo', label: 'Shift', format: 'number'),
-            new GridColumn(key: 'QtyOpen', label: 'Open', format: 'qty'),
-            new GridColumn(key: 'ChainBreak', label: 'Break', format: 'qty',
+            new GridColumn(key: 'QtyOpenOrig', label: 'Original open', format: 'qty', compactQuantity: true),
+            new GridColumn(key: 'QtyOpenNow', label: 'Live open', format: 'qty', compactQuantity: true,
+                title: 'Live opening saved when this run was previewed'),
+            new GridColumn(key: 'QtyOpen', label: 'Basis open', format: 'qty', compactQuantity: true, visible: false),
+            new GridColumn(key: 'ChainBreak', label: 'Break', format: 'qty', compactQuantity: true,
                 title: 'How far the opening missed the previous closing. 3 or fewer keeps the chain going.'),
-            new GridColumn(key: 'QtyIssued', label: 'Issued', format: 'qty'),
-            new GridColumn(key: 'QtyClose', label: 'Close', format: 'qty'),
-            new GridColumn(key: 'QtyPOS', label: 'POS', format: 'qty'),
-            new GridColumn(key: 'QtyVar', label: 'Variance', format: 'qty', sort: 'QtyVar'),
-            new GridColumn(key: 'ChainNetVar', label: 'Chain total', format: 'qty',
+            new GridColumn(key: 'QtyIssued', label: 'Issued', format: 'qty', compactQuantity: true),
+            new GridColumn(key: 'QtyCloseOrig', label: 'Original close', format: 'qty', compactQuantity: true),
+            new GridColumn(key: 'QtyCloseNow', label: 'Live close', format: 'qty', compactQuantity: true,
+                title: 'Live closing saved when this run was previewed'),
+            new GridColumn(key: 'QtyClose', label: 'Basis close', format: 'qty', compactQuantity: true, visible: false),
+            new GridColumn(key: 'QtyPOS', label: 'POS', format: 'qty', compactQuantity: true),
+            new GridColumn(key: 'QtyVar', label: 'Variance', format: 'qty', compactQuantity: true, sort: 'QtyVar'),
+            new GridColumn(key: 'ChainNetVar', label: 'Chain total', format: 'qty', compactQuantity: true,
                 title: 'T — the whole window\'s variance for this item. Fixed by the dates; no amendment changes it.'),
             new GridColumn(key: 'ActiveLen', label: 'Active shifts', format: 'number', visible: false,
                 title: 'Dormant shifts are out of every denominator on this report'),
@@ -128,6 +136,8 @@ class StockReconExceptionGrid extends GridDefinition
                 options: array_keys((array) config('stockrecon.exceptions'))),
             'AuditCode' => new GridFilter(column: 'AuditCode', type: 'set',
                 options: array_keys((array) config('stockrecon.audit'))),
+            'CountDriftReason' => new GridFilter(column: 'CountDriftReason', type: 'set',
+                options: ['Opening', 'Closing', 'Opening and closing']),
             'AreaName' => new GridFilter(column: 'AreaName', type: 'text'),
             'ItemDescription' => new GridFilter(column: 'ItemDescription', type: 'text'),
             'POSCode' => new GridFilter(column: 'POSCode', type: 'text'),
@@ -142,7 +152,7 @@ class StockReconExceptionGrid extends GridDefinition
         return new ProcedureSource(
             'agora.usp_StockRecon_GridExceptions',
             acceptsFilters: true,
-            extra: ['RunId' => $this->runId()],
+            extra: ['RunId' => $this->runId(), 'RowGroup' => self::rowGroup()],
         );
     }
 
@@ -171,6 +181,14 @@ class StockReconExceptionGrid extends GridDefinition
         $runId = $this->runId();
 
         return $runId === null ? null : route('app.stockrecon.line', ['run' => $runId, 'line' => $row->Id]);
+    }
+
+    /** Shared by the page and its extract; unknown URL values use the safe default. */
+    public static function rowGroup(): string
+    {
+        $group = request()->query('group');
+
+        return in_array($group, ['review', 'all'], true) ? $group : 'exceptions';
     }
 
     /**

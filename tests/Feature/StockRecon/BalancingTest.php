@@ -17,6 +17,7 @@ use Modules\StockRecon\Models\StockReconAmendment;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
 use Modules\StockRecon\Services\ChainSummary;
+use Modules\StockRecon\Services\ProposalMetric;
 use Modules\StockRecon\Services\StockReconService;
 use Tests\Fixtures\GrantsAccess;
 use Tests\TestCase;
@@ -127,6 +128,82 @@ class BalancingTest extends TestCase
         $this->assertEqualsWithDelta(abs($total), $shortAfter, 0.001,
             'The residual short must equal |T| exactly — it is the floor the invariant fixes, not a target.');
         $this->assertEqualsWithDelta(-5.0, $total, 0.001, 'The worked example ends five units short.');
+    }
+
+    public function test_proposal_metrics_drill_into_the_preview_totals(): void
+    {
+        $run = $this->preview();
+        $selector = new ProposalMetric;
+        foreach ([
+            'amended' => 'AmendedRows', 'reported' => 'BlockedChains',
+            'over-before' => 'OverRowsBefore', 'over-after' => 'OverRowsAfter',
+            'short-before' => 'ShortRowsBefore', 'short-after' => 'ShortRowsAfter',
+            'dormant' => 'DormantRows', 'openings' => 'RepairedOpenings', 'audit' => 'AuditRows',
+        ] as $metric => $column) {
+            $this->assertSame($run->$column, $selector->records($run->lines, $metric)->count(), $metric);
+        }
+        $positive = $selector->records($run->lines, 'unrecorded');
+        $this->assertEqualsWithDelta((float) $run->NetOverUnits, $positive->sum(fn ($l) => (float) $l->metricChainTotal), 0.001);
+        $this->assertEqualsWithDelta((float) $run->NetOverValue, $positive->sum(fn ($l) => (float) $l->metricChainTotal * (float) $l->metricSellPrice), 0.01);
+
+        $this->actingAs($this->person('admin'));
+        $page = $this->get(route('app.stockrecon.overview', $run))->assertOk();
+        foreach (array_keys($selector::LABELS) as $metric) {
+            $page->assertSee(route('app.stockrecon.proposal-metric', [$run, $metric]), false);
+            $this->get(route('app.stockrecon.proposal-metric', [$run, $metric]))
+                ->assertOk()->assertSee($selector::LABELS[$metric]);
+        }
+        $this->get(route('app.stockrecon.proposal-metric', [$run, 'unknown']))->assertNotFound();
+        $this->get(route('app.stockrecon.proposal-metric', [$run, 'audit']))->assertSee('No shifts contribute to this figure.');
+        $otherRun = $this->preview();
+        $this->get(route('app.stockrecon.line', [$otherRun, $run->lines->first()]))->assertNotFound();
+        $this->get(route('app.stockrecon.proposal-metric', [$run, 'dormant']))
+            ->assertSee(route('app.stockrecon.line', [$run, $selector->records($run->lines, 'dormant')->first()]), false);
+
+        // A direct URL cannot bypass either the grant or the run's branch scope.
+        $noAccess = $this->person('admin');
+        $viewPermission = Permission::query()->acrossBranches()->where('Code', 'stockrecon.runs.view')->value('Id');
+        UserPermission::query()->acrossBranches()->where('UserId', $noAccess->Id)
+            ->where('PermissionId', '!=', $viewPermission)->delete();
+        app(PermissionService::class)->forget($noAccess);
+        $this->actingAs($noAccess)->get(route('app.stockrecon.run', [$run, 'tab' => 'exceptions']))
+            ->assertOk()->assertViewHas('tab', 'proposals')
+            ->assertViewHas('panes', fn ($panes) => array_keys($panes) === ['proposals', 'overview', 'global'])
+            ->assertDontSee('data-tab-panel="exceptions"', false);
+        $this->get(route('app.stockrecon.exceptions', $run))->assertForbidden();
+
+        UserPermission::query()->acrossBranches()->where('UserId', $noAccess->Id)->delete();
+        app(PermissionService::class)->forget($noAccess);
+        $this->actingAs($noAccess)->get(route('app.stockrecon.proposal-metric', [$run, 'dormant']))->assertForbidden();
+        $this->get(route('app.stockrecon.overview', $run))->assertForbidden();
+
+        $restricted = $this->person('admin');
+        $this->db()->table('agora.UserBranch')->insert(['BranchId' => 1, 'UserId' => $restricted->Id]);
+        try {
+            $this->actingAs($restricted)->get(route('app.stockrecon.run', $run))->assertNotFound();
+            $this->get(route('app.stockrecon.overview', $run))->assertNotFound();
+            $this->get(route('app.stockrecon.proposal-metric', [$run, 'dormant']))->assertNotFound();
+            $this->get(route('app.stockrecon.line', [$run, $run->lines->first()]))->assertNotFound();
+        } finally {
+            $this->db()->table('agora.UserBranch')->where('UserId', $restricted->Id)->delete();
+        }
+    }
+
+    public function test_proposal_metric_counts_match_a_captured_missing_issue(): void
+    {
+        config(['stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [5, 0, 5, 0], 3 => [5, 0, 5, 0]],
+            '2026-07-18' => [1 => [5, 0, 6, 0], 3 => [6, 0, 6, 0]],
+            '2026-07-19' => [1 => [6, 0, 6, 0], 3 => [6, 0, 6, 0]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $selector = new ProposalMetric;
+        $this->assertSame($run->AmendedRows, $selector->records($run->lines, 'amended')->count());
+        $this->assertCount(1, $selector->records($run->lines, 'balance'));
+        $this->assertCount(1, $selector->records($run->lines, 'unrecorded'));
+        $this->assertSame($run->OverRowsAfter, $selector->records($run->lines, 'over-after')->count());
+        $this->assertTrue($run->lines->contains(fn ($line) => $line->capturesIssue() && ! $line->CountsMove));
     }
 
     /** Rule 1: an over is corrected to zero and never past it into a short. */
@@ -323,8 +400,10 @@ class BalancingTest extends TestCase
             ->assertOk();
 
         $panel()
-            ->assertSee('Cumulative ends on the chain total, -5.000.', false)
-            ->assertSee('+949.000 where 1 opening was', false)
+            ->assertSee('1 (Day)')
+            ->assertSee('3 (Night)')
+            ->assertSee('Cumulative ends on the chain total, -5.', false)
+            ->assertSee('+949 where 1 opening was', false)
             ->assertSee('set to the previous closing.', false);
 
         // A run totalled before the method settled: the stored T no longer
@@ -675,7 +754,9 @@ class BalancingTest extends TestCase
         $this->actingAs($this->person('admin'));
         $this->get(route('app.stockrecon.run', $run))
             ->assertOk()
-            ->assertSee('Reset to original')
+            ->assertSee('Reset to original');
+        $this->get(route('app.stockrecon.overview', $run))
+            ->assertOk()
             ->assertSee('already balanced in PumpIT', false);
 
         $response = $this->post(route('app.stockrecon.reset', $run));
@@ -702,7 +783,8 @@ class BalancingTest extends TestCase
             ->assertOk()
             ->assertSee('data-tt-pills data-tt-pills-join data-tt-pill-order="Positive|Short|Nil">Chain</th>', false)
             ->assertSee('data-sort="Short"', false)
-            ->assertSee('-5.000');
+            ->assertSee('data-sort="-5.000"', false)
+            ->assertSee('>-5</td>', false);
     }
 
     /**
@@ -727,6 +809,10 @@ class BalancingTest extends TestCase
             ->assertOk()
             ->assertSee('data-tt-groups', false)
             ->assertSee('data-tt-group-head="'.$chain->key.'"', false)
+            ->assertSee('Shift / count')
+            ->assertSee('Chain rows show the number of shifts across the displayed dates', false)
+            ->assertSee('1 (Day)')
+            ->assertSee('3 (Night)')
             ->assertSee('data-tt-group="'.$chain->key.'"', false)
             ->getContent();
 
@@ -789,12 +875,39 @@ class BalancingTest extends TestCase
         $run = $this->preview();
         $this->actingAs($this->person('admin'));
 
-        $html = $this->get(route('app.stockrecon.run', $run))->assertOk()->getContent();
+        $response = $this->get(route('app.stockrecon.run', $run))->assertOk()
+            ->assertViewHas('tab', 'proposals')
+            ->assertViewHas('panes', fn ($panes) => array_keys($panes) === ['proposals', 'overview', 'global', 'exceptions'])
+            ->assertSeeInOrder(['data-tab="proposals"', 'data-tab="overview"', 'data-tab="global"', 'data-tab="exceptions"'], false)
+            ->assertSeeInOrder([
+                'data-tab-panel="proposals"', 'Reset to original',
+                'data-tab-panel="overview"', 'Shifts to amend', 'What this run was given', 'id="duplicates"',
+                'data-tab-panel="global"', 'Raw quantities',
+                'data-tab-panel="exceptions"', 'Filter by exception type',
+            ], false)
+            ->assertDontSee('data-tab-src=', false);
+        $html = $response->getContent();
+        $this->assertMatchesRegularExpression('/data-tab="proposals"\s+aria-selected="true"/', $html);
+        $this->assertMatchesRegularExpression('/data-tab-panel="overview"\s+role="tabpanel"\s+hidden/', $html);
         $this->assertMatchesRegularExpression('/data-loader-overlay\s+data-loader-hold/', $html, 'Held, not hidden.');
         $this->assertStringContainsString('Laying out the chains…', $html);
         $this->assertLessThan(strpos($html, 'id="stockrecon-lines-'), strpos($html, 'data-loader-overlay'), 'It comes first, so it can paint first.');
         $this->assertMatchesRegularExpression('/id="stockrecon-lines-\d+"[^>]*data-loader-hold|data-loader-hold[^>]*id="stockrecon-lines-/s',
             substr($html, strpos($html, '<table'), 4000).' '.$html);
+
+        foreach (['overview', 'global', 'exceptions'] as $tab) {
+            $page = $this->get(route('app.stockrecon.'.$tab, $run))->assertOk()
+                ->assertViewHas('tab', $tab)
+                ->assertViewHas('panes', fn ($panes) => array_keys($panes) === ['proposals', 'overview', 'global', 'exceptions'])
+                ->assertDontSee('data-tab-src=', false)->getContent();
+            $this->assertMatchesRegularExpression('/data-tab="'.$tab.'"\s+aria-selected="true"/', $page);
+            $this->assertMatchesRegularExpression('/data-tab-panel="'.$tab.'"\s+role="tabpanel"\s*>/', $page);
+            $this->assertMatchesRegularExpression('/data-loader-overlay\s+data-loader-hold/', $page);
+        }
+        $this->get(route('app.stockrecon.overview', [$run, 'tab' => 'exceptions']))
+            ->assertOk()->assertViewHas('tab', 'exceptions');
+        $this->get(route('app.stockrecon.run', [$run, 'tab' => 'overview']))
+            ->assertOk()->assertViewHas('tab', 'overview');
 
         $hub = $this->get(route('app.stockrecon.index'))->assertOk()->getContent();
         $this->assertMatchesRegularExpression('/data-loader-overlay\s+hidden/', $hub);
@@ -815,7 +928,10 @@ class BalancingTest extends TestCase
         $response = $this->get(route('app.stockrecon.exceptions', $run))->assertOk()
             ->assertSee('Filter by exception type')->assertSee('All types · 3 types available')
             ->assertSee('data-remember="card:stockrecon-exception-types"', false);
-        $nav = $response->viewData('exceptionNavigation');
+        $nav = $response->viewData('panes')['exceptions']['exceptionNavigation'];
+        $this->assertIsArray($nav);
+        $this->assertArrayHasKey('items', $nav);
+        $this->assertIsArray($nav['items']);
         $items = collect($nav['items'])->keyBy('key');
         $this->assertSame('all', $nav['active']);
         $this->assertCount(4, $items);
@@ -826,22 +942,22 @@ class BalancingTest extends TestCase
 
         $filtered = $this->get($items['ExceptionCode:U1']['href'])->assertOk()
             ->assertSee('What to do:')->assertSee(config('stockrecon.exceptions.U1.todo'));
-        $this->assertSame(2, $filtered->viewData('grid')->total);
-        $this->assertTrue($filtered->viewData('grid')->rows->every(fn ($row) => $row->ExceptionCode === 'U1'));
-        $this->assertSame('ExceptionCode:U1', $filtered->viewData('exceptionNavigation')['active']);
-        $this->assertSame($nav['items'], $filtered->viewData('exceptionNavigation')['items'], 'Run-wide counts and links stay stable.');
+        $this->assertSame(2, $filtered->viewData('panes')['exceptions']['grid']->total);
+        $this->assertTrue($filtered->viewData('panes')['exceptions']['grid']->rows->every(fn ($row) => $row->ExceptionCode === 'U1'));
+        $this->assertSame('ExceptionCode:U1', $filtered->viewData('panes')['exceptions']['exceptionNavigation']['active']);
+        $this->assertSame($nav['items'], $filtered->viewData('panes')['exceptions']['exceptionNavigation']['items'], 'Run-wide counts and links stay stable.');
 
-        parse_str(parse_url($filtered->viewData('grid')->extractUrl('csv'), PHP_URL_QUERY), $export);
+        parse_str(parse_url($filtered->viewData('panes')['exceptions']['grid']->extractUrl('csv'), PHP_URL_QUERY), $export);
         $this->assertSame(['U1'], $export['f']['ExceptionCode']['in']);
         $audit = $this->get($items['AuditCode:S8']['href'])->assertOk();
-        $this->assertSame(1, $audit->viewData('grid')->total);
-        $this->assertSame('S8', $audit->viewData('grid')->rows->first()->AuditCode);
+        $this->assertSame(1, $audit->viewData('panes')['exceptions']['grid']->total);
+        $this->assertSame('S8', $audit->viewData('panes')['exceptions']['grid']->rows->first()->AuditCode);
 
         $scope = ['q' => 'not a matching item', 'page' => 9, 'sort' => 'ExceptionValue', 'dir' => 'desc',
             'f' => ['ExceptionCode' => ['in' => ['U1']], 'AuditCode' => ['in' => ['S7']], 'AreaName' => ['q' => 'TEST']]];
         $scoped = $this->get(route('app.stockrecon.exceptions', ['run' => $run->Id] + $scope))->assertOk();
-        $this->assertSame('custom', $scoped->viewData('exceptionNavigation')['active']);
-        foreach ($scoped->viewData('exceptionNavigation')['items'] as $item) {
+        $this->assertSame('custom', $scoped->viewData('panes')['exceptions']['exceptionNavigation']['active']);
+        foreach ($scoped->viewData('panes')['exceptions']['exceptionNavigation']['items'] as $item) {
             parse_str(parse_url($item['href'], PHP_URL_QUERY), $query);
             $this->assertArrayNotHasKey('page', $query);
             $this->assertSame($scope['q'], $query['q']);
@@ -856,9 +972,67 @@ class BalancingTest extends TestCase
         $this->assertCount(0, $this->service->exceptionTypes($wrongBranch));
         $lines->update(['ExceptionCode' => null, 'AuditCode' => null]);
         $empty = $this->get(route('app.stockrecon.exceptions', $run))->assertOk();
-        $this->assertSame('0', $empty->viewData('exceptionNavigation')['items'][0]['count']);
-        $this->assertCount(1, $empty->viewData('exceptionNavigation')['items']);
-        $this->assertSame(0, $empty->viewData('grid')->total);
+        $this->assertSame('0', $empty->viewData('panes')['exceptions']['exceptionNavigation']['items'][0]['count']);
+        $this->assertCount(1, $empty->viewData('panes')['exceptions']['exceptionNavigation']['items']);
+        $this->assertSame(0, $empty->viewData('panes')['exceptions']['grid']->total);
+    }
+
+    public function test_exception_sections_keep_actionable_drift_and_export_the_selected_rows(): void
+    {
+        $run = $this->preview();
+        $lines = $this->db()->table('agora.StockReconRunLine')->where('RunId', $run->Id);
+        $ids = (clone $lines)->orderBy('Id')->pluck('Id');
+        $lines->update(['ExceptionCode' => null, 'AuditCode' => null, 'CountDriftReason' => null]);
+        foreach ([
+            ['Balanced to zero', null, null],
+            ['No change needed', null, null],
+            ['Opening only: follows the amended closing before it', null, null],
+            ['Short: accountable, no amendment available', null, null],
+            ['Balanced to zero', 'U1', null],
+            ['Balanced to zero', null, 'S7'],
+            ['Future unfamiliar outcome', null, null],
+        ] as $i => [$outcome, $code, $audit]) {
+            (clone $lines)->where('Id', $ids[$i])->update([
+                'CountDriftReason' => 'Opening', 'Outcome' => $outcome,
+                'ExceptionCode' => $code, 'AuditCode' => $audit,
+            ]);
+        }
+        $this->actingAs($this->person('admin'));
+        $page = $this->get(route('app.stockrecon.exceptions', $run))->assertOk();
+        $this->assertSame('exceptions', $page->viewData('panes')['exceptions']['rowGroup']);
+        $this->assertSame(4, $page->viewData('panes')['exceptions']['grid']->total);
+        $this->assertSame(3, (int) $page->viewData('panes')['exceptions']['groupCounts']['review']->TotalRows);
+        $this->assertContains('Short: accountable, no amendment available', $page->viewData('panes')['exceptions']['grid']->rows->pluck('Outcome')->all());
+        $review = $this->get(route('app.stockrecon.exceptions', ['run' => $run->Id, 'group' => 'review']))->assertOk();
+        $this->assertSame(3, $review->viewData('panes')['exceptions']['grid']->total);
+        $this->assertSame('3', $review->viewData('panes')['exceptions']['exceptionNavigation']['items'][0]['count']);
+        $csv = $this->get($review->viewData('panes')['exceptions']['grid']->extractUrl('csv'))->assertOk()->streamedContent();
+        $this->assertStringContainsString('Balanced to zero', $csv);
+        $this->assertStringNotContainsString('Short: accountable', $csv);
+        $all = $this->get(route('app.stockrecon.exceptions', ['run' => $run->Id, 'group' => 'all']))->assertOk();
+        $this->assertSame(7, $all->viewData('panes')['exceptions']['grid']->total);
+        $this->assertSame(7, (int) $all->viewData('panes')['exceptions']['exceptionNavigation']['items'][0]['count']);
+        $this->assertSame(0, $this->get(route('app.stockrecon.exceptions', ['run' => $run->Id, 'group' => 'review',
+            'f' => ['CountDriftReason' => ['in' => ['Closing']]]]))->viewData('panes')['exceptions']['grid']->total);
+        $this->get(route('app.grids.extract', ['grid' => 'app.stockrecon.exceptions', 'run' => 999999999]))->assertNotFound();
+        $sets = app(ProcedureService::class)->callSets('agora.usp_StockRecon_GridExceptions', [
+            'BranchIds' => (string) self::BRANCH, 'RunId' => $run->Id, 'RowGroup' => 'review', 'Page' => 2, 'PageSize' => 2,
+        ]);
+        $this->assertCount(1, $sets[0]);
+        $this->assertSame(3, (int) $sets[1]->first()->TotalRows);
+
+        $noAccess = $this->person('admin');
+        UserPermission::query()->acrossBranches()->where('UserId', $noAccess->Id)->delete();
+        app(PermissionService::class)->forget($noAccess);
+        $this->actingAs($noAccess)->get(route('app.grids.extract', ['grid' => 'app.stockrecon.exceptions', 'run' => $run->Id]))->assertForbidden();
+        $restricted = $this->person('admin');
+        $this->db()->table('agora.UserBranch')->insert(['BranchId' => 1, 'UserId' => $restricted->Id]);
+        try {
+            $this->actingAs($restricted)->get(route('app.stockrecon.exceptions', $run))->assertNotFound();
+            $this->get(route('app.grids.extract', ['grid' => 'app.stockrecon.exceptions', 'run' => $run->Id]))->assertNotFound();
+        } finally {
+            $this->db()->table('agora.UserBranch')->where('UserId', $restricted->Id)->delete();
+        }
     }
 
     /** Codes explain themselves in a modal, opened from the info button or a badge. */
@@ -1069,14 +1243,14 @@ class BalancingTest extends TestCase
         // Since 13 Oct 2026 it balances: the over is captured as the issue
         // the shift never got (Ryan: "customer wants over to balance").
         $chain = ChainSummary::of($run->lines)->first(fn ($c) => $c->first()->StockItemNo === self::DUP_ITEM);
-        $this->assertSame('Balance 1 shift · issue of 1.000 captured', $chain->state()['label']);
+        $this->assertSame('Balance 1 shift · issue of 1 captured', $chain->state()['label']);
         $this->assertTrue($line->capturesIssue() && $line->isWritable(), 'It can be ticked and amended.');
 
         $this->actingAs($this->person('admin'))
             ->get(route('app.stockrecon.line', [$run, $line]), ['X-Requested-With' => 'XMLHttpRequest'])
             ->assertOk()
-            ->assertSee('Balance 1 shift · issue of 1.000 captured')
-            ->assertSee('missing issue 0.000 → 1.000')
+            ->assertSee('Balance 1 shift · issue of 1 captured')
+            ->assertSee('missing issue 0 → 1')
             ->assertDontSee('Held back')
             ->assertDontSee('Too few active shifts to balance');
     }

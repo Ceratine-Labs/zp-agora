@@ -28,6 +28,10 @@
             @endif
         </x-slot:info>
         <x-slot:actions>
+            <a class="btn-ghost" href="{{ route('app.stockrecon.tutorial') }}">Learn stock recon</a>
+            @if (! $pinned)
+                <a class="btn-primary" href="{{ route('app.stockrecon.groups.form') }}">Every-site preview</a>
+            @endif
             <a class="btn-ghost" href="{{ route('app.reports.index') }}">Reports</a>
         </x-slot:actions>
     </x-page-head>

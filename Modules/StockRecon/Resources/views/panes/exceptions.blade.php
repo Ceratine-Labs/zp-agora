@@ -20,13 +20,31 @@
     <x-slot:actions>
         <button type="button" class="btn-ghost" data-modal-open="stockrecon-codes">What the codes mean</button>
     </x-slot:actions>
+    @php
+        $groupFilters = $grid->query[$grid->param('f')] ?? [];
+        $groupFilters = is_array($groupFilters) ? $groupFilters : [];
+        unset($groupFilters['ExceptionCode'], $groupFilters['AuditCode']);
+        $groupItems = [];
+        foreach (['exceptions' => 'Exceptions', 'review' => 'Review', 'all' => 'All rows'] as $key => $label) {
+            $count = $key === 'all' ? $groupCounts->sum('TotalRows') : ($groupCounts[$key]->TotalRows ?? 0);
+            $groupItems[] = ['key' => $key, 'label' => $label, 'count' => \App\Support\Format::n($count),
+                'href' => $grid->urlWith(['group' => $key, $grid->param('page') => null, $grid->param('f') => $groupFilters])];
+        }
+    @endphp
+    <div style="padding:16px 16px 0">
+        <x-tabs :items="$groupItems" :active="$rowGroup" label="Exception and review rows" />
+        <p class="muted">Exceptions include classified findings and other outcomes that may need action. Review holds routine count drift; All rows shows both. Counts cover the whole run before filters.</p>
+    </div>
     <div style="padding:16px" id="exception-types">
         <x-card title="Filter by exception type" collapsible remember="stockrecon-exception-types"
                 :sub="($exceptionNavigation['help']['title'] ?? ($exceptionNavigation['active'] === 'all' ? 'All types' : 'Multiple code filters'))
                     .' · '.(count($exceptionNavigation['items']) - 1).' '.Str::plural('type', count($exceptionNavigation['items']) - 1).' available'"
                 style="margin-bottom:0">
-            <p class="muted">Choose a type to narrow the list. Pill counts are item/shift lines for the whole run, before search and column filters.
+            <p class="muted">Choose a type to narrow the list. Pill counts are item/shift lines in the selected section, before search and column filters.
                 A line can have both a count exception and a hand-balancing check; All types counts it once.</p>
+            <p class="muted">Original and live counts are saved at preview time. Count drift is informational;
+                use its column filter to review opening, closing or both. It does not establish a rule breach.
+                Runs made before drift capture show no original pair; preview again to capture it.</p>
             <x-tabs :items="$exceptionNavigation['items']" :active="$exceptionNavigation['active']"
                     chips label="Exception types" />
         </x-card>

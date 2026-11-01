@@ -1,0 +1,54 @@
+/* Shared report scope: a compact summary, with its form one press away. */
+.report-scope {
+  margin-bottom: 12px;
+
+  .report-scope-summary {
+    display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+    list-style: none; cursor: pointer; border-radius: inherit;
+    &::-webkit-details-marker { display: none; }
+    &::before {
+      content: ''; flex: none; width: 0; height: 0;
+      border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+      border-left: 5px solid var(--ink-2);
+    }
+    > strong { font: 600 17px/1.2 var(--font-display); color: var(--ink); }
+    &:hover .report-scope-edit { text-decoration: underline; }
+  }
+  &[open] > .report-scope-summary::before { transform: rotate(90deg); }
+  .report-scope-tags { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+  .report-scope-tag {
+    max-width: 100%; padding: 3px 7px; border-radius: 4px;
+    background: var(--surface-2); border: 1px solid var(--line-soft);
+    color: var(--ink-2); font-size: 11px; line-height: 1.35; overflow-wrap: anywhere;
+  }
+  .report-scope-edit { flex: none; margin-left: auto; color: var(--brand-ink); font-size: 12px; }
+  .report-scope-body {
+    padding: 14px; border-top: 1px solid var(--line-soft);
+    .field-row { gap: 10px; }
+    .form-actions { margin-top: 12px; }
+  }
+  .report-scope-help { margin: 0; color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+  .report-scope-presets {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    margin: 10px 0 12px; color: var(--ink-2); font-size: 11px;
+    a {
+      padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px;
+      background: var(--surface-2); color: var(--brand-ink); text-decoration: none;
+      &:hover, &.is-active { border-color: var(--brand); background: var(--brand-soft); }
+    }
+  }
+  .report-scope-summary, .report-scope-presets a {
+    &:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  }
+}
+
+@media (max-width: 700px) {
+  .report-scope {
+    .report-scope-summary { flex-wrap: wrap; gap: 8px; }
+    .report-scope-tags { order: 1; width: 100%; }
+  }
+}
+
+@media (max-width: 560px) {
+  .report-scope .report-scope-body .field-row { grid-template-columns: minmax(0, 1fr); }
+}

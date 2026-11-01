@@ -88,83 +88,9 @@
     $emptyLines = $run->lines->filter(fn ($l) => $l->isEmptyChain());
     $emptyChains = $emptyLines->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->count();
     $rows = $hideEmpty ? $run->lines->reject(fn ($l) => $l->isEmptyChain()) : $run->lines;
-
-    /*
-     * Balanceable, but nothing to write: the balanced answer is what PumpIT
-     * already holds — head office balanced it by hand. Said on the strip, or
-     * "45 balanceable" beside "0 to amend" reads as a press that does not
-     * work (Ryan, 7 Oct 2026). Reset to original takes the hand balancing off.
-     */
-    $toBalance = $run->lines
-        ->filter(fn ($l) => $l->WouldAmend && ! $l->ChainBlocked)
-        ->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)
-        ->count();
-
-    $alreadyBalanced = $run->lines
-        ->groupBy(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)
-        ->filter(fn ($chain) => ! $chain->first()->ChainBlocked
-            && ! $chain->contains(fn ($l) => $l->WouldAmend)
-            && $chain->contains(fn ($l) => abs((float) $l->QtyCloseNew - (float) $l->QtyClose) > 0.0005
-                || abs((float) $l->QtyOpenNew - (float) $l->QtyOpen) > 0.0005))
-        ->count();
 @endphp
 
-<x-card :title="'Proposals'"
-        :sub="\App\Support\Format::n($run->TotalRows).' shifts across '.\App\Support\Format::n($run->ChainCount).' item chains · previewed in '.\App\Support\Format::n($run->PreviewMs).' ms'"
-        flush>
-
-    <x-statstrip :stats="[
-        ['label' => 'Shifts to amend', 'value' => \App\Support\Format::n($run->AmendedRows),
-         'note' => \App\Support\Format::n($run->UnitsAmended, 3).' units moved', 'tone' => 'good'],
-        /* Chains with something to WRITE, not chains nothing holds back: a
-           chain short with no over, or one head office already balanced, is
-           not held back and has nothing to balance — and counting those as
-           balanceable is what read as a press that does not work (Ryan,
-           7 Oct 2026, twice). */
-        ['label' => 'Chains to balance', 'value' => \App\Support\Format::n($toBalance),
-         'note' => \App\Support\Format::n($run->BalanceableChains).' not held back'
-             .($alreadyBalanced > 0 ? ' · '.\App\Support\Format::n($alreadyBalanced).' already balanced in PumpIT' : ''),
-         'tone' => 'good'],
-        ['label' => 'Chains reported', 'value' => \App\Support\Format::n($run->BlockedChains), 'tone' => 'serious'],
-        ['label' => 'Unrecorded issue', 'value' => \App\Support\Format::r($run->NetOverValue),
-         'note' => \App\Support\Format::n($run->NetOverUnits, 3).' units', 'tone' => 'warn'],
-        ['label' => 'Shifts over', 'value' => \App\Support\Format::n($run->OverRowsBefore).' → '.\App\Support\Format::n($run->OverRowsAfter),
-         'tone' => 'neutral'],
-        ['label' => 'Shifts short', 'value' => \App\Support\Format::n($run->ShortRowsBefore).' → '.\App\Support\Format::n($run->ShortRowsAfter),
-         'note' => \App\Support\Format::r($run->ShortValueAfter).' after', 'tone' => 'neutral'],
-        ['label' => 'Dormant shifts', 'value' => \App\Support\Format::n($run->DormantRows)],
-        /* Kept breaks are the ones of KeepBreaksUpTo or fewer that the chain
-           runs through (ZRP, 4 Oct 2026); the rest split their chain. */
-        ['label' => 'Openings repaired', 'value' => \App\Support\Format::n($run->RepairedOpenings),
-         'note' => $run->KeptBreaks > 0 ? \App\Support\Format::n($run->KeptBreaks).' small, chain kept' : null,
-         'tone' => $run->RepairedOpenings > 0 ? 'warn' : 'neutral'],
-        ['label' => 'Hand balancing breaches', 'value' => \App\Support\Format::n($run->AuditRows),
-         'note' => $run->AuditRows > 0 ? 'see Exceptions' : null, 'tone' => $run->AuditRows > 0 ? 'serious' : 'neutral'],
-    ]" />
-
-    @if ($run->HeldBackRows > 0)
-        {{-- Rule 10 of the client's pack. A data problem, not a finding, and
-             the pack says to report it first. --}}
-        <x-notice tone="stop" collapsible style="margin:12px 14px 0"
-                  :title="\App\Support\Format::n($run->HeldBackRows).' shift lines held back from '.$run->CompleteTo?->copy()->addDay()->format('d M').' — the recon is not finished that day'">
-            <p>A shift is missing or short of lines, closings are not captured, or POS is not posted. That day
-               and every day after it are left out. Finish it at the site and preview again.</p>
-        </x-notice>
-    @endif
-
-    @if ($run->BlockedChains > 0)
-        {{-- The count is the finding and stays on screen; the reasoning behind
-             it is the same paragraph every time and folds away once read. --}}
-        <x-notice tone="warn" collapsible style="margin:12px 14px 0"
-                  :title="$run->BlockedChains.' '.Str::plural('chain', $run->BlockedChains).' reported rather than balanced'">
-            <p>If any shift trips a test, none of the chain is amended: no till sales linked, an issue that went
-               nowhere, an amendment over a cap, too few active shifts, a possible duplicate issue, or a write the
-               client's weekly audit would flag. Open a row to see which. A chain that totals nil is never held
-               back by the first four: it balances, and the finding stays on the exceptions.</p>
-            <p>A missing issue does not hold a chain back. The chain balances around it, and the over that is
-               left stays on the shift that carries it, marked <strong>Unrecorded issue</strong>, to capture.</p>
-        </x-notice>
-    @endif
+<x-card title="Proposals" flush>
 
     {{-- Reset to original (Ryan, 7 Oct 2026: "update the amended with the
          original column values"). Its own form, because a form cannot sit
@@ -270,6 +196,8 @@
             </p>
         @endif
 
+        <p class="field-help" style="margin:10px 14px 0">Each chain row shows the number of shifts across its date range. Open it to see each numbered shift.</p>
+
         {{-- `data-tt-page`: browser paging over rows that are all already here.
              See the head of this file for why that is allowed on a form that
              stamps, and the head of table-tools.js for the line between a page
@@ -319,7 +247,7 @@
                          this the browser squeezed "01 Sep" onto two lines and
                          the date set the row height. --}}
                     <th class="fit-min">Date</th>
-                    <th class="num">Shift</th>
+                    <th class="num" title="Chain rows show the number of shifts across the displayed dates; individual rows show the shift number.">Shift / count</th>
                     <th class="num">Open</th>
                     {{-- How far the opening missed the previous closing. A
                          small one keeps the chain going but is still a figure
@@ -397,22 +325,22 @@
                         <br><span class="muted mono" style="font-size:11px">{{ $first->StockItemNo }} · {{ $first->areaLabel() }} · {{ $chain->count() }} {{ Str::plural('shift', $chain->count()) }}</span>
                     </td>
                     <td class="num" data-sort="{{ (float) $first->ChainNetVar }}">
-                        {{ $first->chainState() === 'Nil' ? '—' : ($first->chainState() === 'Positive' ? '+' : '').\App\Support\Format::n($first->ChainNetVar, 3) }}
+                        {{ $first->chainState() === 'Nil' ? '—' : ($first->chainState() === 'Positive' ? '+' : '').\App\Support\Format::qty($first->ChainNetVar) }}
                     </td>
                     <td class="fit-min" data-sort="{{ $chain->from()->toDateString() }}">
                         {{ $chain->from()->format('d M') }}{{ $chain->to()->ne($chain->from()) ? ' – '.$chain->to()->format('d M') : '' }}
                     </td>
                     <td class="num">{{ $chain->count() }}</td>
-                    <td class="num">{{ \App\Support\Format::n($first->QtyOpen, 3) }}</td>
-                    <td class="num">{{ abs($chain->breaks()) > 0.0005 ? \App\Support\Format::n($chain->breaks(), 3) : '—' }}</td>
-                    <td class="num">{{ abs($chain->issued()) < 0.0005 ? '—' : \App\Support\Format::n($chain->issued(), 3) }}</td>
-                    <td class="num">{{ \App\Support\Format::n($chain->last()->QtyClose, 3) }}</td>
-                    <td class="num">{{ abs($chain->pos()) < 0.0005 ? '—' : \App\Support\Format::n($chain->pos(), 3) }}</td>
-                    <td class="num">{{ abs($chain->variance()) < 0.0005 ? '—' : \App\Support\Format::n($chain->variance(), 3) }}</td>
-                    <td class="num grp">{{ \App\Support\Format::n($first->QtyOpenNew, 3) }}</td>
-                    <td class="num">{{ \App\Support\Format::n($chain->last()->QtyCloseNew, 3) }}</td>
-                    <td class="num" title="Units the balancing moves on this chain, either way">{{ $chain->moved() < 0.0005 ? '—' : \App\Support\Format::n($chain->moved(), 3) }}</td>
-                    <td class="num">{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::n($chain->varianceNew(), 3) }}</td>
+                    <td class="num" data-sort="{{ \App\Support\Format::n($first->QtyOpen, 3) }}">{{ \App\Support\Format::qty($first->QtyOpen) }}</td>
+                    <td class="num" data-sort="{{ abs($chain->breaks()) > 0.0005 ? \App\Support\Format::n($chain->breaks(), 3) : '—' }}">{{ abs($chain->breaks()) > 0.0005 ? \App\Support\Format::qty($chain->breaks()) : '—' }}</td>
+                    <td class="num" data-sort="{{ abs($chain->issued()) < 0.0005 ? '—' : \App\Support\Format::n($chain->issued(), 3) }}">{{ abs($chain->issued()) < 0.0005 ? '—' : \App\Support\Format::qty($chain->issued()) }}</td>
+                    <td class="num" data-sort="{{ \App\Support\Format::n($chain->last()->QtyClose, 3) }}">{{ \App\Support\Format::qty($chain->last()->QtyClose) }}</td>
+                    <td class="num" data-sort="{{ abs($chain->pos()) < 0.0005 ? '—' : \App\Support\Format::n($chain->pos(), 3) }}">{{ abs($chain->pos()) < 0.0005 ? '—' : \App\Support\Format::qty($chain->pos()) }}</td>
+                    <td class="num" data-sort="{{ abs($chain->variance()) < 0.0005 ? '—' : \App\Support\Format::n($chain->variance(), 3) }}">{{ abs($chain->variance()) < 0.0005 ? '—' : \App\Support\Format::qty($chain->variance()) }}</td>
+                    <td class="num grp" data-sort="{{ \App\Support\Format::n($first->QtyOpenNew, 3) }}">{{ \App\Support\Format::qty($first->QtyOpenNew) }}</td>
+                    <td class="num" data-sort="{{ \App\Support\Format::n($chain->last()->QtyCloseNew, 3) }}">{{ \App\Support\Format::qty($chain->last()->QtyCloseNew) }}</td>
+                    <td class="num" title="Units the balancing moves on this chain, either way" data-sort="{{ $chain->moved() < 0.0005 ? '—' : \App\Support\Format::n($chain->moved(), 3) }}">{{ $chain->moved() < 0.0005 ? '—' : \App\Support\Format::qty($chain->moved()) }}</td>
+                    <td class="num" data-sort="{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::n($chain->varianceNew(), 3) }}">{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::qty($chain->varianceNew()) }}</td>
                     @if ($run->isOpen())
                         {{-- AMEND THIS ONE CHAIN, without touching the ticks
                              (the per-shift button of 11 Sep 2026, moved up to
@@ -501,29 +429,29 @@
                     <td class="num" data-sort="{{ $line->chainState() }}"
                         data-tone="{{ ['Positive' => 'crit', 'Short' => 'warn'][$line->chainState()] ?? 'neutral' }}"
                         title="Chain total {{ \App\Support\Format::n($line->ChainNetVar, 3) }}">
-                        {{ $line->chainState() === 'Nil' ? '—' : ($line->chainState() === 'Positive' ? '+' : '').\App\Support\Format::n($line->ChainNetVar, 3) }}
+                        {{ $line->chainState() === 'Nil' ? '—' : ($line->chainState() === 'Positive' ? '+' : '').\App\Support\Format::qty($line->ChainNetVar) }}
                     </td>
                     <td class="fit-min">{{ $line->TransactionDate->format('d M') }}</td>
-                    <td class="num">{{ $line->ShiftNo }}</td>
-                    <td class="num">{{ \App\Support\Format::n($line->QtyOpen, 3) }}</td>
-                    <td class="num" @if (abs((float) $line->ChainBreak) > 0.0005) title="Previous closing {{ \App\Support\Format::n($line->PrevClose, 3) }}{{ $line->BreakKept ? ' — kept in the chain' : ' — the chain is split here' }}" @endif>
-                        {{ abs((float) $line->ChainBreak) > 0.0005 ? \App\Support\Format::n($line->ChainBreak, 3) : '—' }}
+                    <td class="num" data-sort="{{ $line->ShiftNo }}">{{ \Modules\StockRecon\Support\ShiftLabel::show($line->ShiftNo) }}</td>
+                    <td class="num" data-sort="{{ \App\Support\Format::n($line->QtyOpen, 3) }}">{{ \App\Support\Format::qty($line->QtyOpen) }}</td>
+                    <td class="num" data-sort="{{ abs((float) $line->ChainBreak) > 0.0005 ? \App\Support\Format::n($line->ChainBreak, 3) : '—' }}" @if (abs((float) $line->ChainBreak) > 0.0005) title="Previous closing {{ \App\Support\Format::n($line->PrevClose, 3) }}{{ $line->BreakKept ? ' — kept in the chain' : ' — the chain is split here' }}" @endif>
+                        {{ abs((float) $line->ChainBreak) > 0.0005 ? \App\Support\Format::qty($line->ChainBreak) : '—' }}
                     </td>
-                    <td class="num">{{ (float) $line->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($line->QtyIssued, 3) }}</td>
-                    <td class="num">{{ \App\Support\Format::n($line->QtyClose, 3) }}</td>
-                    <td class="num">{{ (float) $line->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($line->QtyPOS, 3) }}</td>
+                    <td class="num" data-sort="{{ (float) $line->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($line->QtyIssued, 3) }}">{{ (float) $line->QtyIssued === 0.0 ? '—' : \App\Support\Format::qty($line->QtyIssued) }}</td>
+                    <td class="num" data-sort="{{ \App\Support\Format::n($line->QtyClose, 3) }}">{{ \App\Support\Format::qty($line->QtyClose) }}</td>
+                    <td class="num" data-sort="{{ (float) $line->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($line->QtyPOS, 3) }}">{{ (float) $line->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($line->QtyPOS) }}</td>
                     {{-- `data-sort` so the letter beside the figure never reaches
                          the sort or the filter. --}}
-                    <td class="num" @if ($group) data-sort="{{ (float) $line->QtyVar === 0.0 ? '—' : \App\Support\Format::n($line->QtyVar, 3) }}" @endif>
+                    <td class="num" data-sort="{{ (float) $line->QtyVar === 0.0 ? '—' : \App\Support\Format::n($line->QtyVar, 3) }}">
                         @if ($group)
                             <span class="bal-tag" title="{{ \Modules\StockRecon\Services\ChainSummary::balanceNote($group) }}">{{ $group['letter'] }}</span>
                         @endif
-                        {{ (float) $line->QtyVar === 0.0 ? '—' : \App\Support\Format::n($line->QtyVar, 3) }}
+                        {{ (float) $line->QtyVar === 0.0 ? '—' : \App\Support\Format::qty($line->QtyVar) }}
                     </td>
-                    <td class="num grp">{{ \App\Support\Format::n($line->QtyOpenNew, 3) }}</td>
-                    <td class="num">{{ \App\Support\Format::n($line->QtyCloseNew, 3) }}</td>
-                    <td class="num">{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::n($line->AmendClose, 3) }}</td>
-                    <td class="num">{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($line->QtyVarNew, 3) }}</td>
+                    <td class="num grp" data-sort="{{ \App\Support\Format::n($line->QtyOpenNew, 3) }}">{{ \App\Support\Format::qty($line->QtyOpenNew) }}</td>
+                    <td class="num" data-sort="{{ \App\Support\Format::n($line->QtyCloseNew, 3) }}">{{ \App\Support\Format::qty($line->QtyCloseNew) }}</td>
+                    <td class="num" data-sort="{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::n($line->AmendClose, 3) }}">{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::qty($line->AmendClose) }}</td>
+                    <td class="num" data-sort="{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($line->QtyVarNew, 3) }}">{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::qty($line->QtyVarNew) }}</td>
                     @if ($run->isOpen())
                         <td class="fit-min"></td>
                     @endif

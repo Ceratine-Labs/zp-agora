@@ -24,6 +24,9 @@
                                              2026) — refused (ADJUST_MOVED) if
                                              any has changed since
 
+   Cash bags also restore CashBagAmount, AdjustedBy and Adjusted from exact
+   priors, refusing changed rows under lock (Ryan, 25 Oct 2026).
+
    The batch number is NOT returned to SS_UniqueNumber. Gaps in a counter are
    harmless; handing the same number out twice is not.
 
@@ -64,7 +67,9 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_Reverse]
     @BatchId  bigint      = NULL,
     @RunId    bigint      = NULL,
     @Reason   nvarchar(300),
-    @UserId   int         = NULL
+    @UserId   int         = NULL,
+    @ExpectedBatchNo int = NULL,
+    @ReconArea nvarchar(20) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -78,12 +83,16 @@ BEGIN
 
     DECLARE @Targets TABLE (BatchId bigint PRIMARY KEY, BatchNo int, ReconArea nvarchar(20), StampMode varchar(10));
 
+    BEGIN TRANSACTION;
+
     INSERT INTO @Targets (BatchId, BatchNo, ReconArea, StampMode)
     SELECT b.Id, b.BatchNo, b.ReconArea, r.StampMode
-    FROM agora.ReconBatch b
+    FROM agora.ReconBatch b WITH (UPDLOCK, HOLDLOCK)
     JOIN agora.ReconRun r ON r.Id = b.RunId AND r.BranchId = b.BranchId
     WHERE b.BranchId = @BranchId
       AND b.State = 'committed'
+      AND (@ExpectedBatchNo IS NULL OR b.BatchNo = @ExpectedBatchNo)
+      AND (@ReconArea IS NULL OR b.ReconArea = @ReconArea)
       AND (@BatchId IS NULL OR b.Id = @BatchId)
       AND (@RunId IS NULL OR b.RunId = @RunId);
 
@@ -194,7 +203,25 @@ BEGIN
     /* UTC, the application's clock — see usp_Recon_Commit. */
     DECLARE @Now datetime2(0) = SYSUTCDATETIME(), @Bank int = 0, @Mops int = 0, @Lines int = 0;
 
-    BEGIN TRANSACTION;
+    DECLARE @AdjustedBags TABLE (SourceId bigint PRIMARY KEY, BatchNo int, Adjustment money,
+        PriorAmount money, PriorAdjusted bit NULL, PriorAdjustedBy money NULL, PriorBatchNo int);
+    INSERT INTO @AdjustedBags
+    SELECT m.SourceId, m.BatchNo, m.Adjustment, m.PriorAmount, m.PriorAdjusted, m.PriorAdjustedBy, ISNULL(m.PriorBatchNo, 0)
+    FROM agora.ReconMatch m JOIN @Targets t ON t.BatchId = m.BatchId
+    WHERE t.ReconArea = 'CashBags' AND t.StampMode = 'live' AND m.Side = 'mops' AND m.Adjustment IS NOT NULL;
+
+    IF EXISTS (
+        SELECT 1 FROM @AdjustedBags a
+        LEFT JOIN [PumpIT].dbo.BRN_DailyBankingCashBags d WITH (UPDLOCK, HOLDLOCK)
+          ON d.SSBranchId = @BranchId AND d.DailyBankingCashBagID = a.SourceId
+        WHERE d.DailyBankingCashBagID IS NULL OR d.ReconBatchNoPumpIT <> a.BatchNo
+           OR d.CashBagAmount IS NULL OR d.CashBagAmount <> a.PriorAmount + a.Adjustment
+           OR ISNULL(CONVERT(int, d.Adjusted), -1) <> CASE WHEN a.Adjustment = 0 THEN ISNULL(CONVERT(int, a.PriorAdjusted), -1) ELSE 1 END
+           OR (a.Adjustment <> 0 AND (d.AdjustedBy IS NULL OR d.AdjustedBy <> ISNULL(a.PriorAdjustedBy, 0) - a.Adjustment))
+           OR (a.Adjustment = 0 AND (ISNULL(d.AdjustedBy, 0) <> ISNULL(a.PriorAdjustedBy, 0)
+               OR (d.AdjustedBy IS NULL AND a.PriorAdjustedBy IS NOT NULL) OR (d.AdjustedBy IS NOT NULL AND a.PriorAdjustedBy IS NULL)))
+    )
+        THROW 51000, 'AGORA:ADJUST_MOVED:A cash bag changed after this match. Nothing was reversed; review its current amount, adjustment and batch in PumpIT first.', 1;
 
     /* Bank side, by id, restoring what each line held before. Guarded on the
        batch number Agora wrote: a line that something else has since
@@ -289,6 +316,12 @@ BEGIN
                             AND r.KeyText = LTRIM(RTRIM(d.SlipNo))));
         SET @Mops = @Mops + @@ROWCOUNT;
 
+        UPDATE d SET d.CashBagAmount = a.PriorAmount, d.AdjustedBy = a.PriorAdjustedBy,
+            d.Adjusted = a.PriorAdjusted, d.ReconBatchNoPumpIT = a.PriorBatchNo
+        FROM [PumpIT].dbo.BRN_DailyBankingCashBags d JOIN @AdjustedBags a
+          ON d.SSBranchId = @BranchId AND d.DailyBankingCashBagID = a.SourceId;
+        SET @Mops = @Mops + @@ROWCOUNT;
+
         UPDATE d SET d.ReconBatchNoPumpIT = 0
         FROM [PumpIT].dbo.BRN_DailyBankingCashBags d
         JOIN @Targets t ON t.ReconArea = 'CashBags' AND t.StampMode = 'live'
@@ -313,7 +346,8 @@ BEGIN
     UPDATE s
     SET s.State = 'reversed', s.UpdatedAt = @Now, s.UpdatedBy = @UserId
     FROM agora.ReconStamp s
-    JOIN @Targets t ON t.BatchNo = s.BatchNo
+    JOIN agora.ReconMatch m ON m.Id = s.MatchId AND m.BranchId = s.BranchId
+    JOIN @Targets t ON t.BatchId = m.BatchId
     WHERE s.BranchId = @BranchId;
 
     UPDATE b

@@ -112,6 +112,7 @@ class ReconMatchService
      * procedure, which also groups the bags itself and refuses a split that is
      * not theirs or does not add up (ALLOCATION_INCOMPLETE). Null sends none.
      *
+     * @param  array<int, array{id: int|null, amount: string|null, share: string|null}>|null  $bagAdjustments
      * @param  array<int, int>  $bankLineIds
      * @param  array<int, array{id: int|null, key: string, dt: string, amt: float, ref2?: string|null}>  $deposits
      * @param  array<int, array{code: string|null, banked: string|null, share: string|null}>|null  $allocation
@@ -126,6 +127,7 @@ class ReconMatchService
         ?string $reason = null,
         ?string $basis = null,
         ?array $allocation = null,
+        ?array $bagAdjustments = null,
     ): object {
         $status = $this->procedures->write('usp_Recon_ManualMatch', [
             'BranchId' => $branchId,
@@ -142,6 +144,8 @@ class ReconMatchService
             // A forced FNB match writes its variance to the deposits only when
             // this literal says so — see config('recon.fnb_adjust_mode').
             'AdjustMode' => (string) config('recon.fnb_adjust_mode', 'off'),
+            'CashBagAdjustMode' => (string) config('recon.cash_bag_adjust_mode', 'off'),
+            'BagAdjustmentsJson' => $bagAdjustments === null ? null : json_encode(array_values($bagAdjustments)),
         ]);
 
         if ($area === 'CashBags') {

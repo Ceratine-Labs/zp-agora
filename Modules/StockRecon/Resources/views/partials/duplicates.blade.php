@@ -4,9 +4,8 @@
     customer report on the stock recon itself, identifying what is what and
     what is being corrected").
 
-    On both faces of a run, the proposals and the exceptions, because it is
-    about the run rather than either list: a clear one (D1) is a row the commit
-    writes, a possible one (D2) is a chain it will not.
+    In the run Overview: a clear one (D1) is a row the commit writes, a
+    possible one (D2) is a chain it will not.
 
     Everything comes out of agora.usp_StockRecon_GetDuplicates
     (StockReconService::duplicates()): each candidate with its state, the
@@ -40,7 +39,7 @@
     $items = $cases->map(fn ($case) => [
         'key' => 'dup-'.$case->LineId,
         'label' => Str::limit(Str::squish((string) $case->ItemDescription), 26)
-            .' · '.Carbon::parse($case->TransactionDate)->format('j M').' shift '.$case->ShiftNo,
+            .' · '.Carbon::parse($case->TransactionDate)->format('j M').' shift '.\Modules\StockRecon\Support\ShiftLabel::show($case->ShiftNo),
         'group' => $case->DupTier === 'D1' ? 'Clear' : 'Possible',
         'tone' => $case->DupTier === 'D1' ? 'good' : 'serious',
         'count' => $stateWords[$case->State] ?? null,

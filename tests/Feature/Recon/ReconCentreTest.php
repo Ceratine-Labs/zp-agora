@@ -195,6 +195,28 @@ class ReconCentreTest extends TestCase
             ->assertSee('href="'.e(route('app.recon.area', ['FNB'] + $this->scope() + ['tab' => 'match'])).'"', false);
     }
 
+    public function test_browsing_both_sides_does_not_create_a_run_and_exposes_state_controls(): void
+    {
+        $this->actingAs($this->admin())->get(route('app.recon.area', ['FNB'] + $this->scope()))
+            ->assertOk()->assertSee('Show both sides')->assertSee('Read-only — no run is created.')
+            ->assertSee('name="state"', false);
+        $this->actingAs($this->admin())->get(route('app.recon.match', ['FNB'] + $this->scope() + ['centre' => 1]),
+            ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->assertSee('Already reconciled')->assertSee('Recon batch');
+        $this->assertSame(0, ReconRun::query()->acrossBranches()->where('BranchId', self::BRANCH)->count());
+    }
+
+    public function test_reconciled_lines_show_the_batch_and_cannot_be_selected(): void
+    {
+        $this->db()->table('PumpIT.dbo.RCN_BankStatementLinesPumpIT')
+            ->where('SSBranchId', self::BRANCH)->update(['ReconState' => 2, 'ReconBatchNo' => 123456]);
+        $this->db()->table('PumpIT.dbo.BRN_DailyBankingFNB')
+            ->where('SSBranchId', self::BRANCH)->update(['ReconBatchNoPumpIT' => 123456]);
+        $this->actingAs($this->admin())->get(route('app.recon.match', ['FNB'] + $this->scope() + ['state' => 'reconciled']))
+            ->assertOk()->assertSee('123456')->assertSee('data-reconciled', false);
+        $this->assertSame(0, ReconRun::query()->acrossBranches()->where('BranchId', self::BRANCH)->count());
+    }
+
     // ---- helpers -----------------------------------------------------------
 
     /** @return array{branch_id: int, from: string, to: string} */

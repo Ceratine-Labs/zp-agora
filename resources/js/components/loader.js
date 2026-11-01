@@ -6,10 +6,11 @@
  * until the action completes. This is the one place that decides WHEN it is
  * seen; the component decides what it looks like.
  *
- * ONE RULE ABOUT TIME. Nothing appears for a wait under DELAY. A cup that
+ * ACTION WAITS. Nothing appears for a wait under DELAY. A cup that
  * flashes for 80 ms on every quick press is noise, and people learn to stop
  * looking at it — which is the opposite of what a busy state is for. Every
- * entry point below goes through the same timer.
+ * action entry point below goes through the same timer. Initial page setup
+ * is separate: its loader is already visible in the first server paint.
  *
  * Five ways in, and they are the whole API:
  *
@@ -37,13 +38,56 @@
  * from the bfcache, so `pageshow` with `persisted` takes it down.
  */
 const DELAY = 300;
+const STARTUP_LIMIT = 60000;
 
 export default function loader() {
     const overlay = document.querySelector('[data-loader-overlay]');
     const label = overlay?.querySelector('[data-loader-label]');
+    const defaultArt = overlay?.querySelector('.loader-art')?.cloneNode(true);
+    const startup = window.Agora?.startup;
 
     let timer = null;
     let holders = 0;
+    let startupDone = false;
+    let startupTimer = null;
+    let resolveReady;
+    const readiness = new Promise((resolve) => { resolveReady = resolve; });
+    const startupHeld = () => overlay?.hasAttribute('data-loader-startup')
+        && document.documentElement.hasAttribute('data-app-starting');
+    const pageHeld = () => startupHeld() || overlay?.hasAttribute('data-loader-hold');
+
+    function finishStartup(reason, outcome = null) {
+        if (startupDone) return;
+        startupDone = true;
+        if (startupTimer !== null) window.clearTimeout(startupTimer);
+        overlay?.removeAttribute('data-loader-startup');
+        overlay?.removeAttribute('data-loader-hold');
+        startup?.finish();
+        document.documentElement.removeAttribute('data-app-starting');
+        if (overlay && holders === 0) overlay.hidden = true;
+        const detail = { reason, outcome };
+        document.documentElement.dataset.appReady = reason;
+        document.dispatchEvent(new CustomEvent('agora:ready', { detail }));
+        resolveReady(detail);
+    }
+
+    // The head guard also covers a missing/broken main bundle. This timer
+    // bounds an initializer that never settles after the bundle has started.
+    if (startupHeld()) startupTimer = window.setTimeout(() => finishStartup('timeout'), STARTUP_LIMIT);
+
+    function ready(initialization) {
+        Promise.resolve(initialization)
+            .then(async (outcome) => {
+                await afterPaint();
+                finishStartup(outcome?.failures?.length ? 'partial' : 'ready', outcome);
+            })
+            .catch((error) => {
+                console.error('Page setup could not finish.', error);
+                finishStartup('partial');
+            });
+
+        return readiness;
+    }
 
     function show(text = 'Working…') {
         if (!overlay) return { update() {}, hide() {} };
@@ -74,7 +118,7 @@ export default function loader() {
     function clear() {
         holders = 0;
         if (timer !== null) { window.clearTimeout(timer); timer = null; }
-        if (overlay) overlay.hidden = true;
+        if (overlay && !pageHeld()) overlay.hidden = true;
     }
 
     /**
@@ -150,8 +194,30 @@ export default function loader() {
         if (form instanceof HTMLFormElement && form.matches('[data-loader]') && !form.target) submitting(form);
     });
 
+    // Module menu links use the same loader as their destination. Keep normal
+    // browser navigation: modified clicks, downloads and other windows need no
+    // overlay on this page. The art is shared with the static menu icon.
+    document.addEventListener('click', (event) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const link = event.target.closest('a[data-loader]');
+        if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+        const url = new URL(link.href, window.location.href);
+        if (url.origin !== window.location.origin || (url.pathname === window.location.pathname && url.search === window.location.search)) return;
+
+        const art = link.querySelector('[data-module-art]');
+        if (art && overlay) {
+            const clone = uniquely(art.cloneNode(true));
+            clone.dataset.moduleArtAnimated = 'true';
+            overlay.querySelector('.loader-art')?.replaceWith(clone);
+        }
+        show(link.dataset.loader || 'Opening…');
+    });
+
     window.addEventListener('pageshow', (event) => {
-        if (event.persisted) clear();
+        if (!event.persisted) return;
+        clear();
+        finishStartup('bfcache');
+        if (defaultArt) overlay?.querySelector('.loader-art')?.replaceWith(defaultArt.cloneNode(true));
     });
 
     /*
@@ -170,14 +236,25 @@ export default function loader() {
         const release = () => {
             if (!overlay.hasAttribute('data-loader-hold') || waiting().length > 0) return;
             overlay.removeAttribute('data-loader-hold');
-            if (holders === 0) overlay.hidden = true;
+            if (holders === 0 && !startupHeld()) overlay.hidden = true;
         };
 
         document.addEventListener('table-tools:ready', release);
         release();
     }
 
-    return { show, hide: clear, within, beside, submitting };
+    return { show, hide: clear, within, beside, submitting, ready };
+}
+
+/** Let completed layout/resize work cross a paint before showing the page. */
+export function afterPaint() {
+    return new Promise((resolve) => {
+        if (document.hidden || typeof window.requestAnimationFrame !== 'function') {
+            resolve();
+            return;
+        }
+        window.requestAnimationFrame(() => window.requestAnimationFrame(resolve));
+    });
 }
 
 /** Rename every id in a cloned cup, and every url(#id) that points at one. */

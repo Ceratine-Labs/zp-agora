@@ -67,7 +67,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Recon_GridRuns]
     @MineOnly         BIT           = 1,
     @UserId           INT           = NULL,
     @AllowedBranchIds NVARCHAR(MAX) = NULL,
-    @OpenOnly         BIT           = 0
+    @OpenOnly         BIT           = 0,
+    @InvalidOnly      BIT           = 0
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -78,159 +79,77 @@ BEGIN
 
     DECLARE @Offset INT = (@Page - 1) * @PageSize;
 
-    /* The empty-string trap, twice. STRING_SPLIT('', ',') returns ONE row
-       holding an empty string and TRY_CONVERT(int, '') is 0, not NULL — so
-       without the predicates below a caller who selected no branches gets a
-       table containing branch 0 and this screen silently returns nothing. */
-    DECLARE @Branch  TABLE (BranchId int PRIMARY KEY);
-    DECLARE @Allowed TABLE (BranchId int PRIMARY KEY);
-
-    INSERT INTO @Branch (BranchId)
-    SELECT DISTINCT TRY_CONVERT(int, LTRIM(RTRIM(s.value)))
-    FROM STRING_SPLIT(ISNULL(@BranchIds, ''), ',') s
-    WHERE LTRIM(RTRIM(s.value)) <> ''
-      AND TRY_CONVERT(int, LTRIM(RTRIM(s.value))) IS NOT NULL;
-
-    INSERT INTO @Allowed (BranchId)
-    SELECT DISTINCT TRY_CONVERT(int, LTRIM(RTRIM(s.value)))
-    FROM STRING_SPLIT(ISNULL(@AllowedBranchIds, ''), ',') s
-    WHERE LTRIM(RTRIM(s.value)) <> ''
-      AND TRY_CONVERT(int, LTRIM(RTRIM(s.value))) IS NOT NULL;
-
-    DECLARE @AllBranches bit = CASE WHEN EXISTS (SELECT 1 FROM @Branch)  THEN 0 ELSE 1 END;
-    /* An EMPTY grant list means every branch, not none — the same reading
-       BranchContext::maySee() and BranchScope apply. Reading it the other way
-       does not fail loudly: the screen simply comes back empty for the
-       administrator who can see the most. */
-    DECLARE @AllAllowed  bit = CASE WHEN EXISTS (SELECT 1 FROM @Allowed) THEN 0 ELSE 1 END;
-
-    /* The header filters, in the shape the grid actually sends. A filter on a
-       column this screen does not offer is ignored rather than refused: the
-       definition decides what is filterable and this reads what arrived. */
-    DECLARE @Filter TABLE ([Column] nvarchar(80), [Op] nvarchar(20), [Value] nvarchar(400));
-    DECLARE @FilterSet TABLE ([Column] nvarchar(80), [Value] nvarchar(400));
-
-    IF @FiltersJson IS NOT NULL
-    BEGIN
-        INSERT INTO @Filter ([Column], [Op], [Value])
-        SELECT JSON_VALUE(f.value, '$.column'),
-               ISNULL(JSON_VALUE(f.value, '$.op'), 'contains'),
-               JSON_VALUE(f.value, '$.value')
-        FROM OPENJSON(@FiltersJson) f
-        WHERE JSON_VALUE(f.value, '$.value') IS NOT NULL;
-
-        /* A tick list is an array inside the element, so it needs its own
-           pass. Flattened to one row per ticked value, which is what an IN
-           wants. */
-        INSERT INTO @FilterSet ([Column], [Value])
-        SELECT JSON_VALUE(f.value, '$.column'), v.value
-        FROM OPENJSON(@FiltersJson) f
-        CROSS APPLY OPENJSON(f.value, '$.in') v
-        WHERE JSON_VALUE(f.value, '$.type') = 'set';
-    END
-
-    DECLARE @fNote    NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'Note'),
-            @fNoteOp  NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'Note'),
-            @fBranch  NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'BranchName'),
-            @fBranchOp NVARCHAR(20) = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'BranchName'),
-            @fRunBy   NVARCHAR(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'RunBy'),
-            @fRunByOp NVARCHAR(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'RunBy');
-
-    DECLARE @fStatusAny bit = CASE WHEN EXISTS (SELECT 1 FROM @FilterSet WHERE [Column] = 'Status') THEN 1 ELSE 0 END;
-
-    /*
-     * Built once into a temp table, then paged and counted from it.
-     *
-     * The alternative — a CTE repeated in the page query and again in the
-     * count — is how a predicate ends up in one of them and not the other,
-     * and a grid whose footer disagrees with its own rows is worse than one
-     * that is slow.
-     */
-    ;WITH base AS (
-        SELECT
-            r.Id,
-            r.BranchId,
-            b.Name AS BranchName,
-            r.ReconArea,
-            /* The run's own name, and a readable stand-in when nobody gave it
-               one. A column of forty dashes is a column nobody can navigate,
-               so an unnamed run is described by the thing that distinguishes
-               it — and the filter below then matches what is on screen. */
-            ISNULL(NULLIF(LTRIM(RTRIM(r.Note)), ''),
-                   CONVERT(nvarchar(10), r.FromDate, 120) + ' to ' + CONVERT(nvarchar(10), r.ToDate, 120)) AS Note,
-            r.FromDate,
-            r.ToDate,
-            r.Status,
-            r.StampMode,
-            r.ProcedureName,
-            r.TotalRows,
-            r.MatchedRows,
-            r.MismatchRows,
-            r.BankOnlyRows,
-            r.DepositOnlyRows,
-            r.OtherRows,
-            r.MatchedTotal,
-            r.CommittedRows,
-            r.CommittedTotal,
-            r.PreviewMs,
-            r.CreatedAt,
-            u.UserName AS RunBy,
-            /* Whether this run is still open work. A previewed run that was
-               never committed is the one a clerk comes back to; anything else
-               is history. Returned rather than derived on the page, so the row
-               action and the resume card cannot disagree about it. */
-            CONVERT(bit, CASE WHEN r.Status = 'previewed' THEN 1 ELSE 0 END) AS IsOpen,
-            /* Which working-list gesture the row offers. Status alone, on
-               purpose: whether anything has been processed against a run is
-               decided by usp_Recon_DiscardRuns and nowhere else, and it
-               refuses the rare run that says 'previewed' but has evidence
-               hanging off it. The row only has to know which button to show. */
-            CONVERT(bit, CASE WHEN r.Status IN ('previewed', 'failed') THEN 1 ELSE 0 END) AS IsClosable,
-            CONVERT(bit, CASE WHEN r.Status = 'closed' THEN 1 ELSE 0 END) AS IsClosed
-        FROM agora.ReconRun r
-        LEFT JOIN agora.Branch b ON b.BranchId = r.BranchId AND b.DeletedAt IS NULL
-        LEFT JOIN agora.[User] u ON u.Id = r.CreatedBy
-        WHERE (@ReconArea IS NULL OR r.ReconArea = @ReconArea)
-          AND (@AllBranches = 1 OR r.BranchId IN (SELECT BranchId FROM @Branch))
-          AND (@AllAllowed  = 1 OR r.BranchId IN (SELECT BranchId FROM @Allowed))
-          /* @MineOnly with no @UserId is NO runs rather than every run: a
-             filter that fails open is the one that leaks. */
-          AND (@MineOnly = 0 OR (@UserId IS NOT NULL AND r.CreatedBy = @UserId))
-          AND (ISNULL(@OpenOnly, 0) = 0 OR r.Status IN ('previewing', 'previewed'))
-          AND (@DateFrom IS NULL OR r.ToDate   >= @DateFrom)
-          AND (@DateTo   IS NULL OR r.FromDate <= @DateTo)
-    )
-    /*
-     * Materialised once, then paged and counted from the same rows.
-     *
-     * The alternative — repeating the query in the page and again in the count
-     * — is how a predicate ends up in one of them and not the other, and a
-     * grid whose footer disagrees with its own rows is worse than one that is
-     * slow. Read-only throughout: nothing here writes to a real table.
-     */
-    SELECT *
-    INTO #Rows
-    FROM base
-    WHERE (@Search IS NULL
-           OR base.Note       LIKE '%' + @Search + '%'
-           OR base.BranchName LIKE '%' + @Search + '%'
-           OR base.RunBy      LIKE '%' + @Search + '%'
-           OR CONVERT(nvarchar(20), base.Id) = @Search)
-      AND (@fNote   IS NULL OR (CASE WHEN @fNoteOp   = 'eq' THEN CASE WHEN base.Note       =        @fNote        THEN 1 ELSE 0 END
-                                     ELSE                        CASE WHEN base.Note       LIKE '%'+@fNote  +'%' THEN 1 ELSE 0 END END) = 1)
-      AND (@fBranch IS NULL OR (CASE WHEN @fBranchOp = 'eq' THEN CASE WHEN base.BranchName =        @fBranch      THEN 1 ELSE 0 END
-                                     ELSE                        CASE WHEN base.BranchName LIKE '%'+@fBranch+'%' THEN 1 ELSE 0 END END) = 1)
-      AND (@fRunBy  IS NULL OR (CASE WHEN @fRunByOp  = 'eq' THEN CASE WHEN base.RunBy      =        @fRunBy       THEN 1 ELSE 0 END
-                                     ELSE                        CASE WHEN base.RunBy      LIKE '%'+@fRunBy +'%' THEN 1 ELSE 0 END END) = 1)
-      AND (@fStatusAny = 0 OR base.Status IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'Status'));
+    /* One exact permission/filter scope shared with bulk archive; no ceiling. */
+    CREATE TABLE #RunGridScope (RunId bigint PRIMARY KEY);
+    INSERT INTO #RunGridScope EXEC agora.usp_Recon_RunScope
+        @BranchIds=@BranchIds, @DateFrom=@DateFrom, @DateTo=@DateTo,
+        @Search=@Search, @FiltersJson=@FiltersJson, @ReconArea=@ReconArea,
+        @MineOnly=@MineOnly, @UserId=@UserId, @AllowedBranchIds=@AllowedBranchIds,
+        @OpenOnly=@OpenOnly;
 
     SELECT
-        Id, Note, BranchId, BranchName, ReconArea, FromDate, ToDate, Status, RunBy, CreatedAt,
-        TotalRows, MatchedRows, MismatchRows, BankOnlyRows, DepositOnlyRows, OtherRows,
-        MatchedTotal, CommittedRows, CommittedTotal, PreviewMs, StampMode, ProcedureName, IsOpen,
-        IsClosable, IsClosed
-    FROM #Rows
-    ORDER BY
+        r.Id,
+        r.BranchId,
+        b.Name AS BranchName,
+        r.ReconArea,
+        /* The run's own name, and a readable stand-in when nobody gave it
+           one. A column of forty dashes is a column nobody can navigate,
+           so an unnamed run is described by the thing that distinguishes
+           it — and the filter below then matches what is on screen. */
+        ISNULL(NULLIF(LTRIM(RTRIM(r.Note)), ''),
+               CONVERT(nvarchar(10), r.FromDate, 120) + ' to ' + CONVERT(nvarchar(10), r.ToDate, 120)) AS Note,
+        r.FromDate,
+        r.ToDate,
+        r.Status,
+        r.StampMode,
+        r.ProcedureName,
+        r.TotalRows,
+        r.MatchedRows,
+        r.MismatchRows,
+        r.BankOnlyRows,
+        r.DepositOnlyRows,
+        r.OtherRows,
+        r.MatchedTotal,
+        r.CommittedRows,
+        r.CommittedTotal,
+        r.PreviewMs,
+        r.CreatedAt,
+        u.UserName AS RunBy,
+        /* Whether this run is still open work. A previewed run that was
+           never committed is the one a clerk comes back to; anything else
+           is history. Returned rather than derived on the page, so the row
+           action and the resume card cannot disagree about it. */
+        CONVERT(bit, CASE WHEN r.Status = 'previewed' THEN 1 ELSE 0 END) AS IsOpen,
+        /* Which working-list gesture the row offers. Status alone, on
+           purpose: whether anything has been processed against a run is
+           decided by usp_Recon_DiscardRuns and nowhere else, and it
+           refuses the rare run that says 'previewed' but has evidence
+           hanging off it. The row only has to know which button to show. */
+        CONVERT(bit, CASE WHEN r.Status IN ('previewed', 'failed') THEN 1 ELSE 0 END) AS IsClosable,
+        CONVERT(bit, CASE WHEN r.Status = 'closed' THEN 1 ELSE 0 END) AS IsClosed
+    INTO #RunGridRows
+    FROM agora.ReconRun r
+    JOIN #RunGridScope scope ON scope.RunId=r.Id
+    LEFT JOIN agora.Branch b ON b.BranchId = r.BranchId AND b.DeletedAt IS NULL
+    LEFT JOIN agora.[User] u ON u.Id = r.CreatedBy;
+
+    CREATE TABLE #RunGridValidity (RunId bigint PRIMARY KEY, Validity nvarchar(12),
+        InvalidRows int NULL, RemainingRows int NULL, IsInvalid bit);
+    DECLARE @ValidityIds nvarchar(max);
+    /* Only the Invalid filter needs to inspect every scoped run. An ordinary
+       page proves just its visible rows; closed/processed history never drills. */
+    IF ISNULL(@InvalidOnly,0)=1
+    BEGIN
+        SELECT @ValidityIds=N'['+ISNULL(STRING_AGG(CONVERT(nvarchar(max),RunId),N','),N'')+N']'
+        FROM #RunGridScope;
+        INSERT INTO #RunGridValidity EXEC agora.usp_Recon_RunValidity @RunIdsJson=@ValidityIds, @InvalidOnly=1;
+        DELETE r FROM #RunGridRows r
+        WHERE NOT EXISTS (SELECT 1 FROM #RunGridValidity v WHERE v.RunId=r.Id AND v.IsInvalid=1);
+    END
+
+    SELECT *, ROW_NUMBER() OVER (ORDER BY
+        CASE WHEN @SortAsc = 1 AND @SortColumn = 'Id' THEN Id END ASC,
+        CASE WHEN @SortAsc = 0 AND @SortColumn = 'Id' THEN Id END DESC,
         /* Text and date sorts kept apart so each compares as itself — '10'
            after '9', not before it. */
         CASE WHEN @SortAsc = 1 THEN
@@ -263,11 +182,28 @@ BEGIN
         CASE WHEN @SortAsc = 0 AND @SortColumn = 'CreatedAt'    THEN CreatedAt END DESC,
         /* Newest first is the default and also the tie-break: the run a person
            wants is almost always the one they just made. */
-        Id DESC
-    OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+        Id DESC) AS GridRowNumber
+    INTO #RunGridRanked
+    FROM #RunGridRows;
 
-    /* Result set 2: the size of the whole filtered set, by contract. */
-    SELECT COUNT_BIG(*) AS TotalRows FROM #Rows;
+    IF ISNULL(@InvalidOnly,0)=0
+    BEGIN
+        SELECT @ValidityIds=N'['+ISNULL(STRING_AGG(CONVERT(nvarchar(max),Id),N','),N'')+N']'
+        FROM #RunGridRanked WHERE GridRowNumber>@Offset AND GridRowNumber<=CONVERT(bigint,@Offset)+@PageSize;
+        INSERT INTO #RunGridValidity EXEC agora.usp_Recon_RunValidity @RunIdsJson=@ValidityIds;
+    END
 
-    DROP TABLE #Rows;
+    /* Original columns retain their order; validity is append-only. */
+    SELECT
+        Id, Note, BranchId, BranchName, ReconArea, FromDate, ToDate, Status, RunBy, CreatedAt,
+        TotalRows, MatchedRows, MismatchRows, BankOnlyRows, DepositOnlyRows, OtherRows,
+        MatchedTotal, CommittedRows, CommittedTotal, PreviewMs, StampMode, ProcedureName, IsOpen,
+        IsClosable, IsClosed,
+        v.Validity, v.InvalidRows, v.RemainingRows, v.IsInvalid
+    FROM #RunGridRanked r
+    JOIN #RunGridValidity v ON v.RunId=r.Id
+    WHERE GridRowNumber>@Offset AND GridRowNumber<=CONVERT(bigint,@Offset)+@PageSize
+    ORDER BY GridRowNumber;
+
+    SELECT COUNT_BIG(*) AS TotalRows FROM #RunGridRows;
 END

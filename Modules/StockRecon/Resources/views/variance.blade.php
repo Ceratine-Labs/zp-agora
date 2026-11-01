@@ -16,8 +16,11 @@
         ? 'As counted '.\App\Support\Format::n($t[$key] ?? null, 3)
         : 'As counted '.\App\Support\Format::r($t[$key] ?? null);
     $tone = fn (?float $value) => $value === null || abs($value) < 0.005 ? 'neutral' : ($value < 0 ? 'crit' : 'warn');
+    $selectedArea = data_get($grid->query, 'f.Area.q');
+    $selectedArea = is_string($selectedArea) ? $selectedArea : '';
+    $variance = data_get($grid->query, 'f.RemainingVariance.op', 'all');
 @endphp
-{{-- Wide: a grid of 25 columns is scanned across, not read. --}}
+{{-- Let the comparison use the full window. --}}
 <x-app-shell title="Original vs amended variance" wide>
     <x-page-head eyebrow="Control · stock" title="Original vs amended variance">
         <x-slot:info>
@@ -34,9 +37,18 @@
                narrow the sites or the dates.</p>
         </x-slot:info>
         <x-slot:actions>
+            <a class="btn-ghost" href="{{ route('app.stockrecon.water') }}">Water meter reconciliation</a>
             <a class="btn-ghost" href="{{ route('app.stockrecon.index') }}">Stock recon centre</a>
         </x-slot:actions>
     </x-page-head>
+
+    @if ((int) ($t['ExcludedMeterRows'] ?? 0) > 0)
+        <x-notice tone="info" title="Cumulative water meters are separate" style="margin-bottom:16px">
+            <p>{{ \App\Support\Format::n($t['ExcludedMeterRows']) }} mapped meter readings in the selected sites and dates
+                are excluded from physical stock quantities and money totals, before the filters below.
+                <a href="{{ route('app.stockrecon.water', \Illuminate\Support\Arr::only($grid->query, ['branches', 'from', 'to'])) }}">Review meter reconciliation</a>.</p>
+        </x-notice>
+    @endif
 
     @if ($grid->refusal === null && (int) ($t['Lines'] ?? 0) > 0)
         {{-- After balancing, with the figure as counted under each. --}}
@@ -56,5 +68,32 @@
         ]" />
     @endif
 
-    <x-data-grid :grid="$grid" :branches="$branches" surface />
+    <p class="muted">Comparison view · Open, issued, close and POS quantities are available under Columns.
+        Shorts, overs and balanced refer to the amended quantity after waste.</p>
+    <x-data-grid :grid="$grid" :branches="$branches" class="variance-grid" surface>
+        <x-slot:scope>
+            <div class="field">
+                <label for="variance-area">Area</label>
+                <input type="hidden" name="f[Area][eq]" value="1">
+                <select id="variance-area" name="f[Area][q]" data-select data-placeholder="All areas">
+                    <option value="">All areas</option>
+                    @if ($selectedArea !== '' && ! $areas->contains('AreaDescription', $selectedArea))
+                        <option value="{{ $selectedArea }}" selected>{{ $selectedArea }}</option>
+                    @endif
+                    @foreach ($areas as $area)
+                        <option value="{{ $area->AreaDescription }}" @selected($selectedArea === $area->AreaDescription)>{{ $area->AreaDescription }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="field">
+                <label for="variance-status">Amended variance</label>
+                <input type="hidden" name="f[RemainingVariance][q]" value="0">
+                <select id="variance-status" name="f[RemainingVariance][op]">
+                    @foreach (['all' => 'Show all', 'lt' => 'Shorts only', 'gt' => 'Overs only', 'eq' => 'Balanced only'] as $key => $label)
+                        <option value="{{ $key }}" @selected($variance === $key)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </x-slot:scope>
+    </x-data-grid>
 </x-app-shell>

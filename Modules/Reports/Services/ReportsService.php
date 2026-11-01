@@ -2,6 +2,7 @@
 
 namespace Modules\Reports\Services;
 
+use App\Support\BusinessDate;
 use App\Support\ProcedureService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -64,21 +65,47 @@ class ReportsService
      */
     public static function branchIds(mixed $value): array
     {
-        $ids = match (true) {
+        return self::branchSelection($value)['ids'];
+    }
+
+    /**
+     * Keep a rejected selection distinct from an empty one: an empty branch
+     * list means every site to the procedure, so discarding an invalid id
+     * must not turn an explicit selection into an unrestricted report.
+     *
+     * @return array{ids: array<int, int>, hasSelection: bool}
+     */
+    public static function branchSelection(mixed $value): array
+    {
+        $values = match (true) {
             is_array($value) => $value,
             $value === null => [],
-            default => explode(',', (string) $value),
+            is_string($value) => explode(',', $value),
+            default => [$value],
         };
 
-        return collect($ids)
-            // A nested array is not a branch id, and array_map('intval', …)
-            // over one is the same conversion error in a different costume.
-            ->reject(fn (mixed $id) => is_array($id) || is_object($id))
-            ->map(fn (mixed $id) => (int) trim((string) $id))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        $ids = [];
+        $hasSelection = false;
+
+        foreach ($values as $id) {
+            if ($id === null || (is_string($id) && trim($id) === '')) {
+                continue;
+            }
+
+            $hasSelection = true;
+            if (! is_int($id) && ! is_string($id)) {
+                continue;
+            }
+
+            $id = filter_var(trim((string) $id), FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1, 'max_range' => 2147483647],
+            ]);
+            if ($id !== false) {
+                $ids[] = $id;
+            }
+        }
+
+        return ['ids' => array_values(array_unique($ids)), 'hasSelection' => $hasSelection];
     }
 
     /**
@@ -136,10 +163,11 @@ class ReportsService
     /**
      * Run a report and return its page, its total and the parameters it ran
      * with — the last so the screen can render what it actually asked for
-     * rather than what it thinks it asked for.
+     * rather than what it thinks it asked for. An optional third result set
+     * supplies full-scope queue summaries independently of the paged rows.
      *
      * @param  array<string, mixed>  $input
-     * @return array{rows: Collection<int, object>, total: int, params: array<string, mixed>}
+     * @return array{rows: Collection<int, object>, total: int, params: array<string, mixed>, summaries: Collection<string, object>, summariesAvailable: bool}
      */
     public function run(string $key, array $input = []): array
     {
@@ -149,7 +177,7 @@ class ReportsService
             throw new ReportNotFound($key);
         }
 
-        $params = $this->parameters($report, $input);
+        $params = $this->parametersFor($key, $input);
 
         $sets = $this->procedures->callSets($report['procedure'], $params);
 
@@ -160,7 +188,29 @@ class ReportsService
             // something to paper over with a count of the page.
             'total' => (int) (($sets[1] ?? collect())->first()->TotalRows ?? 0),
             'params' => $params,
+            'summaries' => ($sets[2] ?? collect())->keyBy(fn (object $row): string => (string) $row->QueueKey),
+            // An old procedure without this result set has unknown totals,
+            // unlike a present empty set, which confirms no queues in scope.
+            'summariesAvailable' => array_key_exists(2, $sets),
         ];
+    }
+
+    /**
+     * The effective scope, including defaults, without running the report.
+     * A refused report still needs to show the scope the person asked for.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function parametersFor(string $key, array $input = []): array
+    {
+        $report = $this->definition($key);
+
+        if ($report === null) {
+            throw new ReportNotFound($key);
+        }
+
+        return $this->parameters($report, $input);
     }
 
     /**
@@ -188,18 +238,43 @@ class ReportsService
 
         $sortable = collect($columns)->pluck('sort')->filter()->all();
         $sort = $input['sort'] ?? null;
+        $sort = in_array($sort, $sortable, true) ? $sort : null;
+        $sortAsc = (int) (($input['dir'] ?? 'asc') !== 'desc');
+        $from = $this->date($input['from'] ?? null);
+        $to = $this->date($input['to'] ?? null);
+
+        /** @var array<string, mixed> $scope */
+        $scope = is_array($report['scope'] ?? null) ? $report['scope'] : [];
+
+        // Mirror each procedure's defaults in the visible scope. Do not clamp
+        // explicit dates: SQL owns range refusals and any report-specific rules.
+        if (in_array($scope['date_mode'] ?? null, ['range', 'single'], true)) {
+            $to ??= BusinessDate::today()->toDateString();
+            if ($scope['date_mode'] === 'single') {
+                $from = null;
+            } else {
+                $from ??= ($scope['month_start'] ?? false)
+                    ? Carbon::parse($to)->startOfMonth()->toDateString()
+                    : Carbon::parse($to)->subDays((int) ($scope['lookback_days'] ?? 0))->toDateString();
+            }
+        } elseif (($scope['date_mode'] ?? null) === 'none') {
+            $from = $to = null;
+        }
+
+        if (($report['key'] ?? null) === 'my-queue' && $sort === null) {
+            $sort = 'AgeDays';
+            $sortAsc = 0;
+        }
 
         return [
             'BranchIds' => $branches->isEmpty() ? null : $branches->implode(','),
-            'DateFrom' => $this->date($input['from'] ?? null),
-            'DateTo' => $this->date($input['to'] ?? null),
+            'DateFrom' => $from,
+            'DateTo' => $to,
             'Search' => trim((string) ($input['search'] ?? '')) ?: null,
-            // A sort column the procedure does not know falls back to its
-            // natural order rather than being passed through — an unrecognised
-            // @SortColumn is silently ignored by the CASE, and silence is worse
-            // than a default.
-            'SortColumn' => in_array($sort, $sortable, true) ? $sort : null,
-            'SortAsc' => (int) (($input['dir'] ?? 'asc') !== 'desc'),
+            // An unknown sort uses the report default rather than an
+            // unrecognised @SortColumn silently ignored by the procedure.
+            'SortColumn' => $sort,
+            'SortAsc' => $sortAsc,
             'Page' => max(1, (int) ($input['page'] ?? 1)),
             'PageSize' => (int) config('reports.page_size'),
         ];

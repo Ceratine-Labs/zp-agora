@@ -42,7 +42,7 @@
             $chosen = is_array($current['in'] ?? null) ? array_map('strval', $current['in']) : [];
         @endphp
 
-        <th @class(['num' => $column->isNumeric()])>
+        <th @class(['num' => $column->isNumeric()]) data-column="{{ $column->key }}">
             @if ($spec === null)
                 {{-- Deliberately empty: this column declared no filter, and an
                      empty cell says so more clearly than a disabled box. --}}

@@ -11,7 +11,7 @@
 --}}
 <div class="run-panel-head">
     <p>
-        <strong>Run #{{ $run->Id }}</strong>
+        <strong>Run #{{ $run->Id }} · {{ $siteName }}</strong>
         @if ($run->Note) — {{ $run->Note }} @endif
         · previewed {{ $run->CreatedAt?->diffForHumans() }}
         · {{ \App\Support\Format::n($run->TotalRows) }} {{ Str::plural('proposal', $run->TotalRows) }}

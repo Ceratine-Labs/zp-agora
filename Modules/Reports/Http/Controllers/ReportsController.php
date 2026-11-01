@@ -37,30 +37,35 @@ class ReportsController extends Controller
     /** One report, run. */
     public function show(string $report, Request $request, BranchContext $context): View
     {
+        $view = $report === 'my-queue' ? 'reports::my-queue' : 'reports::show';
+        $input = [
+            'branch_ids' => $this->scopedBranchIds($request, $context),
+            'from' => $request->query('from'),
+            'to' => $request->query('to'),
+            'search' => $request->query('q'),
+            'sort' => $request->query('sort'),
+            'dir' => $request->query('dir'),
+            'page' => $request->query('page'),
+        ];
+
         try {
             $definition = $this->service->definition($report)
                 ?? throw new ReportNotFound($report);
 
-            $result = $this->service->run($report, [
-                'branch_ids' => $this->scopedBranchIds($request, $context),
-                'from' => $request->query('from'),
-                'to' => $request->query('to'),
-                'search' => $request->query('q'),
-                'sort' => $request->query('sort'),
-                'dir' => $request->query('dir'),
-                'page' => $request->query('page'),
-            ]);
+            $result = $this->service->run($report, $input);
         } catch (ReportNotFound $e) {
             throw new NotFoundHttpException($e->getMessage(), $e);
         } catch (AgoraProcException $e) {
             // A procedure that REFUSES — a range it cannot usefully answer, so
             // far the only one — is a message to the user, not a 500. An
             // unexpected fault is still a QueryException and still a 500.
-            return view('reports::show', [
+            return view($view, [
                 'report' => $this->service->definition($report),
                 'rows' => collect(),
                 'total' => 0,
-                'params' => [],
+                'params' => $this->service->parametersFor($report, $input),
+                'summaries' => collect(),
+                'summariesAvailable' => false,
                 'refusal' => $e->getMessage(),
                 'branches' => $this->branches($context),
                 'context' => $context,
@@ -68,11 +73,13 @@ class ReportsController extends Controller
             ]);
         }
 
-        return view('reports::show', [
+        return view($view, [
             'report' => $definition,
             'rows' => $result['rows'],
             'total' => $result['total'],
             'params' => $result['params'],
+            'summaries' => $result['summaries'],
+            'summariesAvailable' => $result['summariesAvailable'],
             'refusal' => null,
             'branches' => $this->branches($context),
             'context' => $context,
@@ -86,9 +93,7 @@ class ReportsController extends Controller
      */
     public function auditChange(string $ledger, int $id, Request $request, BranchContext $context): View
     {
-        $allowed = $context->workspace() === 'branch' ? array_filter([$context->id()]) : $context->allowed();
-
-        $found = $this->service->auditChange($ledger, $id, $allowed)
+        $found = $this->service->auditChange($ledger, $id, $this->allowedBranchIds($context))
             ?? throw new NotFoundHttpException('No such change, or not one you may see.');
 
         return view($request->ajax() ? 'reports::audit.change' : 'reports::audit.page', $found);
@@ -107,29 +112,46 @@ class ReportsController extends Controller
     protected function scopedBranchIds(Request $request, BranchContext $context): array
     {
         if ($context->workspace() === 'branch') {
-            return array_filter([$context->id()]);
+            return $this->allowedBranchIds($context);
         }
 
-        /*
-         * Checked, not merely parsed.
-         *
-         * These ids become a CSV argument to a stored procedure, which never
-         * passes through BranchScope — so nothing else in the request would
-         * stop a hand-edited query string reading a site the caller is not
-         * granted. maySee() reads an empty grant list as "every branch", the
-         * way head-office users are configured.
-         */
-        return collect(ReportsService::branchIds($request->query('branches')))
+        $selection = ReportsService::branchSelection($request->query('branches'));
+        if (! $selection['hasSelection']) {
+            return $context->allowed();
+        }
+
+        $selected = collect($selection['ids'])
             ->filter(fn (int $id) => $context->maySee($id))
             ->values()
             ->all();
+
+        // [] becomes SQL NULL/all sites. An explicitly rejected selection
+        // must stay a nonmatching filter instead of falling back to all.
+        return $selected === [] ? [-1] : $selected;
+    }
+
+    /** @return array<int, int> */
+    protected function allowedBranchIds(BranchContext $context): array
+    {
+        if ($context->workspace() === 'branch') {
+            $id = $context->id();
+
+            return [$id !== null && $id > 0 ? $id : -1];
+        }
+
+        return $context->allowed();
     }
 
     /** @return Collection<int, Branch> */
     protected function branches(BranchContext $context): Collection
     {
-        return Branch::query()
+        $allowed = $this->allowedBranchIds($context);
+
+        // BaseModel also exposes the group branch for shared reference data.
+        // A report picker must offer only the sites the caller may report on.
+        return Branch::query()->acrossBranches()
             ->where('IsActive', true)
+            ->when($allowed !== [], fn ($query) => $query->whereIn('BranchId', $allowed))
             ->orderBy('Name')
             ->get();
     }

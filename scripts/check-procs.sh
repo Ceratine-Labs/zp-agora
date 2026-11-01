@@ -11,14 +11,22 @@ cd "$(dirname "$0")/.."
 fail=0
 say() { printf '  %s\n' "$1"; fail=1; }
 
-procs=$(find Modules -path '*/Database/Procedures/*.sql' 2>/dev/null | sort)
+if [ "$#" -gt 0 ]; then
+    procs=("$@")
+else
+    mapfile -t procs < <(find Modules -path '*/Database/Procedures/*.sql' 2>/dev/null | sort)
+fi
 
-if [ -z "$procs" ]; then
+if [ "${#procs[@]}" -eq 0 ]; then
     echo "check-procs: no procedures yet."
     exit 0
 fi
 
-for file in $procs; do
+for file in "${procs[@]}"; do
+    if [[ ! "$file" =~ ^Modules/[^/]+/Database/Procedures/[^/]+\.sql$ ]] || [ ! -f "$file" ]; then
+        say "$file: expected an existing module procedure file relative to the repository."
+        continue
+    fi
     module=$(echo "$file" | cut -d/ -f2)
 
     # CREATE OR ALTER, so re-running a migration is safe and a diff shows the
@@ -73,7 +81,28 @@ for file in $procs; do
         # on its first match, printf dies of SIGPIPE writing the rest, and the
         # pipeline fails — so a file that DOES read $.column was reported as
         # not reading it, now and then (7 Oct 2026, under `composer check-fast`).
-        if ! grep -qF '$.column' <<< "$code"; then
+        # A verified direct delegation may centralise the exact filter scope.
+        # Only this helper is accepted, and its real parser is checked too.
+        # SQL string literals cannot masquerade as an executable EXEC call.
+        delegated=0
+        helper=Modules/Recon/Database/Procedures/usp_Recon_RunScope.sql
+        if [ -f "$helper" ] && perl -0777 -e '
+            my $code = <>;
+            $code =~ s/\x27(?:\x27\x27|[^\x27])*\x27//gs;
+            while ($code =~ /\bEXEC(?:UTE)?\s+\[?agora\]?\s*\.\s*\[?usp_Recon_RunScope\]?\s+([^;]+);/gi) {
+                exit 0 if $1 =~ /(?:^|,)\s*\@FiltersJson\s*=\s*\@FiltersJson\s*(?:,|$)/i;
+            }
+            exit 1;
+        ' <<< "$code"; then
+            helper_code=$(perl -0pe 's{/\*.*?\*/}{}gs; s{--[^\n]*}{}g' "$helper")
+            if grep -qiE 'CREATE +OR +ALTER +PROCEDURE +\[?agora\]?\.\[?usp_Recon_RunScope\]?([[:space:]]|$)' <<< "$helper_code" \
+                && grep -qiE 'OPENJSON[[:space:]]*\([[:space:]]*@FiltersJson[[:space:]]*\)' <<< "$helper_code" \
+                && perl -0777 -ne 'exit(/\bJSON_VALUE\s*\([^,;]+,\s*\x27\$\.column\x27\s*\)/i ? 0 : 1)' <<< "$helper_code" \
+                && ! grep -qE '\.\[key\] *=' <<< "$helper_code"; then
+                delegated=1
+            fi
+        fi
+        if ! grep -qF '$.column' <<< "$code" && [ "$delegated" -ne 1 ]; then
             say "$file: declares @FiltersJson but never reads \$.column — over a JSON array OPENJSON's [key] is the index, so the filters silently do nothing. See docs/grid.md."
         fi
 
@@ -85,12 +114,9 @@ for file in $procs; do
 
     # A writer that never opens a transaction is a rule with no atomicity.
     #
-    # `INSERT INTO @Something` is not a write — it fills a table variable, which
-    # is how a read-only reporting procedure stages its two sides before it
-    # compares them. Counting those as writes flagged all five recon previews,
-    # which touch nothing, and the fix for that is not to make them declare a
-    # transaction they have no use for.
-    if grep -qiE 'INSERT +INTO +(\[?agora|\[?dbo|[A-Za-z#])|UPDATE +\[?agora|DELETE +FROM' "$file"; then
+    # Inserts into table variables and temporary tables do not modify persistent
+    # data; reporting procedures use both to stage results.
+    if grep -qiE 'INSERT +INTO +(\[?agora|\[?dbo|[A-Za-z])|UPDATE +\[?agora|DELETE +FROM' "$file"; then
         if ! grep -qiE 'XACT_ABORT' "$file"; then
             say "$file: writes but does not SET XACT_ABORT ON."
         fi
@@ -98,7 +124,7 @@ for file in $procs; do
 done
 
 if [ "$fail" -eq 0 ]; then
-    echo "check-procs: $(echo "$procs" | wc -l) procedure(s) OK."
+    echo "check-procs: ${#procs[@]} procedure(s) OK."
 fi
 
 exit "$fail"

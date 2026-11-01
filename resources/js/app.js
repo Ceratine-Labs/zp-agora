@@ -12,7 +12,10 @@ import info from './components/info';
 import runbar from './components/runbar';
 import tip from './components/tip';
 import dataGrid from './components/data-grid';
+import operationsWall from './components/operations-wall';
 import reconGroup from './components/recon-group';
+import stockReconGroup from './components/stock-recon-group';
+import stockReconTutorial from './components/stock-recon-tutorial';
 import reconMatch from './components/recon-match';
 import reconSuggest from './components/recon-suggest';
 import modal from './components/modal';
@@ -22,101 +25,85 @@ import dateSpan from './components/date-span';
 import bulkSelection from './components/bulk-selection';
 import postLink from './components/post-link';
 import duplicateRelease from './components/duplicate-release';
-import loader from './components/loader';
+import loader, { afterPaint } from './components/loader';
 import * as format from './format';
 
-megaMenu();
-themeToggle();
+// Install the shared API before any initializer can start a request or throw.
+// The head's startup guard survives the bundle taking ownership of readiness.
+window.Agora = { ...window.Agora, notify, format, tip: null, loader: loader() };
+const failures = [];
 
-// Every one of these looks for its own elements and does nothing — and fetches
-// nothing — when the page has none. Most pages have none.
-selects();
-charts();
-rowDetail();
-checkAll();
-tabs();
-disclosure();
-info();
-runbar();
-// Does nothing on a page with no group in flight, which is every page but one.
-reconGroup();
-reconMatch();
-modal();
-// Sorting, column filters and the sticky heads. Every table gets the head
-// offset; only <x-table tools> gets the controls.
-tableTools();
-// A select whose options belong to another select's choice — the counting
-// areas at a site. Does nothing on a page with none, which is every page but
-// the stock recon centre.
-linkedSelect();
-// A date worked out from another — the stock recon "to", a week from its
-// "from". Does nothing on a page with no `data-follows`.
-dateSpan();
-// Copies a grid's ticked rows into the batch form that acts on them. Does
-// nothing on a page with no `data-bulk-form`, which is every page but the
-// stock recon master.
-bulkSelection();
+function initialize(name, setup) {
+    try {
+        return Promise.resolve(setup()).catch((error) => {
+            failures.push({ name, error });
+            console.error(`${name} could not initialize.`, error);
+            throw error;
+        });
+    } catch (error) {
+        failures.push({ name, error });
+        console.error(`${name} could not initialize.`, error);
+        return Promise.reject(error);
+    }
+}
 
-// Reachable from an inline handler in a blade view without importing anything
-// there. This is the only global the application defines.
-//
-// `tip` returns null on a page with no <x-tip> mounted, which is most of them;
-// a caller that wants it must check, the same way it would check for any
-// element that may not be there.
-//
-// `format` is here rather than imported per page because
-// `Vite::asset('resources/js/format.js')` needs format.js to be its own build
-// input, and it is not one — so that call threw "Unable to locate file in Vite
-// manifest" against built assets and took the whole page down. The parity
-// table on /dev/components is the only guard on the PHP and JS formatters
-// agreeing, so it was the guard that was broken. Reading the twin off the
-// shipped bundle is also the stronger test: it checks the module the
-// application actually runs, not a second copy of it built for one page.
-// `loader` is the coffee cup (<x-loader>): the one place that decides when a
-// wait is long enough to be shown. See loader.js.
-window.Agora = { notify, format, tip: tip(), loader: loader() };
+// A lazy pane can arrive during startup. Its controls participate in the
+// pane's promise; later hydrations use the same wiring without reopening the
+// page loader. Each component limits itself to this fragment and marks its work.
+window.Agora.hydrate = (root) => Promise.allSettled([
+    initialize('Fragment tutorial', () => stockReconTutorial(root)),
+    initialize('Fragment selects', () => selects(root)),
+    initialize('Fragment charts', () => charts(root)),
+    initialize('Fragment row details', () => rowDetail(root)),
+    initialize('Fragment selection', () => checkAll(root)),
+    initialize('Fragment tabs', () => tabs(root)),
+    initialize('Fragment disclosures', () => disclosure(root)),
+    initialize('Fragment information', () => info(root)),
+    initialize('Fragment actions', () => runbar(root)),
+    initialize('Fragment reconciliation', () => reconMatch(root)),
+    initialize('Fragment table tools', () => tableTools(root)),
+    initialize('Fragment confirmations', () => confirmForm(root)),
+    initialize('Fragment suggestions', () => reconSuggest(root)),
+    initialize('Fragment data grids', () => dataGrid(root)),
+]);
 
-// After the global exists — it asks through window.Agora.notify, so that the
-// dialog is the same one every other confirmation in the application uses.
-confirmForm();
+// Give the already-rendered loader a paint before synchronous table setup can
+// occupy the main thread. No component fetches anything when it has no markup.
+const initial = afterPaint().then(() => Promise.allSettled([
+    initialize('Navigation', megaMenu),
+    initialize('Theme', themeToggle),
+    initialize('Selects', selects),
+    initialize('Charts', charts),
+    initialize('Row details', rowDetail),
+    initialize('Selection', checkAll),
+    initialize('Tabs', tabs),
+    initialize('Disclosures', disclosure),
+    initialize('Information', info),
+    initialize('Actions', runbar),
+    // These mount progress controls; their existing long-running batch jobs
+    // remain visible background operations rather than page setup promises.
+    initialize('Bank reconciliation group', reconGroup),
+    initialize('Stock reconciliation group', stockReconGroup),
+    initialize('Stock tutorial', stockReconTutorial),
+    initialize('Reconciliation matching', reconMatch),
+    initialize('Modals', modal),
+    initialize('Table tools', tableTools),
+    initialize('Linked selects', linkedSelect),
+    initialize('Date ranges', dateSpan),
+    initialize('Bulk actions', bulkSelection),
+    initialize('Help tips', () => { window.Agora.tip = tip(); }),
+    initialize('Confirmations', confirmForm),
+    initialize('Post links', postLink),
+    initialize('Duplicate release', duplicateRelease),
+    initialize('Reconciliation suggestions', reconSuggest),
+    initialize('Data grids', dataGrid),
+    initialize('Operations wall', operationsWall),
+])).then(async (results) => {
+    // Late fragments and charts can introduce fonts after the first layout.
+    const fonts = await Promise.allSettled([initialize('Fonts', () => document.fonts?.ready)]);
+    return { results: [...results, ...fonts], failures };
+});
 
-// Same reason: a row action that POSTs asks in the same dialog as a form does.
-postLink();
-
-// Same reason: releasing a possible duplicate issue asks for its reason in the
-// shared dialog. Delegated, so the chain panel fetched after load needs no
-// hydrate. Nothing on any page but the stock recon centre's.
-duplicateRelease();
-
-// Same reason: "match all strong" on the recon Suggestions tab asks in the
-// same dialog before it posts each one. Nothing on any other page.
-reconSuggest();
-
-// Same reason: the column chooser's reset asks before it forgets a layout, and
-// the drawer's copy button reports through the shared toast.
-dataGrid();
-
-/*
- * Wiring for markup that arrives AFTER load.
- *
- * Everything above ran once, over the page the server sent. A recon centre
- * tab is a fragment fetched when it is opened (tabs.js), and its tables, row
- * details, tick boxes, confirmations and bulk presses need exactly the same
- * wiring — so each component that can appear in one takes a root, marks what
- * it has wired, and is run again over just the new markup. The order is the
- * order above, for the same reasons: the action bar before the table tools,
- * the confirmations after window.Agora exists.
- */
-window.Agora.hydrate = (root) => {
-    selects(root);
-    rowDetail(root);
-    checkAll(root);
-    tabs(root);
-    disclosure(root);
-    info(root);
-    runbar(root);
-    reconMatch(root);
-    tableTools(root);
-    confirmForm(root);
-    reconSuggest(root);
-};
+// All asynchronous imports, chart draws, first live snapshot and initial lazy
+// panes finish before reveal. Failure leaves the server's usable page visible.
+window.Agora.ready = window.Agora.loader.ready(initial);

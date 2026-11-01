@@ -1,3 +1,8 @@
+@if ($globalRefusal)
+    <x-notice tone="warn" title="Global comparison is unavailable">
+        <p>{{ $globalRefusal }}</p>
+    </x-notice>
+@else
 <x-notice tone="warn" title="Raw quantities — ratios are still being prepared">
     <p>ZP is preparing the production ratios and expected issue multiples. These comparisons do not convert
         quantities by Ratio. A raw net is an arithmetic comparison, not a confirmed loss, production yield or staff charge.</p>
@@ -89,7 +94,8 @@
     <x-table dense :count="$global['production']->count()" procedure="agora.usp_StockRecon_PreviewGlobal" empty="No matching production records found. This does not prove that no production occurred.">
         <x-slot:head><tr><th>Date</th><th>Shift</th><th>Item</th><th>POS system</th><th>Base code</th><th>Reference</th><th class="num">Recorded quantity</th></tr></x-slot:head>
         @foreach ($global['production'] as $record)
-            <tr><td>{{ substr($record->TransactionDate, 0, 10) }}</td><td>{{ $record->ShiftNo }}</td><td>{{ $record->StockItemNo }}</td><td>{{ $record->PosSystem }}</td><td>{{ $record->BaseCode }}</td><td>{{ $record->TrackingNumber }}</td><td class="num">{{ \App\Support\Format::n($record->TotalQuantity, 3) }}</td></tr>
+            <tr><td>{{ substr($record->TransactionDate, 0, 10) }}</td><td data-sort="{{ $record->ShiftNo }}">{{ \Modules\StockRecon\Support\ShiftLabel::show($record->ShiftNo) }}</td><td>{{ $record->StockItemNo }}</td><td>{{ $record->PosSystem }}</td><td>{{ $record->BaseCode }}</td><td>{{ $record->TrackingNumber }}</td><td class="num">{{ \App\Support\Format::n($record->TotalQuantity, 3) }}</td></tr>
         @endforeach
     </x-table>
 </x-card>
+@endif

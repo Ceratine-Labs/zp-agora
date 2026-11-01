@@ -116,6 +116,15 @@ BEGIN
           AND (@AllBranches = 1 OR l.BranchId IN (SELECT BranchId FROM @Branch))
           AND (@AllAllowed  = 1 OR l.BranchId IN (SELECT BranchId FROM @Allowed)));
 
+    -- This count is for the selected sites/dates, before physical-grid filters.
+    DECLARE @ExcludedMeterRows bigint = (
+        SELECT COUNT_BIG(*) FROM agora.vw_StockReconLine l
+        WHERE l.TransactionDate >= @DateFrom AND l.TransactionDate < @Until
+          AND (@AllBranches = 1 OR l.BranchId IN (SELECT BranchId FROM @Branch))
+          AND (@AllAllowed = 1 OR l.BranchId IN (SELECT BranchId FROM @Allowed))
+          AND EXISTS (SELECT 1 FROM agora.StockReconMeter meter WHERE meter.BranchId = l.BranchId
+              AND meter.AreaNo = l.AreaNo AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1));
+
     IF @Lines > @MaxLines
     BEGIN
         DECLARE @TooMany nvarchar(400) = CONCAT(N'AGORA:TOO_MANY_LINES:', FORMAT(@Lines, 'N0'),
@@ -194,7 +203,9 @@ BEGIN
         WHEN q.QtyGoodWaste = 0                       THEN v.QtyVarB4Waste
         WHEN v.QtyVarB4Waste + q.QtyGoodWaste < 0     THEN v.QtyVarB4Waste + q.QtyGoodWaste
         ELSE CONVERT(decimal(18,4), 0) END AS QtyVar) x
-    WHERE l.TransactionDate >= @DateFrom AND l.TransactionDate < @Until
+    WHERE NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter WHERE meter.BranchId = l.BranchId
+              AND meter.AreaNo = l.AreaNo AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1)
+      AND l.TransactionDate >= @DateFrom AND l.TransactionDate < @Until
       AND (@AllBranches = 1 OR l.BranchId IN (SELECT BranchId FROM @Branch))
       AND (@AllAllowed  = 1 OR l.BranchId IN (SELECT BranchId FROM @Allowed))
       AND (@Search IS NULL
@@ -329,6 +340,7 @@ BEGIN
        and the positive values added apart. */
     SELECT
         COUNT_BIG(*)                                                         AS Lines,
+        @ExcludedMeterRows                                                   AS ExcludedMeterRows,
         SUM(CASE WHEN Balancing = 'Amended' THEN 1 ELSE 0 END)               AS LinesAmended,
         SUM(QtyVarOriginal)                                                  AS QtyVarOriginal,
         SUM(ValueVarOriginal)                                                AS ValueVarOriginal,

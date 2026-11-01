@@ -21,6 +21,7 @@
         ['System and data faults', 'Not a loss: something in the data is wrong, and nobody is charged for it.', ['E1', 'F1', 'F2', 'F3']],
         ['Whole packs', 'Items are issued in packs; a pack-sized difference usually means a pack.', ['S3', 'S5']],
         ['Counting, and real shorts', 'How the item was counted, and what is left after balancing.', ['N1', 'N2', 'L1']],
+        ['Original/live count drift', 'Saved count differences for review, without a hand-balancing rule breach on the line.', ['C1']],
     ];
 
     // What happens to the item's chain on a run, in a few words.

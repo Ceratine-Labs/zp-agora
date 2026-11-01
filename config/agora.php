@@ -1,5 +1,100 @@
 <?php
 
+// Presentation and loader artwork share one definition. Destinations still
+// come only from the person's active, accessible database navigation.
+$landingModules = [
+    'my-queue' => [
+        'label' => 'My queue',
+        'description' => 'Review outstanding work by site and queue.',
+        'art' => 'my-queue',
+        'route_prefixes' => [],
+        'route_names' => ['app.reports.show'],
+        'route_parameters' => ['report' => 'my-queue'],
+        'preferred_routes' => ['app.reports.show'],
+    ],
+    'operations' => [
+        'label' => 'Operations wall',
+        'description' => 'Follow site activity and operational status.',
+        'art' => 'operations',
+        'route_prefixes' => ['app.operations.'],
+        'preferred_routes' => ['app.operations.wall'],
+    ],
+    'utilities' => [
+        'label' => 'Utilities',
+        'description' => 'Meter readings, usage and prepaid utilities.',
+        'art' => 'utilities',
+        'route_prefixes' => ['app.utilities.'],
+        'preferred_routes' => ['app.utilities.index'],
+    ],
+    'recon' => [
+        'label' => 'Bank reconciliation',
+        'description' => 'Match bank statements and resolve banking differences.',
+        'art' => 'bank',
+        'route_prefixes' => ['app.recon.'],
+        'preferred_routes' => ['app.recon.index', 'app.recon.dashboard', 'app.recon.trace'],
+    ],
+    'stockrecon' => [
+        'label' => 'Stock reconciliation',
+        'description' => 'Balance stock counts and investigate exceptions.',
+        'art' => 'cart',
+        'route_prefixes' => ['app.stockrecon.'],
+        'preferred_routes' => ['app.stockrecon.index', 'app.stockrecon.weekly', 'app.stockrecon.variance'],
+    ],
+    'cash' => [
+        'label' => 'Cashups',
+        'description' => 'Daily banking, tills, cash collections and staff shorts.',
+        'art' => 'cashup',
+        'route_prefixes' => ['app.cash.'],
+        'preferred_routes' => ['app.cash.cashups', 'app.cash.banking', 'app.cash.zread'],
+    ],
+    'reports' => [
+        'label' => 'Reports',
+        'description' => 'Trading reports, performance and audit records.',
+        'art' => 'reports',
+        'route_prefixes' => ['app.reports.'],
+        'preferred_routes' => ['app.reports.index'],
+    ],
+    'products' => [
+        'label' => 'Products',
+        'description' => 'Stock items, critical lines and product settings.',
+        'art' => 'product',
+        'route_prefixes' => ['app.master.'],
+        'preferred_routes' => ['app.master.stock.index', 'app.master.critical.index'],
+    ],
+    'debtors' => [
+        'label' => 'Debtors',
+        'description' => 'Customer accounts, transactions and balances.',
+        'art' => 'debtors',
+        'route_prefixes' => ['app.debtors.'],
+        'preferred_routes' => ['app.debtors.index'],
+    ],
+    'assets' => [
+        'label' => 'Assets',
+        'description' => 'The asset register, movements and repairs.',
+        'art' => 'assets',
+        'route_prefixes' => ['app.assets.'],
+        'preferred_routes' => ['app.assets.register', 'app.assets.movement', 'app.assets.repairs', 'app.assets.masters'],
+    ],
+    'access' => [
+        'label' => 'Users and access',
+        'description' => 'Manage people, roles and module access.',
+        'art' => 'settings',
+        'route_prefixes' => ['app.setup.'],
+        'preferred_routes' => ['app.setup.users.index', 'app.setup.roles.index'],
+    ],
+];
+
+$moduleLoaders = [];
+$routeLoaders = [];
+foreach ($landingModules as $module) {
+    foreach ($module['route_prefixes'] as $prefix) {
+        $moduleLoaders[$prefix.'*'] = $module['art'];
+    }
+    foreach ($module['route_names'] ?? [] as $route) {
+        $routeLoaders[] = ['route' => $route, 'parameters' => $module['route_parameters'] ?? [], 'art' => $module['art']];
+    }
+}
+
 return [
 
     /*
@@ -104,22 +199,12 @@ return [
     'source_databases' => [
         'erp' => env('PUMPIT_DB_DATABASE', 'PumpIT'),
         'pos_landing' => env('MIST_DB_DATABASE', 'MIST_Import'),
+        'pos_reference' => env('MIST_REFERENCE_DB_DATABASE', 'MIST_Main'),
         'reporting' => env('ALTERYX_DB_DATABASE', 'Alteryx'),
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Which loader a screen waits with
-    |--------------------------------------------------------------------------
-    |
-    | <x-loader> is a cup of coffee with the ZRP badge (23 Sep 2026). ZP asked
-    | on 7 Oct 2026 for the stock recon screens to wait with "a package or a
-    | shopping cart" instead: route name pattern => variant. The first match
-    | wins; anything unmatched gets the cup. The app shell reads it.
-    |
-    */
-
-    'loaders' => [
-        'app.stockrecon.*' => 'cart',
-    ],
+    // The same motif identifies a module on the landing page and while loading.
+    'landing_modules' => $landingModules,
+    'loaders' => $moduleLoaders,
+    'route_loaders' => $routeLoaders,
 ];

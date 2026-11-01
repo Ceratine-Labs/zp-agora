@@ -1,0 +1,63 @@
+.module-menu {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.module-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 104px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+
+  &:hover, &:focus-visible {
+    color: var(--ink);
+    border-color: var(--brand);
+    box-shadow: var(--shadow);
+    text-decoration: none;
+  }
+
+  &:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+}
+
+.module-menu-art {
+  flex: 0 0 60px;
+  .loader-art { display: block; width: 60px; height: 60px; }
+  &.feature-art { --feature-art-size: 60px; }
+}
+.module-hub-group { margin: 16px 0; }
+.module-hub-title {
+  font-family: var(--font-text); font-size: 12px; font-weight: 600;
+  letter-spacing: .04em; color: var(--ink-2);
+  padding-bottom: 10px; margin: 0; border-bottom: 1px solid var(--line);
+}
+.module-hub .module-menu { margin: 10px 0 16px; }
+.module-hub .module-menu-item { min-height: 104px; }
+.module-menu-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.module-menu-title { font-family: var(--font-display); font-size: 21px; font-weight: 600; line-height: 1.15; }
+.module-menu-description { color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+.module-menu-arrow { flex: 0 0 18px; width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.module-menu-item:hover .module-menu-arrow { stroke: var(--brand); }
+
+@media (max-width: 1100px) {
+  .module-menu { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .module-menu { grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 16px; }
+  .module-menu-item { min-height: 96px; padding: 12px; gap: 14px; }
+  .module-menu-art { flex-basis: 60px; .loader-art { width: 60px; height: 60px; } }
+  .module-menu-art.feature-art { --feature-art-size: 60px; }
+  .module-hub .module-menu-item { min-height: 96px; }
+  .module-menu-title { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .module-menu-item { transition: none; }
+}

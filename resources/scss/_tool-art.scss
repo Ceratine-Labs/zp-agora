@@ -1,0 +1,21 @@
+/* Specific tool illustrations share the report palette and geometry. */
+.tool-art {
+  display: block;
+  flex: none;
+  width: 3.5rem;
+  height: 3.5rem;
+  overflow: visible;
+  .report-art { width: 100%; height: 100%; }
+  &[data-module-art-animated="true"] .tool-art-scene {
+    animation: tool-art-working 2.8s ease-in-out infinite;
+  }
+}
+
+@keyframes tool-art-working {
+  0%, 100% { opacity: .65; transform: translateY(1px); }
+  45%, 75% { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-art[data-module-art-animated="true"] .tool-art-scene { animation: none; }
+}

@@ -1,19 +1,13 @@
-{{--
-    The centre's one form: which site, which period, which readings.
-
-    It POSTs the preview, as the Auto tab always has — auto balancing IS a
-    recorded run, so it is reproducible and reversible — with `centre=1`, which
-    sends the answer back to the centre with its run instead of to the run
-    page. Shown in full before a scope is chosen and folded into
-    <x-scope-line> after.
-
-    Expects the area frame: $area, $branches, $branchId, $pinned, $from, $to,
-    $options.
---}}
-<form method="POST" action="{{ route('app.recon.preview') }}" data-loader="Balancing {{ $area['label'] }}…">
-    @csrf
-    <input type="hidden" name="area" value="{{ $area['key'] }}">
-    <input type="hidden" name="centre" value="1">
+{{-- Read the selected period first; only the explicit auto action records a preview. --}}
+@php($preview = $preview ?? false)
+<form method="{{ $preview ? 'POST' : 'GET' }}" action="{{ $preview ? route('app.recon.preview') : route('app.recon.area', $area['key']) }}" data-loader="{{ $preview ? 'Preparing auto reconciliation…' : 'Reading both sides…' }}">
+    @if ($preview)
+        @csrf
+        <input type="hidden" name="area" value="{{ $area['key'] }}">
+        <input type="hidden" name="centre" value="1">
+    @else
+        <input type="hidden" name="tab" value="match">
+    @endif
 
     <div class="field-row">
         {{-- The branches component lives on the result set, not in the
@@ -41,11 +35,17 @@
         {{-- What to call it. A clerk previews the same month several times
              while narrowing the dates, and "August ABSA, second attempt" is
              how they find the one they meant an hour later. --}}
+        @if ($preview)
         <x-field name="note" label="Name this run" :value="old('note')"
                  info="Optional. Yours to find it by on the Runs tab." />
+        @else
+            <x-field name="state" label="Show"
+                     :choices="['outstanding' => 'Still outstanding', 'reconciled' => 'Already reconciled', 'all' => 'Everything']"
+                     :value="$state ?? 'outstanding'" />
+        @endif
     </div>
 
-    @if ($options)
+    @if ($preview && $options)
         <details class="params-extra" @if (old('options')) open @endif>
             <summary>Rules and readings ({{ count($options) }})</summary>
             {{-- Why the readings exist is on the "What to reconcile" card's
@@ -66,7 +66,7 @@
     @endif
 
     <div class="form-actions">
-        <button type="submit" class="btn-primary">Reconcile</button>
-        <span class="field-help">A preview — nothing in PumpIT changes until you execute.</span>
+        <button type="submit" class="btn-primary">{{ $preview ? 'Run auto balancing' : 'Show both sides' }}</button>
+        <span class="field-help">{{ $preview ? 'A preview — nothing in PumpIT changes until you execute.' : 'Read-only — no run is created.' }}</span>
     </div>
 </form>

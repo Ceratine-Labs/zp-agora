@@ -1,0 +1,354 @@
+AGORA STOCK RECON: PARTS DEFINITION AND TUTORIAL
+Text edition | 30 October 2026
+
+Stock reconciliation compares what a counting area started with, what it
+received, what the tills sold and what staff counted at the end. Agora then
+proposes count corrections, identifies issue problems and keeps unresolved
+differences visible for investigation.
+
+This guide describes the current local Agora implementation. It is a reading
+and training guide; preparing it did not run a reconciliation or change stock.
+Screen availability and write actions depend on the user's access.
+
+PART 1: THE STOCK FIGURES
+
+Site: The branch whose stock is being checked. Stock from different sites is
+not balanced together.
+
+Counting area: A stock-counting section within a site, such as a shop or bakery.
+An item can appear in more than one area. Its area matters when reading a count,
+an issue or a variance.
+
+Stock item and unit: The product being reconciled and the unit its quantities
+use. A quantity of 12 means 12 of that item's unit; it does not automatically
+mean 12 packs. Compare like units.
+
+Shift: One item's stock record for a date and shift in a counting area. A row
+holds its opening, issues, closing and POS quantity.
+
+Opening: The quantity at the start of the shift. Normally it should equal the
+previous shift's closing for the same item and area.
+
+Issued: Stock recorded as supplied into that counting area during the shift.
+Here, an "issue" is a stock movement into the area, not a problem or a sale.
+An omitted or duplicated issue changes the stock available on paper.
+
+Closing: The physical quantity recorded at the end of the shift. It normally
+becomes the next shift's opening.
+
+POS quantity: The quantity sold according to the point-of-sale records linked
+to the stock item. This is a quantity, not sales revenue.
+
+Stock used according to the counts = Opening + Issued - Closing.
+Variance = POS quantity - (Opening + Issued - Closing).
+
+Short: A negative variance. More stock disappeared according to the counts
+than the POS records explain. It needs investigation; the number alone does
+not establish theft, responsibility or a staff charge.
+
+Over: A positive variance. The counts imply less stock used than the POS sold.
+Possible explanations include a counting error, a missing issue or incorrect
+source records. "Over" is the sign of the reconciliation difference; it does
+not by itself prove that extra stock was physically found.
+
+Zero variance: The quantities agree on this basis. It does not prove that all
+the underlying records are correct, because errors can offset each other.
+
+Variance value: The quantity difference expressed in money using the run's
+saved selling price. It is not a cost valuation or an approved staff charge.
+Keep quantity and value separate, especially across different items.
+
+PART 2: HOW THE RECORDS FIT TOGETHER
+
+Period or window: The dates included in a balancing run. Choose From; Agora
+calculates To as six days later, capped at today. The initial choice is the
+last completed Monday-to-Sunday week. A different From date can start on any day.
+
+Chain: The consecutive shifts for one item in one counting area at one site.
+Moving a closing count also affects the next opening, so the shifts must be
+read together. The proposals screen summarises each item/area chain; opening
+it reveals the individual shifts and any breaks or segments.
+
+Anchor: A count held fixed at the edge of the balancing calculation. Within a
+continuous balancing segment, the first opening and latest active closing
+anchor the result. Opening repairs and breaks are assessed before balancing.
+
+Chain break: An opening differs from the previous closing. Agora reports and
+proposes repairing the opening. With the current default, a break of up to
+3 units can remain within the chain; larger breaks separate the balancing
+segments. The 3-unit setting is not permission to ignore a shortage.
+
+Active shift: A shift with stock activity or count movement relevant to the
+calculation. Dormant shifts have no such movement. A run can contain many
+records but too few active shifts to redistribute a difference meaningfully.
+
+Incomplete day: A day with missing shifts, missing closing counts or unposted
+POS under the completeness checks. The default holds it and later days out of
+the calculation. Check the actual included period before interpreting totals.
+
+Original or "as counted": The original opening, issued, closing and POS
+quantities recorded in PumpIT. Agora calculates from these, with its explicit
+correction rule for a grossly mis-keyed issue. Original is the baseline; it is
+not a guarantee that staff captured it correctly.
+
+Current or amended: The figures PumpIT holds now, including earlier changes.
+They can differ from the originals before Agora creates this run.
+
+Proposed or "after proposed balancing": The result Agora calculates for this
+saved run. It can include count repairs, duplicate removals and missing-issue
+corrections. It remains a proposal until the relevant rows are committed.
+
+Count drift: A difference between an original count and the current count.
+It identifies a change to investigate; it does not automatically mean a loss.
+
+Balancing: Moving a count difference between neighbouring shifts while
+preserving the segment's anchored stock position. Count balancing alone
+cannot remove the segment's net shortage. Changing an issue changes the total
+and is recorded separately as an issue correction.
+
+Residual short: The shortage left after the applicable corrections and
+balancing. Do not expect every chain to finish at zero.
+
+Issue multiple: The expected quantity per issue or pack for an item and area.
+It helps identify whole-pack differences and unusual issue quantities. It is
+reference data, not a number to guess from a product description.
+
+PART 3: THE SCREENS AND CONTROLS
+
+Stock recon centre: The starting point for creating a preview and reopening
+saved runs. Head office: Control > Stock > Stock recon centre. Branch workspace:
+Stock > Counting > Balancing.
+
+Run: The saved result of one preview, with its site, dates, area, options and
+lines. A saved run is a snapshot, not a live view of every later PumpIT change.
+Give it a useful name, for example "Shop - week starting 19 October".
+
+Preview the balancing: Reads the source and saves the calculated run in Agora.
+It does not change PumpIT stock. Creating a preview is therefore a saved action,
+even though no stock amendment is posted.
+
+Proposals: Shows the calculated changes and outcomes. The main figures include
+Shifts to amend, Chains to balance, Chains reported, Unrecorded issue, Shifts
+over, Shifts short, Dormant shifts, Openings repaired and Hand balancing breaches.
+Several figures link to their supporting rows. "Units moved" is the magnitude
+of adjustments, not a saving or a quantity of recovered stock.
+
+Outcome: The description of a row's proposed result, such as Balanced, Short,
+No change, Blocked, Possible duplicate, Duplicate issue removed, Missing issue
+captured or Hand amendment reversed. Even past-tense wording on a preview is
+not proof of posting; check the commit state and result separately.
+
+Chain detail: Opens the shifts behind a chain, with the source quantities,
+proposed quantities, variance, breaks, flags and available crew/count evidence.
+Matching letters and colours identify shifts that balance against each other.
+
+Exceptions: The findings requiring attention. Within it, Exceptions, Review
+and All rows separate substantive findings from routine count-drift review.
+Type filters narrow the list; select a code badge for its explanation and action.
+An exception is not always a block on committing.
+
+Duplicate issues panel: Compares suspected repeated issues with their supporting
+shifts. A clear duplicate and a possible duplicate have different consequences.
+A release records an authorised decision with a reason; it does not delete an
+issue or itself commit a stock change.
+
+Global comparison: Compares chains within this run's site, period and areas.
+It offers As counted and After proposed balancing, related-item candidates and
+production context. Ratios are not applied in the current comparison. A raw
+offset or matching quantity is a lead to investigate, not a confirmed correction.
+For cross-area comparisons, the run must include those areas.
+
+Every-site preview: Builds separate site runs for selected sites using one
+week and every counting area. It is a way to organise previews; review and
+commit each site's run individually. Global comparison is a different tool.
+
+Options: Set correction limits, minimum active shifts, the permitted small
+chain break and incomplete-day handling. A share of 0.50 means a correction
+cap of half the stock on hand. Keep the agreed settings; a blocked result
+needs explanation before anyone loosens a limit.
+
+Amend / commit: Applies the selected eligible changes. In live mode it updates
+PumpIT and saves the prior values in Agora's amendment history. Supported issue
+changes include removing a clear duplicate and capturing a remaining over as
+a missing issue. The original columns remain unchanged. In journal mode only
+Agora's amendment history is written. Check the run's mode.
+
+A commit that writes any rows marks the whole run committed, even when other
+rows were unticked or skipped. Create a fresh preview for further amendments.
+If every selected row is skipped, the run remains uncommitted.
+
+Discard: Removes a preview, not a posted stock amendment. A committed run
+cannot be discarded as if it had never happened.
+
+Reverse: Undoes the changes recorded by that run using their saved prior
+values. It requires a reason and the appropriate access. It refuses to overwrite
+affected values changed since the run wrote them. It is not a blanket reset.
+
+Reset to original: A separate write action that restores the run's covered
+opening, closing, issue and POS values to the original basis, plus the previous
+closing needed to anchor the window. It can remove manual amendments. It
+records priors and is followed by a fresh preview. Use it only when restoring
+that baseline is the intended action, not as a routine refresh button.
+It leaves possible-duplicate holds and shifts protected by another run's
+standing balancing amendment alone, reporting what was skipped and why.
+
+Original vs amended variance: A separate comparison of the original and current
+PumpIT figures over a freely selected period. It is useful after committing.
+It includes that report's treatment of good waste against a short, so its
+amended totals need not be identical to the balancing preview's raw variance.
+
+PART 4: READING THE COMMON CODES
+
+S10a / S10b: Opening below / above the preceding closing. Review the proposed
+opening repair and the break in the chain.
+
+D1: Clear duplicate issue. The proposal removes the duplicated issue, with
+the related count changes. Check the supporting pair of shifts.
+
+D2: Possible duplicate issue. The whole chain is held for review. Check the
+issue evidence. An authorised release needs a reason and a new preview; the
+release only stands while the issue remains the one reviewed. Changing only
+an amended PumpIT issue does not erase the original evidence.
+
+S1, U1, U2, U3, U4: Whole-pack over or signs of missing issues: sales exceed
+available stock, closing exceeds available stock, sales without issues, or a
+net over. Review the cause and any proposed missing-issue correction. These
+findings do not all block balancing.
+
+E1: Too little linked POS to explain the stock movement. Check the POS link
+and posting before treating the difference as an ordinary stock shortage.
+
+F1, F2, F3: A data/correction-limit fault; an issue with no corresponding sales
+or count movement; or a conflict with existing amendments. These can hold back
+the chain; check its actual held-back status and reason. Certain F1/F2 findings
+do not block a nil-total chain. Resolve the stated cause before re-previewing.
+
+S3 / S5: A whole-pack short / an issue outside expected pack multiples.
+Check pack sizes, units and issue records.
+
+N1 / N2 / L1: A pattern suggesting no physical count / mostly dormant stock /
+persistent shorts. Review the underlying shifts and available evidence.
+
+C1: Original/current count drift without a more specific count class. It is
+informational and does not itself change commit eligibility or assign a loss.
+
+Hand-balancing checks: S13 is an unresolved opening/closing mismatch; S12 flags
+repair through the previous closing; S7 an over turned into a short; S8 an
+increased short; S11 a changed latest closing; and S4, S4a, S4b a mis-keyed,
+added or reduced issue. These describe existing amendments, separately from
+what Agora proposes now.
+
+PART 5: WORKED EXAMPLES
+
+Example A - a counting difference moves between two shifts.
+
+Shift A: Opening 100, Issued 20, POS 30, Closing 80.
+Variance = 30 - (100 + 20 - 80) = -10: short by 10.
+
+Shift B: Opening 80, Issued 0, POS 20, Closing 70.
+Variance = 20 - (80 + 0 - 70) = +10: over by 10.
+
+The combined variance is zero. Proposing A's closing as 90 and B's opening
+as 90 makes each shift's variance zero. The first opening stays 100, the
+last closing stays 70, and no issue is added. This illustrates count balancing.
+The eligibility checks still decide whether a real chain can be amended.
+
+Example B - a shortage remains.
+
+If a continuous segment totals -5 on one shift and +3 on another, its total
+is -2. Moving counts between them cannot remove that remaining 2-unit short.
+
+Example C - a missing issue changes the total.
+
+Opening 100, Issued 20, POS 30, Closing 95 gives a variance of +5.
+Increasing the recorded issue from 20 to 25 makes the variance zero. That is
+a 5-unit issue correction, not merely moving a closing count. In the current
+live configuration Agora can propose this as "Missing issue captured"; review
+its evidence and include the affected eligible rows in the commit.
+
+PART 6: TUTORIAL - COMPLETE ONE AREA'S RECONCILIATION
+
+1. Open Stock recon centre and select the site and counting area. Start with
+   one area so the supporting shifts are manageable to review.
+
+2. Choose From and read the calculated To date. Confirm that this is the
+   period intended. Name the run. Leave Options at the agreed values and keep
+   incomplete-day handling enabled for normal work.
+
+3. Select Preview the balancing. Check the site, period, area and any days
+   held back. A preview saves evidence in Agora; it has not amended PumpIT.
+
+4. Read the summary. Identify the chains with proposed changes, the chains
+   reported or held, and any unrecorded issues. Zero rows to amend can mean
+   PumpIT already holds the proposed answer; it is not automatically an error.
+
+5. Review Exceptions and the duplicate panel. Open the code explanation and
+   supporting shifts. Resolve missing source information and blocks. When a
+   possible duplicate is released, record the evidence and reason, then create
+   a new preview. A release alone does not post anything.
+
+6. Return to Proposals and open an item chain. Compare the original and proposed
+   figures. Use Exceptions' Live open and Live close columns to review the
+   current counts saved when this run was previewed. Check the anchored counts,
+   the shifts being balanced,
+   the remaining short and any issue correction. Confirm that the explanation
+   fits the count sheets, issue records and POS evidence.
+
+7. Use Global comparison if related items or areas may explain the pattern.
+   Inspect candidates and production records as supporting evidence. Do not
+   add several candidate matches together as separate recoveries or assume a
+   raw offset proves a production conversion.
+
+8. Select the intended changes. Eligible shifts start ticked. Ticks on other
+   table pages still count; outcome and column filters can exclude rows from
+   submission. Check the selected count and filter notice. The chain-row
+   Amend action submits only that chain, regardless of other chains' ticks.
+
+9. Read the confirmation and commit the reviewed selection if your role is
+   authorised. Related shifts must be written together where required. Agora
+   re-checks the source and can skip a chain if values moved or its required
+   changes are not all included.
+
+10. Read the actual commit result. Distinguish written rows from skipped
+    rows and read every skip reason. A proposed "Balanced" result does not
+    prove that the corresponding changes were successfully written. If any
+    rows were written, use a fresh preview to work on remaining amendments;
+    the original run is now committed, including after a one-chain Amend.
+
+11. Open Original vs amended variance for the same site, area and dates.
+    Compare the saved PumpIT result with the intended changes and investigate
+    remaining differences. Use the run's amendment evidence for the exact
+    writes; the comparison report has its own waste treatment.
+
+12. Retain the run as the record of the work. If the commit was wrong, review
+    Reverse and its reason requirement. If the intended job is to remove
+    existing hand amendments, review Reset to original as a separate action.
+    If data changed or a reversal is refused, investigate before trying again.
+
+A run is ready to hand over when its scope is clear, its proposed changes have
+been reviewed, its actual writes and skips are understood, and remaining
+exceptions have an evidence-based explanation or an identified owner.
+
+PART 7: RELATED WORK THAT IS SEPARATE FROM THIS TUTORIAL
+
+Weekly investigation is a separate evidence-and-case workflow. It builds a
+snapshot for a completed Monday-to-Sunday week, can use a wider control period,
+and keeps investigation findings against that snapshot revision. Building it
+again creates another revision. It is not the same as choosing any From date
+for a balancing run, and its review/approval process is a separate procedure.
+
+Counting-area maintenance, item/pack reference data and water-meter analysis
+also have their own screens and access. Water meters use cumulative readings
+and should not be interpreted as an ordinary shelf-stock count.
+
+Virtual Items areas, such as lotto, airtime and electricity, are excluded from
+physical stock balancing because they do not have the same issue/count basis.
+
+SOURCE AND VERIFICATION NOTE
+
+Prepared from docs/stock-recon.md and the current StockRecon routes, views,
+configuration, request validation and preview/commit/reset/reverse procedures
+in this working checkout. Current executable behaviour takes precedence over
+older explanatory comments about date choices, overs and issue amendments.
+This is source-checked documentation, not a claim that the production screen
+was exercised. No application tests, live stock writes or deployment were run.

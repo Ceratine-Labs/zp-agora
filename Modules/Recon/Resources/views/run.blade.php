@@ -3,8 +3,8 @@
          behind the info button. --}}
     <x-page-head
         eyebrow="Auto reconciliation"
-        :title="$area['label'].' — run #'.$run->Id"
-        :blurb="'Site '.$run->BranchId.' · '.$run->FromDate->format('j M Y').' to '.$run->ToDate->format('j M Y')">
+        :title="$area['label'].' — run #'.$run->Id.' · '.$siteName"
+        :blurb="$siteName.' · '.$run->FromDate->format('j M Y').' to '.$run->ToDate->format('j M Y')">
         <x-slot:info>
             <p>A preview as it was recorded. Its arguments are stored with it, so this answer can be reproduced
                after the customer edits their extraction rules.</p>
