@@ -27,6 +27,19 @@ if [ ! -f "$drill" ]; then
     exit 1
 fi
 
+# The drill now delegates extraction to an inline function. Only follow it if
+# the procedure actually calls it; a stray function must not satisfy the guard.
+drill_code=$(sed 's|--.*$||' "$drill" | perl -0777 -pe 's{/\*.*?\*/}{}gs')
+source_code="$drill_code"
+if printf '%s\n' "$drill_code" | grep -qi 'FROM[[:space:]]\+agora\.fn_Recon_DrillBank[[:space:]]*('; then
+    extraction="Modules/Recon/Database/Functions/fn_Recon_DrillBank.sql"
+    if [ ! -f "$extraction" ]; then
+        echo "check-recon-types: delegated bank extraction is missing: $extraction" >&2
+        exit 1
+    fi
+    source_code=$(sed 's|--.*$||' "$extraction" | perl -0777 -pe 's{/\*.*?\*/}{}gs')
+fi
+
 for preview in Modules/Recon/Database/Procedures/usp_Recon_Preview*.sql; do
     [ -e "$preview" ] || continue
 
@@ -49,7 +62,7 @@ for preview in Modules/Recon/Database/Procedures/usp_Recon_Preview*.sql; do
     # file and passed against a deliberately reintroduced bug, because the
     # docblock explaining the mapping contains the very string it was looking
     # for. A guard that its own documentation satisfies is not a guard.
-    if ! sed 's|--.*$||' "$drill" | perl -0777 -pe 's{/\*.*?\*/}{}gs' | grep -q "'${type}'"; then
+    if ! printf '%s\n' "$source_code" | grep -q "'${type}'"; then
         printf "  %s filters the statement on Type = '%s', but %s cannot produce it.\n" \
             "$(basename "$preview")" "$type" "$(basename "$drill")"
         printf "     The drill would return no bank lines for this area — and the commit re-reads through it.\n"
