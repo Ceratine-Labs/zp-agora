@@ -7,7 +7,7 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Services\MenuService;
 
 /** Register the wall. Existing user permission and menu assignments are unchanged. */
-class OperationsWallSeeder extends Seeder
+class MenuSeeder extends Seeder
 {
     public int $seedOrder = 80;
 

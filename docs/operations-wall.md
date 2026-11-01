@@ -26,7 +26,7 @@ Explicit site IDs are intersected with the current scope. Invalid selections sta
 
 ## Installation and rollback
 
-Deploy the entire Operations module and its JS/SCSS entry wiring, component catalogue, and rebuilt Vite assets. Apply `v1__25_operations_budget_view` then `v1__25p_operations_procs`. The critical-item drilldown fix also requires `v1__05pc_product_critical_exact`, which updates only the read-only `usp_Product_GridCriticalLines` procedure. Seed only `OperationsWallSeeder` (catalogue and menu metadata; no UserPermission/UserMenuItem changes). Refresh module/config/route/view caches and PHP opcache. No customer tables or dependency packages are changed.
+Deploy the entire Operations module and its JS/SCSS entry wiring, component catalogue, and rebuilt Vite assets. Apply `v1__25_operations_budget_view` then `v1__25p_operations_procs`. The critical-item drilldown fix also requires `v1__05pc_product_critical_exact`, which updates only the read-only `usp_Product_GridCriticalLines` procedure. Seed only `MenuSeeder` (catalogue and menu metadata; no UserPermission/UserMenuItem changes). Refresh module/config/route/view caches and PHP opcache. No customer tables or dependency packages are changed.
 
 The budget migration creates only an Agora read view. If the configured reporting database/table is absent, its typed empty view yields unavailable targets; a present incompatible schema refuses installation. Reapply its up method when connecting a previously absent source.
 

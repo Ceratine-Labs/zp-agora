@@ -3,7 +3,7 @@
 namespace Tests\Feature\Operations;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Operations\Database\Seeders\OperationsWallSeeder;
+use Modules\Operations\Database\Seeders\MenuSeeder;
 use Tests\TestCase;
 
 class WallInstallTest extends TestCase
@@ -16,7 +16,7 @@ class WallInstallTest extends TestCase
         $menus = $db->table('agora.UserMenuItem')->count();
         $db->beginTransaction();
         try {
-            app(OperationsWallSeeder::class)->run();
+            app(MenuSeeder::class)->run();
             $this->assertSame($permissions, $db->table('agora.UserPermission')->count());
             $this->assertSame($menus, $db->table('agora.UserMenuItem')->count());
             $this->assertSame(1, $db->table('agora.Permission')->where('Code', 'operations.wall.view')->count());

@@ -77,24 +77,17 @@
     @endif
 
     @unless ($refusal)
-    <section class="card queue-results" aria-labelledby="queue-results-title">
-        <header class="card-h queue-results-heading">
-            <div>
-                <h2 id="queue-results-title">Outstanding by site</h2>
-                <span class="muted">
-                    @if ($rows->isEmpty() && $total > 0)
-                        No rows on page {{ $page }} · {{ \App\Support\Format::n($total) }} site queues in scope
-                    @else
-                        {{ \App\Support\Format::n($rows->count()) }} of {{ \App\Support\Format::n($total) }} site queues · page {{ $page }} of {{ $pages }}
-                    @endif
-                </span>
-            </div>
+    @php($resultsSummary = $rows->isEmpty() && $total > 0
+        ? 'No rows on page '.$page.' · '.\App\Support\Format::n($total).' site queues in scope'
+        : \App\Support\Format::n($rows->count()).' of '.\App\Support\Format::n($total).' site queues · page '.$page.' of '.$pages)
+    <x-card class="queue-results" title="Outstanding by site" :sub="$resultsSummary" flush>
+        <x-slot:actions>
             <nav class="queue-sort-links" aria-label="Order queues">
                 <a data-loader="Loading report…" @class(['is-active' => $sort === 'AgeDays' && ! $asc]) href="{{ $url(['sort' => 'AgeDays', 'dir' => 'desc']) }}">Oldest work</a>
                 <a data-loader="Loading report…" @class(['is-active' => $sort === 'OpenItems' && ! $asc]) href="{{ $url(['sort' => 'OpenItems', 'dir' => 'desc']) }}">Most open</a>
                 <a data-loader="Loading report…" @class(['is-active' => $sort === 'BranchName' && $asc]) href="{{ $url(['sort' => 'BranchName', 'dir' => 'asc']) }}">By site</a>
             </nav>
-        </header>
+        </x-slot:actions>
         @if ($rows->isEmpty())
             <div class="queue-empty">
                 <x-report-art variant="day-close" />
@@ -139,7 +132,7 @@
                 @if ($page < $pages)<a data-loader="Loading report…" class="btn-ghost" href="{{ $url(['page' => $page + 1]) }}">Next</a>@endif
             </nav>
         @endif
-    </section>
+    </x-card>
     @endunless
 </div>
 </x-app-shell>

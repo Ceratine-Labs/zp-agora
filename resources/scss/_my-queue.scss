@@ -58,7 +58,7 @@
   .queue-warning-art { display: block; flex: 0 0 40px; width: 40px; height: 40px; }
 
   .queue-results { margin-bottom: 12px; }
-  .queue-results-heading {
+  .queue-results > .card-h {
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
     padding: 12px 14px; border-bottom: 1px solid var(--line-soft);
     h2, h3 { margin: 0; font: 600 20px/1.2 var(--font-display); color: var(--ink); }
@@ -133,7 +133,7 @@
     }
     .queue-count { font-size: 25px; }
     .queue-warning { align-items: flex-start; }
-    .queue-results-heading { align-items: flex-start; }
+    .queue-results > .card-h { align-items: flex-start; }
 
     .queue-results {
       .table-scroll { overflow: visible; max-height: none; }
