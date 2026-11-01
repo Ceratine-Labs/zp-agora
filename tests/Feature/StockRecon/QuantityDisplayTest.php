@@ -4,6 +4,7 @@ namespace Tests\Feature\StockRecon;
 
 use App\Grid\GridColumn;
 use App\Support\Format;
+use Illuminate\Support\Facades\Blade;
 use Modules\StockRecon\Grids\StockReconVarianceGrid;
 use Modules\StockRecon\Grids\WeeklyCaseGrid;
 use Tests\TestCase;
@@ -23,13 +24,13 @@ class QuantityDisplayTest extends TestCase
 
     public function test_duplicate_correction_uses_compact_quantities_only_when_requested(): void
     {
-        $html = \Illuminate\Support\Facades\Blade::render(
+        $html = Blade::render(
             '<x-reports::before-after before="35.000" after="7.500" :dp="3" :compact-quantity="true" />'
         );
         $this->assertStringContainsString('>35</span>', $html);
         $this->assertStringContainsString('>7.5</span>', $html);
 
-        $default = \Illuminate\Support\Facades\Blade::render(
+        $default = Blade::render(
             '<x-reports::before-after before="35.000" after="7.500" :dp="3" />'
         );
         $this->assertStringContainsString('>35.000</span>', $default);

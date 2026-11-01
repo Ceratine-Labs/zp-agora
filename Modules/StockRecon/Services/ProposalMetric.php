@@ -25,7 +25,7 @@ class ProposalMetric
     ];
 
     /** @param Collection<int, StockReconRunLine> $lines
-     *  @return Collection<int, StockReconRunLine> One representative per chain for chain metrics.
+     * @return Collection<int, StockReconRunLine> One representative per chain for chain metrics.
      */
     public function records(Collection $lines, string $metric): Collection
     {
