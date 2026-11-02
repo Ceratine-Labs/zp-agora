@@ -149,7 +149,7 @@ class VarianceTest extends TestCase
                 ->update(['AreaNo' => 2]);
         }
 
-        foreach (['all' => [4, 0], 'lt' => [1, -4], 'gt' => [1, 4], 'eq' => [2, 0]] as $op => [$count, $value]) {
+        foreach (['all' => [4, 0], 'ne' => [2, 0], 'lt' => [1, -4], 'gt' => [1, 4], 'eq' => [2, 0]] as $op => [$count, $value]) {
             $grid = $this->grid(['f' => ['RemainingVariance' => ['op' => $op, 'q' => '0']]]);
             $this->assertSame($count, $grid->total, $op);
             $this->assertEquals($count, $grid->totals['Lines'], $op);
@@ -199,7 +199,7 @@ class VarianceTest extends TestCase
             '>Original value<', '>Amended variance<', '>Amended value<'], false);
         $page->assertSee('data-chooser-item="QtyOpenOriginal"', false);
         $page->assertDontSee('data-column="QtyOpenOriginal"', false);
-        $page->assertSee('Show all')->assertSee('Shorts only')->assertSee('Overs only')->assertSee('Balanced only');
+        $page->assertSee('Show all')->assertSee('Variances only')->assertSee('Shorts only')->assertSee('Overs only')->assertSee('Balanced only');
         $page->assertSee('name="f[Area][q]"', false);
         $page->assertSee('usp_StockRecon_GridVariance');
         $page->assertSee('tone-value tone-crit', false);

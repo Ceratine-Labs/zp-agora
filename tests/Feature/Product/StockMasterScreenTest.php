@@ -75,6 +75,14 @@ class StockMasterScreenTest extends TestCase
         }
     }
 
+    public function test_listing_shows_site_by_default(): void
+    {
+        $this->actingAs($this->person('admin'))
+            ->get(route('app.master.stock.index'))
+            ->assertOk()
+            ->assertSee('data-column="BranchName"', false);
+    }
+
     public function test_the_four_roles_that_may_write_can(): void
     {
         foreach (['admin', 'finance', 'operations', 'branch-manager'] as $role) {

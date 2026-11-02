@@ -52,6 +52,7 @@ class StockItemGrid extends GridDefinition
     public function columns(): array
     {
         return [
+            new GridColumn(key: 'BranchName', label: 'Site'),
             // The item number is the row's identity, so it is the way in.
             new GridColumn(key: 'StockItemNo', label: 'Item', sort: 'StockItemNo', mono: true, link: true),
             new GridColumn(key: 'StockItemDescription', label: 'Description', sort: 'StockItemDescription', wide: true),
@@ -122,7 +123,6 @@ class StockItemGrid extends GridDefinition
                 visible: false,
                 title: 'Whether this row is the customer\'s own (legacy) or an Agora override.',
             ),
-            new GridColumn(key: 'BranchName', label: 'Site', sort: 'BranchName', visible: false),
         ];
     }
 

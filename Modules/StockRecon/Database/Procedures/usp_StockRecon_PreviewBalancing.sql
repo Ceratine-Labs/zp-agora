@@ -452,6 +452,10 @@ BEGIN
                LAG(c.QtyCloseNow, 1, p.PredCloseNow) OVER (
                    PARTITION BY c.AreaNo, c.StockItemNo
                    ORDER BY c.TransactionDate, c.ShiftNo)                   AS PrevCloseNow,
+               CONVERT(bit, CASE WHEN ROW_NUMBER() OVER (
+                                           PARTITION BY c.AreaNo, c.StockItemNo
+                                           ORDER BY c.TransactionDate, c.ShiftNo) = 1
+                                 THEN 1 ELSE 0 END)                         AS IsFirstInWindow,
                CONVERT(bit, CASE WHEN LEAD(c.ShiftNo) OVER (
                                            PARTITION BY c.AreaNo, c.StockItemNo
                                            ORDER BY c.TransactionDate, c.ShiftNo) IS NULL
@@ -1390,7 +1394,9 @@ BEGIN
        captured.
 
        Never on a chain held back, nor a possible duplicate's (DupHold): those
-       wait as a whole. Never on a dormant shift: it carries no variance. */
+       wait as a whole. Never on a dormant shift: it carries no variance.
+       The first and last lines of each item chain keep their issues as they
+       are: a transaction outside the selected period may explain the over. */
     IF @CaptureMissingIssues = 1
         UPDATE #apply
            SET IssueAdd  = EffVarNew,
@@ -1398,6 +1404,8 @@ BEGIN
         WHERE ChainBlocked = 0
           AND DupHold = 0
           AND IsDormant = 0
+          AND IsFirstInWindow = 0
+          AND IsLastInWindow = 0
           AND EffVarNew > @eps;
 
     /* ------------------------------------------------------------- stage 7c

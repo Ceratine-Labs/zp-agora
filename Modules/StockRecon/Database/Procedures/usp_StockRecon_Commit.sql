@@ -105,6 +105,23 @@ BEGIN
     IF @Status NOT IN ('previewed', 'reversed')
         THROW 51000, 'AGORA:RUN_NOT_READY:Only a previewed run can be committed.', 1;
 
+    /* Old saved previews may propose a boundary issue. Re-preview the whole
+       run so counts are never committed using an issue we no longer capture. */
+    IF EXISTS (
+        SELECT 1 FROM agora.StockReconRunLine rl
+        WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+          AND rl.Selected = 1 AND rl.WouldAmend = 1 AND rl.CommitState IN ('pending', 'skipped')
+          AND rl.QtyIssuedNew > rl.QtyIssued
+          AND (NOT EXISTS (SELECT 1 FROM agora.StockReconRunLine p
+               WHERE p.BranchId = rl.BranchId AND p.RunId = rl.RunId
+                 AND p.AreaNo = rl.AreaNo AND p.StockItemNo = rl.StockItemNo
+                 AND (p.TransactionDate < rl.TransactionDate OR (p.TransactionDate = rl.TransactionDate AND p.ShiftNo < rl.ShiftNo)))
+            OR NOT EXISTS (SELECT 1 FROM agora.StockReconRunLine n
+               WHERE n.BranchId = rl.BranchId AND n.RunId = rl.RunId
+                 AND n.AreaNo = rl.AreaNo AND n.StockItemNo = rl.StockItemNo
+                 AND (n.TransactionDate > rl.TransactionDate OR (n.TransactionDate = rl.TransactionDate AND n.ShiftNo > rl.ShiftNo))))
+    ) THROW 51000, 'AGORA:BOUNDARY_ISSUE:This saved run proposes an issue on the first or last line. Preview again.', 1;
+
     /* A saved preview predating the explicit measurement mapping may still
        contain meter proposals. Refuse BEFORE any run/source mutation. A new
        preview excludes those keys; reversal of historic amendments is separate. */

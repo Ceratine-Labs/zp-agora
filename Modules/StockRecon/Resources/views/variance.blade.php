@@ -89,7 +89,7 @@
                 <label for="variance-status">Amended variance</label>
                 <input type="hidden" name="f[RemainingVariance][q]" value="0">
                 <select id="variance-status" name="f[RemainingVariance][op]">
-                    @foreach (['all' => 'Show all', 'lt' => 'Shorts only', 'gt' => 'Overs only', 'eq' => 'Balanced only'] as $key => $label)
+                    @foreach (['all' => 'Show all', 'ne' => 'Variances only', 'lt' => 'Shorts only', 'gt' => 'Overs only', 'eq' => 'Balanced only'] as $key => $label)
                         <option value="{{ $key }}" @selected($variance === $key)>{{ $label }}</option>
                     @endforeach
                 </select>

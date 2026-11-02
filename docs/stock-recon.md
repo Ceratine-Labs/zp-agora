@@ -882,7 +882,7 @@ stay on one line, with teal Original and orange Amended headings in both themes.
 
 The **Area** selector reads `agora.usp_StockRecon_VarianceAreas` for the selected
 and granted sites, including historical areas, and matches the description
-exactly. **Amended variance** offers All, Shorts (`QtyVar < 0`), Overs
+exactly. **Amended variance** offers All, Variances only (`QtyVar <> 0`), Shorts (`QtyVar < 0`), Overs
 (`QtyVar > 0`, including within allowance) and Balanced (`QtyVar = 0`).
 Both use the existing grid procedure filters, so totals, pages and extracts
 share the same selection. Header filters remain independent and intersect

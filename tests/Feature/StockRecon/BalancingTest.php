@@ -1264,6 +1264,41 @@ class BalancingTest extends TestCase
      * the audit trail names it, a re-preview has nothing more to write, and
      * the reversal puts the 0 back.
      */
+    public function test_boundary_overs_do_not_add_issues_but_an_interior_over_does(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [5, 2, 8, 0], 3 => [8, 0, 8, 0]],
+            '2026-07-18' => [1 => [8, 0, 9, 0], 3 => [9, 0, 9, 0]],
+            '2026-07-19' => [1 => [9, 0, 9, 0], 3 => [9, 3, 13, 0]],
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $first = $this->lineAt($run, '2026-07-17', 1);
+        $middle = $this->lineAt($run, '2026-07-18', 1);
+        $last = $this->lineAt($run, '2026-07-19', 3);
+        $this->assertNull($first->QtyIssuedNew);
+        $this->assertNull($last->QtyIssuedNew);
+        $this->assertEqualsWithDelta(1, (float) $middle->QtyIssuedNew, 0.005);
+        // A saved preview from before this rule must be rejected as a whole.
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $first->Id)->update([
+            'QtyIssuedNew' => 3, 'WouldAmend' => 1, 'Selected' => 1,
+        ]);
+        try {
+            $this->service->commit($run);
+            $this->fail('A stale boundary issue must require a fresh preview.');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString('Preview again', $e->getMessage());
+        }
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $first->Id)->update([
+            'QtyIssuedNew' => null, 'WouldAmend' => 0, 'Selected' => 0,
+        ]);
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(2, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 1)->QtyIssued, 0.005);
+        $this->assertEqualsWithDelta(3, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 3)->QtyIssued, 0.005);
+        $this->assertEqualsWithDelta(1, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.005);
+    }
+
     public function test_an_over_balances_by_capturing_the_missing_issue_written_and_reversed(): void
     {
         config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
