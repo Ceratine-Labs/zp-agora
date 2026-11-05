@@ -1310,6 +1310,7 @@ class BalancingTest extends TestCase
      */
     public function test_a_chain_amend_writes_that_chains_shifts_and_no_other(): void
     {
+        $this->seedWritableOpeningBreak();
         $user = User::query()->acrossBranches()->where('EmailAddress', 'ryan@revvtech.co.za')->first();
 
         if (! $user) {
@@ -2565,6 +2566,7 @@ class BalancingTest extends TestCase
      */
     public function test_a_journal_commit_records_the_amendment_and_touches_nothing_in_pumpit(): void
     {
+        $this->seedWritableOpeningBreak();
         config(['stockrecon.stamp_mode' => 'journal']);
 
         $run = $this->preview();
@@ -2651,13 +2653,14 @@ class BalancingTest extends TestCase
      */
     public function test_a_live_commit_writes_both_counts_and_a_reversal_puts_them_back(): void
     {
+        $this->seedWritableOpeningBreak();
         config(['stockrecon.stamp_mode' => 'live']);
 
         $run = $this->preview();
         $before = $this->countsInSource();
 
         $moving = $run->lines->where('WouldAmend', true);
-        $this->assertGreaterThan(0, $moving->count(), 'The fixture must propose something for this to mean anything.');
+        $this->assertGreaterThan(0, $moving->count(), 'The fixture must propose something for this to mean anything: '.$run->lines->pluck('Outcome')->unique()->implode('; '));
 
         $result = $this->service->commit($run);
 
@@ -3758,6 +3761,27 @@ class BalancingTest extends TestCase
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /** A preceding short and a following opening break produce a writable chain. */
+    private function seedWritableOpeningBreak(): void
+    {
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')->where('SSBranchId', self::BRANCH)
+            ->where('AreaNo', self::AREA)->where('StockItemNo', self::ITEM)->delete();
+        $chain = [
+            '2026-07-17' => [1 => [187, 0, 131, 58], 3 => [131, 0, 113, 16]],
+            '2026-07-18' => [1 => [113, 0, 0, 40], 3 => [0, 0, 61, 11]],
+            '2026-07-19' => [1 => [61, 300, 321, 40], 3 => [321, 0, 306, 15]],
+            '2026-07-20' => [1 => [306, 0, 288, 18], 3 => [288, 0, 203, 24]],
+            '2026-07-21' => [1 => [258, 0, 236, 27], 3 => [236, 0, 211, 25]],
+        ];
+        foreach ($chain as $date => $shifts) {
+            foreach ($shifts as $shift => [$open, $issued, $close, $pos]) {
+                $this->db()->table('PumpIT.dbo.STK_StockReconLine')->insert(
+                    $this->line(self::ITEM, $date, $shift, $open, $issued, $close, $pos)
+                );
+            }
+        }
+    }
 
     /**
      * The Dunhill 10s night of 23 Aug, moved onto the fixture's dates: day

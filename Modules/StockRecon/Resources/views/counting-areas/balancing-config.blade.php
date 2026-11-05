@@ -15,7 +15,7 @@
                     <input type="hidden" name="revision" value="{{ $profile->Revision }}">
                     <x-field name="name" label="Profile name" :value="$profile->Name" />
                     <x-field name="MaxAmendment" label="Largest correction in units" type="number" min="1" max="999999" step="0.0001" :value="$profile->MaxAmendment" />
-                    <x-field name="MaxAmendmentPct" label="Largest correction as share of stock" type="number" min="0.01" max="1" step="0.01" :value="$profile->MaxAmendmentPct" />
+                    <x-field name="MaxAmendmentPct" label="Largest correction as share of stock" type="number" min="0.01" max="1" step="0.0001" :value="$profile->MaxAmendmentPct" />
                     <x-field name="MinShiftsInChain" label="Minimum active shifts" type="number" min="2" max="30" step="1" :value="$profile->MinShiftsInChain" />
                     <x-field name="KeepBreaksUpTo" label="Keep breaks up to units" type="number" min="0" max="99" step="0.0001" :value="$profile->KeepBreaksUpTo" />
                     @if ($profile->IsDefault)
@@ -36,7 +36,7 @@
                 @csrf
                 <x-field name="name" label="Profile name" />
                 <x-field name="MaxAmendment" label="Largest correction in units" type="number" min="1" max="999999" step="0.0001" value="9999" />
-                <x-field name="MaxAmendmentPct" label="Largest correction as share of stock" type="number" min="0.01" max="1" step="0.01" value="1" />
+                <x-field name="MaxAmendmentPct" label="Largest correction as share of stock" type="number" min="0.01" max="1" step="0.0001" value="1" />
                 <x-field name="MinShiftsInChain" label="Minimum active shifts" type="number" min="2" max="30" step="1" value="2" />
                 <x-field name="KeepBreaksUpTo" label="Keep breaks up to units" type="number" min="0" max="99" step="0.0001" value="3" />
                 <button class="btn primary" type="submit">Create profile</button>
