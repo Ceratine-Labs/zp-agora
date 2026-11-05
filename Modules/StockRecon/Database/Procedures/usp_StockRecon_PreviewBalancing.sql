@@ -147,7 +147,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_PreviewBalancing]
        and the chain balances as usual. Defaults ON, so a call that forgets it
        errs towards writing nothing. */
     @BlockPossibleDuplicates BIT          = 1,
-    @UserId               INT             = NULL
+    @UserId               INT             = NULL,
+    @ProfileBranchId      INT             = 2
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -164,10 +165,7 @@ BEGIN
        Half the three decimals the ledger stores. */
     DECLARE @tol DECIMAL(18,4) = 0.0005;
 
-    /* The size a break has to EXCEED to split the chain. Below it the break is
-       kept: repaired, reported, and balanced through. At 0 every break splits,
-       which is how it worked from 30 Sep to 4 Oct 2026. */
-    DECLARE @split DECIMAL(18,4) = ISNULL(CASE WHEN @KeepBreaksUpTo > 0 THEN @KeepBreaksUpTo ELSE 0 END, 0) + @tol;
+    /* Each item's effective break threshold is resolved with its profile. */
 
     IF @RunId IS NULL OR NOT EXISTS (SELECT 1 FROM agora.StockReconRun WHERE BranchId = @BranchId AND Id = @RunId)
         THROW 51000, 'AGORA:NO_RUN:That run does not exist for this branch.', 1;
@@ -305,6 +303,11 @@ BEGIN
     SELECT
         l.AreaNo,
         l.StockItemNo,
+        mapped.Id AS BalancingProfileId, mapped.Name AS BalancingProfileName, mapped.Revision AS BalancingProfileRevision,
+        CONVERT(decimal(18,4), CASE WHEN mapped.IsDefault = 1 THEN @MaxAmendment ELSE mapped.MaxAmendment END) AS CfgMaxAmendment,
+        CONVERT(decimal(9,4), CASE WHEN mapped.IsDefault = 1 THEN @MaxAmendmentPct ELSE mapped.MaxAmendmentPct END) AS CfgMaxAmendmentPct,
+        CONVERT(int, CASE WHEN mapped.IsDefault = 1 THEN @MinShiftsInChain ELSE mapped.MinShiftsInChain END) AS CfgMinShifts,
+        CONVERT(decimal(18,4), CASE WHEN mapped.IsDefault = 1 THEN @KeepBreaksUpTo ELSE mapped.KeepBreaksUpTo END) AS CfgKeepBreaksUpTo,
         CONVERT(date, l.TransactionDate)                                  AS TransactionDate,
         l.ShiftNo,
         CONVERT(decimal(18,2), ISNULL(l.SellPrice, 0))                    AS SellPrice,
@@ -347,6 +350,14 @@ BEGIN
     FROM agora.vw_StockReconLine l
     JOIN agora.vw_StockArea a
       ON a.BranchId = l.BranchId AND a.AreaNo = l.AreaNo
+    OUTER APPLY (SELECT TOP 1 profile.Id, profile.Name, profile.Revision, profile.IsDefault, profile.MaxAmendment, profile.MaxAmendmentPct,
+            profile.MinShiftsInChain, profile.KeepBreaksUpTo
+        FROM agora.StockReconBalancingProfile profile
+        WHERE profile.BranchId = @ProfileBranchId AND profile.IsActive = 1 AND profile.Id = COALESCE(
+            (SELECT map.ProfileId FROM agora.StockReconItemProfile map
+             WHERE map.BranchId = l.BranchId AND map.AreaNo = l.AreaNo AND map.StockItemNo = l.StockItemNo),
+            (SELECT generic.Id FROM agora.StockReconBalancingProfile generic
+             WHERE generic.BranchId = @ProfileBranchId AND generic.IsDefault = 1 AND generic.IsActive = 1))) mapped
     LEFT JOIN agora.vw_StockWasteLine w ON w.BranchId = l.BranchId AND w.TransactionDate = l.TransactionDate
       AND w.ShiftNo = l.ShiftNo AND w.AreaNo = l.AreaNo AND w.StockItemNo = l.StockItemNo
     OUTER APPLY (SELECT TOP 1 z.Id, z.IsAuthorized, z.CapturedGood, z.CapturedAt, z.AuthorizedGood
@@ -363,13 +374,46 @@ BEGIN
               WHERE meter.BranchId = l.BranchId AND meter.AreaNo = l.AreaNo
                 AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1);
 
+    /* If an entire completed area has no lines in the selected window, there
+       is no item row on which to show a hold. Refuse the preview instead. */
+    DECLARE @EmptyCompletedArea INT = (
+        SELECT TOP 1 done.AreaNo
+        FROM agora.StockReconAreaShiftCompletion done
+        JOIN agora.vw_StockArea area ON area.BranchId = done.BranchId AND area.AreaNo = done.AreaNo
+        WHERE done.BranchId = @BranchId AND done.WithdrawnAt IS NULL
+          AND done.TransactionDate BETWEEN @FromDate AND @ToDate
+          AND (@AreaNo IS NULL OR done.AreaNo = @AreaNo)
+          AND NOT EXISTS (SELECT 1 FROM @Excluded e WHERE e.AreaGroup = area.AreaGroup)
+          AND NOT EXISTS (SELECT 1 FROM #chain c WHERE c.AreaNo = done.AreaNo)
+          AND EXISTS (SELECT 1 FROM agora.vw_StockReconLine prior
+              WHERE prior.BranchId = @BranchId AND prior.AreaNo = done.AreaNo AND prior.TransactionDate < @FromDate
+                AND NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter WHERE meter.BranchId = prior.BranchId
+                    AND meter.AreaNo = prior.AreaNo AND meter.StockItemNo = prior.StockItemNo AND meter.IsActive = 1)
+                AND NOT EXISTS (SELECT 1 FROM agora.vw_StockReconLine newer WHERE newer.BranchId = prior.BranchId
+                    AND newer.AreaNo = prior.AreaNo AND newer.StockItemNo = prior.StockItemNo AND newer.TransactionDate < @FromDate
+                    AND (newer.TransactionDate > prior.TransactionDate OR (newer.TransactionDate = prior.TransactionDate AND newer.ShiftNo > prior.ShiftNo)))
+                AND NOT EXISTS (SELECT 1 FROM agora.StockReconItemRemoval removal WHERE removal.BranchId = prior.BranchId
+                    AND removal.AreaNo = prior.AreaNo AND removal.StockItemNo = prior.StockItemNo AND removal.WithdrawnAt IS NULL
+                    AND removal.LastDate = CONVERT(date, prior.TransactionDate) AND removal.LastShift = prior.ShiftNo))
+        ORDER BY done.AreaNo
+    );
+    IF @EmptyCompletedArea IS NOT NULL
+    BEGIN
+        DECLARE @EmptyAreaMessage NVARCHAR(200) = N'AGORA:MISSING_SHIFT:Completed area '
+            + CONVERT(nvarchar(12), @EmptyCompletedArea) + N' has no counts in this period. Correct the counts or record item removals.';
+        THROW 51000, @EmptyAreaMessage, 1;
+    END;
+
+    IF EXISTS (SELECT 1 FROM #chain WHERE BalancingProfileId IS NULL)
+        THROW 51000, 'AGORA:PROFILE_INVALID:An item profile or generic profile is missing or inactive. Correct the configuration.', 1;
+
     DECLARE @HeldBackRows INT = (SELECT COUNT(*) FROM #chain WHERE TransactionDate > @CompleteTo);
 
     /* The shift BEFORE the window, per item — the previous closing the first
        opening has to equal. Its LIVE closing, because that row is outside the
        window and will not be written: the repaired opening must meet the
-       chain as it stands in PumpIT. Five weeks back at most; the pack exports
-       three, and a closing older than that is not "the previous shift". */
+       chain as it stands in PumpIT. A recorded removal ends the chain; without
+       one, an older observation cannot safely be treated as a new item. */
     IF OBJECT_ID('tempdb..#pred') IS NOT NULL DROP TABLE #pred;
 
     ;WITH items AS (SELECT DISTINCT AreaNo, StockItemNo FROM #chain),
@@ -389,7 +433,6 @@ BEGIN
         FROM agora.vw_StockReconLine l
         JOIN items i ON i.AreaNo = l.AreaNo AND i.StockItemNo = l.StockItemNo
         WHERE l.BranchId = @BranchId
-          AND l.TransactionDate >= DATEADD(day, -35, @FromDate)
           AND l.TransactionDate <  @FromDate
           AND NOT EXISTS (SELECT 1 FROM agora.StockReconItemRemoval removal WHERE removal.BranchId = l.BranchId
               AND removal.AreaNo = l.AreaNo AND removal.StockItemNo = l.StockItemNo AND removal.WithdrawnAt IS NULL
@@ -414,7 +457,8 @@ BEGIN
     )
     SELECT c.AreaNo, c.StockItemNo, c.TransactionDate, c.ShiftNo,
            DATEADD(day, (expected.NextOffset - 1) / 3, c.PriorDate) AS MissingDate,
-           (expected.NextOffset - 1) % 3 + 1 AS MissingShift, c.StockItemNo AS MissingItemNo
+           (expected.NextOffset - 1) % 3 + 1 AS MissingShift, c.StockItemNo AS MissingItemNo,
+           CONVERT(bit, 0) AS RemovalBoundary
     INTO #missingShift
     FROM ordered c
     JOIN agora.vw_StockArea a ON a.BranchId = @BranchId AND a.AreaNo = c.AreaNo
@@ -427,6 +471,18 @@ BEGIN
     WHERE c.PriorDate IS NOT NULL
       AND expected.NextOffset < DATEDIFF(day, c.PriorDate, c.TransactionDate) * 3 + c.ShiftNo;
 
+    /* Until independent segments are supported, never join counts across an
+       explicit removal, even when the item returns on the very next shift. */
+    INSERT INTO #missingShift (AreaNo, StockItemNo, TransactionDate, ShiftNo, MissingDate, MissingShift, MissingItemNo, RemovalBoundary)
+    SELECT c.AreaNo, c.StockItemNo, c.TransactionDate, c.ShiftNo,
+           removal.LastDate, removal.LastShift, c.StockItemNo, 1
+    FROM #chain c
+    JOIN agora.StockReconItemRemoval removal ON removal.BranchId = @BranchId
+      AND removal.AreaNo = c.AreaNo AND removal.StockItemNo = c.StockItemNo AND removal.WithdrawnAt IS NULL
+      AND removal.LastDate = c.TransactionDate AND removal.LastShift = c.ShiftNo
+    WHERE EXISTS (SELECT 1 FROM #chain later WHERE later.AreaNo = c.AreaNo AND later.StockItemNo = c.StockItemNo
+      AND (later.TransactionDate > c.TransactionDate OR (later.TransactionDate = c.TransactionDate AND later.ShiftNo > c.ShiftNo)));
+
     /* A later count in the same area establishes that the area continued.
        A recorded removal after the item's last count ends its obligation. */
     ;WITH lastItem AS (
@@ -434,10 +490,10 @@ BEGIN
             ORDER BY c.TransactionDate DESC, c.ShiftNo DESC) AS rn
         FROM #chain c
     )
-    INSERT INTO #missingShift (AreaNo, StockItemNo, TransactionDate, ShiftNo, MissingDate, MissingShift, MissingItemNo)
+    INSERT INTO #missingShift (AreaNo, StockItemNo, TransactionDate, ShiftNo, MissingDate, MissingShift, MissingItemNo, RemovalBoundary)
     SELECT c.AreaNo, c.StockItemNo, c.TransactionDate, c.ShiftNo,
            DATEADD(day, (expected.NextOffset - 1) / 3, c.TransactionDate),
-           (expected.NextOffset - 1) % 3 + 1, c.StockItemNo
+           (expected.NextOffset - 1) % 3 + 1, c.StockItemNo, 0
     FROM lastItem c
     JOIN agora.vw_StockArea a ON a.BranchId = @BranchId AND a.AreaNo = c.AreaNo
     CROSS APPLY (
@@ -463,7 +519,7 @@ BEGIN
         SELECT l.AreaNo, l.StockItemNo, CONVERT(date, l.TransactionDate) AS LastDate, l.ShiftNo AS LastShift,
                ROW_NUMBER() OVER (PARTITION BY l.AreaNo, l.StockItemNo ORDER BY l.TransactionDate DESC, l.ShiftNo DESC) AS rn
         FROM agora.vw_StockReconLine l JOIN areas x ON x.AreaNo = l.AreaNo
-        WHERE l.BranchId = @BranchId AND l.TransactionDate >= DATEADD(day, -35, @FromDate) AND l.TransactionDate < @FromDate
+        WHERE l.BranchId = @BranchId AND l.TransactionDate < @FromDate
           AND NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter WHERE meter.BranchId = l.BranchId
               AND meter.AreaNo = l.AreaNo AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1)
     ), missing AS (
@@ -484,8 +540,8 @@ BEGIN
               AND removal.AreaNo = p.AreaNo AND removal.StockItemNo = p.StockItemNo AND removal.WithdrawnAt IS NULL
               AND removal.LastDate = p.LastDate AND removal.LastShift = p.LastShift)
     )
-    INSERT INTO #missingShift (AreaNo, StockItemNo, TransactionDate, ShiftNo, MissingDate, MissingShift, MissingItemNo)
-    SELECT c.AreaNo, c.StockItemNo, c.TransactionDate, c.ShiftNo, m.MissingDate, m.MissingShift, m.StockItemNo
+    INSERT INTO #missingShift (AreaNo, StockItemNo, TransactionDate, ShiftNo, MissingDate, MissingShift, MissingItemNo, RemovalBoundary)
+    SELECT c.AreaNo, c.StockItemNo, c.TransactionDate, c.ShiftNo, m.MissingDate, m.MissingShift, m.StockItemNo, 0
     FROM missing m JOIN #chain c ON c.AreaNo = m.AreaNo WHERE m.areaRank = 1;
 
     /* Keep incomplete chains as blocked evidence even beyond the optional
@@ -589,7 +645,7 @@ BEGIN
            CONVERT(bit, CASE WHEN ABS(rep.ChainBreak) > @tol THEN 1 ELSE 0 END) AS LinkBroken,
            /* Broken, but small enough to keep the chain going. */
            CONVERT(bit, CASE WHEN ABS(rep.ChainBreak) > @tol
-                              AND ABS(rep.ChainBreak) <= @split THEN 1 ELSE 0 END)  AS BreakKept,
+                              AND ABS(rep.ChainBreak) <= rep.CfgKeepBreaksUpTo + @tol THEN 1 ELSE 0 END)  AS BreakKept,
            /* As the staff counted it, before any repair — what the screen
               calls "counted". */
            CONVERT(decimal(18,4), rep.QtyPOS - (rep.QtyOpen + rep.QtyIssued - rep.QtyClose)) AS QtyVar,
@@ -1201,14 +1257,14 @@ BEGIN
                                   AND ABS(ch.QtyPOS) < @eps
                                  THEN 1 ELSE 0 END)                        AS FlagIssueWentNowhere,
                /* F1 — the plausibility caps, both halves. */
-               CONVERT(bit, CASE WHEN ABS(ch.AmendClose) > @MaxAmendment THEN 1 ELSE 0 END)
+               CONVERT(bit, CASE WHEN ABS(ch.AmendClose) > ch.CfgMaxAmendment THEN 1 ELSE 0 END)
                                                                            AS FlagBigAmendment,
                CONVERT(bit, CASE WHEN ch.OpenRep + ch.QtyIssued > 0
-                                  AND ABS(ch.AmendClose) > @MaxAmendmentPct * (ch.OpenRep + ch.QtyIssued)
+                                  AND ABS(ch.AmendClose) > ch.CfgMaxAmendmentPct * (ch.OpenRep + ch.QtyIssued)
                                  THEN 1 ELSE 0 END)                        AS FlagPctAmendment,
                CONVERT(bit, CASE WHEN ch.QtyClose + ch.AmendClose < -@eps THEN 1 ELSE 0 END)
                                                                            AS FlagNegativeClose,
-               CONVERT(bit, CASE WHEN ch.ActiveLen < @MinShiftsInChain THEN 1 ELSE 0 END)
+               CONVERT(bit, CASE WHEN ch.ActiveLen < ch.CfgMinShifts THEN 1 ELSE 0 END)
                                                                            AS FlagShortChain,
                /* Rule 3 of ours, checked rather than assumed. */
                CONVERT(bit, CASE WHEN ch.IsDormant = 1
@@ -1364,8 +1420,8 @@ BEGIN
            CASE
                /* A break no bigger than @KeepBreaksUpTo is not one the chain
                   stops at, so neither of these reads it. */
-               WHEN ABS(a.BreakOrig) > @split AND ABS(a.QtyOpenNow - a.PrevCloseNow) > @tol   THEN 'S13'
-               WHEN ABS(a.BreakOrig) > @split AND ABS(a.PrevCloseNow - a.PrevCloseOrig) > @tol THEN 'S12'
+               WHEN ABS(a.BreakOrig) > a.CfgKeepBreaksUpTo + @tol AND ABS(a.QtyOpenNow - a.PrevCloseNow) > @tol   THEN 'S13'
+               WHEN ABS(a.BreakOrig) > a.CfgKeepBreaksUpTo + @tol AND ABS(a.PrevCloseNow - a.PrevCloseOrig) > @tol THEN 'S12'
                WHEN a.StaffVar > 0.5 AND a.HandVar < -0.5                                    THEN 'S7'
                WHEN a.StaffVar < 0   AND a.HandVar < a.StaffVar - 0.5                        THEN 'S8'
                WHEN a.IsLastInWindow = 1 AND @AtDataEnd = 1
@@ -1474,7 +1530,7 @@ BEGIN
                   flag, the chain is held for Reset to original. */
                CONVERT(decimal(18,4), a.QtyPOSNow
                    - (a.EffOpenNew + CASE WHEN a.IssueCut > 0 THEN 0 WHEN ABS(a.PreIssue) > @eps THEN a.QtyIssued ELSE a.QtyIssuedKeyed END - a.EffCloseNew)) AS VarP,
-               a.StaffVar, a.HandVar, a.BreakOrig, a.BreakKept, a.PrevCloseOrig, a.PrevCloseNow,
+               a.StaffVar, a.HandVar, a.BreakOrig, a.BreakKept, a.CfgKeepBreaksUpTo, a.PrevCloseOrig, a.PrevCloseNow,
                a.QtyOpenNow, a.QtyCloseNow, a.QtyCloseOrig, a.IsLastInWindow
         FROM #apply a
         WHERE a.ChainBlocked = 0 OR a.RestoresHand = 1
@@ -1483,15 +1539,15 @@ BEGIN
        S7 it does not have is still handing the client a new flag. */
     judged AS (
         SELECT p.*,
-               /* @split, not @tol, for the reason the audit above uses it: a
+               /* Use the item's configured threshold for the same reason as the audit: a
                   closing that moves at a KEPT break is the chain balancing
                   through it, which is the whole point of keeping it. */
                /* And a break kept because its chain is nil (7 Oct 2026) is
                   kept here too, whatever its size. */
-               CASE WHEN ABS(p.BreakOrig) > @split AND p.BreakKept = 0 AND ABS(p.EffOpenNew - p.PrevCloseP) > @tol THEN 1 ELSE 0 END AS S13After,
-               CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.QtyOpenNow - p.PrevCloseNow)   > @tol THEN 1 ELSE 0 END AS S13Now,
-               CASE WHEN ABS(p.BreakOrig) > @split AND p.BreakKept = 0 AND ABS(p.PrevCloseP - p.PrevCloseOrig) > @tol THEN 1 ELSE 0 END AS S12After,
-               CASE WHEN ABS(p.BreakOrig) > @split AND ABS(p.PrevCloseNow - p.PrevCloseOrig) > @tol THEN 1 ELSE 0 END AS S12Now,
+               CASE WHEN ABS(p.BreakOrig) > p.CfgKeepBreaksUpTo + @tol AND p.BreakKept = 0 AND ABS(p.EffOpenNew - p.PrevCloseP) > @tol THEN 1 ELSE 0 END AS S13After,
+               CASE WHEN ABS(p.BreakOrig) > p.CfgKeepBreaksUpTo + @tol AND ABS(p.QtyOpenNow - p.PrevCloseNow)   > @tol THEN 1 ELSE 0 END AS S13Now,
+               CASE WHEN ABS(p.BreakOrig) > p.CfgKeepBreaksUpTo + @tol AND p.BreakKept = 0 AND ABS(p.PrevCloseP - p.PrevCloseOrig) > @tol THEN 1 ELSE 0 END AS S12After,
+               CASE WHEN ABS(p.BreakOrig) > p.CfgKeepBreaksUpTo + @tol AND ABS(p.PrevCloseNow - p.PrevCloseOrig) > @tol THEN 1 ELSE 0 END AS S12Now,
                CASE WHEN p.StaffVar > 0.5 AND p.VarP    < -0.5                 THEN 1 ELSE 0 END AS S7After,
                CASE WHEN p.StaffVar > 0.5 AND p.HandVar < -0.5                 THEN 1 ELSE 0 END AS S7Now,
                CASE WHEN p.StaffVar < 0   AND p.VarP    < p.StaffVar - 0.5     THEN 1 ELSE 0 END AS S8After,
@@ -1709,6 +1765,7 @@ BEGIN
         FlagPackOver, FlagNoPosLink, RestoresHand, FlagAuditConflict, AuditCode, BreakKept,
         DupTier, DupTwinDate, DupTwinShift, DupTwinVar, DupQty, DupReason, QtyIssuedNew, CountsMove,
         DupHold, DupReleaseId, WasteAuthorizationId, AuthorizedGoodWaste, AppliedGoodWaste,
+        BalancingProfileId, BalancingProfileName, BalancingProfileRevision, ProfileMaxAmendment, ProfileMaxAmendmentPct, ProfileMinShifts, ProfileKeepBreaksUpTo,
         ExceptionCode, Outcome, WouldAmend, Selected, CommitState,
         ItemDescription, POSCode, StockLocation, AreaDescription,
         EmployeeCodes, EmployeeNames, EmployeeCount,
@@ -1752,6 +1809,7 @@ BEGIN
              WHEN a.IssueWrite = 1 THEN CONVERT(decimal(18,4), 0) END,
         a.RowMoves,
         a.DupHold, a.DupReleaseId, a.WasteAuthorizationId, a.AuthorizedGoodWaste, a.AppliedGoodWaste,
+        a.BalancingProfileId, a.BalancingProfileName, a.BalancingProfileRevision, a.CfgMaxAmendment, a.CfgMaxAmendmentPct, a.CfgMinShifts, a.CfgKeepBreaksUpTo,
 
         /* The class, ranked most serious first; a line is reported under the
            first test it trips. Codes are the pack's where the pack defines the
@@ -1788,10 +1846,11 @@ BEGIN
            hovers the rest (StockReconRunLine::outcomeLabel()). What blocks the
            chain first, then what happens to this row. */
         CASE
-            WHEN a.GapHold = 1 THEN (SELECT TOP 1 N'Missing shift: ' + CONVERT(nvarchar(10), g.MissingDate, 23)
-                                             + N' shift ' + CONVERT(nvarchar(4), g.MissingShift) + N' item ' + g.MissingItemNo + N'; correct or split at removal'
+            WHEN a.GapHold = 1 THEN (SELECT TOP 1 CASE WHEN g.RemovalBoundary = 1 THEN N'Removal and return: split the preview after '
+                                             ELSE N'Missing shift: ' END + CONVERT(nvarchar(10), g.MissingDate, 23)
+                                             + N' shift ' + CONVERT(nvarchar(4), g.MissingShift) + N' item ' + g.MissingItemNo
                                      FROM #missingShift g WHERE g.AreaNo = a.AreaNo AND g.StockItemNo = a.StockItemNo
-                                     ORDER BY g.MissingDate, g.MissingShift)
+                                     ORDER BY g.RemovalBoundary DESC, g.MissingDate, g.MissingShift)
             /* This shift's own news first: the issue goes, whatever else the
                chain does. "(D1)" is what the audit trail's reason reads. */
             WHEN a.IssueWrite = 1             THEN 'Duplicate issue removed (D1): captured twice, the issue goes to nil'

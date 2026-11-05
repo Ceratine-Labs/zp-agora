@@ -79,7 +79,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_Commit]
     @IssueMode         NVARCHAR(20)  = 'off',
     /* Defaults ON, so a call that forgets it errs towards writing nothing. */
     @BlockPossibleDuplicates BIT     = 1,
-    @UserId            INT           = NULL
+    @UserId            INT           = NULL,
+    @ProfileBranchId   INT           = 2
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -105,6 +106,67 @@ BEGIN
     IF @Status NOT IN ('previewed', 'reversed')
         THROW 51000, 'AGORA:RUN_NOT_READY:Only a previewed run can be committed.', 1;
 
+    /* Profile selection and revision are part of the preview basis. */
+    IF EXISTS (
+        SELECT 1 FROM agora.StockReconRunLine rl
+        OUTER APPLY (SELECT TOP 1 profile.Id, profile.Revision FROM agora.StockReconBalancingProfile profile
+            WHERE profile.BranchId = @ProfileBranchId AND profile.IsActive = 1 AND profile.Id = COALESCE(
+                (SELECT map.ProfileId FROM agora.StockReconItemProfile map WHERE map.BranchId = rl.BranchId
+                    AND map.AreaNo = rl.AreaNo AND map.StockItemNo = rl.StockItemNo),
+                (SELECT generic.Id FROM agora.StockReconBalancingProfile generic WHERE generic.BranchId = @ProfileBranchId
+                    AND generic.IsDefault = 1 AND generic.IsActive = 1))) currentProfile
+        WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+          AND (currentProfile.Id IS NULL OR rl.BalancingProfileId IS NULL
+               OR currentProfile.Id <> rl.BalancingProfileId OR currentProfile.Revision <> rl.BalancingProfileRevision)
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = rl.BranchId AND selected.RunId = rl.RunId AND selected.AreaNo = rl.AreaNo
+                AND selected.StockItemNo = rl.StockItemNo AND selected.Selected = 1 AND selected.WouldAmend = 1
+                AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:PROFILE_CHANGED:The item profile changed since this preview. Preview again.', 1;
+
+    /* Removal can also change the predecessor just outside the window. Compare
+       the preview's predecessor with today's removal-aware source before writing. */
+    IF EXISTS (SELECT 1 FROM (
+        SELECT rl.*, run.FromDate, ROW_NUMBER() OVER (PARTITION BY rl.AreaNo, rl.StockItemNo
+            ORDER BY rl.TransactionDate, rl.ShiftNo) AS rn
+        FROM agora.StockReconRunLine rl JOIN agora.StockReconRun run ON run.BranchId = rl.BranchId AND run.Id = rl.RunId
+        WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+    ) firstLine
+    OUTER APPLY (SELECT TOP 1 CONVERT(decimal(18,4), ISNULL(CASE WHEN @UseOriginalCounts = 1
+            THEN l.QtyClose_Original ELSE l.QtyClose END, 0)) AS PredClose
+        FROM agora.vw_StockReconLine l
+        WHERE l.BranchId = @BranchId AND l.AreaNo = firstLine.AreaNo AND l.StockItemNo = firstLine.StockItemNo
+          AND l.TransactionDate < firstLine.FromDate
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconItemRemoval removal WHERE removal.BranchId = l.BranchId
+            AND removal.AreaNo = l.AreaNo AND removal.StockItemNo = l.StockItemNo AND removal.WithdrawnAt IS NULL
+            AND (removal.LastDate > CONVERT(date, l.TransactionDate)
+              OR (removal.LastDate = CONVERT(date, l.TransactionDate) AND removal.LastShift >= l.ShiftNo))
+            AND removal.LastDate < firstLine.FromDate)
+        ORDER BY l.TransactionDate DESC, l.ShiftNo DESC) prior
+    WHERE firstLine.rn = 1
+      AND ((firstLine.PrevClose IS NULL AND prior.PredClose IS NOT NULL)
+        OR (firstLine.PrevClose IS NOT NULL AND prior.PredClose IS NULL)
+        OR ABS(firstLine.PrevClose - prior.PredClose) > 0.001)
+      AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+        AND selected.AreaNo = firstLine.AreaNo AND selected.StockItemNo = firstLine.StockItemNo
+        AND selected.Selected = 1 AND selected.WouldAmend = 1 AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:PREDECESSOR_CHANGED:The previous count or removal changed since this preview. Preview again.', 1;
+
+    /* A removal recorded after preview also invalidates any selected chain
+       that crosses it, including an immediate return on the next shift. */
+    IF EXISTS (SELECT 1 FROM agora.StockReconRunLine beforeRemoval
+        JOIN agora.StockReconItemRemoval removal ON removal.BranchId = beforeRemoval.BranchId
+          AND removal.AreaNo = beforeRemoval.AreaNo AND removal.StockItemNo = beforeRemoval.StockItemNo
+          AND removal.WithdrawnAt IS NULL AND removal.LastDate = beforeRemoval.TransactionDate AND removal.LastShift = beforeRemoval.ShiftNo
+        WHERE beforeRemoval.BranchId = @BranchId AND beforeRemoval.RunId = @RunId
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine later WHERE later.BranchId = @BranchId AND later.RunId = @RunId
+            AND later.AreaNo = beforeRemoval.AreaNo AND later.StockItemNo = beforeRemoval.StockItemNo
+            AND (later.TransactionDate > beforeRemoval.TransactionDate OR (later.TransactionDate = beforeRemoval.TransactionDate AND later.ShiftNo > beforeRemoval.ShiftNo)))
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+            AND selected.AreaNo = beforeRemoval.AreaNo AND selected.StockItemNo = beforeRemoval.StockItemNo
+            AND selected.Selected = 1 AND selected.WouldAmend = 1 AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:REMOVAL_BOUNDARY:This item was removed and returned within the preview. Split the period at removal and preview again.', 1;
+
     /* Reject old previews as well: a saved run may predate the shift guard or
        the area's configured shifts may have changed since it was created. */
     IF EXISTS (
@@ -117,7 +179,7 @@ BEGIN
             OUTER APPLY (SELECT TOP 1 CONVERT(date, l.TransactionDate) AS TransactionDate, l.ShiftNo
                 FROM agora.vw_StockReconLine l
                 WHERE l.BranchId = rl.BranchId AND l.AreaNo = rl.AreaNo AND l.StockItemNo = rl.StockItemNo
-                  AND l.TransactionDate >= DATEADD(day, -35, run.FromDate) AND l.TransactionDate < run.FromDate
+                  AND l.TransactionDate < run.FromDate
                   AND NOT EXISTS (SELECT 1 FROM agora.StockReconItemRemoval removal WHERE removal.BranchId = l.BranchId
                       AND removal.AreaNo = l.AreaNo AND removal.StockItemNo = l.StockItemNo AND removal.WithdrawnAt IS NULL
                       AND (removal.LastDate > CONVERT(date, l.TransactionDate)
@@ -182,7 +244,7 @@ BEGIN
                    ROW_NUMBER() OVER (PARTITION BY l.AreaNo, l.StockItemNo ORDER BY l.TransactionDate DESC, l.ShiftNo DESC) AS rn
             FROM agora.vw_StockReconLine l
             JOIN agora.StockReconRun run ON run.BranchId = l.BranchId AND run.Id = @RunId
-            WHERE l.BranchId = @BranchId AND l.TransactionDate >= DATEADD(day, -35, run.FromDate) AND l.TransactionDate < run.FromDate
+            WHERE l.BranchId = @BranchId AND l.TransactionDate < run.FromDate
               AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
                   AND selected.AreaNo = l.AreaNo AND selected.Selected = 1 AND selected.WouldAmend = 1 AND selected.CommitState IN ('pending', 'skipped'))
               AND NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter WHERE meter.BranchId = l.BranchId

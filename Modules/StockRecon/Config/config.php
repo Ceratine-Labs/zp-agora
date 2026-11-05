@@ -216,9 +216,10 @@ return [
             'help' => 'The same cap in absolute terms, for items where a share of a small holding is still '
                 .'an implausible number of units.',
             'default' => 9999,
-            'type' => 'int',
+            'type' => 'decimal',
             'min' => 1,
             'max' => 999999,
+            'step' => 0.0001,
         ],
 
         'MinShiftsInChain' => [
@@ -243,9 +244,10 @@ return [
             'help' => 'Units. An opening that misses the previous closing by this much or less is repaired '
                 .'and reported, but does not split the chain. 0 splits at every break.',
             'default' => 3,
-            'type' => 'int',
+            'type' => 'decimal',
             'min' => 0,
             'max' => 99,
+            'step' => 0.0001,
         ],
 
         /*

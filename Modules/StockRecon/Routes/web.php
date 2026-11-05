@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\StockRecon\Http\Controllers\BalancingProfileController;
 use Modules\StockRecon\Http\Controllers\CountingAreaController;
 use Modules\StockRecon\Http\Controllers\StockReconController;
 use Modules\StockRecon\Http\Controllers\StockReconGroupController;
@@ -51,6 +52,15 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
     Route::prefix('counting-areas')->middleware(CountingAreaAccess::class)->group(function () {
         Route::get('/', [CountingAreaController::class, 'index'])->name('countingareas');
         Route::get('{branch}/{area}', [CountingAreaController::class, 'show'])->whereNumber(['branch', 'area'])->name('countingareas.show');
+        Route::get('{branch}/{area}/balancing-config', [BalancingProfileController::class, 'show'])->whereNumber(['branch', 'area'])->middleware('can:stockrecon.profiles.view')->name('countingareas.balancing-config');
+        Route::post('{branch}/{area}/balancing-config/profiles', [BalancingProfileController::class, 'store'])->whereNumber(['branch', 'area'])
+            ->middleware(['can:stockrecon.profiles.view', 'can:stockrecon.profiles.save'])->name('countingareas.profiles.store');
+        Route::put('{branch}/{area}/balancing-config/profiles/{profile}', [BalancingProfileController::class, 'update'])->whereNumber(['branch', 'area', 'profile'])
+            ->middleware(['can:stockrecon.profiles.view', 'can:stockrecon.profiles.save'])->name('countingareas.profiles.update');
+        Route::post('{branch}/{area}/balancing-config/mappings', [BalancingProfileController::class, 'map'])->whereNumber(['branch', 'area'])
+            ->middleware(['can:stockrecon.profiles.view', 'can:stockrecon.profiles.save'])->name('countingareas.profiles.map');
+        Route::delete('{branch}/{area}/balancing-config/mappings', [BalancingProfileController::class, 'unmap'])->whereNumber(['branch', 'area'])
+            ->middleware(['can:stockrecon.profiles.view', 'can:stockrecon.profiles.save'])->name('countingareas.profiles.unmap');
         Route::get('{branch}/{area}/edit', [CountingAreaController::class, 'edit'])->whereNumber(['branch', 'area'])
             ->middleware('can:stockrecon.countingareas.edit')->name('countingareas.edit');
         Route::post('{branch}/{area}/removals', [CountingAreaController::class, 'recordRemoval'])->whereNumber(['branch', 'area'])

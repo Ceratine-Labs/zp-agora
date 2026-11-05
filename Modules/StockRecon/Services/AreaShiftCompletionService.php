@@ -2,17 +2,20 @@
 
 namespace Modules\StockRecon\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AreaShiftCompletionService
 {
-    public function history(int $branch, int $area)
+    /** @return Collection<int, \stdClass> */
+    public function history(int $branch, int $area): Collection
     {
         return DB::table('agora.StockReconAreaShiftCompletion')->where('BranchId', $branch)
             ->where('AreaNo', $area)->orderByDesc('Id')->limit(100)->get();
     }
 
+    /** @param array<string, mixed> $input */
     public function record(int $branch, int $area, array $input, int $user): void
     {
         $shift = (int) $input['shift'];

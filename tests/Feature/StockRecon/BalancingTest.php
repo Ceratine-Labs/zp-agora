@@ -18,6 +18,7 @@ use Modules\StockRecon\Models\StockReconAmendment;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
 use Modules\StockRecon\Services\AreaShiftCompletionService;
+use Modules\StockRecon\Services\BalancingProfileService;
 use Modules\StockRecon\Services\ChainSummary;
 use Modules\StockRecon\Services\ItemRemovalService;
 use Modules\StockRecon\Services\ProposalMetric;
@@ -120,6 +121,133 @@ class BalancingTest extends TestCase
         $this->assertEqualsWithDelta(203, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 3)->QtyClose, 0.001);
     }
 
+    public function test_completed_area_with_no_current_item_counts_refuses_preview(): void
+    {
+        $this->seedShelfChain(['2026-06-11' => [3 => [30, 0, 30, 0]]]);
+        app(AreaShiftCompletionService::class)->record(self::BRANCH, self::SHELF_AREA, ['date' => '2026-07-17', 'shift' => 3], 1);
+        $runCount = $this->db()->table('agora.StockReconRun')->where('BranchId', self::BRANCH)->count();
+        try {
+            $this->previewArea(self::SHELF_AREA);
+            $this->fail('A completed area without any current counts must not appear clean.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('has no counts in this period', $e->getMessage());
+        }
+        $this->assertSame($runCount, $this->db()->table('agora.StockReconRun')->where('BranchId', self::BRANCH)->count());
+        try {
+            $this->db()->transaction(fn () => $this->previewArea(self::SHELF_AREA));
+            $this->fail('A grouped preview must also roll back a refused run.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('has no counts in this period', $e->getMessage());
+        }
+        $this->assertSame($runCount, $this->db()->table('agora.StockReconRun')->where('BranchId', self::BRANCH)->count());
+        app(ItemRemovalService::class)->record(self::BRANCH, self::SHELF_AREA,
+            ['item' => self::DUP_ITEM, 'date' => '2026-06-11', 'shift' => 3], 1);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $this->assertCount(0, $run->lines);
+    }
+
+    public function test_generic_profile_supplies_fractional_default_and_revision_invalidates_preview(): void
+    {
+        $this->seedShelfChain(['2026-07-17' => [1 => [50, 0, 45, 0], 3 => [45, 0, 45, 0]]]);
+        $table = $this->db()->table('agora.StockReconBalancingProfile');
+        $original = (array) $table->where('BranchId', 2)->where('IsDefault', 1)->first();
+        try {
+            $profiles = app(BalancingProfileService::class);
+            $values = ['name' => $original['Name'], 'MaxAmendment' => 99.5, 'MaxAmendmentPct' => 0.5,
+                'MinShiftsInChain' => 2, 'KeepBreaksUpTo' => 3.5, 'HoldBackIncomplete' => 1, 'revision' => $original['Revision']];
+            $profiles->save($values, -999, $original['Id']);
+            $this->assertTrue((bool) $this->service->options()['HoldBackIncomplete']['default']);
+            $values['revision']++;
+            $values['HoldBackIncomplete'] = 0;
+            $profiles->save($values, -999, $original['Id']);
+            $run = $this->previewArea(self::SHELF_AREA);
+            $row = $this->db()->table('agora.StockReconRunLine')->where('BranchId', self::BRANCH)->where('RunId', $run->Id)->first();
+            $this->assertEqualsWithDelta(99.5, (float) $row->ProfileMaxAmendment, 0.001);
+            $this->assertEqualsWithDelta(3.5, (float) $row->ProfileKeepBreaksUpTo, 0.001);
+            $values['revision']++;
+            $profiles->save($values, -999, $original['Id']);
+            $this->db()->table('agora.StockReconRunLine')->where('Id', $row->Id)->update(['WouldAmend' => 1, 'Selected' => 1, 'CommitState' => 'pending']);
+            try {
+                $this->service->commit($run);
+                $this->fail('Changing the generic profile must invalidate the saved preview.');
+            } catch (AgoraProcException $e) {
+                $this->assertStringContainsString('profile changed', $e->getMessage());
+            }
+        } finally {
+            unset($original['Id'], $original['BranchId']);
+            $this->db()->table('agora.StockReconBalancingProfile')->where('BranchId', 2)->where('IsDefault', 1)->update($original);
+        }
+    }
+
+    public function test_item_profile_overrides_only_its_item_and_changes_invalidate_saved_previews(): void
+    {
+        $this->seedShelfChain(['2026-07-17' => [1 => [50, 0, 45, 0], 3 => [45, 0, 45, 0]]]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->insert([
+            'SSBranchId' => self::BRANCH, 'StockItemNo' => 'TPRO', 'StockItemDescription' => 'TEST profile item',
+            'AreaNo' => self::SHELF_AREA, 'Location' => 'TEST', 'UOMCode' => 'EA', 'SellingPrice' => 1,
+            'POSCode' => 'TESTPRO', 'QtyVarAllowance' => 0, 'isMonitoredItem' => 0, 'IssueMultiple' => 1,
+        ]);
+        foreach ([1 => [20, 19], 3 => [19, 18]] as $shift => [$open, $close]) {
+            $this->db()->table('PumpIT.dbo.STK_StockReconLine')->insert(
+                $this->line('TPRO', '2026-07-17', $shift, $open, 0, $close, 0, self::SHELF_AREA)
+            );
+        }
+        $baseline = $this->previewArea(self::SHELF_AREA);
+        $baselineRow = $this->db()->table('agora.StockReconRunLine')->where('RunId', $baseline->Id)->where('BranchId', self::BRANCH)->where('StockItemNo', 'TPRO')->first();
+        $this->assertFalse((bool) $baselineRow->FlagShortChain);
+        $profiles = app(BalancingProfileService::class);
+        $values = ['name' => 'TEST item profile', 'MaxAmendment' => 42, 'MaxAmendmentPct' => 0.5,
+            'MinShiftsInChain' => 3, 'KeepBreaksUpTo' => 5];
+        $profiles->save($values, -999);
+        $profile = $this->db()->table('agora.StockReconBalancingProfile')->where('CreatedBy', -999)->where('Name', $values['name'])->first();
+        $profiles->map(self::BRANCH, self::SHELF_AREA, 'TPRO', $profile->Id, -999);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $baselineRow->Id)->update(['WouldAmend' => 1, 'Selected' => 1, 'CommitState' => 'pending']);
+        try {
+            $this->service->commit($baseline);
+            $this->fail('A newly mapped profile must invalidate an older generic preview.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('profile changed', $e->getMessage());
+        }
+        $run = $this->previewArea(self::SHELF_AREA);
+        $rows = $this->db()->table('agora.StockReconRunLine')->where('BranchId', self::BRANCH)->where('RunId', $run->Id)->get();
+        $custom = $rows->firstWhere('StockItemNo', 'TPRO');
+        $generic = $rows->firstWhere('StockItemNo', self::DUP_ITEM);
+        $this->assertEquals($profile->Id, $custom->BalancingProfileId);
+        $this->assertSame('TEST item profile', $run->lines->firstWhere('StockItemNo', 'TPRO')->BalancingProfileName);
+        $this->assertEqualsWithDelta(5, (float) $custom->ProfileKeepBreaksUpTo, 0.001);
+        $this->assertEqualsWithDelta(3, (float) $generic->ProfileKeepBreaksUpTo, 0.001);
+        $this->assertNotEquals($custom->BalancingProfileId, $generic->BalancingProfileId);
+        $this->assertTrue((bool) $custom->FlagShortChain);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $custom->Id)->update(['WouldAmend' => 1, 'Selected' => 1, 'CommitState' => 'pending']);
+        $profiles->unmap(self::BRANCH, self::SHELF_AREA, 'TPRO', -999);
+        try {
+            $this->service->commit($run);
+            $this->fail('A changed item mapping must invalidate a saved preview.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('profile changed', $e->getMessage());
+        }
+        $profiles->map(self::BRANCH, self::SHELF_AREA, 'TPRO', $profile->Id, -999);
+        $profiles->save($values + ['revision' => 1], -999, $profile->Id);
+        try {
+            $this->service->commit($run);
+            $this->fail('A changed profile must invalidate a saved preview.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('profile changed', $e->getMessage());
+        }
+    }
+
+    public function test_continuity_checks_a_prior_count_exactly_35_days_before_window(): void
+    {
+        $this->seedShelfChain([
+            '2026-06-12' => [3 => [30, 0, 30, 0]],
+            '2026-07-17' => [1 => [50, 0, 50, 0]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($run, '2026-07-17', 1);
+        $this->assertTrue((bool) $line->ChainBlocked);
+        $this->assertStringContainsString('2026-06-13 shift 1', $line->Outcome);
+    }
+
     public function test_removal_before_window_starts_returned_item_without_old_opening(): void
     {
         $this->seedShelfChain([
@@ -137,7 +265,58 @@ class BalancingTest extends TestCase
         $this->assertEqualsWithDelta(50, (float) $line->QtyOpenNew, 0.001);
     }
 
-    public function test_completed_area_shift_holds_area_when_item_is_absent_for_entire_window(): void
+    public function test_immediate_return_after_removal_holds_chain_and_invalidates_saved_preview(): void
+    {
+        $this->seedShelfChain(['2026-07-17' => [1 => [30, 0, 25, 0], 3 => [50, 0, 50, 0]]]);
+        $before = $this->previewArea(self::SHELF_AREA);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $this->lineAt($before, '2026-07-17', 1)->Id)
+            ->update(['WouldAmend' => 1, 'Selected' => 1, 'CommitState' => 'pending']);
+        app(ItemRemovalService::class)->record(self::BRANCH, self::SHELF_AREA,
+            ['item' => self::DUP_ITEM, 'date' => '2026-07-17', 'shift' => 1], 1);
+        $after = $this->previewArea(self::SHELF_AREA);
+        foreach ($after->lines as $line) {
+            $this->assertTrue((bool) $line->ChainBlocked);
+            $this->assertStringContainsString('Removal and return: split the preview', $line->Outcome);
+        }
+        try {
+            $this->service->commit($before);
+            $this->fail('A removal recorded after preview must invalidate a crossing chain.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('removed and returned within the preview', $e->getMessage());
+        }
+    }
+
+    public function test_removal_change_before_window_invalidates_the_saved_predecessor(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-16' => [3 => [30, 0, 30, 0]],
+            '2026-07-17' => [1 => [50, 0, 45, 0], 3 => [45, 0, 45, 0]],
+        ]);
+        $before = $this->previewArea(self::SHELF_AREA);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $this->lineAt($before, '2026-07-17', 1)->Id)
+            ->update(['WouldAmend' => 1, 'Selected' => 1, 'CommitState' => 'pending']);
+        $removals = app(ItemRemovalService::class);
+        $removals->record(self::BRANCH, self::SHELF_AREA,
+            ['item' => self::DUP_ITEM, 'date' => '2026-07-16', 'shift' => 3], 1);
+        try {
+            $this->service->commit($before);
+            $this->fail('A new removal before the window must invalidate the saved predecessor.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('previous count or removal changed', $e->getMessage());
+        }
+        $after = $this->previewArea(self::SHELF_AREA);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $this->lineAt($after, '2026-07-17', 1)->Id)
+            ->update(['WouldAmend' => 1, 'Selected' => 1, 'CommitState' => 'pending']);
+        $removals->withdraw(self::BRANCH, self::SHELF_AREA, $removals->history(self::BRANCH, self::SHELF_AREA)->first()->Id, 1);
+        try {
+            $this->service->commit($after);
+            $this->fail('Withdrawing a removal before the window must invalidate the saved predecessor.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('previous count or removal changed', $e->getMessage());
+        }
+    }
+
+    public function test_completed_area_shift_holds_area_for_item_last_counted_beyond_35_days(): void
     {
         $this->seedShelfChain(['2026-07-17' => [1 => [50, 0, 45, 0], 3 => [45, 0, 45, 0]]]);
         $this->db()->table('PumpIT.dbo.STK_StockMaster')->insert([
@@ -146,7 +325,7 @@ class BalancingTest extends TestCase
             'POSCode' => 'TESTOLD', 'QtyVarAllowance' => 0, 'isMonitoredItem' => 0, 'IssueMultiple' => 1,
         ]);
         $this->db()->table('PumpIT.dbo.STK_StockReconLine')->insert(
-            $this->line('TOLD', '2026-07-16', 3, 20, 0, 20, 0, self::SHELF_AREA)
+            $this->line('TOLD', '2026-06-11', 3, 20, 0, 20, 0, self::SHELF_AREA)
         );
         $before = $this->previewArea(self::SHELF_AREA);
         $service = app(AreaShiftCompletionService::class);
@@ -162,7 +341,7 @@ class BalancingTest extends TestCase
             $this->assertStringContainsString('absent from a completed area shift', $e->getMessage());
         }
         app(ItemRemovalService::class)->record(self::BRANCH, self::SHELF_AREA,
-            ['item' => 'TOLD', 'date' => '2026-07-16', 'shift' => 3], 1);
+            ['item' => 'TOLD', 'date' => '2026-06-11', 'shift' => 3], 1);
         $resolved = $this->previewArea(self::SHELF_AREA);
         $this->assertStringNotContainsString('Missing shift:', $this->lineAt($resolved, '2026-07-17', 1)->Outcome);
     }
@@ -3875,6 +4054,10 @@ class BalancingTest extends TestCase
         }
 
         $schema = config('agora.schema');
+
+        $db->table('agora.StockReconItemProfile')->where('BranchId', self::BRANCH)->delete();
+        $db->table('agora.StockReconProfileEvent')->where('CreatedBy', -999)->delete();
+        $db->table('agora.StockReconBalancingProfile')->where('CreatedBy', -999)->where('Name', 'TEST item profile')->delete();
 
         foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun', 'StockIssueMultiple', 'StockAreaSetting',
             'StockReconDuplicateRelease', 'StockWasteAuthorization', 'StockReconItemRemoval', 'StockReconAreaShiftCompletion'] as $table) {

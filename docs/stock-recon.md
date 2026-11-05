@@ -1026,3 +1026,11 @@ ambiguity/food checks; possible duplicates remain held. A pack-sized short
 alone is not proof of a duplicate. Writes still require the existing commit
 confirmation and retain exact priors for reversal. The global comparison does
 not expand that write contract.
+
+## Balancing profiles and item mappings
+
+Head office can open **Balancing configuration** from a counting area. The generic profile supplies the normal preview defaults; a custom profile can be mapped to an item in a particular site and area. The mapping overrides that item's correction limits, minimum active shifts and kept-break threshold. Items without a mapping use the generic run settings. The unfinished-day setting applies to the whole preview period, not to an individual item.
+
+The preview records the selected profile, revision and effective values on each line. Changing a profile or an item mapping invalidates a saved preview for the affected item; preview again before committing. Profile and mapping changes retain an audit event. Reading and changing profiles require separate permissions, and neither permission changes the live-write or original-count safeguards.
+
+A recorded item removal ends its counting obligation after the specified shift. A preview beginning after that removal starts a new chain without inheriting the previous closing. A preview spanning both removal and return remains blocked and currently needs separate windows. The history lookup no longer assumes an item was removed merely because its last count was over 35 days ago. A completed area with no item counts is refused rather than presented as a clean preview. The customer database index proposed for history lookup is not part of an Agora migration and requires customer permission and a build-impact review before execution.

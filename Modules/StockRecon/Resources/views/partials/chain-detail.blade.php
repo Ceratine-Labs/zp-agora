@@ -55,11 +55,14 @@
         <a class="btn-ghost" href="{{ route('app.stockrecon.helper', [$run, 'line' => $line->Id]) }}">Explain this chain</a>
         <div class="card-t">
             <h4>{{ $item->StockItemDescription ?? $line->StockItemNo }}</h4>
+            @if ($line->BalancingProfileName)
+                <p>Balancing profile: {{ $line->BalancingProfileName }} · correction limit {{ \App\Support\Format::qty($line->ProfileMaxAmendment) }} · share {{ $line->ProfileMaxAmendmentPct }} · minimum shifts {{ $line->ProfileMinShifts }} · keep breaks up to {{ \App\Support\Format::qty($line->ProfileKeepBreaksUpTo) }}</p>
+            @endif
             {{-- The reading notes, behind a button (ZRP, 4 Oct 2026). --}}
             <x-info label="How to read this chain" class="info-wide">
                 <p>Balancing amends the closing count; the opening follows, because it <em>is</em> the previous
                    closing. Where the counted opening missed the previous closing, the opening is repaired: a
-                   break of 3 or fewer is balanced straight through, a bigger one splits the chain and the
+                   break within the item’s configured limit is balanced straight through; a bigger one splits the chain and the
                    closing before it stands.</p>
                 <p>Where two people were on a shift both are named: the counts cannot say which of them a
                    variance belongs to. A red chip beside the outcome is hand balancing already in PumpIT that

@@ -63,9 +63,14 @@ class StockReconService
         /** @var array<string, array<string, mixed>> $declared */
         $declared = config('stockrecon.options');
 
+        $generic = DB::table(config('agora.schema').'.StockReconBalancingProfile')
+            ->where('BranchId', (int) config('agora.group_branch_id', 2))->where('IsDefault', 1)->where('IsActive', 1)->first();
         $options = [];
 
         foreach ($declared as $name => $option) {
+            if ($generic !== null && property_exists($generic, $name)) {
+                $option['default'] = $generic->{$name};
+            }
             $options[$name] = $option + ['name' => $name];
         }
 
@@ -186,60 +191,67 @@ class StockReconService
         ?string $groupRef = null,
         ?string $note = null,
     ): StockReconRun {
-        $params = $this->parameters($options) + $this->duplicateSwitches();
-        $procedure = config('agora.schema').'.usp_StockRecon_PreviewBalancing';
+        $work = function () use ($branchId, $areaNo, $from, $to, $options, $groupRef, $note) {
+            $params = $this->parameters($options) + $this->duplicateSwitches();
+            $procedure = config('agora.schema').'.usp_StockRecon_PreviewBalancing';
 
-        $run = StockReconRun::create([
-            'BranchId' => $branchId,
-            'GroupRef' => $groupRef ?? (string) Str::uuid(),
-            'AreaNo' => $areaNo,
-            'FromDate' => $from->toDateString(),
-            'ToDate' => $to->toDateString(),
-            'Status' => 'previewing',
-            'StampMode' => config('stockrecon.stamp_mode'),
-            'ProcedureName' => $procedure,
-            'ParamsJson' => json_encode($params),
-            'Note' => $note,
-            'CreatedBy' => auth()->id(),
-            'CreatedAt' => now(),
-        ]);
+            $run = StockReconRun::create([
+                'BranchId' => $branchId,
+                'GroupRef' => $groupRef ?? (string) Str::uuid(),
+                'AreaNo' => $areaNo,
+                'FromDate' => $from->toDateString(),
+                'ToDate' => $to->toDateString(),
+                'Status' => 'previewing',
+                'StampMode' => config('stockrecon.stamp_mode'),
+                'ProcedureName' => $procedure,
+                'ParamsJson' => json_encode($params),
+                'Note' => $note,
+                'CreatedBy' => auth()->id(),
+                'CreatedAt' => now(),
+            ]);
 
-        $started = microtime(true);
+            $started = microtime(true);
 
-        /*
-         * write(), not call(): the procedure inserts the run's lines and
-         * rewrites its header counts, and a refusal — a window the wrong way
-         * round, an area that is not configured at this site — has to arrive
-         * as an AgoraProcException with its code intact rather than as an
-         * empty grid the reader would take for "this branch is clean".
-         */
-        $this->procedures->write('usp_StockRecon_PreviewBalancing', [
-            'RunId' => $run->Id,
-            'BranchId' => $branchId,
-            'FromDate' => $from->toDateString(),
-            'ToDate' => $to->toDateString(),
-            'AreaNo' => $areaNo,
-            'ExcludedAreaGroups' => implode(',', (array) config('stockrecon.excluded_area_groups')),
-            'UserId' => auth()->id(),
-            ...$params,
-        ]);
+            /*
+             * write(), not call(): the procedure inserts the run's lines and
+             * rewrites its header counts, and a refusal — a window the wrong way
+             * round, an area that is not configured at this site — has to arrive
+             * as an AgoraProcException with its code intact rather than as an
+             * empty grid the reader would take for "this branch is clean".
+             */
+            $this->procedures->write('usp_StockRecon_PreviewBalancing', [
+                'RunId' => $run->Id,
+                'BranchId' => $branchId,
+                'FromDate' => $from->toDateString(),
+                'ToDate' => $to->toDateString(),
+                'AreaNo' => $areaNo,
+                'ProfileBranchId' => (int) config('agora.group_branch_id', 2),
+                'ExcludedAreaGroups' => implode(',', (array) config('stockrecon.excluded_area_groups')),
+                'UserId' => auth()->id(),
+                ...$params,
+            ]);
 
-        $elapsed = (int) round((microtime(true) - $started) * 1000);
+            $elapsed = (int) round((microtime(true) - $started) * 1000);
 
-        /*
-         * fresh(), not a save of $elapsed onto the model in hand.
-         *
-         * The procedure rewrote nineteen columns of this row. Saving the model
-         * as PHP last saw it would put every count back to the zero it was
-         * created with — the header would then say "0 proposals" over a table
-         * of fourteen thousand.
-         */
-        StockReconRun::query()
-            ->where('BranchId', $branchId)
-            ->where('Id', $run->Id)
-            ->update(['PreviewMs' => $elapsed]);
+            /*
+             * fresh(), not a save of $elapsed onto the model in hand.
+             *
+             * The procedure rewrote nineteen columns of this row. Saving the model
+             * as PHP last saw it would put every count back to the zero it was
+             * created with — the header would then say "0 proposals" over a table
+             * of fourteen thousand.
+             */
+            StockReconRun::query()
+                ->where('BranchId', $branchId)
+                ->where('Id', $run->Id)
+                ->update(['PreviewMs' => $elapsed]);
 
-        return $run->fresh();
+            return $run->fresh();
+        };
+
+        $connection = DB::connection(config('agora.connections.app'));
+
+        return $connection->transactionLevel() > 0 ? $work() : $connection->transaction($work);
     }
 
     /**
@@ -256,6 +268,7 @@ class StockReconService
         $sets = $this->procedures->callSets('usp_StockRecon_Commit', [
             'RunId' => $run->Id,
             'BranchId' => $run->BranchId,
+            'ProfileBranchId' => (int) config('agora.group_branch_id', 2),
             'StampMode' => (string) config('stockrecon.stamp_mode'),
             // Read here, like the stamp mode: whether a clear duplicate's issue
             // may be written. The procedure refuses a run that removed one if

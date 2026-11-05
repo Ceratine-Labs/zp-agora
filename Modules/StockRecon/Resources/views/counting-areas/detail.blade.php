@@ -1,6 +1,9 @@
 <x-card :title="$area->AreaDescription" :sub="$area->BranchName.' · Area '.$area->AreaNo">
     <x-slot:actions>
         <a class="btn sm" href="{{ route('app.stockrecon.countingareas.show', ['branch' => $area->BranchId, 'area' => $area->AreaNo]) }}">View</a>
+        @can('stockrecon.profiles.view')
+        <a class="btn sm" href="{{ route('app.stockrecon.countingareas.balancing-config', ['branch' => $area->BranchId, 'area' => $area->AreaNo]) }}">Balancing configuration</a>
+        @endcan
         @can('stockrecon.countingareas.edit')
             <a class="btn sm" href="{{ route('app.stockrecon.countingareas.edit', ['branch' => $area->BranchId, 'area' => $area->AreaNo]) }}">Edit classification</a>
         @endcan

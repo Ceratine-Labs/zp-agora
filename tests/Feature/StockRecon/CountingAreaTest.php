@@ -56,6 +56,8 @@ class CountingAreaTest extends TestCase
         if ($this->safe) {
             $this->cleanUp();
             foreach ($this->users as $user) {
+                $this->db()->table('agora.StockReconProfileEvent')->where('CreatedBy', $user->Id)->delete();
+                $this->db()->table('agora.StockReconBalancingProfile')->where('CreatedBy', $user->Id)->where('Name', 'TEST area profile')->delete();
                 foreach (['UserPermission', 'UserBranch', 'UserGridColumn', 'UserMenuItem'] as $table) {
                     $this->db()->table('agora.'.$table)->where('UserId', $user->Id)->delete();
                 }
@@ -63,6 +65,43 @@ class CountingAreaTest extends TestCase
             }
         }
         parent::tearDown();
+    }
+
+    public function test_balancing_configuration_is_readable_and_requires_save_permission(): void
+    {
+        $user = $this->person(['view']);
+        $profileView = $this->db()->table('agora.Permission')->where('Code', 'stockrecon.profiles.view')->value('Id');
+        $profileSave = $this->db()->table('agora.Permission')->where('Code', 'stockrecon.profiles.save')->value('Id');
+        $this->db()->table('agora.UserPermission')->insert(['BranchId' => 2, 'UserId' => $user->Id, 'PermissionId' => $profileView]);
+        app(PermissionService::class)->forget($user);
+        $this->actingAs($user)->get($this->url('balancing-config'))->assertOk()->assertSee('Generic')->assertSee('Item mappings')->assertDontSee('Create profile');
+        $this->post($this->url('profiles.store'), [])->assertForbidden();
+        $this->db()->table('agora.UserPermission')->insert(['BranchId' => 2, 'UserId' => $user->Id, 'PermissionId' => $profileSave]);
+        app(PermissionService::class)->forget($user);
+        $this->get($this->url('balancing-config'))->assertOk()->assertSee('Create profile');
+    }
+
+    public function test_authorized_profile_edit_is_audited_and_rejects_a_stale_revision(): void
+    {
+        $user = $this->person(['view']);
+        foreach (['view', 'save'] as $action) {
+            $permission = $this->db()->table('agora.Permission')->where('Code', 'stockrecon.profiles.'.$action)->value('Id');
+            $this->db()->table('agora.UserPermission')->insert(['BranchId' => 2, 'UserId' => $user->Id, 'PermissionId' => $permission]);
+        }
+        app(PermissionService::class)->forget($user);
+        $this->actingAs($user);
+        $payload = ['name' => 'TEST area profile', 'MaxAmendment' => 50, 'MaxAmendmentPct' => 0.5,
+            'MinShiftsInChain' => 2, 'KeepBreaksUpTo' => 3];
+        $this->post($this->url('profiles.store'), $payload)->assertRedirect();
+        $profile = $this->db()->table('agora.StockReconBalancingProfile')->where('CreatedBy', $user->Id)->where('Name', $payload['name'])->first();
+        $this->assertNotNull($profile);
+        $url = route('app.stockrecon.countingareas.profiles.update', ['branch' => self::BRANCH, 'area' => 801, 'profile' => $profile->Id]);
+        $this->put($url, array_replace($payload, ['revision' => 1, 'MaxAmendment' => 40]))->assertRedirect();
+        $this->put($url, array_replace($payload, ['revision' => 1, 'MaxAmendment' => 30]))->assertSessionHasErrors('revision');
+        $fresh = $this->db()->table('agora.StockReconBalancingProfile')->where('Id', $profile->Id)->first();
+        $this->assertEquals(40, $fresh->MaxAmendment);
+        $this->assertEquals(2, $fresh->Revision);
+        $this->assertSame(2, $this->db()->table('agora.StockReconProfileEvent')->where('CreatedBy', $user->Id)->count());
     }
 
     public function test_listing_detail_edit_and_csv_leave_safe_proposals_unchanged(): void
