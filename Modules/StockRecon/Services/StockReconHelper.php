@@ -21,14 +21,14 @@ class StockReconHelper
 
     /**
      * Routing choices from the saved preview, using existing model classifications.
-     * One link per item/area; the evidence itself comes from DrillChain.
+     * One link per continuous item period; the evidence comes from DrillChain.
      *
      * @param  Collection<int, StockReconRunLine>  $lines
      * @return Collection<int, StockReconRunLine>
      */
     public function choices(Collection $lines, string $topic): Collection
     {
-        return $lines->groupBy(fn (StockReconRunLine $line) => $line->AreaNo.'|'.$line->StockItemNo)
+        return $lines->groupBy(fn (StockReconRunLine $line) => $line->continuityKey())
             ->filter(fn (Collection $chain) => $chain->contains(fn (StockReconRunLine $line) => match ($topic) {
                 'held' => (bool) $line->ChainBlocked,
                 'issues' => $line->DupTier !== null || $line->QtyIssuedNew !== null

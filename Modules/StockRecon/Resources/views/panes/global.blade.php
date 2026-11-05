@@ -45,7 +45,7 @@
                 <x-slot:head><tr><th>Area / item</th><th>Unit</th><th class="num">Ratio</th><th class="num">As counted</th><th class="num">After proposed balancing</th><th>Evidence</th></tr></x-slot:head>
                 @foreach ($global['chains']->where('PreProductionTypeNo', $group->PreProductionTypeNo) as $chain)
                     <tr data-detail-url="{{ route('app.stockrecon.line', [$run, $chain->LineId]) }}" tabindex="0" aria-expanded="false">
-                        <td><a href="{{ route('app.stockrecon.line', [$run, $chain->LineId]) }}">{{ $chain->ItemDescription }}</a><br><span class="muted">Area {{ $chain->AreaNo }} · {{ $chain->StockItemNo }} · {{ $chain->ShiftCount }} shifts</span></td>
+                        <td><a href="{{ route('app.stockrecon.line', [$run, $chain->LineId]) }}">{{ $chain->ItemDescription }}</a><br><span class="muted">Area {{ $chain->AreaNo }} · {{ $chain->StockItemNo }} · {{ $chain->ShiftCount }} shifts<br>{{ $chain->FirstShift }} – {{ $chain->LastShift }}</span></td>
                         <td>{{ $chain->UOMCode ?: 'Unknown' }}</td>
                         <td class="num">{{ \App\Support\Format::n($chain->Ratio, 3) }}</td>
                         <td class="num">{{ \App\Support\Format::n($chain->OriginalVariance, 3) }}</td>

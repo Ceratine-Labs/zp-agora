@@ -87,15 +87,15 @@
      */
     $hideEmpty = $hideEmpty ?? true;
     $emptyLines = $run->lines->filter(fn ($l) => $l->isEmptyChain());
-    $emptyChains = $emptyLines->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->count();
+    $emptyChains = $emptyLines->unique(fn ($l) => $l->continuityKey())->count();
     $rows = $hideEmpty ? $run->lines->reject(fn ($l) => $l->isEmptyChain()) : $run->lines;
     $showAll = ! $run->isOpen() || request()->query('scope') === 'all';
     $writableKeys = $rows->filter(fn ($l) => $l->isWritable() || (float) $l->AppliedGoodWaste > 0.0005 || str_starts_with((string) $l->Outcome, 'Missing shift:'))
-        ->map(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->unique()->flip();
-    $hiddenChains = $rows->reject(fn ($l) => $writableKeys->has($l->AreaNo.'|'.$l->StockItemNo))
-        ->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->count();
+        ->map(fn ($l) => $l->continuityKey())->unique()->flip();
+    $hiddenChains = $rows->reject(fn ($l) => $writableKeys->has($l->continuityKey()))
+        ->unique(fn ($l) => $l->continuityKey())->count();
     if (! $showAll) {
-        $rows = $rows->filter(fn ($l) => $writableKeys->has($l->AreaNo.'|'.$l->StockItemNo));
+        $rows = $rows->filter(fn ($l) => $writableKeys->has($l->continuityKey()));
     }
     $defaultStates = $showAll ? '' : implode('|', array_diff_key($states, ['clean' => true]));
 @endphp
@@ -355,6 +355,7 @@
                     </td>
                     <td class="fit-min" data-sort="{{ $chain->from()->toDateString() }}">
                         {{ $chain->from()->format('d M') }}{{ $chain->to()->ne($chain->from()) ? ' – '.$chain->to()->format('d M') : '' }}
+                        <br><span class="muted">Shift {{ $chain->first()->ShiftNo }} – {{ $chain->last()->ShiftNo }}</span>
                     </td>
                     <td class="num">{{ $chain->count() }}</td>
                     <td class="num" data-sort="{{ \App\Support\Format::n($first->QtyOpen, 3) }}">{{ \App\Support\Format::qty($first->QtyOpen) }}</td>

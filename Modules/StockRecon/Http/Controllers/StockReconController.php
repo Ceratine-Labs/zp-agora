@@ -268,7 +268,7 @@ class StockReconController extends Controller
             }
 
             $panes['proposals'] = [
-                'globalChains' => ($proposalGlobal['chains'] ?? collect())->keyBy(fn ($chain) => $chain->AreaNo.'|'.$chain->StockItemNo),
+                'globalChains' => ($proposalGlobal['chains'] ?? collect())->keyBy(fn ($chain) => $chain->AreaNo.'|'.$chain->StockItemNo.'|'.($chain->ContinuitySegment ?? 'legacy')),
                 'globalRefusal' => $proposalGlobalRefusal,
                 // These hidden empty chains remain counted, with a visible way
                 // to include them. The complete amendable set stays in the form.

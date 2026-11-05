@@ -35,8 +35,7 @@ class StockReconHelperController extends Controller
             abort_unless($line->RunId === $run->Id && $line->BranchId === $run->BranchId, 404);
         }
         $lines = $line === null ? collect() : $run->lines->filter(
-            fn (StockReconRunLine $candidate) => $candidate->AreaNo === $line->AreaNo
-                && $candidate->StockItemNo === $line->StockItemNo,
+            fn (StockReconRunLine $candidate) => $candidate->continuityKey() === $line->continuityKey(),
         )->values();
         $chain = $line === null ? ['item' => null, 'shifts' => collect()] : $this->recon->chain($run, $line);
         $choices = $this->helper->choices($run->lines, $topic);

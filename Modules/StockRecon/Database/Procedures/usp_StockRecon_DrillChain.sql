@@ -37,9 +37,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @AreaNo INT, @StockItemNo NVARCHAR(10);
+    DECLARE @AreaNo INT, @StockItemNo NVARCHAR(10), @ContinuitySegment INT;
 
-    SELECT @AreaNo = AreaNo, @StockItemNo = StockItemNo
+    SELECT @AreaNo = AreaNo, @StockItemNo = StockItemNo, @ContinuitySegment = ContinuitySegment
     FROM agora.StockReconRunLine
     WHERE BranchId = @BranchId AND RunId = @RunId AND Id = @LineId;
 
@@ -82,7 +82,7 @@ BEGIN
                  AND xse.ShiftNo         = x.ShiftNo
                  AND xse.AreaNo          = x.AreaNo
           WHERE x.BranchId = rl.BranchId AND x.RunId = rl.RunId
-            AND x.AreaNo = rl.AreaNo AND x.StockItemNo = rl.StockItemNo
+            AND x.AreaNo = rl.AreaNo AND x.StockItemNo = rl.StockItemNo AND ISNULL(x.ContinuitySegment, -1) = ISNULL(rl.ContinuitySegment, -1)
             AND ISNULL(x.EmployeeCodes, xse.EmployeeCodes) IS NOT NULL) AS DistinctEmployeeSets,
         MAX(rl.ActiveLen)                                   AS ActiveShifts,
         COUNT(*)                                            AS ChainShifts,
@@ -149,8 +149,8 @@ BEGIN
                   ORDER BY CASE WHEN m.AreaNo = rl.AreaNo THEN 0 ELSE 1 END, m.StockLocation) m
     LEFT JOIN agora.vw_StockArea   a ON a.BranchId = rl.BranchId AND a.AreaNo      = rl.AreaNo
     WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
-      AND rl.AreaNo = @AreaNo AND rl.StockItemNo = @StockItemNo
-    GROUP BY rl.BranchId, rl.RunId, rl.AreaNo, rl.StockItemNo;
+      AND rl.AreaNo = @AreaNo AND rl.StockItemNo = @StockItemNo AND ISNULL(rl.ContinuitySegment, -1) = ISNULL(@ContinuitySegment, -1)
+    GROUP BY rl.BranchId, rl.RunId, rl.AreaNo, rl.StockItemNo, rl.ContinuitySegment;
 
     /* The chain. `IsClicked` marks the row the reader came from, so a panel
        over twelve shifts does not make them find it again. `CumulativeVar` is
@@ -270,6 +270,6 @@ BEGIN
           AND se.ShiftNo         = rl.ShiftNo
           AND se.AreaNo          = rl.AreaNo
     WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
-      AND rl.AreaNo = @AreaNo AND rl.StockItemNo = @StockItemNo
+      AND rl.AreaNo = @AreaNo AND rl.StockItemNo = @StockItemNo AND ISNULL(rl.ContinuitySegment, -1) = ISNULL(@ContinuitySegment, -1)
     ORDER BY rl.[LineNo];
 END

@@ -8,11 +8,11 @@
      */
     $toBalance = $run->lines
         ->filter(fn ($l) => $l->WouldAmend && ! $l->ChainBlocked)
-        ->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)
+        ->unique(fn ($l) => $l->continuityKey())
         ->count();
 
     $alreadyBalanced = $run->lines
-        ->groupBy(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)
+        ->groupBy(fn ($l) => $l->continuityKey())
         ->filter(fn ($chain) => ! $chain->first()->ChainBlocked
             && ! $chain->contains(fn ($l) => $l->WouldAmend)
             && $chain->contains(fn ($l) => abs((float) $l->QtyCloseNew - (float) $l->QtyClose) > 0.0005

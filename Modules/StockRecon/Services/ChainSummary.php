@@ -29,7 +29,7 @@ final class ChainSummary
     public static function of(Collection $lines): Collection
     {
         return $lines
-            ->groupBy(fn (StockReconRunLine $line) => $line->AreaNo.'|'.$line->StockItemNo)
+            ->groupBy(fn (StockReconRunLine $line) => $line->continuityKey())
             ->map(fn (Collection $chain, string $key) => new self($key, $chain->values()))
             ->values();
     }

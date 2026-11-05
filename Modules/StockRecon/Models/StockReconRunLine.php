@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property int $LineNo
  * @property int $AreaNo
  * @property string $StockItemNo
+ * @property int|null $ContinuitySegment
  * @property Carbon $TransactionDate
  * @property int $ShiftNo
  * @property string|null $SellPrice
@@ -81,10 +82,25 @@ use Illuminate\Support\Carbon;
  * @property bool $CountsMove
  * @property bool $DupHold
  * @property int|null $DupReleaseId
+ * @property int|null $WasteAuthorizationId
+ * @property string|null $AuthorizedGoodWaste
+ * @property string|null $AppliedGoodWaste
+ * @property int|null $BalancingProfileId
+ * @property string|null $BalancingProfileName
+ * @property int|null $BalancingProfileRevision
+ * @property string|null $ProfileMaxAmendment
+ * @property string|null $ProfileMaxAmendmentPct
+ * @property int|null $ProfileMinShifts
+ * @property string|null $ProfileKeepBreaksUpTo
  * @property-read StockReconRun $run
  */
 class StockReconRunLine extends BaseModel
 {
+    public function continuityKey(): string
+    {
+        return $this->AreaNo.'|'.$this->StockItemNo.'|'.($this->ContinuitySegment ?? 'legacy');
+    }
+
     /**
      * READS COME FROM THE VIEW, and that is the fix for what Ryan saw on
      * 9 September 2026: a proposals row reading `10` over `area 1` while the
@@ -117,6 +133,7 @@ class StockReconRunLine extends BaseModel
         'RunId' => 'integer',
         'LineNo' => 'integer',
         'AreaNo' => 'integer',
+        'ContinuitySegment' => 'integer',
         'ShiftNo' => 'integer',
         'ActiveSeq' => 'integer',
         'ActiveLen' => 'integer',

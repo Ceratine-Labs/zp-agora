@@ -68,6 +68,7 @@ BEGIN
         rl.AreaNo,
         rl.AreaDescription,
         rl.StockItemNo,
+        rl.ContinuitySegment,
         rl.ItemDescription,
         rl.SellPrice,
         rl.TransactionDate,
@@ -158,7 +159,7 @@ BEGIN
     OUTER APPLY (SELECT TOP 1 t.Id, t.DupTier, t.QtyOpen, t.PrevClose, t.QtyIssued, t.QtyPOS, t.QtyClose
                    FROM agora.StockReconRunLine t
                   WHERE t.BranchId = rl.BranchId AND t.RunId = rl.RunId
-                    AND t.AreaNo = rl.AreaNo AND t.StockItemNo = rl.StockItemNo
+                    AND t.AreaNo = rl.AreaNo AND t.StockItemNo = rl.StockItemNo AND ISNULL(t.ContinuitySegment, -1) = ISNULL(rl.ContinuitySegment, -1)
                     AND t.TransactionDate = rl.DupTwinDate AND t.ShiftNo = rl.DupTwinShift) tw
     LEFT JOIN agora.StockReconAmendment am
       ON am.BranchId = rl.BranchId AND am.RunId = rl.RunId AND am.RunLineId = rl.Id
@@ -295,7 +296,7 @@ BEGIN
         /* What the possible ones leave on the shifts as counted: a short, so
            negative, at the sell price. */
         CONVERT(decimal(18,2), ISNULL(SUM(CASE WHEN DupTier = 'D2' THEN ShortValue END), 0))  AS PossibleValue,
-        (SELECT COUNT(*) FROM (SELECT DISTINCT AreaNo, StockItemNo FROM #case WHERE DupTier = 'D2' AND DupHold = 1) h) AS ChainsHeld
+        (SELECT COUNT(*) FROM (SELECT DISTINCT AreaNo, StockItemNo, ContinuitySegment FROM #case WHERE DupTier = 'D2' AND DupHold = 1) h) AS ChainsHeld
     FROM #case;
 
     DROP TABLE #case;

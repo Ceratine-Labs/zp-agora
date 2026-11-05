@@ -20,7 +20,7 @@ BEGIN
     SELECT @From=FromDate, @To=ISNULL(CompleteTo,ToDate)
     FROM agora.StockReconRun WHERE BranchId=@BranchId AND Id=@RunId;
 
-    SELECT ROW_NUMBER() OVER (ORDER BY c.AreaNo,c.StockItemNo) ChainId,
+    SELECT ROW_NUMBER() OVER (ORDER BY c.AreaNo,c.StockItemNo,c.ContinuitySegment) ChainId,
            c.*, COALESCE(NULLIF(c.SavedDescription,''),m.StockItemDescription,c.StockItemNo) ItemDescription,
            COALESCE(NULLIF(c.SavedPOS,''),m.POSCode) POSCode,
            m.UOMCode,
@@ -31,7 +31,9 @@ BEGIN
                CHARINDEX(' ',LTRIM(COALESCE(NULLIF(c.SavedDescription,''),m.StockItemDescription,c.StockItemNo))+' ')-1)) NameRoot
     INTO #chains
     FROM (
-        SELECT AreaNo,StockItemNo,MIN(Id) LineId,COUNT(*) ShiftCount,
+        SELECT AreaNo,StockItemNo,ContinuitySegment,MIN(Id) LineId,COUNT(*) ShiftCount,
+               MIN(CONVERT(char(10),TransactionDate,23)+' shift '+CONVERT(varchar(2),ShiftNo)) FirstShift,
+               MAX(CONVERT(char(10),TransactionDate,23)+' shift '+CONVERT(varchar(2),ShiftNo)) LastShift,
                MAX(ItemDescription) SavedDescription,MAX(POSCode) SavedPOS,
                MAX(StockLocation) SavedLocation,
                SUM(QtyVar) OriginalVariance,SUM(QtyVarNew) BalancedVariance,
@@ -41,7 +43,7 @@ BEGIN
                SUM(CASE WHEN DupTier='D2' THEN 1 ELSE 0 END) PossibleDuplicates
         FROM agora.StockReconRunLine
         WHERE BranchId=@BranchId AND RunId=@RunId
-        GROUP BY AreaNo,StockItemNo
+        GROUP BY AreaNo,StockItemNo,ContinuitySegment
     ) c
     OUTER APPLY (
         SELECT TOP 1 x.StockItemDescription,x.POSCode,x.UOMCode,x.PosSystem,x.PreProductionTypeNo,x.Ratio
@@ -69,7 +71,8 @@ BEGIN
                 ELSE 0 END LinkStrength
     INTO #pairs
     FROM #chains p JOIN #chains n ON p.Residual>0.005 AND n.Residual < -0.005
-        AND ABS(p.Residual+n.Residual)<=0.01;
+        AND ABS(p.Residual+n.Residual)<=0.01
+        AND NOT (p.AreaNo=n.AreaNo AND p.StockItemNo=n.StockItemNo);
 
     IF (SELECT COUNT(*) FROM #pairs)>100000
         THROW 51000, 'AGORA:GLOBAL_TOO_LARGE:Too many possible pairs; use a smaller run.', 1;
