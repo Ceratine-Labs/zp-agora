@@ -26,6 +26,19 @@ import { test } from './support/fixtures.js';
  * shape being tested, not a limitation of it.
  */
 test.describe('stock recon centre', () => {
+    test('runs history starts collapsed and retains its controls when opened', async ({ signedIn: page }) => {
+        await page.addInitScript(() => localStorage.removeItem('agora.open.card:stockrecon.runs'));
+        await page.goto('/app/stock-recon');
+
+        const runs = page.locator('details[data-remember="card:stockrecon.runs"]');
+        await expect(runs).toHaveJSProperty('open', false);
+        await runs.locator('summary').click();
+        await expect(runs).toHaveJSProperty('open', true);
+        await expect(runs.getByRole('link', { name: 'Mine' })).toBeVisible();
+        await expect(runs.getByRole('link', { name: 'Everyone' })).toBeVisible();
+        await expect(runs.locator('form').first()).toBeVisible();
+    });
+
     test('the standing explanation is behind the info button beside the title', async ({ signedIn: page }) => {
         await page.goto('/app/stock-recon');
 

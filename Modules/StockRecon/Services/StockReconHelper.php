@@ -77,6 +77,12 @@ class StockReconHelper
                 'Review next' => 'Compare the proposed issue with the issue sheet, receipts and POS evidence. Check the saved outcome and commit state before treating “Missing issue captured” as a completed write.',
             ]);
         }
+        if ($lines->contains(fn (StockReconRunLine $line) => $line->reducesIssue())) {
+            $cases[] = $this->case('An issue reduction was proposed', 'warn', 'missing-issues', [
+                'What it means' => 'Agora proposes reducing an issue by a whole configured multiple because the shift is short. The issue cannot be reduced below zero.',
+                'Review next' => 'Compare the proposed reduction with the issue sheet and check the commit state before treating it as a completed write.',
+            ]);
+        }
         if ($lines->contains(fn (StockReconRunLine $line) => (bool) $line->FlagChainBroken
             || $line->CountDriftReason !== null || $line->AuditCode !== null || (bool) $line->RestoresHand)) {
             $cases[] = $this->case('Separate the count bases', 'neutral', 'chains', [

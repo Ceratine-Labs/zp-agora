@@ -16,7 +16,7 @@
 
     @include('cash::banking.partials.facts', ['one' => $one, 'tolerance' => $tolerance])
 
-    <x-table :count="$totals->count()" procedure="agora.usp_Cash_GetCashup" dense empty="No legs on this cashup." style="margin-top:12px">
+    <x-table layout-key="Cash.cashups.row.1" :count="$totals->count()" procedure="agora.usp_Cash_GetCashup" dense empty="No legs on this cashup." style="margin-top:12px">
         <x-slot:head>
             <tr>
                 <th>Leg</th>

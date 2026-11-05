@@ -31,7 +31,7 @@ namespace App\Grid;
 final class GridColumnState
 {
     /** The only keys that are ever written to the database. */
-    public const KEYS = ['column_order', 'hidden', 'widths', 'text_size', 'page_size', 'sort', 'dir'];
+    public const KEYS = ['column_order', 'hidden', 'widths', 'text_size', 'table_height', 'page_size', 'sort', 'dir'];
 
     public const TEXT_SIZES = ['compact', 'normal', 'large'];
 
@@ -108,6 +108,10 @@ final class GridColumnState
 
         if (in_array($input['text_size'] ?? null, self::TEXT_SIZES, true)) {
             $clean['text_size'] = $input['text_size'];
+        }
+
+        if (in_array($input['table_height'] ?? null, ['compact', 'normal', 'large'], true)) {
+            $clean['table_height'] = $input['table_height'];
         }
 
         /** @var array<int, int> $sizes */

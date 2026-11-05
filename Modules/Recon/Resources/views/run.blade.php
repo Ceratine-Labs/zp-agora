@@ -84,7 +84,7 @@
     {{-- Provenance, not the answer: it has to be on the page and it should not
          be the first thing between the reader and the run. --}}
     <x-card title="What this run was given" collapsible flush>
-        <x-table dense :count="count($run->params()) + 3">
+        <x-table layout-key="Recon.run.1" dense :count="count($run->params()) + 3">
             <x-slot:head>
                 <tr><th>Argument</th><th>Value</th></tr>
             </x-slot:head>

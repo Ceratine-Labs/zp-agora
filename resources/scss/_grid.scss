@@ -258,6 +258,8 @@ table.dg {
 // somebody who cannot comfortably read the normal size, and tightening it
 // would take away the only setting that helps them.
 .dg-text-large   table.dg { font-size: 14.5px; th, td { padding: 9px 13px; line-height: 1.5; } }
+.dg-height-compact > .table-block > .table-scroll { max-height: 280px; }
+.dg-height-large > .table-block > .table-scroll { max-height: 80vh; }
 
 // The loading state. It sits above the table and the rows below it dim rather
 // than disappear — the figures the person was reading stay readable while the
@@ -424,6 +426,11 @@ td.dg-actions {
     dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
     dd.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
+
+  .dg-text-compact .dg-card-field, .dg-text-compact .dg-card-more dl { font-size: 12px; }
+  .dg-text-large .dg-card-field, .dg-text-large .dg-card-more dl { font-size: 15px; }
+  .dg-text-large .dg-card-label, .dg-text-large .dg-card-more dt { font-size: 12px; }
+  .dg-text-large .dg-card-field.is-lead .dg-card-value { font-size: 18px; }
 
   .dg-card-actions {
     display: flex; gap: 8px; flex-wrap: wrap; margin-top: 9px;

@@ -27,7 +27,7 @@
             ? 'Z-read EOD '.$s->EodCounter.' · log file '.$s->LogFiles.' · operator '.$s->PosUserIds.' · '.\App\Support\Format::r($s->Total).' in the file against '.\App\Support\Format::r($s->OnLegTotal).' on the leg'
             : 'No Z-read is allocated to this till and shift, so there is no batch file to read.'"
         flush style="margin-top:16px">
-    <x-table :count="$cards['lines']->count()" procedure="agora.usp_Cash_LoadCardAmounts" dense
+    <x-table layout-key="Cash.banking.partials.cards.1" :count="$cards['lines']->count()" procedure="agora.usp_Cash_LoadCardAmounts" dense
              empty="The terminal's batch file has nothing for this Z-read.">
         <x-slot:head>
             <tr>

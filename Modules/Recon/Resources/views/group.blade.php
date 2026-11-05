@@ -128,7 +128,7 @@
                 </x-info>
             </x-action-bar>
 
-            <x-table :count="$sites->count()" :procedure="'agora.'.$area['procedure']"
+            <x-table layout-key="Recon.group.1" :count="$sites->count()" :procedure="'agora.'.$area['procedure']"
                      id="group-sites" tools
                      empty="No trading site is in scope for you.">
                 <x-slot:head>

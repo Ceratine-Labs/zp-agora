@@ -90,6 +90,7 @@ export default function tableTools(root = document) {
     fresh('[data-action-bar]', 'data-action-bar-ready').forEach(actionBar);
 
     fresh('table[data-table-tools]', 'data-table-tools-ready').forEach((table) => {
+        restoreReloadSelection(table);
         const tools = new TableTools(table);
 
         if (!tools.usable) {
@@ -108,6 +109,22 @@ export default function tableTools(root = document) {
         // holding references to rows the DOM has thrown away.
         table.addEventListener('table-tools:rescan', () => tools.refresh());
     });
+}
+
+/* The full stock-recon scope includes chains the default scope did not send.
+   Returning from that view needs a reload; carry the operator's ticks across
+   it so a filter button cannot silently undo their selection. */
+function restoreReloadSelection(table) {
+    if (!table.id) return;
+    try {
+        const key = `agora.table-defaults.selection:${table.id}`;
+        const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+        sessionStorage.removeItem(key);
+        if (!saved || Date.now() - saved.at > 60000 || !saved.boxes) return;
+        table.querySelectorAll('[data-check]').forEach((box) => {
+            if (Object.hasOwn(saved.boxes, box.value)) box.checked = saved.boxes[box.value];
+        });
+    } catch (_) { /* A disabled browser storage must not break the table. */ }
 }
 
 /** Mark a table as laid out, and say so. */
@@ -392,14 +409,14 @@ class TableTools {
      * in the filter row so the columns still line up.
      */
     readColumns() {
-        return Array.from(this.headRow.cells).map((th, index) => {
+        return Array.from(this.headRow.cells).map((th) => {
             const skip = th.classList.contains('pick')
                 || th.classList.contains('dg-actions-head')
                 || th.hasAttribute('data-no-tools')
                 || th.querySelector('a');
 
             const column = {
-                index,
+                get index() { return th.cellIndex; },
                 th,
                 label: th.textContent.trim(),
                 skip,
@@ -471,6 +488,23 @@ class TableTools {
         this.buildPills();
         if (this.grouped) this.buildGroups();
         this.buildPager();
+        document.querySelectorAll('[data-tt-restore-defaults]').forEach((control) => {
+            if (control.dataset.ttRestoreDefaults !== this.table.id) return;
+            control.addEventListener('click', (event) => {
+                event.preventDefault();
+                this.restoreDefaults();
+            });
+        });
+        document.querySelectorAll('[data-tt-defaults-reload]').forEach((control) => {
+            if (control.dataset.ttDefaultsReload !== this.table.id) return;
+            control.addEventListener('click', () => {
+                try {
+                    const boxes = {};
+                    this.table.querySelectorAll('[data-check]').forEach((box) => { boxes[box.value] = box.checked; });
+                    sessionStorage.setItem(`agora.table-defaults.selection:${this.table.id}`, JSON.stringify({ at: Date.now(), boxes }));
+                } catch (_) { /* The link still works if storage is unavailable. */ }
+            });
+        });
         stickyHead(this.table);
         // Not `report(total)`: a pill strip can arrive with a default scope on,
         // so the first paint has to be a real pass over the rows rather than an
@@ -625,6 +659,20 @@ class TableTools {
             this.markPills(column);
         });
 
+        this.refilter();
+    }
+
+    /** Restore the opening scopes without changing anyone's ticked rows. */
+    restoreDefaults() {
+        this.columns.forEach((column) => {
+            column.query = '';
+            if (column.input) column.input.value = '';
+            const opening = column.pillDefault.filter((value) =>
+                this.rows.some((row) => (this.text(row, column.index) || NOTHING) === value));
+            column.chosen = opening.length ? new Set(opening) : null;
+            this.markColumn(column);
+            this.markPills(column);
+        });
         this.refilter();
     }
 

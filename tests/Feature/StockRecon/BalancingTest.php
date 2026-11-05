@@ -13,10 +13,13 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserPermission;
 use Modules\Core\Services\PermissionService;
+use Modules\Reports\Services\WasteAuthorizationService;
 use Modules\StockRecon\Models\StockReconAmendment;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
+use Modules\StockRecon\Services\AreaShiftCompletionService;
 use Modules\StockRecon\Services\ChainSummary;
+use Modules\StockRecon\Services\ItemRemovalService;
 use Modules\StockRecon\Services\ProposalMetric;
 use Modules\StockRecon\Services\StockReconService;
 use Tests\Fixtures\GrantsAccess;
@@ -78,6 +81,303 @@ class BalancingTest extends TestCase
     /** @var array<int, User> people a test made, removed in tearDown */
     private array $made = [];
 
+    public function test_opening_break_uses_following_over_to_reduce_previous_short_before_adding_issue(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [187, 0, 131, 58], 3 => [131, 0, 113, 16]],
+            '2026-07-18' => [1 => [113, 0, 0, 40], 3 => [0, 0, 61, 11]],
+            '2026-07-19' => [1 => [61, 300, 321, 40], 3 => [321, 0, 306, 15]],
+            '2026-07-20' => [1 => [306, 0, 288, 18], 3 => [288, 0, 203, 24]],
+            '2026-07-21' => [1 => [258, 0, 236, 27], 3 => [236, 0, 211, 25]],
+            '2026-07-22' => [1 => [211, 0, 195, 16], 3 => [195, 0, 176, 19]],
+            '2026-07-23' => [1 => [176, 0, 156, 20], 3 => [156, 0, 140, 16]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 60]);
+        $run = $this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'),
+            Carbon::parse('2026-07-23'), note: 'TEST-opening')->load('lines');
+        $night = $this->lineAt($run, '2026-07-20', 3);
+        $day = $this->lineAt($run, '2026-07-21', 1);
+        $this->assertFalse((bool) $night->ChainBlocked, $night->Outcome);
+        $this->assertEqualsWithDelta(-1, (float) $night->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $day->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(263, (float) $night->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(263, (float) $day->QtyOpenNew, 0.001);
+        $this->assertNull($day->QtyIssuedNew);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $day->Id)->update(['QtyIssuedNew' => 60]);
+        try {
+            $this->service->commit($run);
+            $this->fail('A stale issue proposal at this opening must be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('before offsetting a previous short', $e->getMessage());
+        }
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $day->Id)->update(['QtyIssuedNew' => null]);
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(263, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-21', 1)->QtyIssued, 0.001);
+        $this->service->reverse($run->fresh(), 'TEST-opening reversal');
+        $this->assertEqualsWithDelta(203, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 3)->QtyClose, 0.001);
+    }
+
+    public function test_removal_before_window_starts_returned_item_without_old_opening(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-15' => [3 => [30, 0, 30, 0]],
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        $before = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringContainsString('Missing shift:', $this->lineAt($before, '2026-07-17', 1)->Outcome);
+        app(ItemRemovalService::class)->record(self::BRANCH, self::SHELF_AREA,
+            ['item' => self::DUP_ITEM, 'date' => '2026-07-15', 'shift' => 3], 1);
+        $after = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($after, '2026-07-17', 1);
+        $this->assertStringNotContainsString('Missing shift:', $line->Outcome);
+        $this->assertEqualsWithDelta(0, (float) $line->ChainBreak, 0.001);
+        $this->assertEqualsWithDelta(50, (float) $line->QtyOpenNew, 0.001);
+    }
+
+    public function test_completed_area_shift_holds_area_when_item_is_absent_for_entire_window(): void
+    {
+        $this->seedShelfChain(['2026-07-17' => [1 => [50, 0, 45, 0], 3 => [45, 0, 45, 0]]]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->insert([
+            'SSBranchId' => self::BRANCH, 'StockItemNo' => 'TOLD', 'StockItemDescription' => 'TEST absent item',
+            'AreaNo' => self::SHELF_AREA, 'Location' => 'TEST', 'UOMCode' => 'EA', 'SellingPrice' => 1,
+            'POSCode' => 'TESTOLD', 'QtyVarAllowance' => 0, 'isMonitoredItem' => 0, 'IssueMultiple' => 1,
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')->insert(
+            $this->line('TOLD', '2026-07-16', 3, 20, 0, 20, 0, self::SHELF_AREA)
+        );
+        $before = $this->previewArea(self::SHELF_AREA);
+        $service = app(AreaShiftCompletionService::class);
+        $service->record(self::BRANCH, self::SHELF_AREA, ['date' => '2026-07-17', 'shift' => 3], 1);
+        $held = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringContainsString('item TOLD', $this->lineAt($held, '2026-07-17', 1)->Outcome);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $this->lineAt($before, '2026-07-17', 1)->Id)
+            ->update(['WouldAmend' => 1, 'Selected' => 1]);
+        try {
+            $this->service->commit($before);
+            $this->fail('A missing item in a completed area shift must invalidate an older preview.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('absent from a completed area shift', $e->getMessage());
+        }
+        app(ItemRemovalService::class)->record(self::BRANCH, self::SHELF_AREA,
+            ['item' => 'TOLD', 'date' => '2026-07-16', 'shift' => 3], 1);
+        $resolved = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringNotContainsString('Missing shift:', $this->lineAt($resolved, '2026-07-17', 1)->Outcome);
+    }
+
+    public function test_completed_area_shift_flags_a_missing_final_item_count_and_withdrawal_restores_preview(): void
+    {
+        $this->seedShelfChain(['2026-07-17' => [1 => [50, 0, 45, 0]]]);
+        $before = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringNotContainsString('Missing shift:', $this->lineAt($before, '2026-07-17', 1)->Outcome);
+        $service = app(AreaShiftCompletionService::class);
+        $service->record(self::BRANCH, self::SHELF_AREA, ['date' => '2026-07-17', 'shift' => 3], 1);
+        $blocked = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringContainsString('2026-07-17 shift 3', $this->lineAt($blocked, '2026-07-17', 1)->Outcome);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $this->lineAt($before, '2026-07-17', 1)->Id)
+            ->update(['WouldAmend' => 1, 'Selected' => 1]);
+        try {
+            $this->service->commit($before);
+            $this->fail('A completed area shift must invalidate an older preview.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('required continuation is missing', $e->getMessage());
+        }
+        $completion = $service->history(self::BRANCH, self::SHELF_AREA)->first();
+        $service->withdraw(self::BRANCH, self::SHELF_AREA, $completion->Id, 1);
+        $after = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringNotContainsString('Missing shift:', $this->lineAt($after, '2026-07-17', 1)->Outcome);
+    }
+
+    public function test_recorded_removal_resolves_tail_gap_and_withdrawal_reinstates_it(): void
+    {
+        $this->seedShelfChain(['2026-07-17' => [1 => [50, 0, 45, 0]]]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->insert([
+            'SSBranchId' => self::BRANCH, 'StockItemNo' => 'TLATE', 'StockItemDescription' => 'TEST later item',
+            'AreaNo' => self::SHELF_AREA, 'Location' => 'TEST', 'UOMCode' => 'EA', 'SellingPrice' => 1,
+            'POSCode' => 'TESTLATE', 'QtyVarAllowance' => 0, 'isMonitoredItem' => 0, 'IssueMultiple' => 1,
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')->insert(
+            $this->line('TLATE', '2026-07-17', 3, 20, 0, 20, 0, self::SHELF_AREA)
+        );
+        $run = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringContainsString('2026-07-17 shift 3', $this->lineAt($run, '2026-07-17', 1)->Outcome);
+        $service = app(ItemRemovalService::class);
+        $service->record(self::BRANCH, self::SHELF_AREA, ['item' => self::DUP_ITEM, 'date' => '2026-07-17', 'shift' => 1], 1);
+        $cleared = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringNotContainsString('Missing shift:', $this->lineAt($cleared, '2026-07-17', 1)->Outcome);
+        $removal = $service->history(self::BRANCH, self::SHELF_AREA)->first();
+        $service->withdraw(self::BRANCH, self::SHELF_AREA, $removal->Id, 1);
+        $again = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringContainsString('2026-07-17 shift 3', $this->lineAt($again, '2026-07-17', 1)->Outcome);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $this->lineAt($cleared, '2026-07-17', 1)->Id)
+            ->update(['WouldAmend' => 1, 'Selected' => 1]);
+        try {
+            $this->service->commit($cleared);
+            $this->fail('A withdrawn removal must invalidate the saved preview.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('required continuation is missing', $e->getMessage());
+        }
+    }
+
+    public function test_missing_configured_shift_holds_chain_until_corrected(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 45, 0]],
+            '2026-07-18' => [1 => [45, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        foreach ($run->lines->where('StockItemNo', self::DUP_ITEM) as $line) {
+            $this->assertTrue((bool) $line->ChainBlocked);
+            $this->assertFalse((bool) $line->WouldAmend);
+            $this->assertSame('blocked', $line->outcomeKey());
+            $this->assertSame('crit', $line->tone());
+            $this->assertFalse($line->isEmptyChain());
+            $this->assertStringContainsString('2026-07-17 shift 3', $line->Outcome);
+        }
+        $this->actingAs($this->person('admin'))->get(route('app.stockrecon.run', $run))
+            ->assertOk()->assertSee('2026-07-17 shift 3')->assertSee('data-tone="crit"', false);
+        // A saved preview made before the guard cannot bypass it either.
+        $line = $this->lineAt($run, '2026-07-17', 1);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $line->Id)
+            ->update(['ChainBlocked' => 0, 'WouldAmend' => 1, 'Selected' => 1]);
+        try {
+            $this->service->commit($run);
+            $this->fail('A saved run with a required missing shift must be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('required shift is missing', $e->getMessage());
+        }
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')->insert(
+            $this->line(self::DUP_ITEM, '2026-07-17', 3, 45, 0, 45, 0, self::SHELF_AREA)
+        );
+        $corrected = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringNotContainsString('Missing shift:', $this->lineAt($corrected, '2026-07-18', 1)->Outcome);
+    }
+
+    public function test_shift_sequence_uses_each_areas_enabled_shifts(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+            '2026-07-18' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        $normal = $this->previewArea(self::SHELF_AREA);
+        $this->assertStringNotContainsString('Missing shift:', $this->lineAt($normal, '2026-07-18', 1)->Outcome);
+        $this->db()->table('PumpIT.dbo.STK_Area')->where('SSBranchId', self::BRANCH)
+            ->where('AreaNo', self::SHELF_AREA)->update(['AfternoonShift' => 1]);
+        $threeShifts = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($threeShifts, '2026-07-17', 3);
+        $this->assertTrue((bool) $line->ChainBlocked);
+        $this->assertStringContainsString('2026-07-17 shift 2', $line->Outcome);
+    }
+
+    public function test_shift_removed_after_preview_cannot_be_committed(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 45, 0], 3 => [45, 0, 50, 0]],
+            '2026-07-18' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $selected = $this->lineAt($run, '2026-07-17', 1);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $selected->Id)->update(['Selected' => 1, 'WouldAmend' => 1]);
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->where('TransactionDate', '2026-07-18')->where('ShiftNo', 1)->delete();
+        try {
+            $this->service->commit($run);
+            $this->fail('A chain missing an intermediate source row must be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('shift in this item chain no longer exists', $e->getMessage());
+        }
+    }
+
+    public function test_gap_between_previous_window_and_first_shift_is_flagged(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-16' => [3 => [50, 0, 50, 0]],
+            '2026-07-17' => [3 => [50, 0, 50, 0]],
+            '2026-07-18' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        $line = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-17', 3);
+        $this->assertTrue((bool) $line->ChainBlocked);
+        $this->assertStringContainsString('2026-07-17 shift 1', $line->Outcome);
+    }
+
+    public function test_preview_applies_only_authorized_good_waste_and_refuses_a_stale_decision(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [50, 0, 45, 0]],
+            '2026-07-18' => [1 => [45, 0, 45, 0], 3 => [45, 0, 45, 0]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockWasteLine')->insert([
+            'SSBranchId' => self::BRANCH, 'TransactionDate' => '2026-07-17', 'ShiftNo' => 3,
+            'AreaNo' => self::SHELF_AREA, 'StockItemNo' => self::DUP_ITEM,
+            'QtyGoodWaste' => 3, 'QtyBadWaste' => 100,
+        ]);
+        $before = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-17', 3);
+        $this->assertEqualsWithDelta(-5, (float) $before->QtyVarNew, 0.001);
+        $data = ['branch_id' => self::BRANCH, 'date' => '2026-07-17', 'shift' => 3,
+            'area' => self::SHELF_AREA, 'item' => self::DUP_ITEM, 'captured_good' => 3,
+            'captured_at' => null, 'decision' => 'authorize', 'authorized_good' => 3];
+        app(WasteAuthorizationService::class)->decide($data, 123);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($run, '2026-07-17', 3);
+        $this->assertEqualsWithDelta(-2, (float) $line->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(3, (float) $line->AppliedGoodWaste, 0.001);
+        $this->assertStringContainsString('Authorized waste applied', $line->Outcome);
+        $this->assertNull($line->QtyIssuedNew);
+        $this->actingAs($this->person('admin'))->get(route('app.stockrecon.run', $run))
+            ->assertOk()->assertSee('Authorized waste applied');
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $line->Id)->update(['WouldAmend' => 1, 'Selected' => 1]);
+        $data['decision'] = 'withdraw';
+        app(WasteAuthorizationService::class)->decide($data, 123);
+        try {
+            $this->service->commit($run);
+            $this->fail('A changed waste authorization must require a fresh preview.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('Waste authorization changed', $e->getMessage());
+        }
+    }
+
+    public function test_preview_caps_authorized_waste_at_the_short_and_leaves_overs_alone(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 45, 0], 3 => [45, 0, 50, 0]],
+            '2026-07-18' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        foreach ([1, 3] as $shift) {
+            $this->db()->table('PumpIT.dbo.STK_StockWasteLine')->insert([
+                'SSBranchId' => self::BRANCH, 'TransactionDate' => '2026-07-17', 'ShiftNo' => $shift,
+                'AreaNo' => self::SHELF_AREA, 'StockItemNo' => self::DUP_ITEM,
+                'QtyGoodWaste' => 7, 'QtyBadWaste' => 0,
+            ]);
+            app(WasteAuthorizationService::class)->decide(['branch_id' => self::BRANCH, 'date' => '2026-07-17',
+                'shift' => $shift, 'area' => self::SHELF_AREA, 'item' => self::DUP_ITEM, 'captured_good' => 7,
+                'captured_at' => null, 'decision' => 'authorize', 'authorized_good' => 7], 123);
+        }
+        $run = $this->previewArea(self::SHELF_AREA);
+        $short = $this->lineAt($run, '2026-07-17', 1);
+        $over = $this->lineAt($run, '2026-07-17', 3);
+        $this->assertEqualsWithDelta(0, (float) $short->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(5, (float) $short->AppliedGoodWaste, 0.001);
+        $this->assertEqualsWithDelta(5, (float) $over->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $over->AppliedGoodWaste, 0.001);
+    }
+
+    public function test_incomplete_day_option_keeps_missing_shift_warning_visible(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0]],
+            '2026-07-18' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+            '2026-07-19' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        $run = $this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'),
+            Carbon::parse('2026-07-19'), ['HoldBackIncomplete' => 1], note: 'TEST-gap')->load('lines');
+        $line = $this->lineAt($run, '2026-07-18', 1);
+        $this->assertTrue((bool) $line->ChainBlocked);
+        $this->assertFalse((bool) $line->WouldAmend);
+        $this->assertStringContainsString('2026-07-17 shift 3', $line->Outcome);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -107,27 +407,16 @@ class BalancingTest extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * THE INVARIANT. Every over goes to zero, and what is left short is
-     * exactly |T| — the total the window fixed before anything was amended.
-     *
-     * Checked on the UNBLOCKED chain only, because a blocked one carries no
-     * proposal at all and its counted variance stands.
-     */
+    /** Count changes cannot cancel or move a counted shortage to another shift. */
     public function test_the_invariant_holds(): void
     {
         $run = $this->preview();
-
-        $lines = $run->lines->where('StockItemNo', self::ITEM);
-
-        $overAfter = $lines->filter(fn ($l) => (float) $l->QtyVarNew > 0.005);
-        $shortAfter = $lines->sum(fn ($l) => max(0.0, -(float) $l->QtyVarNew));
-        $total = $lines->sum(fn ($l) => (float) $l->QtyVar);
-
-        $this->assertTrue($overAfter->isEmpty(), 'No shift may end over: an over is written down to zero and no further.');
-        $this->assertEqualsWithDelta(abs($total), $shortAfter, 0.001,
-            'The residual short must equal |T| exactly — it is the floor the invariant fixes, not a target.');
-        $this->assertEqualsWithDelta(-5.0, $total, 0.001, 'The worked example ends five units short.');
+        foreach ($run->lines->where('StockItemNo', self::ITEM) as $line) {
+            if ((float) $line->QtyVar < -0.005) {
+                $issueChange = (float) ($line->QtyIssuedNew ?? $line->QtyIssued) - (float) $line->QtyIssued;
+                $this->assertEqualsWithDelta((float) $line->QtyVar - $issueChange, (float) $line->QtyVarNew, 0.005);
+            }
+        }
     }
 
     public function test_proposal_metrics_drill_into_the_preview_totals(): void
@@ -194,9 +483,10 @@ class BalancingTest extends TestCase
         config(['stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
         $this->seedShelfChain([
             '2026-07-17' => [1 => [5, 0, 5, 0], 3 => [5, 0, 5, 0]],
-            '2026-07-18' => [1 => [5, 0, 6, 0], 3 => [6, 0, 6, 0]],
-            '2026-07-19' => [1 => [6, 0, 6, 0], 3 => [6, 0, 6, 0]],
+            '2026-07-18' => [1 => [5, 0, 7, 0], 3 => [7, 0, 7, 0]],
+            '2026-07-19' => [1 => [7, 0, 7, 0], 3 => [7, 0, 7, 0]],
         ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 2]);
         $run = $this->previewArea(self::SHELF_AREA);
         $selector = new ProposalMetric;
         $this->assertSame($run->AmendedRows, $selector->records($run->lines, 'amended')->count());
@@ -290,7 +580,11 @@ class BalancingTest extends TestCase
      */
     public function test_a_row_whose_opening_alone_moves_is_still_written(): void
     {
-        $run = $this->preview();
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [45, 0, 50, 0]],
+            '2026-07-18' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
 
         $openingOnly = $run->lines->filter(
             fn (StockReconRunLine $l) => $l->WouldAmend && abs((float) $l->AmendClose) < 0.005
@@ -327,23 +621,12 @@ class BalancingTest extends TestCase
         $this->assertTrue($broken->FlagChainBroken, 'The break was not noticed.');
         $this->assertSame('S10b', $broken->ExceptionCode, 'An opening above the previous closing is the pack\'s S10b.');
         $this->assertEqualsWithDelta(949.0, (float) $broken->ChainBreak, 0.005);
-        $this->assertFalse($broken->ChainBlocked, 'A break is repaired now, not blocked.');
-        $this->assertEqualsWithDelta(50.0, (float) $broken->QtyOpenNew, 0.005, 'The opening is amended to the previous closing.');
-        $this->assertTrue($broken->WouldAmend, 'The repair is written.');
-        $this->assertStringStartsWith('Opening repaired', $broken->Outcome);
-
-        $this->assertEqualsWithDelta((float) $before->QtyClose, (float) $before->QtyCloseNew, 0.005,
-            'The closing before a repaired opening stands — moving it is what the pack calls S12.');
-
-        // The invariant still holds, on the repaired total: every over goes to
-        // zero and the residual short is exactly the chain total.
-        $this->assertTrue($lines->every(fn ($l) => (float) $l->QtyVarNew <= 0.005));
-        $this->assertEqualsWithDelta(-5.0, $lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.001);
-        $this->assertEqualsWithDelta(-5.0, (float) $broken->ChainNetVar, 0.001,
-            'T is the repaired total: the break is not a loss or a gain, it is a capture error.');
-        $this->assertEqualsWithDelta(-5.0 - 949.0, $lines->sum(fn ($l) => (float) $l->QtyVar), 0.001,
-            'The counted variance still shows what the staff actually wrote down.');
-        $this->assertSame(1, (int) $run->fresh()->RepairedOpenings);
+        $this->assertTrue((bool) $broken->ChainBlocked, 'Repairing this opening would erase a counted short.');
+        $this->assertFalse((bool) $broken->WouldAmend);
+        $this->assertEqualsWithDelta((float) $broken->QtyVar, (float) $broken->QtyVarNew, 0.005);
+        $this->assertStringContainsString('move a shift shortage', $broken->Outcome);
+        $this->assertEqualsWithDelta((float) $before->QtyClose, (float) $before->QtyCloseNew, 0.005);
+        $this->assertSame(0, (int) $run->fresh()->RepairedOpenings);
     }
 
     /**
@@ -362,8 +645,10 @@ class BalancingTest extends TestCase
 
         $this->assertSame('S10a', $line->ExceptionCode);
         $this->assertEqualsWithDelta(-10.0, (float) $line->ChainBreak, 0.005);
-        $this->assertEqualsWithDelta(50.0, (float) $line->QtyOpenNew, 0.005);
+        $this->assertTrue((bool) $line->ChainBlocked);
+        $this->assertEqualsWithDelta(40.0, (float) $line->QtyOpenNew, 0.005);
         $this->assertEqualsWithDelta(0.0, (float) $line->QtyVar, 0.005, 'As counted, the shift looked balanced.');
+        $this->assertEqualsWithDelta(0.0, (float) $line->QtyVarNew, 0.005, 'The repair must not create a short.');
         $this->assertEqualsWithDelta(-5.0, (float) $line->ChainNetVar, 0.001,
             'Repaired, the ten units that vanished are back in the chain total.');
     }
@@ -440,14 +725,13 @@ class BalancingTest extends TestCase
         $this->assertTrue($broken->BreakKept, 'A two-unit break is kept.');
         $this->assertEqualsWithDelta(-2.0, (float) $broken->ChainBreak, 0.005);
         $this->assertSame('S10a', $broken->ExceptionCode, 'A kept break is still on the exceptions tab.');
-        $this->assertStringStartsWith('Break -2.000 kept', $broken->Outcome, 'The qty is on the row.');
+        $this->assertStringStartsWith('Unrecorded issue', $broken->Outcome, 'The residual over stays visible.');
         $this->assertNull($broken->AuditCode, 'S13 does not read a break that small.');
 
         $this->assertTrue($lines->every(fn ($l) => ! $l->ChainBlocked), 'The chain is not split, so no stretch of it ends over.');
-        $this->assertEqualsWithDelta(39.0, (float) $lines['2026-07-19/1']->QtyCloseNew, 0.005,
-            'The closing before a kept break moves: the chain balances through it.');
-        $this->assertEqualsWithDelta(39.0, (float) $broken->QtyOpenNew, 0.005, 'The opening follows it.');
-        $this->assertTrue($lines->every(fn ($l) => (float) $l->QtyVarNew <= 0.005), 'No shift ends over.');
+        $this->assertEqualsWithDelta(30.0, (float) $lines['2026-07-19/1']->QtyCloseNew, 0.005);
+        $this->assertEqualsWithDelta(30.0, (float) $broken->QtyOpenNew, 0.005, 'A safe opening repair follows the preceding count.');
+        $this->assertTrue($lines->contains(fn ($l) => (float) $l->QtyVarNew > 0.005), 'The over is not used to cancel a short.');
         $this->assertEqualsWithDelta(-5.0, $lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.001, 'The invariant still holds.');
         $this->assertSame(1, (int) $run->fresh()->KeptBreaks);
 
@@ -488,8 +772,9 @@ class BalancingTest extends TestCase
         $this->assertFalse((bool) $next->FlagSoldMoreThanOnHand);
         $this->assertFalse((bool) $next->ChainBlocked, 'A chain whose total is nil is not held back by a miscount.');
         $this->assertEqualsWithDelta(0.0, (float) $miscount->ChainNetVar, 0.001);
-        $this->assertEqualsWithDelta(2.0, (float) $miscount->QtyCloseNew, 0.005, 'The miscounted closing goes 0 → 2, as head office did by hand.');
-        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
+        $this->assertEqualsWithDelta(0.0, (float) $miscount->QtyCloseNew, 0.005);
+        $this->assertEqualsWithDelta(-2.0, (float) $miscount->QtyVarNew, 0.005);
+        $this->assertEqualsWithDelta(2.0, (float) $next->QtyVarNew, 0.005);
     }
 
     /**
@@ -539,8 +824,9 @@ class BalancingTest extends TestCase
         $this->assertFalse((bool) $over->FlagCloseExceedsOnHand, 'The short before it covers the over: nothing came from nowhere.');
         $this->assertFalse((bool) $over->ChainBlocked, 'A chain whose total is nil is not held back by one miscount.');
         $this->assertEqualsWithDelta(0.0, (float) $over->ChainNetVar, 0.001);
-        $this->assertEqualsWithDelta(3.0, (float) $miscount->QtyCloseNew, 0.005, 'The miscounted closing goes 1 → 3.');
-        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
+        $this->assertEqualsWithDelta(1.0, (float) $miscount->QtyCloseNew, 0.005);
+        $this->assertEqualsWithDelta(-2.0, (float) $miscount->QtyVarNew, 0.005);
+        $this->assertEqualsWithDelta(2.0, (float) $over->QtyVarNew, 0.005);
     }
 
     /**
@@ -564,8 +850,9 @@ class BalancingTest extends TestCase
 
         $this->assertFalse((bool) $over->FlagCloseExceedsOnHand, 'The short after it covers the over.');
         $this->assertFalse((bool) $over->ChainBlocked);
-        $this->assertEqualsWithDelta(3.0, (float) $over->QtyCloseNew, 0.005, 'The closing counted high goes 5 → 3.');
-        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
+        $this->assertEqualsWithDelta(5.0, (float) $over->QtyCloseNew, 0.005);
+        $this->assertEqualsWithDelta(2.0, (float) $over->QtyVarNew, 0.005);
+        $this->assertEqualsWithDelta(-2.0, (float) $this->lineAt($run, '2026-07-19', 1)->QtyVarNew, 0.005);
     }
 
     /**
@@ -619,9 +906,10 @@ class BalancingTest extends TestCase
         $this->assertTrue((bool) $over->FlagCloseExceedsOnHand, 'Neither side covers the 6 alone: still U2.');
         $this->assertSame('U2', $over->ExceptionCode, 'And reported as one.');
         $this->assertFalse((bool) $over->ChainBlocked, 'But the chain is nil, so it balances.');
-        $this->assertNotSame('unrecorded', $over->outcomeKey());
-        $this->assertStringStartsNotWith('Unrecorded issue', $over->Outcome);
-        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
+        $this->assertSame('unrecorded', $over->outcomeKey());
+        $this->assertEqualsWithDelta(6, (float) $over->QtyVarNew, 0.005);
+        $this->assertEqualsWithDelta(-2, (float) $this->lineAt($run, '2026-07-18', 1)->QtyVarNew, 0.005);
+        $this->assertEqualsWithDelta(-4, (float) $this->lineAt($run, '2026-07-19', 1)->QtyVarNew, 0.005);
     }
 
     /**
@@ -648,7 +936,7 @@ class BalancingTest extends TestCase
 
         $handBalanced = $this->previewArea(self::SHELF_AREA);
         $this->assertFalse($handBalanced->lines->contains(fn ($l) => $l->ChainBlocked), 'Balanceable…');
-        $this->assertFalse($handBalanced->lines->contains(fn ($l) => $l->WouldAmend), '…and nothing to write: PumpIT holds the answer.');
+        $this->assertTrue($handBalanced->lines->contains(fn ($l) => $l->WouldAmend), 'The original shift shortage differs from the hand-balanced source.');
 
         $reset = $this->service->resetToOriginal($handBalanced);
         $this->assertSame('RESET', $reset['status']->Code);
@@ -668,26 +956,13 @@ class BalancingTest extends TestCase
             ->where('Ledger', 'StockReconAmendment')->where('Ref', 'Stock recon run '.$handBalanced->Id)
             ->where('Action', 'Reset to original')->count());
 
-        // The preview after it balances from the staff counts, and writes.
+        // Once explicitly reset, no proposal rolls the short onto the over.
         $next = $reset['run']->load('lines');
         $miscount = $this->lineAt($next, '2026-07-18', 3);
-        $this->assertTrue((bool) $miscount->WouldAmend);
-        $this->assertEqualsWithDelta(3.0, (float) $miscount->QtyCloseNew, 0.005);
+        $this->assertFalse((bool) $miscount->WouldAmend);
+        $this->assertEqualsWithDelta(1.0, (float) $miscount->QtyCloseNew, 0.005);
+        $this->assertEqualsWithDelta(-2.0, (float) $miscount->QtyVarNew, 0.005);
 
-        $commit = $this->service->commit($next);
-        $this->assertSame('COMMITTED', $commit['status']->Code, 'A balancing commit stands on the reset.');
-        $this->assertEqualsWithDelta(3.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.0005);
-
-        // Unwound in order: the reset refuses while the balancing stands.
-        try {
-            $this->service->reverse($handBalanced->fresh(), 'TEST-out of order');
-            $this->fail('The reset must not be reversed over the balancing written on it.');
-        } catch (AgoraProcException $e) {
-            $this->assertSame('COUNT_MOVED', $e->code());
-        }
-
-        $this->service->reverse($next->fresh(), 'TEST-balancing off');
-        $this->assertEqualsWithDelta(1.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.0005);
         $this->service->reverse($handBalanced->fresh(), 'TEST-reset off');
         $this->assertEqualsWithDelta(3.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.0005, 'Back to the hand figure.');
         $this->assertEqualsWithDelta(3.0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyOpen, 0.0005);
@@ -824,9 +1099,30 @@ class BalancingTest extends TestCase
         // No middle drill (12 Oct 2026): the chain row opens the chain panel,
         // and the shifts under it open nothing — they are never shown.
         $this->assertStringContainsString('data-tt-group-detail', $html);
-        $this->assertSame(substr_count($html, 'data-tt-group-head="'), substr_count($html, 'data-detail-url="'),
-            'Only the chain rows open a panel.');
+        preg_match_all('/<tr class="tt-group"[^>]*data-detail-url="[^"]+"/s', $html, $expandableChains);
+        $this->assertCount(substr_count($html, 'data-tt-group-head="'), $expandableChains[0],
+            'Each chain row opens its own panel.');
         $this->assertStringContainsString('data-detail-url="'.route('app.stockrecon.line', [$run, $chain->first()]).'"', $html);
+    }
+
+    public function test_proposals_default_to_amendable_chains_with_a_show_all_option(): void
+    {
+        $run = $this->preview();
+        $this->actingAs($this->person('admin'));
+        $this->get(route('app.stockrecon.run', $run))
+            ->assertOk()
+            ->assertSee('Showing amendable chains')
+            ->assertSee('show all chains')
+            ->assertSee('Default filters')
+            ->assertSee('data-tt-restore-defaults="stockrecon-lines-'.$run->Id.'"', false)
+            ->assertSee('data-tt-pills="Balanced|Duplicate issue removed|Missing issue captured|Issue reduced|Short|Possible duplicate|Blocked|Hand amendment reversed|Unrecorded issue|Dormant"', false)
+            ->assertDontSee('data-tt-group-head="'.self::AREA.'|'.self::DORMANT_ITEM.'"', false);
+        $this->get(route('app.stockrecon.run', [$run, 'scope' => 'all', 'empty' => 'show']))
+            ->assertOk()
+            ->assertSee('Showing all chains')
+            ->assertSee('data-tt-defaults-reload="stockrecon-lines-'.$run->Id.'"', false)
+            ->assertSee('data-tt-pills=""', false)
+            ->assertSee('data-tt-group-head="'.self::AREA.'|'.self::DORMANT_ITEM.'"', false);
     }
 
     /**
@@ -1240,19 +1536,10 @@ class BalancingTest extends TestCase
         $this->assertEqualsWithDelta(1.0, (float) $line->ChainNetVar, 0.001);
         $this->assertFalse($line->isEmptyChain(), 'An over of 1 is never hidden.');
 
-        // Since 13 Oct 2026 it balances: the over is captured as the issue
-        // the shift never got (Ryan: "customer wants over to balance").
-        $chain = ChainSummary::of($run->lines)->first(fn ($c) => $c->first()->StockItemNo === self::DUP_ITEM);
-        $this->assertSame('Balance 1 shift · issue of 1 captured', $chain->state()['label']);
-        $this->assertTrue($line->capturesIssue() && $line->isWritable(), 'It can be ticked and amended.');
-
-        $this->actingAs($this->person('admin'))
-            ->get(route('app.stockrecon.line', [$run, $line]), ['X-Requested-With' => 'XMLHttpRequest'])
-            ->assertOk()
-            ->assertSee('Balance 1 shift · issue of 1 captured')
-            ->assertSee('missing issue 0 → 1')
-            ->assertDontSee('Held back')
-            ->assertDontSee('Too few active shifts to balance');
+        // A multiple of one does not authorize an automatic issue change.
+        $this->assertNull($line->QtyIssuedNew);
+        $this->assertFalse($line->capturesIssue());
+        $this->assertSame('unrecorded', $line->outcomeKey());
     }
 
     /**
@@ -1269,17 +1556,18 @@ class BalancingTest extends TestCase
         config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
         $this->seedShelfChain([
             '2026-07-17' => [1 => [5, 2, 8, 0], 3 => [8, 0, 8, 0]],
-            '2026-07-18' => [1 => [8, 0, 9, 0], 3 => [9, 0, 9, 0]],
-            '2026-07-19' => [1 => [9, 0, 9, 0], 3 => [9, 3, 13, 0]],
+            '2026-07-18' => [1 => [8, 0, 10, 0], 3 => [10, 0, 10, 0]],
+            '2026-07-19' => [1 => [10, 0, 10, 0], 3 => [10, 3, 14, 0]],
         ]);
 
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 2]);
         $run = $this->previewArea(self::SHELF_AREA);
         $first = $this->lineAt($run, '2026-07-17', 1);
         $middle = $this->lineAt($run, '2026-07-18', 1);
         $last = $this->lineAt($run, '2026-07-19', 3);
         $this->assertNull($first->QtyIssuedNew);
         $this->assertNull($last->QtyIssuedNew);
-        $this->assertEqualsWithDelta(1, (float) $middle->QtyIssuedNew, 0.005);
+        $this->assertEqualsWithDelta(2, (float) $middle->QtyIssuedNew, 0.005);
         // A saved preview from before this rule must be rejected as a whole.
         $this->db()->table('agora.StockReconRunLine')->where('Id', $first->Id)->update([
             'QtyIssuedNew' => 3, 'WouldAmend' => 1, 'Selected' => 1,
@@ -1296,7 +1584,241 @@ class BalancingTest extends TestCase
         $this->service->commit($run);
         $this->assertEqualsWithDelta(2, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 1)->QtyIssued, 0.005);
         $this->assertEqualsWithDelta(3, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 3)->QtyIssued, 0.005);
-        $this->assertEqualsWithDelta(1, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.005);
+        $this->assertEqualsWithDelta(2, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.005);
+    }
+
+    public function test_missing_issues_use_current_master_multiples_only_on_interior_shifts(): void
+    {
+        config(['stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [5, 0, 5, 0], 3 => [5, 0, 12, 0]],
+            '2026-07-18' => [1 => [12, 0, 24, 0], 3 => [24, 0, 24, 0]],
+            '2026-07-19' => [1 => [24, 0, 31, 0], 3 => [31, 0, 31, 0]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 5]);
+        $this->db()->table('agora.StockIssueMultiple')->insert([
+            'BranchId' => self::BRANCH, 'AreaNo' => self::SHELF_AREA, 'StockItemNo' => self::DUP_ITEM,
+            'IssueMultiple' => 9, 'IsWeighed' => 0, 'Workbook' => 'TEST-multiples',
+        ]);
+
+        $run = $this->previewArea(self::SHELF_AREA);
+        $boundary = $this->lineAt($run, '2026-07-17', 1);
+        $first = $this->lineAt($run, '2026-07-17', 3);
+        $middle = $this->lineAt($run, '2026-07-18', 1);
+        $last = $this->lineAt($run, '2026-07-19', 1);
+        $this->assertEqualsWithDelta(5, (float) $first->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta(5, (float) $last->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta(5, (float) $middle->IssueMultiple, 0.001);
+        $this->assertEqualsWithDelta(10, (float) $middle->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta(2, (float) $middle->QtyVarNew, 0.001);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $boundary->Id)->update([
+            'QtyIssuedNew' => 5, 'WouldAmend' => 1, 'Selected' => 1,
+        ]);
+        try {
+            $this->service->commit($run);
+            $this->fail('An issue on the first shift must require a fresh preview.');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString('first or last shift', $e->getMessage());
+        }
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $boundary->Id)->update([
+            'QtyIssuedNew' => null, 'WouldAmend' => 0, 'Selected' => 0,
+        ]);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $middle->Id)->update([
+            'QtyIssuedNew' => 11, 'WouldAmend' => 1, 'Selected' => 1,
+        ]);
+        try {
+            $this->service->commit($run);
+            $this->fail('A stale non-multiple issue must require a fresh preview.');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString('Preview again', $e->getMessage());
+        }
+
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 0]);
+        $zero = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-18', 1);
+        $this->assertNull($zero->QtyIssuedNew, 'A master multiple of zero disables issue adjustments even when the workbook has a value.');
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 1]);
+        $one = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-18', 1);
+        $this->assertNull($one->QtyIssuedNew, 'A master multiple of one disables issue adjustments.');
+        $this->db()->table('agora.StockIssueMultiple')->where('BranchId', self::BRANCH)
+            ->where('AreaNo', self::SHELF_AREA)->where('StockItemNo', self::DUP_ITEM)->delete();
+        $missing = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-18', 1);
+        $this->assertNull($missing->QtyIssuedNew);
+    }
+
+    public function test_an_exact_missing_issue_is_identified_before_balancing_nearby_shorts(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [44, 10, 48, 6], 3 => [48, 0, 41, 7]],
+            '2026-07-18' => [1 => [41, 0, 41, 10], 3 => [41, 0, 28, 12]],
+            '2026-07-19' => [1 => [28, 20, 44, 5], 3 => [44, 0, 40, 4]],
+            '2026-07-20' => [1 => [40, 10, 48, 2], 3 => [48, 0, 44, 4]],
+            '2026-07-21' => [1 => [44, 0, 39, 5], 3 => [39, 0, 33, 6]],
+            '2026-07-22' => [1 => [33, 20, 46, 8], 3 => [46, 0, 38, 7]],
+            '2026-07-23' => [1 => [38, 20, 54, 4], 3 => [54, 0, 40, 14]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 10]);
+        $run = $this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'), Carbon::parse('2026-07-23'), note: 'TEST-missing issue')->load('lines');
+        $issue = $this->lineAt($run, '2026-07-18', 1);
+        $this->assertEqualsWithDelta(10, (float) $issue->QtyVar, 0.001);
+        $this->assertEqualsWithDelta(10, (float) $issue->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $issue->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(-1, (float) $this->lineAt($run, '2026-07-18', 3)->QtyVarNew, 0.001);
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(10, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
+        $again = $this->lineAt($this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'), Carbon::parse('2026-07-23'), note: 'TEST-missing issue repeat')->load('lines'), '2026-07-18', 1);
+        $this->assertNull($again->QtyIssuedNew);
+        $this->service->reverse($run->fresh(), 'TEST-missing issue reversal');
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
+    }
+
+    public function test_shift_shorts_are_not_cancelled_against_other_shifts(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [50, 0, 45, 0]],
+            '2026-07-18' => [1 => [45, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $short = $this->lineAt($run, '2026-07-17', 3);
+        $over = $this->lineAt($run, '2026-07-18', 1);
+        $this->assertEqualsWithDelta(-5, (float) $short->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(5, (float) $over->QtyVarNew, 0.001);
+        $this->assertNull($short->QtyIssuedNew);
+        $this->assertNull($over->QtyIssuedNew);
+        $chain = ChainSummary::of($run->lines)->first(fn ($c) => $c->first()->StockItemNo === self::DUP_ITEM);
+        $this->assertStringContainsString('short 5 and over 5 remain', $chain->state()['label']);
+    }
+
+    public function test_opposing_whole_multiple_issues_are_corrected_on_their_own_shifts(): void
+    {
+        config(['stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [50, 10, 50, 0]],
+            '2026-07-18' => [1 => [50, 0, 50, 10], 3 => [50, 0, 50, 0]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 10]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $short = $this->lineAt($run, '2026-07-17', 3);
+        $over = $this->lineAt($run, '2026-07-18', 1);
+        $this->assertEqualsWithDelta(0, (float) $short->QtyIssuedNew, 0.001);
+        $this->assertNotNull($short->QtyIssuedNew);
+        $this->assertEqualsWithDelta(10, (float) $over->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $short->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $over->QtyVarNew, 0.001);
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyIssued, 0.001);
+        $this->assertEqualsWithDelta(10, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
+        $this->service->reverse($run->fresh(), 'TEST-opposing issue reversal');
+        $this->assertEqualsWithDelta(10, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyIssued, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
+    }
+
+    public function test_repair_that_creates_a_shift_short_is_held_for_review(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [49, 0, 49, 0]],
+            '2026-07-18' => [1 => [49, 0, 49, 0], 3 => [49, 0, 49, 0]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($run, '2026-07-17', 3);
+        $this->assertTrue((bool) $line->ChainBlocked);
+        $this->assertFalse((bool) $line->WouldAmend);
+        $this->assertEqualsWithDelta(0, (float) $line->QtyVarNew, 0.001);
+        $this->assertStringContainsString('move a shift shortage', $line->Outcome);
+    }
+
+    public function test_old_preview_that_moves_a_short_is_refused_before_commit(): void
+    {
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [50, 0, 45, 0]],
+            '2026-07-18' => [1 => [45, 0, 50, 0], 3 => [50, 0, 50, 0]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $short = $this->lineAt($run, '2026-07-17', 3);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $short->Id)
+            ->update(['QtyVarNew' => 0, 'WouldAmend' => 1, 'Selected' => 1]);
+        try {
+            $this->service->commit($run);
+            $this->fail('A saved preview that moves a shortage must be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('moves a shift shortage', $e->getMessage());
+            $this->assertEqualsWithDelta(45, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyClose, 0.001);
+        }
+    }
+
+    public function test_an_exact_short_reduces_an_issue_by_a_multiple_and_is_audited_and_reversed(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+            '2026-07-18' => [1 => [50, 20, 60, 0], 3 => [60, 0, 60, 0]],
+            '2026-07-19' => [1 => [60, 0, 60, 0], 3 => [60, 0, 60, 0]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 10]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($run, '2026-07-18', 1);
+        $this->assertEqualsWithDelta(-10, (float) $line->QtyVar, 0.001);
+        $this->assertEqualsWithDelta(10, (float) $line->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $line->QtyVarNew, 0.001);
+        $this->assertTrue($line->reducesIssue());
+        $this->assertSame('reduced', $line->outcomeKey());
+        $this->actingAs($this->person('admin'))->get(route('app.stockrecon.line', [$run, $line]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->assertSee('Agora proposes reducing issue');
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(10, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
+        $amendment = StockReconAmendment::query()->acrossBranches()->where('RunId', $run->Id)->where('RunLineId', $line->Id)->firstOrFail();
+        $this->assertSame('Issue reduced', $this->db()->table('agora.vw_PumpItChange')->where('Ledger', 'StockReconAmendment')->where('LedgerId', $amendment->Id)->value('Action'));
+        $again = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-18', 1);
+        $this->assertNull($again->QtyIssuedNew, 'The same issue reduction must not be proposed twice.');
+        $this->service->reverse($run->fresh(), 'TEST-reduction reversal');
+        $this->assertEqualsWithDelta(20, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
+    }
+
+    public function test_multiple_reductions_cannot_touch_boundary_shifts_or_make_issues_negative(): void
+    {
+        config(['stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 20, 58, 2], 3 => [58, 0, 58, 0]],
+            '2026-07-18' => [1 => [58, 20, 66, 2], 3 => [66, 0, 66, 0]],
+            '2026-07-19' => [1 => [66, 5, 59, 2], 3 => [59, 20, 67, 2]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 10]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $this->assertNull($this->lineAt($run, '2026-07-17', 1)->QtyIssuedNew);
+        $this->assertNull($this->lineAt($run, '2026-07-19', 3)->QtyIssuedNew);
+        $this->assertNull($this->lineAt($run, '2026-07-19', 1)->QtyIssuedNew);
+        $this->assertEqualsWithDelta(10, (float) $this->lineAt($run, '2026-07-18', 1)->QtyIssuedNew, 0.001);
+        foreach ([0, 1] as $multiple) {
+            $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+                ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => $multiple]);
+            $disabled = $this->previewArea(self::SHELF_AREA);
+            $this->assertNull($this->lineAt($disabled, '2026-07-18', 1)->QtyIssuedNew, "Multiple {$multiple} must not reduce an issue.");
+        }
+    }
+
+    public function test_a_remaining_short_can_reduce_whole_multiples_and_leave_the_remainder(): void
+    {
+        config(['stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [50, 0, 50, 0], 3 => [50, 0, 50, 0]],
+            '2026-07-18' => [1 => [50, 20, 55, 0], 3 => [55, 0, 55, 0]],
+            '2026-07-19' => [1 => [55, 0, 55, 0], 3 => [55, 0, 55, 0]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 10]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($run, '2026-07-18', 1);
+        $this->assertEqualsWithDelta(10, (float) $line->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta(-5, (float) $line->QtyVarNew, 0.001);
+        $chain = ChainSummary::of($run->lines)->first(fn ($c) => $c->first()->StockItemNo === self::DUP_ITEM);
+        $this->assertSame('Proposed issue reduction · short 5 remains', $chain->state()['label']);
     }
 
     public function test_an_over_balances_by_capturing_the_missing_issue_written_and_reversed(): void
@@ -1304,18 +1826,19 @@ class BalancingTest extends TestCase
         config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
         $this->seedShelfChain([
             '2026-07-17' => [1 => [5, 0, 5, 0], 3 => [5, 0, 5, 0]],
-            '2026-07-18' => [1 => [5, 0, 6, 0], 3 => [6, 0, 6, 0]],
-            '2026-07-19' => [1 => [6, 0, 6, 0], 3 => [6, 0, 6, 0]],
+            '2026-07-18' => [1 => [5, 0, 7, 0], 3 => [7, 0, 7, 0]],
+            '2026-07-19' => [1 => [7, 0, 7, 0], 3 => [7, 0, 7, 0]],
         ]);
 
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 2]);
         $run = $this->previewArea(self::SHELF_AREA);
         $line = $this->lineAt($run, '2026-07-18', 1);
 
-        $this->assertEqualsWithDelta(1.0, (float) $line->QtyVar, 0.005, 'As counted, one over.');
+        $this->assertEqualsWithDelta(2.0, (float) $line->QtyVar, 0.005, 'As counted, one over.');
         $this->assertEqualsWithDelta(0.0, (float) $line->QtyVarNew, 0.005, 'Captured, it balances to nil.');
-        $this->assertEqualsWithDelta(1.0, (float) $line->QtyIssuedNew, 0.005, 'The issue it was missing.');
+        $this->assertEqualsWithDelta(2.0, (float) $line->QtyIssuedNew, 0.005, 'The issue it was missing.');
         $this->assertSame('captured', $line->outcomeKey());
-        $this->assertStringStartsWith('Missing issue captured: 1.000 recorded as issued', $line->Outcome);
+        $this->assertStringStartsWith('Missing issue captured: 2.000 recorded as issued', $line->Outcome);
         $this->assertFalse($line->CountsMove, 'No count moves for it.');
         $this->assertTrue($line->WouldAmend && $line->isWritable());
         $this->assertSame(0, (int) $run->fresh()->OverRowsAfter, 'Nothing is left over.');
@@ -1326,7 +1849,7 @@ class BalancingTest extends TestCase
         // captured, and its running total ends on what is left — nothing.
         ['shifts' => $shifts] = $this->service->chain($run, $line);
         $amended = $shifts->first(fn ($s) => (int) $s->Id === (int) $line->Id);
-        $this->assertEqualsWithDelta(1.0, (float) $amended->QtyIssuedAmended, 0.005);
+        $this->assertEqualsWithDelta(2.0, (float) $amended->QtyIssuedAmended, 0.005);
         $this->assertTrue($shifts->every(fn ($s) => (int) $s->Id === (int) $line->Id
             || abs((float) $s->QtyIssuedAmended - (float) $s->QtyIssued) < 0.0005), 'No other issue moves.');
         $this->assertEqualsWithDelta(0.0, (float) $shifts->last()->CumulativeVarNew, 0.005);
@@ -1341,20 +1864,20 @@ class BalancingTest extends TestCase
         $this->assertStringContainsString('1 missing issue(s) captured', $result['status']->Message);
 
         $after = $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1);
-        $this->assertEqualsWithDelta(1.0, (float) $after->QtyIssued, 0.005, 'QtyIssued is raised in PumpIT.');
+        $this->assertEqualsWithDelta(2.0, (float) $after->QtyIssued, 0.005, 'QtyIssued is raised in PumpIT.');
         $this->assertEqualsWithDelta(0.0, (float) $after->QtyIssued_Original, 0.005, 'The _Original issue is never written.');
         $this->assertEqualsWithDelta(5.0, (float) $after->QtyOpen, 0.005, 'The counts are not touched.');
-        $this->assertEqualsWithDelta(6.0, (float) $after->QtyClose, 0.005);
+        $this->assertEqualsWithDelta(7.0, (float) $after->QtyClose, 0.005);
 
         $amendment = StockReconAmendment::query()->acrossBranches()
             ->where('RunId', $run->Id)->where('RunLineId', $line->Id)->firstOrFail();
         $this->assertEqualsWithDelta(0.0, (float) $amendment->PriorQtyIssued, 0.005);
-        $this->assertEqualsWithDelta(1.0, (float) $amendment->NewQtyIssued, 0.005);
+        $this->assertEqualsWithDelta(2.0, (float) $amendment->NewQtyIssued, 0.005);
 
         $change = $this->db()->table('agora.vw_PumpItChange')
             ->where('Ledger', 'StockReconAmendment')->where('LedgerId', $amendment->Id)->first();
         $this->assertSame('Missing issue captured', $change->Action);
-        $this->assertSame('Issue 0.000 → 1.000', $change->Change, 'The audit trail names the issue, and only the issue.');
+        $this->assertSame('Issue 0.000 → 2.000', $change->Change, 'The audit trail names the issue, and only the issue.');
 
         // Previewed again, PumpIT already holds the issue: nothing to write.
         $again = $this->previewArea(self::SHELF_AREA);
@@ -1363,7 +1886,7 @@ class BalancingTest extends TestCase
         $this->assertFalse((bool) $repeat->WouldAmend);
         $this->assertStringStartsWith('Missing issue already in PumpIT', $repeat->Outcome);
         ['shifts' => $shifts] = $this->service->chain($again, $repeat);
-        $this->assertEqualsWithDelta(1.0, (float) $shifts->first(fn ($s) => (int) $s->Id === (int) $repeat->Id)->QtyIssuedAmended, 0.005,
+        $this->assertEqualsWithDelta(2.0, (float) $shifts->first(fn ($s) => (int) $s->Id === (int) $repeat->Id)->QtyIssuedAmended, 0.005,
             'Nothing to write, but the amended row stands on the issue PumpIT holds, so it still adds up.');
 
         $this->service->reverse($run->fresh(), 'TEST-capture off');
@@ -1461,11 +1984,25 @@ class BalancingTest extends TestCase
             ->where('SSBranchId', self::BRANCH)->where('TransactionDate', '2026-07-21')->where('ShiftNo', 3)
             ->delete();
 
-        $run = $this->preview()->fresh();
+        $run = $this->preview(['HoldBackIncomplete' => 1])->fresh();
 
         $this->assertSame('2026-07-20', $run->CompleteTo?->toDateString());
         $this->assertSame(3, $run->HeldBackRows, 'Shifts 1 and 2 of the item and shift 1 of the dormant item.');
         $this->assertTrue($run->lines->every(fn ($l) => $l->TransactionDate->toDateString() <= '2026-07-20'));
+    }
+
+    public function test_available_rows_on_an_incomplete_day_are_included_by_default(): void
+    {
+        $this->db()->table('PumpIT.dbo.STK_StockReconLine')
+            ->where('SSBranchId', self::BRANCH)->where('TransactionDate', '2026-07-21')->where('ShiftNo', 3)
+            ->delete();
+
+        $run = $this->preview()->fresh()->load('lines');
+
+        $this->assertSame(0, $run->params()['HoldBackIncomplete']);
+        $this->assertSame(0, $run->HeldBackRows);
+        $this->assertSame('2026-07-21', $run->CompleteTo?->toDateString());
+        $this->assertCount(3, $run->lines->filter(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-21'));
     }
 
     /**
@@ -1615,14 +2152,14 @@ class BalancingTest extends TestCase
 
         // T = 89: the counted -5 plus the 94 the last shift sold beyond its stock.
         $last = $lines->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-21' && $l->ShiftNo === 3);
-        $this->assertEqualsWithDelta(89.0, (float) $last->QtyVarNew, 0.005, 'The whole over stays on the shift that sold it.');
+        $this->assertEqualsWithDelta((float) $last->QtyVar, (float) $last->QtyVarNew, 0.005, 'The over stays on the shift that sold it.');
         $this->assertSame('unrecorded', $last->outcomeKey());
         $this->assertStringStartsWith('Unrecorded issue, over left', $last->Outcome);
         $this->assertEqualsWithDelta(0.0, (float) $last->AmendClose, 0.005, 'The latest count stands.');
 
         foreach ($lines->reject(fn ($l) => $l->Id === $last->Id) as $l) {
-            $this->assertEqualsWithDelta(0.0, (float) $l->QtyVarNew, 0.005,
-                "{$l->TransactionDate->toDateString()} shift {$l->ShiftNo}: every other shift balances to nil.");
+            $this->assertEqualsWithDelta((float) $l->QtyVar, (float) $l->QtyVarNew, 0.005,
+                "{$l->TransactionDate->toDateString()} shift {$l->ShiftNo}: its counted variance stays on that shift.");
             if ((float) $l->QtyVar < -0.005) {
                 $this->assertGreaterThanOrEqual((float) $l->QtyVar - 0.005, (float) $l->QtyVarNew, 'A short never grows.');
             }
@@ -1630,7 +2167,7 @@ class BalancingTest extends TestCase
 
         $this->assertEqualsWithDelta((float) $last->ChainNetVar, (float) $lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.005,
             'Redistributed, never reduced: T is what is left.');
-        $this->assertTrue($lines->contains(fn ($l) => $l->isWritable()), 'And the press writes it.');
+        $this->assertFalse($lines->contains(fn ($l) => $l->isWritable()), 'No unsupported count movement is proposed.');
     }
 
     /**
@@ -1664,45 +2201,15 @@ class BalancingTest extends TestCase
 
         $at = fn (string $date, int $shift) => $this->lineAt($run, $date, $shift);
 
-        // Closings: 52 → 53, 34 → 27, 27 → 26, 0 → 2; the rest stand.
-        foreach ([['2026-07-17', 1, 53], ['2026-07-17', 3, 39], ['2026-07-18', 1, 27], ['2026-07-18', 3, 26],
-            ['2026-07-19', 1, 21], ['2026-07-19', 3, 7], ['2026-07-20', 1, 2], ['2026-07-20', 3, 0],
-            ['2026-07-21', 1, 0], ['2026-07-21', 3, 0]] as [$date, $shift, $close]) {
-            $this->assertEqualsWithDelta($close, (float) $at($date, $shift)->QtyCloseNew, 0.005, "{$date} shift {$shift} closes on {$close}.");
+        foreach ($lines as $line) {
+            $this->assertEqualsWithDelta((float) $line->QtyVar, (float) $line->QtyVarNew, 0.005,
+                'A variance on one shift is not cancelled against another.');
+            $this->assertEqualsWithDelta((float) $line->QtyClose, (float) $line->QtyCloseNew, 0.005);
         }
-
-        // What is left: the over, on the shifts that sold from an empty shelf.
-        foreach ([['2026-07-20', 3, 18], ['2026-07-21', 1, 7], ['2026-07-21', 3, 14]] as [$date, $shift, $over]) {
-            $line = $at($date, $shift);
-            $this->assertEqualsWithDelta($over, (float) $line->QtyVarNew, 0.005);
-            $this->assertSame('unrecorded', $line->outcomeKey(), "{$date} shift {$shift} is the missing issue.");
-        }
-        $this->assertSame('U1', $at('2026-07-20', 3)->ExceptionCode, 'Still reported: it sold more than it held.');
-        $this->assertEqualsWithDelta(0.0, (float) $lines->filter(fn ($l) => $l->TransactionDate->toDateString() < '2026-07-20'
-            || ($l->TransactionDate->toDateString() === '2026-07-20' && $l->ShiftNo === 1))->sum(fn ($l) => abs((float) $l->QtyVarNew)), 0.005,
-            'Everything before the empty shelf balances to nil.');
-
-        // What balances with what.
-        $groups = ChainSummary::of($lines)->first()->balanceGroups();
-        $letter = fn (string $date, int $shift) => $groups[$at($date, $shift)->Id]['letter'] ?? null;
-
-        $this->assertSame(['A', 'A'], [$letter('2026-07-17', 1), $letter('2026-07-17', 3)]);
-        $this->assertSame(['B', 'B', 'B'], [$letter('2026-07-18', 1), $letter('2026-07-18', 3), $letter('2026-07-19', 1)]);
-        $this->assertSame(['C', 'C'], [$letter('2026-07-20', 1), $letter('2026-07-20', 3)]);
-        $this->assertSame([null, null, null], [$letter('2026-07-19', 3), $letter('2026-07-21', 1), $letter('2026-07-21', 3)],
-            'A shift nothing balanced against carries no group.');
-        $this->assertSame('18 Jul shift 3, 19 Jul shift 1', $groups[$at('2026-07-18', 1)->Id]['with']);
-        $this->assertEqualsWithDelta(18.0, $groups[$at('2026-07-20', 1)->Id]['net'], 0.005, 'Group C leaves the over.');
-        $this->assertStringContainsString('come to nil', ChainSummary::balanceNote($groups[$at('2026-07-17', 1)->Id]));
-
         $state = ChainSummary::of($lines)->first()->state();
-        $this->assertStringStartsWith('Balance ', $state['label']);
-        $this->assertStringContainsString('over 39', $state['label']);
-
-        // On screen: the rail, the letter and the sentence behind it.
-        $html = $this->actingAs($this->person('admin'))->get(route('app.stockrecon.run', $run))->assertOk()->getContent();
-        $this->assertStringContainsString('bal-g1', (string) $html);
-        $this->assertMatchesRegularExpression('/class="bal-tag" title="Group B — balances with 18 Jul shift 3, 19 Jul shift 1\. Together they come to nil\."/', (string) $html);
+        $this->assertStringContainsString('short', $state['label']);
+        $this->assertStringContainsString('over', $state['label']);
+        $this->assertSame([], ChainSummary::of($lines)->first()->balanceGroups());
     }
 
     /** The counts are read from the _Original columns, so a re-run never compounds. */
@@ -3173,7 +3680,7 @@ class BalancingTest extends TestCase
             'StockItemDescription' => 'TEST-Dunhill 10s', 'AreaNo' => self::SHELF_AREA,
             'Location' => 'TEST', 'UOMCode' => 'EA',
             'SellingPrice' => 35.00, 'POSCode' => 'TEST'.self::DUP_ITEM,
-            'QtyVarAllowance' => 0, 'isMonitoredItem' => 0,
+            'QtyVarAllowance' => 0, 'isMonitoredItem' => 0, 'IssueMultiple' => 1,
         ]);
 
         foreach ($chain as $date => $shifts) {
@@ -3218,13 +3725,15 @@ class BalancingTest extends TestCase
             ->update($values);
     }
 
-    private function preview(): StockReconRun
+    /** @param  array<string, scalar|null>  $options */
+    private function preview(array $options = []): StockReconRun
     {
         return $this->service->preview(
             self::BRANCH,
             self::AREA,
             Carbon::parse('2026-07-17'),
             Carbon::parse('2026-07-21'),
+            options: $options,
             note: 'TEST-balancing',
         )->load('lines');
     }
@@ -3360,7 +3869,7 @@ class BalancingTest extends TestCase
     {
         $db = $this->db();
 
-        foreach (['STK_StockReconLine', 'STK_StockReconEmployees', 'STK_StockMaster',
+        foreach (['STK_StockReconLine', 'STK_StockReconEmployees', 'STK_StockWasteLine', 'STK_StockMaster',
             'STK_Area', 'BRN_Employee'] as $table) {
             $db->table("PumpIT.dbo.{$table}")->where('SSBranchId', self::BRANCH)->delete();
         }
@@ -3368,7 +3877,7 @@ class BalancingTest extends TestCase
         $schema = config('agora.schema');
 
         foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun', 'StockIssueMultiple', 'StockAreaSetting',
-            'StockReconDuplicateRelease'] as $table) {
+            'StockReconDuplicateRelease', 'StockWasteAuthorization', 'StockReconItemRemoval', 'StockReconAreaShiftCompletion'] as $table) {
             $db->table("{$schema}.{$table}")->where('BranchId', self::BRANCH)->delete();
         }
     }

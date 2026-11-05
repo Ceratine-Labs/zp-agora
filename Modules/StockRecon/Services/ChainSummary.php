@@ -126,6 +126,30 @@ final class ChainSummary
                 'title' => $reason->Outcome.($writes > 0 ? ' — '.$writes.' hand '.($writes === 1 ? 'amendment' : 'amendments').' put back to the counts.' : '')];
         }
 
+        $overAfter = self::overLeft($this->lines);
+        $shortAfter = (float) $this->lines->sum(fn ($line) => max(0.0, -(float) $line->QtyVarNew));
+        if ($overAfter > 0.0005 && $shortAfter > 0.0005) {
+            $writes = $this->writable();
+
+            return ['label' => ($writes > 0 ? 'Amend '.$writes.' · ' : '').'short '.self::quantity($shortAfter).' and over '.self::quantity($overAfter).' remain',
+                'tone' => 'warn', 'title' => 'Shorts stay on their own shifts; an over on another shift cannot cancel them.'];
+        }
+
+        if ($this->lines->contains(fn ($l) => $l->reducesIssue())) {
+            $writes = $this->writable();
+            $remaining = (float) $this->lines->sum('QtyVarNew');
+
+            if (abs($remaining) <= 0.0005) {
+                return ['label' => $writes > 0 ? 'Balance '.$writes.' '.($writes === 1 ? 'shift' : 'shifts').' · issue reduction proposed' : 'Issue reduction by Agora',
+                    'tone' => 'good', 'title' => 'The proposed issue reduction balances the chain; the prior quantity is kept for reversal.'];
+            }
+
+            if ($remaining < 0) {
+                return ['label' => 'Proposed issue reduction · short '.self::quantity(abs($remaining)).' remains',
+                    'tone' => 'warn', 'title' => 'The proposed issue reduction removes whole multiples; the remaining short stays visible.'];
+            }
+        }
+
         $verdict = self::verdict(
             (float) $first->ChainNetVar,
             $this->lines->filter(fn ($l) => $l->WouldAmend)->count(),

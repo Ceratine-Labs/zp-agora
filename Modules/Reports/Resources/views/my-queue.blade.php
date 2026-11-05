@@ -13,13 +13,11 @@
     $query = \Modules\Reports\Services\ReportScope::query($params);
     $url = fn (array $changes = []) => route('app.reports.show', array_merge(['report' => 'my-queue'],
         array_filter(array_merge($query, $changes), fn ($value) => $value !== null && $value !== '')));
-    $queues = ['day-close' => 'Day close', 'unallocated-zreads' => 'Z-reads',
-        'open-cashups' => 'Cashups', 'purchase-approvals' => 'Purchases',
-        'staff-shorts' => 'Staff shorts', 'drop-safe' => 'Drop safe'];
+    $queues = array_intersect_key(\Modules\Reports\Services\MyQueueAccess::TYPES, array_flip($queueKeys));
     $units = ['day-close' => 'days open', 'unallocated-zreads' => 'unallocated', 'open-cashups' => 'open',
-        'purchase-approvals' => 'pending', 'staff-shorts' => 'pending', 'drop-safe' => 'bags'];
+        'purchase-approvals' => 'pending', 'staff-shorts' => 'pending', 'drop-safe' => 'bags', 'waste-approvals' => 'pending'];
     $reviewUrl = fn (string $key, ?int $branch = null) => route('app.reports.show', array_filter([
-        'report' => $key, 'from' => $from, 'to' => $to,
+        'report' => $key === 'waste-approvals' ? 'waste' : $key, 'from' => $from, 'to' => $to,
         'branches' => $branch !== null ? [$branch] : ($scopeIds ?: null),
     ], fn ($value) => $value !== null));
     // A warning about the returned page, never a fabricated total or SLA.
@@ -53,7 +51,7 @@
                     @if ($summariesAvailable)
                         <strong>{{ \App\Support\Format::n($summary->OpenItems ?? 0) }}</strong>
                         <small>{{ $units[$key] }}</small>
-                        @if ($key !== 'day-close')
+                        @if (! in_array($key, ['day-close', 'waste-approvals'], true))
                             @php($value = $summary === null ? 0 : $summary->Value)
                             <span class="queue-shortcut-value" title="{{ \App\Support\Format::r($value) }}" aria-label="Value: {{ \App\Support\Format::r($value) }}">{{ \App\Support\Format::rk($value) }}</span>
                         @endif
@@ -97,7 +95,7 @@
             </div>
             <footer class="table-foot"><span class="table-proc">agora.{{ $report['procedure'] }}</span></footer>
         @else
-            <x-table :count="$rows->count()" :total="$total" procedure="agora.{{ $report['procedure'] }}">
+            <x-table layout-key="Reports.my-queue.1" :count="$rows->count()" :total="$total" procedure="agora.{{ $report['procedure'] }}">
                 <x-slot:head><tr>
                     @foreach ($report['columns'] as $column)
                         <th @class(['num' => in_array($column['type'], ['number', 'money'])]) aria-sort="{{ $sort === $column['sort'] ? ($asc ? 'ascending' : 'descending') : 'none' }}">

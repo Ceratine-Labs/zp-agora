@@ -87,16 +87,14 @@
             @php($twin = $spec->table())
             <details class="chart-table">
                 <summary>The figures behind this chart</summary>
-                <div class="table-scroll">
-                    <table class="dt dense">
-                        <thead>
+                <x-table dense :layout-key="'chart.'.(request()->route()?->getName() ?? 'unknown').'.'.$describe">
+                        <x-slot:head>
                             <tr>
                                 @foreach ($twin['columns'] as $i => $column)
                                     <th @class(['num' => ($twin['aligns'][$i] ?? 'text') === 'num'])>{{ $column }}</th>
                                 @endforeach
                             </tr>
-                        </thead>
-                        <tbody>
+                        </x-slot:head>
                             @foreach ($twin['rows'] as $row)
                                 <tr>
                                     @foreach ($row as $i => $cell)
@@ -104,9 +102,7 @@
                                     @endforeach
                                 </tr>
                             @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                </x-table>
             </details>
         @endif
     @endif

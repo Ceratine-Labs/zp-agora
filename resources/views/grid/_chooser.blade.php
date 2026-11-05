@@ -56,6 +56,15 @@
                 </select>
             </label>
 
+            <label class="dg-chooser-size">
+                Table height
+                <select data-table-height>
+                    @foreach (['compact' => 'Short', 'normal' => 'Normal', 'large' => 'Tall'] as $key => $label)
+                        <option value="{{ $key }}" @selected(($grid->state['table_height'] ?? 'normal') === $key)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+
             {{-- Reset removes the row rather than storing an empty layout: "put
                  it back" has to mean the catalogue's own order and auto widths,
                  and a stored empty map replays the old widths on the next load. --}}

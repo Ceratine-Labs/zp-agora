@@ -9,37 +9,10 @@ use Modules\Core\Models\User;
 use Modules\Core\Models\UserMenuItem;
 
 /**
- * Which entries of the menu a person may see, and reach.
- *
- * THE TICK IS THE ACCESS, not a decoration on it. Hiding a link while the URL
- * behind it still answers is the kind of control that looks like access
- * control until somebody types the address — so the same answer that filters
- * the mega panel also stands in front of the route, through
- * EnforceMenuAccess.
- *
- * AN EMPTY SET IS THE WHOLE MENU. Nobody holds a grant on the day this ships
- * and reading a grant-list literally would blank the navigation for all 88
- * people at once; agora.UserBranch already settles this question the same way
- * and the screen says so in words. The moment one entry is ticked for a person
- * the ticks become the whole of what they see.
- *
- * Direct menu ticks and managed-role ticks are combined. An empty combined
- * set retains the existing unrestricted-menu convention.
- *
- * TWO THINGS CAN HIDE AN ENTRY and they are not the same thing:
- *
- *   the tick      this service. The customer's own decision about who sees
- *                 what, made on the Users and Roles screens.
- *   PermissionCode  the software's. An item that names a permission the person
- *                 does not hold is hidden whether or not it is ticked, because
- *                 the route behind it already refuses them through `can:` and
- *                 a link that 403s is worse than no link. Only 4 items set one
- *                 today; every item can.
- *
- * THE SET IS CLOSED UPWARDS. Ticking "Pump readings" without also ticking the
- * "Capture" heading it hangs under would otherwise hide the entry by hiding
- * its column. A heading is therefore kept when anything under it is kept, and
- * dropped when nothing is — so a column never renders empty.
+ * Permission-based visibility for navigation and its named routes.
+ * Direct and role permissions are additive. Legacy menu ticks are retained as
+ * historical data but never grant or restrict access. Headings survive only
+ * when an accessible descendant exists.
  */
 class MenuAccessService
 {
@@ -105,22 +78,58 @@ class MenuAccessService
     }
 
     /**
-     * May this person see this entry — the tick AND the permission it names.
+     * May this person see this entry under their effective permissions.
      *
      * Used by the renderer for one node at a time and by EnforceMenuAccess for
      * the item behind a route, so the panel and the URL cannot disagree.
      */
     public function mayView(User $user, MenuItem $item): bool
     {
-        return $this->permits($user, $item) && $this->isTicked($user, (int) $item->Id);
+        return $this->permits($user, $item);
     }
 
     /** The item's own PermissionCode, if it names one. */
     public function permits(User $user, MenuItem $item): bool
     {
         $code = trim((string) $item->PermissionCode);
+        if ($code !== '') {
+            return $this->permissions->userHas($user, $code);
+        }
 
-        return $code === '' || $this->permissions->userHas($user, $code);
+        $routeName = (string) $item->RouteName;
+        $path = (string) parse_url((string) $item->Url, PHP_URL_PATH);
+        if (str_starts_with($path, '/app/reports/')) {
+            $key = substr($path, strlen('/app/reports/'));
+
+            return array_key_exists($key, (array) config('reports.reports', []))
+                && $this->permissions->userHas($user, 'reports.'.$key.'.view');
+        }
+        if (str_starts_with($path, '/app/recon/')) {
+            return $this->permissions->userHas($user, 'recon.runs.view');
+        }
+        if ($routeName === 'app.reports.index') {
+            return $this->permissions->userHas($user, 'reports.catalogue.view');
+        }
+        if ($routeName === 'app.dashboard') {
+            return $this->permissions->patternsFor($user) !== [];
+        }
+
+        $route = $routeName !== '' ? app('router')->getRoutes()->getByName($routeName) : null;
+        if ($route === null) {
+            return false;
+        }
+        $abilities = [];
+        foreach ($route->gatherMiddleware() as $middleware) {
+            if (is_string($middleware) && str_starts_with($middleware, 'can:')) {
+                $ability = substr($middleware, 4);
+                if (str_contains($ability, ',')) {
+                    return false;
+                }
+                $abilities[] = $ability;
+            }
+        }
+
+        return $abilities !== [] && $this->permissions->userHasAll($user, $abilities);
     }
 
     /**

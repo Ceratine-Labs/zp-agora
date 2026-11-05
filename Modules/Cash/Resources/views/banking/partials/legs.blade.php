@@ -54,7 +54,7 @@
                     @endif
                 </div>
             @endif
-            <x-table :count="$rows->count()" procedure="agora.usp_Cash_GetCashup" dense
+            <x-table layout-key="Cash.banking.partials.legs.1" :count="$rows->count()" procedure="agora.usp_Cash_GetCashup" dense
                      :empty="'No '.mb_strtolower($item['label']).' on this cashup.'">
                 <x-slot:head>
                     <tr>

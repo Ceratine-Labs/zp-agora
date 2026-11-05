@@ -247,7 +247,7 @@
                        configuration.</p>
                 @endif
             </x-slot:info>
-            <x-table procedure="agora.usp_Utilities_PrepareReadings" :count="$meters->count()"
+            <x-table layout-key="Utilities.index.1" procedure="agora.usp_Utilities_PrepareReadings" :count="$meters->count()"
                      empty="No meters at this site." fit>
                 <x-slot:head>
                     <tr>

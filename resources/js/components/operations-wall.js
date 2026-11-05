@@ -25,7 +25,7 @@ export function wallPreferences(raw = {}, sites = []) {
         autoReturn: raw.autoReturn !== false,
         morning: raw.morning !== false,
         attention: raw.attention === true,
-        hideZero: raw.hideZero === true,
+        hideZero: raw.hideZero === undefined ? true : raw.hideZero === true,
     };
 }
 
@@ -59,14 +59,14 @@ export function wallOverview(snapshot) {
     const screens = snapshot.screens.filter((screen) => screen.id !== 'overview');
     const items = screens.flatMap((screen) => (screen.items || []).map((item) => ({
         ...item, id: `${screen.id}:${item.id}`, category: screen.title, sourceLabel: screen.sourceLabel,
-    })));
+    }))).concat(Array.isArray(snapshot.siteWork) ? snapshot.siteWork : []);
     const live = screens.filter((screen) => screen.status === 'live').length;
     return {
         id: 'overview', title: 'The day at a glance',
         subtitle: 'The most urgent signals across your sites. Open a card to follow the evidence.',
-        status: live ? 'live' : 'unavailable', updatedAt: snapshot.generatedAt,
+        status: live || snapshot.siteWorkAvailable ? 'live' : 'unavailable', updatedAt: snapshot.generatedAt,
         sourceLabel: `${live} of ${screens.length} areas reporting`,
-        message: live ? '' : 'No live area has returned data for this scope.',
+        message: live || snapshot.siteWorkAvailable ? '' : 'No live area has returned data for this scope.',
         metrics: [
             { label: 'Critical signals', value: string(items.filter((item) => item.severity === 'crit').length), tone: items.some((item) => item.severity === 'crit') ? 'crit' : 'neutral' },
             { label: 'Needs review', value: string(items.filter((item) => item.severity === 'warn').length), tone: items.some((item) => item.severity === 'warn') ? 'warn' : 'neutral' },
@@ -223,8 +223,10 @@ export default function operationsWall(root = document) {
             find('scope').textContent = snapshot.scope?.label || `${snapshot.scope?.siteCount ?? 0} sites in scope`;
             find('date').textContent = `Business date ${snapshot.businessDate || 'not supplied'}`;
             find('title').textContent = screen.title;
+            find('stage').classList.toggle('is-shop', screen.id === 'shop');
             find('subtitle').textContent = screen.subtitle || screen.message || '';
-            find('metrics').replaceChildren(...(screen.metrics || []).map((metric) => {
+            find('metrics').replaceChildren(...(screen.metrics || []).filter((metric) =>
+                !preferences.hideZero || !['0', '—', '-', ''].includes(string(metric.value).trim())).map((metric) => {
                 const tile = node('div', `operations-wall__metric is-${tone(metric.tone)}`);
                 tile.append(node('span', 'operations-wall__metric-label', metric.label), node('strong', '', metric.value ?? '—'));
                 return tile;
@@ -265,8 +267,11 @@ export default function operationsWall(root = document) {
             head.append(node('span', 'operations-wall__severity', { crit: 'Critical', warn: 'Review', good: 'In range', neutral: 'Information' }[tone(item.severity)]));
             if (item.category) head.append(node('span', 'operations-wall__category', item.category));
             button.append(head, node('span', 'operations-wall__site', item.site || 'Selected sites'),
-                node('strong', 'operations-wall__card-title', item.title), node('strong', 'operations-wall__value', item.value ?? '—'),
-                node('span', 'operations-wall__card-detail', item.detail || 'Open for source detail'),
+                node('strong', 'operations-wall__card-title', item.title));
+            if (item.value != null && !['—', '-', ''].includes(string(item.value).trim())) {
+                button.append(node('strong', 'operations-wall__value', item.value));
+            }
+            button.append(node('span', 'operations-wall__card-detail', item.detail || 'Open for source detail'),
                 node('span', 'operations-wall__card-open', 'View detail →'));
             return button;
         }
@@ -406,6 +411,9 @@ export default function operationsWall(root = document) {
                 if (data.screens.some((screen) => !screen || !records(screen.metrics) || !records(screen.items)
                     || !Array.isArray(screen.gaps) || screen.items.some((item) => item.facts != null && !records(item.facts)))) {
                     throw new Error('The live feed returned incomplete source details. The last complete snapshot is kept until the next refresh.');
+                }
+                if (data.siteWork != null && (!records(data.siteWork) || data.siteWork.some((item) => item.facts != null && !records(item.facts)))) {
+                    throw new Error('The live feed returned incomplete site work. The last complete snapshot is kept until the next refresh.');
                 }
                 if (version !== scopeVersion || suspended) return;
                 snapshot = data;

@@ -24,16 +24,6 @@
             @endif
         @endforeach
     </x-card>
-    <x-card title="Menu entries" collapsible>
-        @if ($menuIds === [])<p class="field-help">This role adds no menu ticks. If the user has no other ticks, the whole menu remains available, subject to permissions.</p>@endif
-        @foreach ($workspaces as $workspace)
-            <ul class="perm-list">
-                @foreach ($workspace['rows'] as $row)
-                    @if (in_array((int) $row['item']->Id, $menuIds, true))<li>{{ $workspace['label'] }} · {{ $row['section']->Label }} · {{ $row['item']->Label }}</li>@endif
-                @endforeach
-            </ul>
-        @endforeach
-    </x-card>
     @can('setup.roles.delete')
         <form method="POST" action="{{ route('app.setup.roles.destroy', ['role' => $role->Id]) }}" data-confirm="Delete this role?" data-confirm-action="Delete role" data-confirm-danger>
             @csrf @method('DELETE')

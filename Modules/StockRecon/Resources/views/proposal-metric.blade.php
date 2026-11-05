@@ -26,7 +26,7 @@
                    {{ \App\Support\Format::n($records->count()) }}. Preview again for a current result.</p>
             </x-notice>
         @endif
-        <x-table :count="$records->count()" tools fit data-tt-page="50" :id="'proposal-metric-'.$metric"
+        <x-table layout-key="StockRecon.proposal-metric.1" :count="$records->count()" tools fit data-tt-page="50" :id="'proposal-metric-'.$metric"
                  empty="No {{ $chainMetric ? 'chains' : 'shifts' }} contribute to this figure.">
             <x-slot:head>
                 <tr>

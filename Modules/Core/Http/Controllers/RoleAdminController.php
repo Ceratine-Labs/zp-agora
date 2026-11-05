@@ -10,11 +10,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\RoleMenuItem;
 use Modules\Core\Models\RolePermission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserRole;
-use Modules\Core\Services\MenuService;
 use Modules\Core\Services\RoleAccessService;
 
 class RoleAdminController extends Controller
@@ -66,7 +64,6 @@ class RoleAdminController extends Controller
             'Code' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/'],
             'Name' => ['required', 'string', 'max:80'],
             'permissions' => ['sometimes', 'array'], 'permissions.*' => ['required', 'integer', 'distinct'],
-            'menu' => ['sometimes', 'array'], 'menu.*' => ['required', 'integer', 'distinct'],
         ]);
         $role = $this->roles->save($id, $data, $request->user());
 
@@ -76,19 +73,11 @@ class RoleAdminController extends Controller
     /** @return array<string, mixed> */
     private function state(Role $role): array
     {
-        $workspaces = [];
-        foreach ((array) config('core.workspaces', []) as $code => $label) {
-            $workspaces[$code] = ['label' => $label, 'rows' => app(MenuService::class)->flatten((string) $code)];
-        }
-
         return [
             'role' => $role,
             'permissionGroups' => Permission::query()->acrossBranches()->orderBy('SortOrder')->get()->groupBy('Module'),
             'permissionIds' => RolePermission::query()->acrossBranches()->where('RoleId', $role->Id ?? 0)
                 ->pluck('PermissionId')->map(fn ($id) => (int) $id)->all(),
-            'menuIds' => RoleMenuItem::query()->acrossBranches()->where('RoleId', $role->Id ?? 0)
-                ->pluck('MenuItemId')->map(fn ($id) => (int) $id)->all(),
-            'workspaces' => $workspaces,
             'members' => User::query()->acrossBranches()->whereIn('Id', UserRole::query()->acrossBranches()
                 ->where('RoleId', $role->Id ?? 0)->select('UserId'))->orderBy('UserName')->get(),
         ];

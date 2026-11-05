@@ -15,7 +15,7 @@ BEGIN
         THROW 51000, 'AGORA:WEEKLY_MASTER:Resolve missing or duplicate stock-master mappings before building the week.', 1;
     SELECT l.AreaNo, l.StockItemNo, a.AreaDescription, m.StockItemDescription AS Description,
         UPPER(LTRIM(RTRIM(m.StockLocation))) AS SourceSystem, LTRIM(RTRIM(m.POSCode)) AS POSCode,
-        CONVERT(decimal(19,4),COALESCE(im.IssueMultiple,si.IssueMultiple,0)) AS IssueMultiple,
+        CONVERT(decimal(19,4),COALESCE(si.IssueMultiple,im.IssueMultiple,0)) AS IssueMultiple,
         CONVERT(bit,CASE WHEN im.IsWeighed=1 OR si.UOMCode IN ('KG','KGS','L','LT','LTR') THEN 1 ELSE 0 END) AS IsWeighed,
         CONVERT(date,l.TransactionDate) AS TransactionDate, l.ShiftNo,
         CONVERT(decimal(19,4),l.SellPrice) AS UnitSellingPrice,

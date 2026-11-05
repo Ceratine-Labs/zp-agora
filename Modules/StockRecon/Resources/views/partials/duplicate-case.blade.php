@@ -142,7 +142,7 @@
         <a class="btn-ghost btn-row" href="{{ route('app.stockrecon.line', [$run, $case->LineId]) }}">Open the chain</a>
     </x-slot:actions>
 
-    <x-table dense :count="$case->shifts->count()" :procedure="$procedure"
+    <x-table layout-key="StockRecon.partials.duplicate-case.1" dense :count="$case->shifts->count()" :procedure="$procedure"
              empty="The run holds none of the shifts behind this case.">
         <x-slot:head>
             <tr>

@@ -55,7 +55,7 @@
                 <p>Variance is sold − (open + issued − counted): negative is short.</p>
             </x-info>
         </div>
-        <x-table procedure="agora.usp_Reports_GetAuditChange" :count="$shown->count()" :total="$context->count()" dense fit>
+        <x-table layout-key="Reports.audit.change.1" procedure="agora.usp_Reports_GetAuditChange" :count="$shown->count()" :total="$context->count()" dense fit>
             <x-slot:head>
                 <tr>
                     <th class="fit-min">Date</th><th class="fit-min">Shift</th>
@@ -99,7 +99,7 @@
         @endif
     @elseif ($c->Ledger === 'ReconStamp' && $context->isNotEmpty())
         <p class="audit-change-note">Every row this batch stamped: the bank side first, then the deposits it was matched to.</p>
-        <x-table procedure="agora.usp_Reports_GetAuditChange" :count="$context->count()" dense>
+        <x-table layout-key="Reports.audit.change.2" procedure="agora.usp_Reports_GetAuditChange" :count="$context->count()" dense>
             <x-slot:head>
                 <tr><th>Row</th><th>Action</th><th>Before → after</th><th class="fit-min">Now</th></tr>
             </x-slot:head>

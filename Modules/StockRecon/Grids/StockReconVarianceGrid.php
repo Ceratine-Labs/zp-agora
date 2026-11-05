@@ -49,7 +49,7 @@ class StockReconVarianceGrid extends GridDefinition
     public function blurb(): ?string
     {
         return 'Each count line\'s variance as counted beside its variance after balancing. Red is short, '
-            .'yellow is over by more than the item\'s allowance. Moved by balancing is the amended value less '
+            .'yellow is over by more than the item\'s allowance. Change in variance is the amended value less '
             .'the original.';
     }
 
@@ -75,8 +75,8 @@ class StockReconVarianceGrid extends GridDefinition
             // Keep the comparison on screen; raw quantities remain in Columns.
             new GridColumn(key: 'Balancing', label: 'Balancing', format: 'chip', sort: 'Balancing',
                 title: 'Amended: an open, issue, close or POS quantity differs from what was counted'),
-            new GridColumn(key: 'ValueVarMoved', label: 'Moved by balancing', format: 'money', sort: 'ValueVarMoved',
-                total: true, title: 'Amended value less original value: what balancing changed on this line'),
+            new GridColumn(key: 'ValueVarMoved', label: 'Change in variance', format: 'money', sort: 'ValueVarMoved',
+                total: true, title: 'Amended value less original value, including authorized waste'),
 
             new GridColumn(key: 'QtyOpenOriginal', label: 'Original open', format: 'qty', compactQuantity: true, visible: false),
             new GridColumn(key: 'QtyIssuedOriginal', label: 'Original issued', format: 'qty', compactQuantity: true, visible: false),
@@ -92,11 +92,13 @@ class StockReconVarianceGrid extends GridDefinition
             new GridColumn(key: 'QtyClose', label: 'Amended close', format: 'qty', compactQuantity: true, visible: false),
             new GridColumn(key: 'QtyComputer', label: 'Amended POS', format: 'qty', compactQuantity: true, total: true, visible: false),
             new GridColumn(key: 'QtyVarB4Waste', label: 'Variance before waste', format: 'qty', compactQuantity: true, visible: false,
-                title: 'The amended variance before good waste is set against it'),
+                title: 'The amended variance before any waste adjustment'),
             new GridColumn(key: 'QtyGoodWaste', label: 'Good waste', format: 'qty', compactQuantity: true, visible: false,
-                title: 'Good waste recorded for the line. It can explain a short; it never makes an over.'),
+                title: 'Captured good waste, which may differ from the authorized quantity.'),
+            new GridColumn(key: 'QtyAuthorizedGoodWaste', label: 'Authorized good waste', format: 'qty', compactQuantity: true, visible: false,
+                title: 'Good waste approved by operations against this captured quantity.'),
             new GridColumn(key: 'QtyVar', label: 'Amended variance', format: 'qty', compactQuantity: true, sort: 'QtyVar', total: true,
-                title: 'POS - (open + issued - close) on the amended quantities, after good waste'),
+                title: 'Amended variance with authorized good waste applied to shortages only'),
             new GridColumn(key: 'ValueVar', label: 'Amended value', format: 'money', sort: 'ValueVar', total: true),
             new GridColumn(key: 'QtyVarMoved', label: 'Quantity moved', format: 'qty', compactQuantity: true, visible: false, total: true),
         ];

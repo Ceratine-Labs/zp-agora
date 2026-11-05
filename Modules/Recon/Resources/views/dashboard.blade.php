@@ -139,7 +139,7 @@
                     <p>One row per site with anything outstanding. A figure opens the rows behind it on the Items tab;
                        a site's name opens its own breakdown.</p>
                 </x-slot:info>
-                <x-table :count="count($figures['sites'])" procedure="agora.usp_Recon_DashboardOutstanding" tools fit
+                <x-table layout-key="Recon.dashboard.1" :count="count($figures['sites'])" procedure="agora.usp_Recon_DashboardOutstanding" tools fit
                          empty="Nothing is outstanding for this scope.">
                     <x-slot:head>
                         <tr>
@@ -176,7 +176,7 @@
             @forelse ($figures['sites'] as $site)
                 <x-card :title="$site['name']" :sub="Format::n($site['rows']).' items outstanding · oldest '.\Illuminate\Support\Carbon::parse($site['oldest'])->format('j M Y')"
                         collapsible :open="count($figures['sites']) <= 3" flush style="margin-top:16px">
-                    <x-table :count="count($site['cells']) * 2" dense fit>
+                    <x-table layout-key="Recon.dashboard.2" :count="count($site['cells']) * 2" dense fit>
                         <x-slot:head>
                             <tr>
                                 <th>Area</th><th>Side</th>

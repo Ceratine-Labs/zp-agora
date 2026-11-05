@@ -180,7 +180,7 @@
                      full-width line beneath it. On a phone the table then fits
                      the screen, so the state and the Reverse form are never
                      behind a sideways scroll; on a desk it reads as a list. --}}
-                <x-table :count="$commits->count()" procedure="agora.usp_Cash_ZreadCommits" dense>
+                <x-table layout-key="Cash.zread.index.1" :count="$commits->count()" procedure="agora.usp_Cash_ZreadCommits" dense>
                     <x-slot:head>
                         <tr>
                             <th>Saved</th>

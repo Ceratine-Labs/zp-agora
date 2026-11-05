@@ -216,8 +216,7 @@ class MenuService
          * built rather than a check inside the renderer. It has to be flat:
          * keeping a heading depends on whether anything under it survived, and
          * a per-node check in the blade can only see downwards one level at a
-         * time. A person with no ticks anywhere is unrestricted and nothing is
-         * removed — see MenuAccessService.
+         * time. Entries are retained only when the user holds the required permission.
          */
         if ($user !== null) {
             $keep = $this->access->keepMap($user, $items);

@@ -175,7 +175,7 @@
                 @endforeach
             @endif
 
-                <x-table :count="$bags->count()" procedure="agora.usp_Cash_GetDropSafe" dense tools
+                <x-table layout-key="Cash.dropsafe.index.1" :count="$bags->count()" procedure="agora.usp_Cash_GetDropSafe" dense tools
                          empty="The safe is empty — every bag at this site has been collected.">
                     <x-slot:head>
                         <tr>
@@ -253,7 +253,7 @@
                 <p>Collected from this safe in these days, newest first. Where a collection declares a different count
                    or total from what its bags add up to, the declared figure is shown beside it.</p>
             </x-slot:info>
-            <x-table :count="$collections->count()" procedure="agora.usp_Cash_GetDropSafe" dense tools
+            <x-table layout-key="Cash.dropsafe.index.2" :count="$collections->count()" procedure="agora.usp_Cash_GetDropSafe" dense tools
                      empty="Nothing was collected from this safe in these days.">
                 <x-slot:head>
                     <tr>

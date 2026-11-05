@@ -51,25 +51,56 @@
 
     <x-kpi-strip>
         <x-kpi
-            label="Sell (incl VAT)"
+            label="Sell (incl VAT)" art="till-balance" modal="stock-sell-details" stripe="s1"
             :value="\App\Support\Format::r($item->SellingPrice)"
             :note="$item->PriceType" />
         <x-kpi
-            label="Cost (excl VAT)"
+            label="Cost (excl VAT)" art="cash-deductions" modal="stock-cost-details" stripe="s2"
             :value="$item->CostPrice === null ? '—' : \App\Support\Format::r($item->CostPrice)"
             :note="$item->CostPrice === null ? 'no POS record for this code' : 'from the POS cost file'" />
         <x-kpi
-            label="On hand"
+            label="On hand" art="product-stock" modal="stock-on-hand-details" stripe="s3"
             :value="$item->QtyOnHand === null ? '—' : \App\Support\Format::n($item->QtyOnHand, 0)"
             :note="$item->UOMCode" />
         <x-kpi
-            label="Last counted"
+            label="Last counted" art="stock-areas" modal="stock-count-details" stripe="s4"
             :value="$item->LastCountedAt ? \Illuminate\Support\Carbon::parse($item->LastCountedAt)->format('j M Y') : '—'"
             :note="$item->LastCountedAt ? ($item->CountLines90 ?? 0).' counts in 90 days' : 'never counted'"
             :tone="$item->LastCountedAt ? null : 'warn'" />
     </x-kpi-strip>
 
-    <x-card title="What this line is">
+    <x-modal id="stock-sell-details" title="Selling price">
+        <x-facts>
+            <x-fact label="Master sell (incl VAT)" :value="\App\Support\Format::r($item->SellingPrice)">{{ $item->PriceType }}</x-fact>
+            <x-fact label="POS sell (excl VAT)" :value="$item->PosSellPrice === null ? null : \App\Support\Format::r($item->PosSellPrice)">From the site's POS cost file.</x-fact>
+            @if ($priceDiffers)
+                <x-fact label="POS sell at 15% VAT" :value="\App\Support\Format::r($posSellIncl)">This differs from the master selling price.</x-fact>
+            @endif
+        </x-facts>
+    </x-modal>
+    <x-modal id="stock-cost-details" title="Cost and margin">
+        <x-facts>
+            <x-fact label="Cost (excl VAT)" :value="$item->CostPrice === null ? null : \App\Support\Format::r($item->CostPrice)">From the site's POS cost file.</x-fact>
+            <x-fact label="POS sell (excl VAT)" :value="$item->PosSellPrice === null ? null : \App\Support\Format::r($item->PosSellPrice)" />
+            <x-fact label="Gross profit" :value="$hasGp ? \App\Support\Format::pct(((float) $item->PosSellPrice - (float) $item->CostPrice) * 100 / (float) $item->PosSellPrice) : null">(POS sell less cost) ÷ POS sell; both prices exclude VAT.</x-fact>
+        </x-facts>
+    </x-modal>
+    <x-modal id="stock-on-hand-details" title="Stock on hand">
+        <x-facts>
+            <x-fact label="On hand" :value="$item->QtyOnHand === null ? null : \App\Support\Format::n($item->QtyOnHand, 0)">From the site's POS cost file.</x-fact>
+            <x-fact label="Unit" :value="$item->UOMCode" />
+            <x-fact label="Last sold" :value="$item->LastSoldAt ? \Illuminate\Support\Carbon::parse($item->LastSoldAt)->format('j M Y') : null">{{ \App\Support\Format::n($item->QtySoldThisMonth ?? 0, 0) }} sold this month.</x-fact>
+        </x-facts>
+    </x-modal>
+    <x-modal id="stock-count-details" title="Counting history">
+        <x-facts>
+            <x-fact label="Last counted" :value="$item->LastCountedAt ? \Illuminate\Support\Carbon::parse($item->LastCountedAt)->format('j M Y') : null" />
+            <x-fact label="Counts in 90 days" :value="$item->LastCountedAt ? \App\Support\Format::n($item->CountLines90 ?? 0, 0) : null" />
+            <x-fact label="All-time counts" :value="$item->CountStatsRefreshedAt ? \App\Support\Format::n($item->CountLinesAllTime ?? 0, 0) : null">{{ $item->CountStatsRefreshedAt ? 'Rollup rebuilt '.\Illuminate\Support\Carbon::parse($item->CountStatsRefreshedAt)->format('j M Y, H:i').'.' : 'The rollup has not yet been rebuilt.' }}</x-fact>
+        </x-facts>
+    </x-modal>
+
+    <x-card title="What this line is" flush>
         <x-facts>
             <x-fact label="Item number" :value="$item->StockItemNo">
                 Unique within this site only. The same number is a different product at the other twenty-one.
@@ -94,7 +125,7 @@
         </x-facts>
     </x-card>
 
-    <x-card title="What it costs and makes">
+    <x-card title="What it costs and makes" flush>
         <x-slot:info>
             <p>From that site's POS cost file, joined on branch, POS system and code.</p>
         </x-slot:info>
@@ -140,7 +171,7 @@
         @endif
     </x-card>
 
-    <x-card title="How the counting behaves" collapsible remember="product.stock.show.counting">
+    <x-card title="How the counting behaves" flush collapsible remember="product.stock.show.counting">
         <x-facts>
             <x-fact label="Variance allowance" :value="\App\Support\Format::n($item->QtyVarAllowance, 2)">
                 Above this a count is flagged.

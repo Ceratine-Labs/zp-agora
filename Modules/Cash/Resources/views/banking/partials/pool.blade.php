@@ -34,7 +34,7 @@
         @include('cash::banking.partials.key-inputs', ['scope' => $scope, 'from' => 'banking'])
         <input type="hidden" name="channel" value="{{ $channel }}">
 
-        <x-table :count="$rows->count()" :total="$s?->Available" procedure="agora.usp_Cash_GetCashupPool" dense
+        <x-table layout-key="Cash.banking.partials.pool.1" :count="$rows->count()" :total="$s?->Available" procedure="agora.usp_Cash_GetCashupPool" dense
                  :empty="'Nothing unbanked in '.$poolName.' around this day.'">
             <x-slot:head>
                 <tr>

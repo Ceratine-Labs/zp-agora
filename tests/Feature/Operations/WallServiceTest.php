@@ -49,4 +49,50 @@ class WallServiceTest extends TestCase
         $this->assertSame($first['generatedAt'], $second['generatedAt']);
         $this->assertStringContainsString('branches%5B0%5D=3', $second['screens'][0]['items'][0]['href']);
     }
+
+    public function test_site_work_is_limited_to_allowed_queue_types_and_shows_oldest_date(): void
+    {
+        $store = Cache::store('array');
+        $store->flush();
+        Cache::shouldReceive('store')->with('file')->andReturn($store);
+        $proc = Mockery::mock(ProcedureService::class);
+        $proc->shouldReceive('call')->twice()->andReturn(collect());
+        $proc->shouldReceive('callSets')->once()->with('agora.usp_Reports_GridMyQueue',
+            Mockery::on(fn (array $args): bool => $args['BranchIds'] === '3' && $args['QueueKeys'] === 'day-close'))
+            ->andReturn([collect([(object) ['BranchId' => 3, 'BranchName' => 'Site A', 'QueueKey' => 'day-close',
+                'Queue' => 'Days open', 'OpenItems' => 2, 'OldestDate' => '2026-10-01']])]);
+        $wall = new OperationsWallService($proc);
+        $snapshot = $wall->snapshot([3], ['shop'], ['day-close', 'not-a-queue']);
+        $this->assertTrue($snapshot['siteWorkAvailable']);
+        $this->assertSame('2', $snapshot['siteWork'][0]['value']);
+        $this->assertStringContainsString('Oldest: 01 Oct 2026', $snapshot['siteWork'][0]['detail']);
+        $this->assertSame([], $wall->snapshot([3], ['shop'], [])['siteWork']);
+    }
+
+    public function test_queue_only_access_does_not_require_other_wall_sources(): void
+    {
+        $proc = Mockery::mock(ProcedureService::class);
+        $proc->shouldNotReceive('call');
+        $proc->shouldReceive('callSets')->once()->andReturn([collect()]);
+        $result = (new OperationsWallService($proc))->snapshot([3], [], ['day-close']);
+        $this->assertTrue($result['siteWorkAvailable']);
+        $this->assertSame([], $result['screens']);
+    }
+
+    public function test_waste_decision_revision_refreshes_the_cached_snapshot(): void
+    {
+        $store = Cache::store('array');
+        $store->flush();
+        Cache::shouldReceive('store')->with('file')->andReturn($store);
+        $proc = Mockery::mock(ProcedureService::class);
+        $proc->shouldReceive('call')->with('agora.usp_Operations_Snapshot', Mockery::type('array'))->twice()->andReturn(collect());
+        $proc->shouldReceive('call')->with('agora.usp_Operations_TradingChecks', Mockery::type('array'))->twice()->andReturn(collect());
+        $wall = new OperationsWallService($proc);
+        $store->forever('operations.wall.waste-revision', 'before');
+        $wall->snapshot([3], ['stock']);
+        $wall->snapshot([3], ['stock']);
+        $store->forever('operations.wall.waste-revision', 'after');
+        $wall->snapshot([3], ['stock']);
+        $this->assertTrue(true); // Mock expectations prove one load per revision.
+    }
 }

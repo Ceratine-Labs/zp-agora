@@ -21,9 +21,9 @@
     same day. The pills set the same `column.chosen` the tick list set, so
     scoping to a state disables the rows outside it exactly as any other filter
     does, and the Amend button's count follows, with the amber note in the
-    action bar saying how many rows a scope is holding back. It opened scoped
-    to Balanced until 7 Oct 2026; it opens on All now, and pills are several
-    at once (Ryan: "default the pills to all, make them multiple selectable").
+    action bar saying how many rows a scope is holding back. The default
+    shows amendable chains and excludes No change; Show all restores the full
+    set. Pills remain independently selectable.
 --}}
 {{-- The loader stays up until this table is laid out (Ryan, 7 Oct 2026:
      "show the loader until the grid has been initialized when running a stock
@@ -40,7 +40,7 @@
     request()->attributes->set('loader_hold', 'Laying out the chains…');
 
     $tones = [
-        'balanced' => 'is-matched', 'duplicate' => 'is-matched', 'captured' => 'is-matched', 'short' => 'is-warn',
+        'balanced' => 'is-matched', 'duplicate' => 'is-matched', 'captured' => 'is-matched', 'reduced' => 'is-matched', 'short' => 'is-warn',
         'possible' => 'is-serious', 'blocked' => 'is-serious',
         'restored' => 'is-warn', 'unrecorded' => 'is-crit', 'dormant' => '', 'clean' => '',
     ];
@@ -64,6 +64,7 @@
         'duplicate' => 'Duplicate issue removed',
         /* An over balanced by capturing its missing issue (13 Oct 2026). */
         'captured' => 'Missing issue captured',
+        'reduced' => 'Issue reduced',
         'short' => 'Short',
         'possible' => 'Possible duplicate',
         'blocked' => 'Blocked',
@@ -88,6 +89,15 @@
     $emptyLines = $run->lines->filter(fn ($l) => $l->isEmptyChain());
     $emptyChains = $emptyLines->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->count();
     $rows = $hideEmpty ? $run->lines->reject(fn ($l) => $l->isEmptyChain()) : $run->lines;
+    $showAll = ! $run->isOpen() || request()->query('scope') === 'all';
+    $writableKeys = $rows->filter(fn ($l) => $l->isWritable() || (float) $l->AppliedGoodWaste > 0.0005 || str_starts_with((string) $l->Outcome, 'Missing shift:'))
+        ->map(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->unique()->flip();
+    $hiddenChains = $rows->reject(fn ($l) => $writableKeys->has($l->AreaNo.'|'.$l->StockItemNo))
+        ->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->count();
+    if (! $showAll) {
+        $rows = $rows->filter(fn ($l) => $writableKeys->has($l->AreaNo.'|'.$l->StockItemNo));
+    }
+    $defaultStates = $showAll ? '' : implode('|', array_diff_key($states, ['clean' => true]));
 @endphp
 
 <x-card title="Proposals" flush>
@@ -156,6 +166,11 @@
                     {{ $ready }} {{ Str::plural('shift', $ready) }}
                 </button>
 
+                <a class="btn-ghost" role="button"
+                   href="{{ request()->fullUrlWithQuery(['scope' => 'amendable', 'empty' => 'hide']) }}"
+                   @if ($showAll) data-tt-defaults-reload="stockrecon-lines-{{ $run->Id }}"
+                   @else data-tt-restore-defaults="stockrecon-lines-{{ $run->Id }}" @endif>Default filters</a>
+
                 <x-info label="What this press does">
                     <p>A ticked shift on any page is in the press. Only the outcome pills and the column filters
                        take rows out of it.</p>
@@ -177,7 +192,7 @@
             </x-action-bar>
         @endif
 
-        @if ($emptyChains > 0)
+        @if ($showAll && $emptyChains > 0)
             {{-- Counted out loud, with the way back. A screen that silently
                  decides what you are not allowed to see is worse than a long
                  one — and on a branch-month these are most of the length. --}}
@@ -188,14 +203,24 @@
                 {{ Str::plural('shift', $emptyLines->count()) }})
                 @if ($hideEmpty)
                     with no movement hidden —
-                    <a href="{{ route('app.stockrecon.run', [$run, 'empty' => 'show']) }}">show them</a>.
+                    <a href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}">show them</a>.
                 @else
                     with no movement —
-                    <a href="{{ route('app.stockrecon.run', $run) }}">hide them</a>.
+                    <a href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'hide']) }}">hide them</a>.
                 @endif
             </p>
         @endif
 
+        @if ($run->isOpen())
+            <p class="field-help" style="margin:10px 14px 0">
+                @if ($showAll)
+                    Showing all chains — <a href="{{ request()->fullUrlWithQuery(['scope' => 'amendable', 'empty' => 'hide']) }}">show amendable chains</a>.
+                @else
+                    Showing amendable chains; {{ \App\Support\Format::n($hiddenChains) }} {{ Str::plural('chain', $hiddenChains) }} with nothing to amend hidden —
+                    <a href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}">show all chains</a>.
+                @endif
+            </p>
+        @endif
         <p class="field-help" style="margin:10px 14px 0">Each chain row shows the number of shifts across its date range. Open it to see each numbered shift.</p>
 
         {{-- `data-tt-page`: browser paging over rows that are all already here.
@@ -204,7 +229,7 @@
              and a filter. A Blade comment cannot go INSIDE a component tag —
              the tag compiler reads the attribute list with a regex — which is
              why this one is out here. --}}
-        <x-table :count="$rows->count()"
+        <x-table layout-key="StockRecon.panes.proposals.1" :count="$rows->count()"
                  :procedure="$run->ProcedureName"
                  :id="'stockrecon-lines-'.$run->Id"
                  tools fit
@@ -215,7 +240,7 @@
                  data-tt-group-noun="chain"
                  data-tt-row-noun="shift"
                  data-row-detail
-                 empty="The procedure ran and found no shifts in this period. That is an answer, not a failure.">
+                 :empty="$showAll ? 'The procedure ran and found no shifts in this period.' : 'There are no amendable chains in this run. Use Show all chains to see the rest.'">
             <x-slot:head>
                 <tr>
                     @if ($run->isOpen())
@@ -227,13 +252,12 @@
                         <th class="pick"><input type="checkbox" data-check-all aria-label="Select every amendable shift"></th>
                     @endif
                     {{-- Filtered by the pill strip above the table, not by a
-                         tick list in the filter row. It OPENS ON ALL (Ryan,
-                         7 Oct 2026: "default the pills to all"); until then it
-                         opened scoped to Balanced and a duplicate taken out.
+                         tick list in the filter row. The default excludes
+                         unchanged shifts while keeping every amendable kind.
                          Pills are several at once. The order is declared so a
                          run with no blocked chains still shows "Blocked 0" in
                          the same place rather than reshuffling the strip. --}}
-                    <th data-tt-pills
+                    <th data-tt-pills="{{ $defaultStates }}"
                         data-tt-pill-order="{{ $stateOrder }}">Outcome</th>
                     <th>Item</th>
                     {{-- The item's chain total, and a second pill set in the
@@ -301,8 +325,10 @@
                     @if ($run->isOpen())
                         <td class="pick">
                             @if ($chain->writable() > 0)
-                                <input type="checkbox" data-tt-group-check
-                                       aria-label="Every amendable shift of {{ $first->StockItemNo }}">
+                                <label class="pick-target">
+                                    <input type="checkbox" data-tt-group-check
+                                           aria-label="Every amendable shift of {{ $first->StockItemNo }}">
+                                </label>
                             @endif
                         </td>
                     @endif
@@ -374,7 +400,7 @@
                 @php($group = $groups[$line->Id] ?? null)
                 {{-- A shift: the data the filters and the press act on, never
                      shown (the chain row opens the panel instead). --}}
-                <tr class="{{ $tones[$line->outcomeKey()] ?? '' }}{{ $group ? ' bal-g'.$group['series'] : '' }}"
+                <tr class="{{ $line->tone() === 'crit' ? 'is-crit' : ($tones[$line->outcomeKey()] ?? '') }}{{ $group ? ' bal-g'.$group['series'] : '' }}"
                     data-tt-group="{{ $chain->key }}">
                     @if ($run->isOpen())
                         <td class="pick">

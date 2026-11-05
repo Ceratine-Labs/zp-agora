@@ -41,7 +41,7 @@
             </summary>
             <p class="muted">Ratios not applied. {{ $group->UnsetRatios }} chains have a missing or zero ratio.
                 Gross reduction counts both sides of an arithmetic offset; it is not a correction amount.</p>
-            <x-table dense data-row-detail :count="$global['chains']->where('PreProductionTypeNo', $group->PreProductionTypeNo)->count()" procedure="agora.usp_StockRecon_PreviewGlobal">
+            <x-table layout-key="StockRecon.panes.global.1" dense data-row-detail :count="$global['chains']->where('PreProductionTypeNo', $group->PreProductionTypeNo)->count()" procedure="agora.usp_StockRecon_PreviewGlobal">
                 <x-slot:head><tr><th>Area / item</th><th>Unit</th><th class="num">Ratio</th><th class="num">As counted</th><th class="num">After proposed balancing</th><th>Evidence</th></tr></x-slot:head>
                 @foreach ($global['chains']->where('PreProductionTypeNo', $group->PreProductionTypeNo) as $chain)
                     <tr data-detail-url="{{ route('app.stockrecon.line', [$run, $chain->LineId]) }}" tabindex="0" aria-expanded="false">
@@ -73,7 +73,7 @@
         {{ $global['summary']->LinkedPairs }} linked candidates. Matching tolerance: 0.01 raw units.</p>
     <p class="muted">Ranked by shared production group, then shared POS code, then same area and shared first description word.
         A shared word is a weak clue. Even a strong link is not proof that stock moved between these items.</p>
-    <x-table dense :count="$global['pairs']->count()" procedure="agora.usp_StockRecon_PreviewGlobal" empty="No linked offset candidates in this basis.">
+    <x-table layout-key="StockRecon.panes.global.2" dense :count="$global['pairs']->count()" procedure="agora.usp_StockRecon_PreviewGlobal" empty="No linked offset candidates in this basis.">
         <x-slot:head><tr><th>Over</th><th class="num">Quantity</th><th>Short</th><th class="num">Quantity</th><th>Unit</th><th>Link</th></tr></x-slot:head>
         @foreach ($global['pairs'] as $pair)
             <tr>
@@ -91,7 +91,7 @@
 <x-card title="Recorded production in this run’s period" style="margin-top:16px">
     <p>Production records for the same site, items, POS system and covered dates. These records provide context;
         they do not establish that production explains a variance. Ratios and the production mapping still need ZP’s confirmation.</p>
-    <x-table dense :count="$global['production']->count()" procedure="agora.usp_StockRecon_PreviewGlobal" empty="No matching production records found. This does not prove that no production occurred.">
+    <x-table layout-key="StockRecon.panes.global.3" dense :count="$global['production']->count()" procedure="agora.usp_StockRecon_PreviewGlobal" empty="No matching production records found. This does not prove that no production occurred.">
         <x-slot:head><tr><th>Date</th><th>Shift</th><th>Item</th><th>POS system</th><th>Base code</th><th>Reference</th><th class="num">Recorded quantity</th></tr></x-slot:head>
         @foreach ($global['production'] as $record)
             <tr><td>{{ substr($record->TransactionDate, 0, 10) }}</td><td data-sort="{{ $record->ShiftNo }}">{{ \Modules\StockRecon\Support\ShiftLabel::show($record->ShiftNo) }}</td><td>{{ $record->StockItemNo }}</td><td>{{ $record->PosSystem }}</td><td>{{ $record->BaseCode }}</td><td>{{ $record->TrackingNumber }}</td><td class="num">{{ \App\Support\Format::n($record->TotalQuantity, 3) }}</td></tr>

@@ -8,7 +8,9 @@ use App\Support\BranchContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Modules\Core\Models\Branch;
+use Modules\Reports\Services\MyQueueAccess;
 use Modules\Reports\Services\ReportNotFound;
 use Modules\Reports\Services\ReportsService;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -38,7 +40,9 @@ class ReportsController extends Controller
     public function show(string $report, Request $request, BranchContext $context): View
     {
         $view = $report === 'my-queue' ? 'reports::my-queue' : 'reports::show';
+        $queueKeys = $report === 'my-queue' ? app(MyQueueAccess::class)->allowed($request->user()) : [];
         $input = [
+            'queue_keys' => $queueKeys,
             'branch_ids' => $this->scopedBranchIds($request, $context),
             'from' => $request->query('from'),
             'to' => $request->query('to'),
@@ -52,6 +56,7 @@ class ReportsController extends Controller
             $definition = $this->service->definition($report)
                 ?? throw new ReportNotFound($report);
 
+            Gate::authorize('reports.'.$report.'.view');
             $result = $this->service->run($report, $input);
         } catch (ReportNotFound $e) {
             throw new NotFoundHttpException($e->getMessage(), $e);
@@ -70,6 +75,7 @@ class ReportsController extends Controller
                 'branches' => $this->branches($context),
                 'context' => $context,
                 'ceiling' => (int) config('reports.export_ceiling'),
+                'queueKeys' => $queueKeys,
             ]);
         }
 
@@ -84,6 +90,7 @@ class ReportsController extends Controller
             'branches' => $this->branches($context),
             'context' => $context,
             'ceiling' => (int) config('reports.export_ceiling'),
+            'queueKeys' => $queueKeys,
         ]);
     }
 

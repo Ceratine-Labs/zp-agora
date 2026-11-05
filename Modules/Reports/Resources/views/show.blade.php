@@ -42,6 +42,11 @@
         </x-notice>
     @endif
 
+    @if ($report['key'] === 'waste' && ($errors->any() || session('status')))
+        <x-notice :tone="$errors->any() ? 'warn' : 'good'" title="Waste authorization">
+            <p>{{ $errors->first() ?: session('status') }}</p>
+        </x-notice>
+    @endif
     <x-reports::scope :report="$report" :params="$params" :context="$context" :branches="$branches" :open="$refusal || $rows->isEmpty()" />
 
     <x-card :title="$report['label']" flush>
@@ -56,7 +61,7 @@
              (feature-rules §3.5, row-detail.js): the route, and which of the
              row's columns fill its parameters. --}}
         @php($detail = $report['detail'] ?? null)
-        <x-table :count="$rows->count()" :total="$total"
+        <x-table layout-key="Reports.show.1" :count="$rows->count()" :total="$total"
                  procedure="agora.{{ $report['procedure'] }}"
                  :empty="__('reports::reports.nothing')"
                  :data-row-detail="$detail ? 'row' : null">
@@ -75,6 +80,7 @@
                             @endif
                         </th>
                     @endforeach
+                    @if ($report['key'] === 'waste')<th>Operations decision</th>@endif
                 </tr>
             </x-slot:head>
 
@@ -86,6 +92,36 @@
                             <x-reports::cell :type="$column['type']" :value="$row->{$column['key']} ?? null" />
                         </td>
                     @endforeach
+                    @if ($report['key'] === 'waste')
+                        <td>
+                            @can('reports.waste.approve')
+                                @if ((float) $row->QtyGoodWaste > 0)
+                                <form method="POST" action="{{ route('app.reports.waste.authorization') }}">
+                                    @csrf
+                                    <input type="hidden" name="branch_id" value="{{ $row->BranchId }}">
+                                    <input type="hidden" name="date" value="{{ \Illuminate\Support\Carbon::parse($row->TransactionDate)->toDateString() }}">
+                                    <input type="hidden" name="shift" value="{{ $row->ShiftNo }}">
+                                    <input type="hidden" name="area" value="{{ $row->AreaNo }}">
+                                    <input type="hidden" name="item" value="{{ $row->StockItemNo }}">
+                                    <input type="hidden" name="captured_good" value="{{ $row->QtyGoodWaste }}">
+                                    <input type="hidden" name="captured_at" value="{{ $row->CapturedAt ? \Illuminate\Support\Carbon::parse($row->CapturedAt)->format('Y-m-d H:i:s.v') : '' }}">
+                                    <label>Good quantity <input type="number" name="authorized_good" min="0.0001" max="{{ $row->QtyGoodWaste }}" step="0.0001" value="{{ in_array($row->Status, ['Authorized', 'Partially authorized'], true) ? $row->AuthorizedGood : $row->QtyGoodWaste }}" required></label>
+                                    <button type="submit" name="decision" value="authorize" class="btn sm">Authorize</button>
+                                    @if (in_array($row->Status, ['Authorized', 'Partially authorized'], true))
+                                        <button type="submit" name="decision" value="withdraw" formnovalidate class="btn sm">Withdraw</button>
+                                    @endif
+                                </form>
+                                @if ($row->DecisionAt)
+                                    <small>Last decision: {{ $row->DecisionByName ?: 'user '.$row->DecisionBy }} · {{ \Illuminate\Support\Carbon::parse($row->DecisionAt, 'UTC')->format('d M Y H:i') }} UTC</small>
+                                @endif
+                                @else
+                                    <span class="muted">No good waste to authorize</span>
+                                @endif
+                            @else
+                                <span class="muted">Operations authorization required</span>
+                            @endcan
+                        </td>
+                    @endif
                 </tr>
             @endforeach
         </x-table>

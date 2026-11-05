@@ -4,19 +4,14 @@
    WHAT IT IS FOR
    Waste captured at a branch, by area, shift and stock item, with what it cost.
 
-   ⚠ WHAT IT CANNOT DO, AND WHY THE MENU ENTRY SAYS "WASTE TO APPROVE"
    PumpIT HOLDS NO APPROVAL STATE FOR WASTE. STK_StockWasteLine has eight
    columns — branch, date, shift, area, item, good qty, bad qty, created-at —
    and not one of them records approval, decline, an approver or an approval
    date. Staff shorts have Approved / ApprovedByUserId / ApprovedDate /
    IsDeclined; purchase requests have the same four; waste has none of it.
 
-   So this report is CAPTURED waste, not waste awaiting approval, and it says
-   so in the Status column rather than returning an empty grid that would read
-   as "nothing outstanding". An approval trail for waste is a thing Agora would
-   have to own in its own database — it does not exist to be reported on.
-
-   Raised for Ryan as a decision rather than invented here.
+   Agora records authorization separately. The most recent decision applies
+   only while captured good quantity and source capture time still match.
 
    ALSO WORTH KNOWING BEFORE READING THE NUMBERS
    STK_StockWasteLine holds 91 rows in total and the most recent is 1 Mar 2026,
@@ -90,8 +85,17 @@ BEGIN
                        * ISNULL(m.SellingPrice, 0))                           AS TotalAtSellingPrice,
         w.CreateDateTime                                AS CapturedAt,
 
-        /* Not an approval state. PumpIT has none for waste — see the header. */
-        'Captured (PumpIT records no approval for waste)' AS Status
+        CASE WHEN ISNULL(w.QtyGoodWaste, 0) <= 0 THEN 'No good waste'
+             WHEN auth.IsAuthorized = 1
+              AND auth.CapturedGood = CONVERT(decimal(18,4), ISNULL(w.QtyGoodWaste, 0))
+              AND (auth.CapturedAt = w.CreateDateTime OR (auth.CapturedAt IS NULL AND w.CreateDateTime IS NULL))
+             THEN CASE WHEN auth.AuthorizedGood < w.QtyGoodWaste THEN 'Partially authorized' ELSE 'Authorized' END
+             ELSE 'Awaiting authorization' END AS Status,
+        CASE WHEN auth.IsAuthorized = 1
+              AND auth.CapturedGood = CONVERT(decimal(18,4), ISNULL(w.QtyGoodWaste, 0))
+              AND (auth.CapturedAt = w.CreateDateTime OR (auth.CapturedAt IS NULL AND w.CreateDateTime IS NULL))
+             THEN auth.AuthorizedGood ELSE CONVERT(decimal(18,4), 0) END AS AuthorizedGood,
+        auth.CreatedAt AS DecisionAt, auth.CreatedBy AS DecisionBy, u.UserName AS DecisionByName
     INTO #Rows
     FROM agora.vw_StockWasteLine w
     JOIN agora.vw_Branch b ON b.BranchId = w.BranchId
@@ -99,6 +103,12 @@ BEGIN
            ON a.BranchId = w.BranchId AND a.AreaNo = w.AreaNo
     LEFT JOIN agora.vw_Shift f
            ON f.BranchId = w.BranchId AND f.ShiftNo = w.ShiftNo
+    OUTER APPLY (SELECT TOP 1 z.IsAuthorized, z.CapturedGood, z.CapturedAt, z.AuthorizedGood, z.CreatedAt, z.CreatedBy
+        FROM agora.StockWasteAuthorization z
+        WHERE z.BranchId = w.BranchId AND z.TransactionDate = CONVERT(date, w.TransactionDate)
+          AND z.ShiftNo = w.ShiftNo AND z.AreaNo = w.AreaNo AND z.StockItemNo = w.StockItemNo
+        ORDER BY z.Id DESC) auth
+    LEFT JOIN agora.[User] u ON u.Id = auth.CreatedBy
     /* The stock master is keyed on (branch, item); the waste line's AreaNo is
        the counting area the waste happened IN, not the item's home area, so it
        is deliberately not part of this join. Joining it too is what makes an
@@ -123,7 +133,7 @@ BEGIN
            r.AreaNo, r.AreaDescription, r.AreaGroup, r.StockItemNo, r.StockItemDescription,
            r.UOMCode, r.QtyGoodWaste, r.QtyBadWaste, r.QtyTotalWaste, r.SellingPrice,
            r.GoodWasteAtSellingPrice, r.BadWasteAtSellingPrice, r.TotalAtSellingPrice,
-           r.CapturedAt, r.Status
+           r.CapturedAt, r.Status, r.AuthorizedGood, r.DecisionAt, r.DecisionBy, r.DecisionByName
     FROM #Rows r
     ORDER BY
         CASE WHEN @SortAsc = 1 THEN

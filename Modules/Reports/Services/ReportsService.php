@@ -179,6 +179,11 @@ class ReportsService
 
         $params = $this->parametersFor($key, $input);
 
+        if ($key === 'my-queue') {
+            $requested = is_array($input['queue_keys'] ?? null) ? $input['queue_keys'] : [];
+            $params['QueueKeys'] = implode(',', array_intersect(array_keys(MyQueueAccess::TYPES), $requested));
+        }
+
         $sets = $this->procedures->callSets($report['procedure'], $params);
 
         return [

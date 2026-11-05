@@ -285,15 +285,24 @@ BEGIN
     LEFT JOIN agora.vw_StockWasteLine w
            ON w.BranchId = l.BranchId AND w.TransactionDate = l.TransactionDate
           AND w.ShiftNo = l.ShiftNo AND w.AreaNo = l.AreaNo AND w.StockItemNo = l.StockItemNo
+    OUTER APPLY (SELECT TOP 1 z.IsAuthorized, z.CapturedGood, z.AuthorizedGood, z.CapturedAt
+        FROM agora.StockWasteAuthorization z
+        WHERE z.BranchId = l.BranchId AND z.TransactionDate = CONVERT(date, l.TransactionDate)
+          AND z.ShiftNo = l.ShiftNo AND z.AreaNo = l.AreaNo AND z.StockItemNo = l.StockItemNo
+        ORDER BY z.Id DESC) auth
     CROSS APPLY (SELECT
         CONVERT(decimal(18,4), ISNULL(l.QtyOpen, 0)) AS QtyOpen,
         CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0)) AS QtyIssued,
         CONVERT(decimal(18,4), ISNULL(l.QtyClose, 0)) AS QtyClose,
         CONVERT(decimal(18,4), ISNULL(l.QtyComputer, 0)) AS QtyComputer,
-        CONVERT(decimal(18,4), ISNULL(w.QtyGoodWaste, 0)) AS QtyGoodWaste
+        CONVERT(decimal(18,4), CASE WHEN auth.IsAuthorized = 1
+            AND auth.CapturedGood = CONVERT(decimal(18,4), ISNULL(w.QtyGoodWaste, 0))
+            AND (auth.CapturedAt = w.CreateDateTime OR (auth.CapturedAt IS NULL AND w.CreateDateTime IS NULL))
+            THEN auth.AuthorizedGood ELSE 0 END) AS QtyGoodWaste
     ) q
     CROSS APPLY (SELECT q.QtyComputer - (q.QtyOpen + q.QtyIssued - q.QtyClose) AS QtyVarB4Waste) v
     CROSS APPLY (SELECT CASE
+        WHEN v.QtyVarB4Waste >= 0 THEN v.QtyVarB4Waste
         WHEN q.QtyGoodWaste = 0 THEN v.QtyVarB4Waste
         WHEN v.QtyVarB4Waste + q.QtyGoodWaste < 0 THEN v.QtyVarB4Waste + q.QtyGoodWaste
         ELSE CONVERT(decimal(18,4), 0) END AS QtyVar
@@ -326,7 +335,7 @@ BEGIN
                   CASE WHEN NULLIF(r.StockLocation, '') IS NOT NULL THEN CONCAT(' (', r.StockLocation, ')') ELSE '' END),
            r.LossValue, r.LossRank, 'rand', 'crit',
            CONCAT('Top ', r.LossRank, ' loss code at this site; ', r.ShortLines,
-                  ' shortage lines after good waste, at selling price. Overs are kept separate. Source: ',
+                  ' shortage lines after authorized good waste, at selling price. Overs are kept separate. Source: ',
                   COALESCE(r.StockLocation, 'unmapped stock location'), '.'),
            NULL, r.StockItemNo, r.Area, r.ShortLines
     FROM #RankedLoss r JOIN #Branch b ON b.BranchId = r.BranchId
@@ -340,7 +349,7 @@ BEGIN
            CASE WHEN s.Records = 0 THEN 'neutral'
                 WHEN s.Losses < 0 THEN 'crit' WHEN s.Overs > 0 THEN 'warn' ELSE 'good' END,
            CASE WHEN s.Records = 0 THEN 'No count lines for this trading day; a balanced site cannot be inferred.'
-                ELSE CONCAT('All ', s.Records, ' count lines after good waste, at selling price. Losses and overs separate; top 10 item codes shown below.') END,
+                ELSE CONCAT('All ', s.Records, ' count lines after authorized good waste, at selling price. Losses and overs separate; top 10 item codes shown below.') END,
            NULL, NULL, NULL, s.Records
     FROM #Branch b
     CROSS APPLY (

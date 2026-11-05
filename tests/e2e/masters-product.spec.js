@@ -78,6 +78,22 @@ test.describe('Stock recon master', () => {
         // Provenance, not decoration: the detail page has to say whether the
         // row it is showing is the customer's or an Agora override.
         await expect(page.getByText('Held by')).toBeVisible();
+
+        // Each headline opens its own sourced breakdown, and Escape returns focus.
+        for (const [name, title] of [
+            ['Sell (incl VAT)', 'Selling price'],
+            ['Cost (excl VAT)', 'Cost and margin'],
+            ['On hand', 'Stock on hand'],
+            ['Last counted', 'Counting history'],
+        ]) {
+            const card = page.getByRole('button', { name: new RegExp(name.replace(/[()]/g, '\\$&'), 'i') });
+            await card.click();
+            const dialog = page.getByRole('dialog', { name: title });
+            await expect(dialog).toBeVisible();
+            await page.keyboard.press('Escape');
+            await expect(dialog).not.toBeVisible();
+            await expect(card).toBeFocused();
+        }
     });
 
     test('a reader who cannot write is not offered the batch flag action', async ({ page }) => {

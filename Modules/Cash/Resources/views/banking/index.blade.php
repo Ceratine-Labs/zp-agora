@@ -125,7 +125,7 @@
                 ['label' => 'Pump shortages', 'value' => \App\Support\Format::r($summary['shorts'])],
             ]" />
 
-            <x-table :count="$cashups->count()" procedure="agora.usp_Cash_GetCashup" dense
+            <x-table layout-key="Cash.banking.index.1" :count="$cashups->count()" procedure="agora.usp_Cash_GetCashup" dense
                      empty="PumpIT holds no cashups for this site on this day.">
                 <x-slot:head>
                     <tr>
@@ -163,7 +163,7 @@
                            <a href="{{ route('app.cash.zread', ['branch_id' => $scope->branchId, 'date_from' => $scope->date, 'date_to' => $scope->date]) }}">allocate {{ $unallocated->count() === 1 ? 'it' : 'them' }}</a> first.</p>
                     </x-notice>
                 @endif
-                <x-table :count="$notCaptured->count()" procedure="agora.usp_Cash_GetCashup" dense
+                <x-table layout-key="Cash.banking.index.2" :count="$notCaptured->count()" procedure="agora.usp_Cash_GetCashup" dense
                          empty="Every allocated Z-read that day has a cashup.">
                     <x-slot:head>
                         <tr>
@@ -240,7 +240,7 @@
 
             @if ($events->isNotEmpty())
                 <x-card title="What has been done" flush style="margin-top:16px">
-                    <x-table :count="$events->count()" procedure="agora.usp_Cash_GetCashup" dense>
+                    <x-table layout-key="Cash.banking.index.3" :count="$events->count()" procedure="agora.usp_Cash_GetCashup" dense>
                         <x-slot:head>
                             <tr>
                                 <th>When</th>

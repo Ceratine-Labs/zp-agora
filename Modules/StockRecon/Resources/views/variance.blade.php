@@ -28,11 +28,11 @@
                counted and sold — <code>POS &minus; (Open + Issued &minus; Close)</code> on PumpIT's
                <code>_Original</code> columns. <strong>Amended</strong> is the same sum on the quantities as they stand
                now, after balancing, whether Agora balanced them or somebody did by hand in PumpIT.
-               <strong>Moved by balancing</strong> is the amended value less the original.</p>
+               <strong>Change in variance</strong> is the amended value less the original and includes authorized waste.</p>
             <p>Balancing moves a short from one shift onto the over on another, so the totals show what it did: the
                shorts and the overs as counted, and what is left of them after. The arithmetic and the colours are
                PumpIT's Stock Recon Balancing screen's — red is short, yellow is over by more than the item's
-               allowance. Good waste can explain a short on the amended side; it never makes an over.</p>
+               allowance. Only good waste authorized by operations can reduce a short; it never reduces an over.</p>
             <p>Any period can be chosen. A very wide one across every site is refused with a count of the lines, so
                narrow the sites or the dates.</p>
         </x-slot:info>
@@ -69,7 +69,7 @@
     @endif
 
     <p class="muted">Comparison view · Open, issued, close and POS quantities are available under Columns.
-        Shorts, overs and balanced refer to the amended quantity after waste.</p>
+        Shortages include only authorized good waste; unapproved and bad waste are excluded.</p>
     <x-data-grid :grid="$grid" :branches="$branches" class="variance-grid" surface>
         <x-slot:scope>
             <div class="field">

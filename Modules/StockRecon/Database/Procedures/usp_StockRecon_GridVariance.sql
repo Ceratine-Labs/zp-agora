@@ -14,15 +14,14 @@
    The managers, after a week has been balanced. The grid on Stock → Original
    vs amended variance; the third result set is the strip above it.
 
-   THE ARITHMETIC IS PUMPIT'S OWN, from dbo.sp_SelectStockReconBalancing — the
-   Stock Recon Balancing screen this mirrors:
+   THE ARITHMETIC starts from dbo.sp_SelectStockReconBalancing. Agora records
+   operations' authorization against the captured good-waste quantity:
 
      Original   QtyVar   = Computer_Original - (Open_Original + Issued_Original - Close_Original)
      Amended    VarB4Waste = Computer - (Open + Issued - Close)
-                QtyVar   = VarB4Waste where no good waste was recorded; with good
-                           waste, VarB4Waste + waste where that is still short,
-                           otherwise 0 — waste can explain a short, never make
-                           an over
+                QtyVar   = VarB4Waste plus authorized good waste on a shortage.
+                           The calculation caps this adjustment at zero;
+                           an existing over is never reduced by waste.
      Both       ValueVar = QtyVar * SellPrice
 
    Three deliberate differences from that screen, each because it would have
@@ -158,6 +157,7 @@ BEGIN
         q.QtyOpen, q.QtyIssued, q.QtyClose, q.QtyComputer,
         v.QtyVarB4Waste,
         q.QtyGoodWaste,
+        q.QtyAuthorizedGoodWaste,
         x.QtyVar,
         CONVERT(decimal(18,2), x.QtyVar * ISNULL(l.SellPrice, 0))         AS ValueVar,
         CASE WHEN x.QtyVar < 0 THEN 'crit'
@@ -186,6 +186,11 @@ BEGIN
     LEFT JOIN agora.vw_StockWasteLine w
            ON w.BranchId = l.BranchId AND w.TransactionDate = l.TransactionDate AND w.ShiftNo = l.ShiftNo
           AND w.AreaNo = l.AreaNo AND w.StockItemNo = l.StockItemNo
+    OUTER APPLY (SELECT TOP 1 z.IsAuthorized, z.CapturedGood, z.AuthorizedGood, z.CapturedAt
+        FROM agora.StockWasteAuthorization z
+        WHERE z.BranchId = l.BranchId AND z.TransactionDate = CONVERT(date, l.TransactionDate)
+          AND z.ShiftNo = l.ShiftNo AND z.AreaNo = l.AreaNo AND z.StockItemNo = l.StockItemNo
+        ORDER BY z.Id DESC) auth
     CROSS APPLY (SELECT
         CONVERT(decimal(18,4), ISNULL(l.QtyOpen_Original, 0))     AS QtyOpenOriginal,
         CONVERT(decimal(18,4), ISNULL(l.QtyIssued_Original, 0))   AS QtyIssuedOriginal,
@@ -195,13 +200,18 @@ BEGIN
         CONVERT(decimal(18,4), ISNULL(l.QtyIssued, 0))            AS QtyIssued,
         CONVERT(decimal(18,4), ISNULL(l.QtyClose, 0))             AS QtyClose,
         CONVERT(decimal(18,4), ISNULL(l.QtyComputer, 0))          AS QtyComputer,
-        CONVERT(decimal(18,4), ISNULL(w.QtyGoodWaste, 0))         AS QtyGoodWaste) q
+        CONVERT(decimal(18,4), ISNULL(w.QtyGoodWaste, 0))         AS QtyGoodWaste,
+        CONVERT(decimal(18,4), CASE WHEN auth.IsAuthorized = 1
+            AND auth.CapturedGood = CONVERT(decimal(18,4), ISNULL(w.QtyGoodWaste, 0))
+            AND (auth.CapturedAt = w.CreateDateTime OR (auth.CapturedAt IS NULL AND w.CreateDateTime IS NULL))
+            THEN auth.AuthorizedGood ELSE 0 END)                   AS QtyAuthorizedGoodWaste) q
     CROSS APPLY (SELECT
         q.QtyComputerOriginal - (q.QtyOpenOriginal + q.QtyIssuedOriginal - q.QtyCloseOriginal) AS QtyVarOriginal,
         q.QtyComputer - (q.QtyOpen + q.QtyIssued - q.QtyClose)                                 AS QtyVarB4Waste) v
     CROSS APPLY (SELECT CASE
-        WHEN q.QtyGoodWaste = 0                       THEN v.QtyVarB4Waste
-        WHEN v.QtyVarB4Waste + q.QtyGoodWaste < 0     THEN v.QtyVarB4Waste + q.QtyGoodWaste
+        WHEN v.QtyVarB4Waste >= 0                     THEN v.QtyVarB4Waste
+        WHEN q.QtyAuthorizedGoodWaste = 0             THEN v.QtyVarB4Waste
+        WHEN v.QtyVarB4Waste + q.QtyAuthorizedGoodWaste < 0 THEN v.QtyVarB4Waste + q.QtyAuthorizedGoodWaste
         ELSE CONVERT(decimal(18,4), 0) END AS QtyVar) x
     WHERE NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter WHERE meter.BranchId = l.BranchId
               AND meter.AreaNo = l.AreaNo AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1)
@@ -295,7 +305,7 @@ BEGIN
            StockItemNo, StockItemDescription, UOMCode, SellPrice, QtyVarAllowance,
            QtyOpenOriginal, QtyIssuedOriginal, QtyCloseOriginal, QtyComputerOriginal, QtyVarOriginal, ValueVarOriginal,
            OriginalTone,
-           QtyOpen, QtyIssued, QtyClose, QtyComputer, QtyVarB4Waste, QtyGoodWaste, QtyVar, ValueVar, AmendedTone,
+           QtyOpen, QtyIssued, QtyClose, QtyComputer, QtyVarB4Waste, QtyGoodWaste, QtyAuthorizedGoodWaste, QtyVar, ValueVar, AmendedTone,
            QtyVarMoved, ValueVarMoved, Balancing
     FROM #Rows
     ORDER BY

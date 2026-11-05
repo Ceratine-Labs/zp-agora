@@ -10,11 +10,17 @@ use Modules\Core\Http\Controllers\LandingStubController;
 use Modules\Core\Http\Controllers\ModuleMenuController;
 use Modules\Core\Http\Controllers\PreferenceController;
 use Modules\Core\Http\Controllers\RoleAdminController;
+use Modules\Core\Http\Controllers\TableLayoutController;
 use Modules\Core\Http\Controllers\UserAdminController;
 use Modules\Core\Http\Middleware\AuthorizeAccessGrid;
 
 // Registered under /app with the web stack by ModuleServiceProvider.
 Route::middleware('auth')->group(function () {
+    Route::post('table-layouts/read', [TableLayoutController::class, 'read'])->name('table-layouts.read');
+    Route::get('table-layouts/{key}', [TableLayoutController::class, 'show'])->name('table-layouts.show');
+    Route::post('table-layouts/{key}', [TableLayoutController::class, 'store'])->name('table-layouts.store');
+    Route::delete('table-layouts/{key}', [TableLayoutController::class, 'destroy'])->name('table-layouts.destroy');
+    Route::view('access-required', 'core::access-required')->name('access-required');
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('modules/{module}', ModuleMenuController::class)->where('module', '[a-z][a-z0-9-]*')->name('modules.show');
     Route::post('preferences/theme', [PreferenceController::class, 'theme'])->name('preferences.theme');
@@ -56,25 +62,18 @@ Route::middleware('auth')->group(function () {
         Route::get('users/{user}', [UserAdminController::class, 'show'])
             ->middleware('can:setup.users.view')->whereNumber('user')->name('users.show');
 
-        /*
-         | The edit screen and its saves. One route per card, because each card
-         | REPLACES the whole set it owns and a single endpoint would have no
-         | way to tell "the sites card was not on this form" from "grant no
-         | sites" — and granting no sites means granting every site.
-         */
+        // The editor saves all access sets together; legacy section routes
+        // remain available for existing integrations and bookmarked clients.
         Route::get('users/{user}/edit', [UserAdminController::class, 'edit'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.edit');
+        Route::put('users/{user}', [UserAdminController::class, 'update'])
+            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.update');
         Route::put('users/{user}/details', [UserAdminController::class, 'updateDetails'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.details.update');
         Route::put('users/{user}/branches', [UserAdminController::class, 'updateBranches'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.branches.update');
         Route::put('users/{user}/permissions', [UserAdminController::class, 'updatePermissions'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.permissions.update');
-
-        // The menu card. A fifth save on the same screen, and the same rule:
-        // it REPLACES the whole set, and an empty set means the whole menu.
-        Route::put('users/{user}/menu', [UserAdminController::class, 'updateMenu'])
-            ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.menu.update');
 
         // POST, not PUT: mailing a link and minting a credential are things
         // that HAPPEN rather than a resource being replaced, and neither is

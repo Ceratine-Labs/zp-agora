@@ -24,6 +24,9 @@ async function sweet() {
 function theme(options = {}) {
     return {
         buttonsStyling: false,
+        // Native modal dialogs live in the browser's top layer. A prompt
+        // attached to the body would be hidden behind that layer and inert.
+        target: Array.from(document.querySelectorAll('dialog[open]')).at(-1) || document.body,
         customClass: {
             popup: 'ag-dialog',
             title: 'ag-dialog-title',

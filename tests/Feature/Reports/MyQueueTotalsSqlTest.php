@@ -32,6 +32,8 @@ class MyQueueTotalsSqlTest extends TestCase
             'vw_PurchaseRequestLine' => 'BranchId int, TransactionNo int, PurchaseAmount money',
             'vw_StaffShort' => 'BranchId int, TransactionDate datetime2, AmountShort money, Approved bit, IsDeclined bit',
             'vw_DropSafeBag' => 'BranchId int, DropDate datetime2, Amount money, CollectionId int',
+            'vw_StockWasteLine' => 'BranchId int, TransactionDate date, ShiftNo int, AreaNo int, StockItemNo nvarchar(10), QtyGoodWaste decimal(18,4), CreateDateTime datetime',
+            'StockWasteAuthorization' => 'Id int, BranchId int, TransactionDate date, ShiftNo int, AreaNo int, StockItemNo nvarchar(10), IsAuthorized bit, CapturedGood decimal(18,4), CapturedAt datetime',
         ];
         foreach ($tables as $name => $columns) {
             $this->connection->unprepared("CREATE TABLE [{$this->schema}].[{$name}] ({$columns})");
@@ -106,13 +108,40 @@ class MyQueueTotalsSqlTest extends TestCase
         $this->assertSame(['OpenItems' => 3, 'Value' => null, 'SiteQueues' => 2], $totals['day-close']);
     }
 
+    public function test_event_permissions_filter_rows_totals_and_pagination_before_return(): void
+    {
+        $this->seedRows();
+        $one = $this->runQueue(queueKeys: 'day-close');
+        $this->assertSame(2, (int) $one[1][0]['TotalRows']);
+        $this->assertSame(['day-close'], array_keys($this->totals($one)));
+        $this->assertSame('day-close', $one[0][0]['QueueKey']);
+        $none = $this->runQueue(queueKeys: '');
+        $this->assertSame([], $none[0]);
+        $this->assertSame(0, (int) $none[1][0]['TotalRows']);
+        $this->assertSame([], $none[2]);
+    }
+
+    public function test_waste_queue_counts_only_good_waste_without_a_matching_current_authorization(): void
+    {
+        $this->connection->statement("INSERT INTO [{$this->schema}].[vw_Branch] VALUES (13, 'Site A')");
+        $this->connection->statement("INSERT INTO [{$this->schema}].[vw_StockWasteLine] VALUES (13,'2026-10-01',1,1,'A',2,NULL),(13,'2026-10-01',1,1,'B',2,NULL),(13,'2026-10-01',1,1,'C',0,NULL)");
+        $this->connection->statement("INSERT INTO [{$this->schema}].[StockWasteAuthorization] VALUES (1,13,'2026-10-01',1,1,'B',1,2,NULL)");
+        $result = $this->runQueue(queueKeys: 'waste-approvals');
+        $this->assertSame(1, (int) $result[1][0]['TotalRows']);
+        $this->assertSame(1, (int) $result[0][0]['OpenItems']);
+        $this->connection->statement("UPDATE [{$this->schema}].[vw_StockWasteLine] SET QtyGoodWaste=3 WHERE StockItemNo='B'");
+        $changed = $this->runQueue(queueKeys: 'waste-approvals');
+        $this->assertSame(2, (int) $changed[0][0]['OpenItems']);
+        $this->assertNull($changed[0][0]['Value']);
+    }
+
     /** @return array<int, array<int, array<string, mixed>>> */
-    private function runQueue(int $page = 1, string $branches = '13,18', ?string $search = null): array
+    private function runQueue(int $page = 1, string $branches = '13,18', ?string $search = null, string $queueKeys = 'day-close,unallocated-zreads,open-cashups,purchase-approvals,staff-shorts,drop-safe'): array
     {
         $statement = $this->connection->getPdo()->prepare(
-            "EXEC [{$this->schema}].[usp_Reports_GridMyQueue] @BranchIds=?, @DateFrom='2026-10-01', @DateTo='2026-10-31', @Search=?, @Page=?, @PageSize=1"
+            "EXEC [{$this->schema}].[usp_Reports_GridMyQueue] @BranchIds=?, @DateFrom='2026-10-01', @DateTo='2026-10-31', @Search=?, @Page=?, @PageSize=1, @QueueKeys=?"
         );
-        $statement->execute([$branches, $search, $page]);
+        $statement->execute([$branches, $search, $page, $queueKeys]);
         $sets = [];
         do {
             if ($statement->columnCount() > 0) {

@@ -1,8 +1,10 @@
+    @if ($editing)
+    <form method="POST" action="{{ route('app.setup.users.update', ['user' => $person->Id]) }}" data-loader="Saving user…">
+        @csrf @method('PUT')
+        <input type="hidden" name="user_editor" value="1">
+    @endif
     <x-card class="user-access-section" id="details" title="Account details">
         @if ($editing)
-        <form method="POST" action="{{ route('app.setup.users.details.update', ['user' => $person->Id]) }}">
-            @csrf
-            @method('PUT')
 
             <div class="field-row">
                 <x-field name="UserName" label="Name" :value="old('UserName', $person->UserName)"
@@ -27,11 +29,6 @@
                          placeholder="Locked out"
                          info="A locked account is refused at sign-in. Carried over from PumpIT." />
             </div>
-
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Save details</button>
-            </div>
-        </form>
         @else
         <div class="field-row">
             <x-field name="UserName" label="Name" :value="$person->UserName" readonly />
@@ -48,9 +45,6 @@
 
     <x-card class="user-access-section" id="roles" title="Roles">
         @if ($editing)
-        <form method="POST" action="{{ route('app.setup.users.roles.update', ['user' => $person->Id]) }}">
-            @csrf @method('PUT')
-            <input type="hidden" name="_section" value="roles">
             <input type="hidden" name="roles_form" value="1">
             <div class="field field-wide">
                 <label for="user-roles">Assigned roles</label>
@@ -60,12 +54,8 @@
                     @endforeach
                 </select>
                 <p class="field-help">Permissions from all assigned roles combine with direct grants. Sites and landing pages stay on this person.</p>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Save roles</button>
                 @can('setup.roles.view')<a class="btn" href="{{ route('app.setup.roles.index') }}">Manage roles</a>@endcan
             </div>
-        </form>
         @else
         @if ($grantedRoleIds === [])
             <x-empty-state text="No roles assigned. This person uses direct grants." />
@@ -89,10 +79,6 @@
                keep a trading day.</p>
         </x-slot:info>
             @if ($editing)
-        <form method="POST" action="{{ route('app.setup.users.branches.update', ['user' => $person->Id]) }}">
-                @csrf
-                @method('PUT')
-            <input type="hidden" name="_section" value="branches">
 
                 <div class="field field-wide">
                     <label for="f-branches">Sites granted</label>
@@ -100,18 +86,13 @@
                             data-placeholder="Every site — no individual grant">
                         @foreach ($allBranches as $branch)
                             <option value="{{ $branch->BranchId }}"
-                                @selected(in_array((int) $branch->BranchId, array_map('intval', old('_section') === 'branches' ? old('branches', []) : $grantedBranchIds), true))>{{ $branch->Name }}@unless ($branch->IsTrading) · not trading @endunless</option>
+                                @selected(in_array((int) $branch->BranchId, array_map('intval', old('user_editor') ? old('branches', []) : $grantedBranchIds), true))>{{ $branch->Name }}@unless ($branch->IsTrading) · not trading @endunless</option>
                         @endforeach
                     </select>
                     <p class="field-help">
                         No sites selected means every site. Selecting one site switches this person to that branch workspace.
                     </p>
                 </div>
-
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Save sites</button>
-            </div>
-        </form>
         @else
         @if ($branchCount === 0)
             <x-notice tone="info" title="Every site — no individual restrictions" />
@@ -127,10 +108,6 @@
 
     <x-card class="user-access-section" id="permissions" title="Permissions" collapsible :open="$errors->any() || ! $editing">
         @if ($editing)
-        <form method="POST" action="{{ route('app.setup.users.permissions.update', ['user' => $person->Id]) }}">
-            @csrf
-            @method('PUT')
-            <input type="hidden" name="_section" value="permissions">
 
             <p class="field-help">Ticks are direct grants. Role grants stay effective until the role is removed.</p>
             @foreach ($permissionRows as $module => $rows)
@@ -138,22 +115,17 @@
                 <div class="role-list" data-access-checks>
                     <div class="menu-ticks-bulk"><button type="button" class="btn sm" data-tick-all>Select group</button><button type="button" class="btn sm" data-tick-none>Clear direct grants</button></div>
                     @foreach ($rows as $row)
-                        <label class="role-row {{ (old('_section') === 'permissions' ? in_array((int) $row['permission']->Id, array_map('intval', old('permissions', [])), true) : $row['direct']) ? 'on' : '' }}">
+                        <label class="role-row {{ $row['inherited'] ? 'is-inherited' : '' }} {{ (old('user_editor') ? in_array((int) $row['permission']->Id, array_map('intval', old('permissions', [])), true) : $row['direct']) ? 'on' : '' }}">
                             <input type="checkbox" name="permissions[]" value="{{ $row['permission']->Id }}"
-                                   @checked(old('_section') === 'permissions' ? in_array((int) $row['permission']->Id, array_map('intval', old('permissions', [])), true) : $row['direct'])>
+                                   @checked(old('user_editor') ? in_array((int) $row['permission']->Id, array_map('intval', old('permissions', [])), true) : $row['direct'])>
                             <span class="role-name">
                                 <code>{{ $row['permission']->Code }}</code>
                             </span>
-                            <span class="role-primary">{{ $row['permission']->Name }} @if ($row['inherited'])<x-chip tone="info">Granted by role</x-chip>@endif</span>
+                            <span class="role-primary">{{ $row['permission']->Name }} @if ($row['inherited'])<x-chip tone="info">Granted by role: {{ implode(', ', $row['roleNames']) }}</x-chip>@endif</span>
                         </label>
                     @endforeach
                 </div>
             @endforeach
-
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Save permissions</button>
-            </div>
-        </form>
         @else
         @if ($effective === [])
             <x-empty-state text="No permissions granted. This person cannot use protected actions." />
@@ -165,7 +137,7 @@
                     @foreach ($rows as $row)
                         @continue(! $row['effective'])
                         <li>{{ $row['permission']->Name }} <code>{{ $row['permission']->Code }}</code>
-                            @if ($row['inherited'])<x-chip tone="info">Granted by role</x-chip>@endif
+                            @if ($row['inherited'])<x-chip tone="info">Granted by role: {{ implode(', ', $row['roleNames']) }}</x-chip>@endif
                             @if ($row['direct'])<x-chip tone="neutral">Direct grant</x-chip>@endif
                         </li>
                     @endforeach
@@ -175,73 +147,11 @@
         @endif
     </x-card>
 
-    <x-card class="user-access-section" id="menu" title="Menu access" collapsible :open="$errors->any()">
-        @if ($editing)
-        <form method="POST" action="{{ route('app.setup.users.menu.update', ['user' => $person->Id]) }}">
-            @csrf
-            @method('PUT')
-            <input type="hidden" name="_section" value="menu">
-
-            <p class="field-help">No direct or role menu ticks means the whole menu.</p>
-
-            @foreach ($menuWorkspaces as $code => $workspace)
-                <h4 class="perm-module">{{ $workspace['label'] }}</h4>
-
-                <div class="menu-ticks" data-access-checks>
-                    <div class="menu-ticks-bulk">
-                        <button type="button" class="btn sm" data-tick-all>Tick all</button>
-                        <button type="button" class="btn sm" data-tick-none>Tick none</button>
-                    </div>
-
-                    @php($section = null)
-                    @foreach ($workspace['rows'] as $row)
-                        @if ($section !== $row['section']->Code)
-                            @php($section = $row['section']->Code)
-                            <p class="menu-ticks-section">{{ $row['section']->Label }}</p>
-                        @endif
-
-                        @php($id = (int) $row['item']->Id)
-                        <label class="role-row menu-tick {{ in_array($id, array_map('intval', old('_section') === 'menu' ? old('menu', []) : $menuDirectIds), true) ? 'on' : '' }}"
-                               style="--depth: {{ $row['depth'] }}">
-                            <input type="checkbox" name="menu[]" value="{{ $id }}"
-                                   @checked(in_array($id, array_map('intval', old('_section') === 'menu' ? old('menu', []) : $menuDirectIds), true))>
-                            <span class="role-name">
-                                {{ $row['item']->Label }}
-                                @if ($row['item']->PermissionCode)<code>{{ $row['item']->PermissionCode }}</code>@endif
-                            </span>
-                            <span class="role-primary">
-                                {{ $row['item']->isLink() ? 'screen' : 'not built yet' }}
-                                @if (in_array($id, $roleMenuIds, true))<x-chip tone="info">Granted by role</x-chip>@endif
-                            </span>
-                        </label>
-                    @endforeach
-                </div>
-            @endforeach
-
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Save menu access</button>
-            </div>
-        </form>
-        @else
-        @if (! $menuRestricted)
-            <x-notice tone="info" title="The whole menu — no individual restrictions" />
-        @else
-            @foreach ($menuWorkspaces as $workspace)
-                @php($ticked = collect($workspace['rows'])->filter(fn ($row) => in_array((int) $row['item']->Id, $effectiveMenuIds, true)))
-                @continue($ticked->isEmpty())
-                <h4 class="perm-module">{{ $workspace['label'] }}</h4>
-                <ul class="perm-list">
-                    @foreach ($ticked as $row)
-                        <li>{{ $row['section']->Label }} · {{ $row['item']->Label }}
-                            @if (in_array((int) $row['item']->Id, $roleMenuIds, true))<x-chip tone="info">Granted by role</x-chip>@endif
-                            @if (in_array((int) $row['item']->Id, $menuDirectIds, true))<x-chip tone="neutral">Direct grant</x-chip>@endif
-                        </li>
-                    @endforeach
-                </ul>
-            @endforeach
-        @endif
-        @endif
-    </x-card>
+    @if ($editing)
+        <input type="hidden" name="editor_complete" value="1">
+        <div class="form-actions"><button type="submit" class="btn-primary">Save user</button></div>
+    </form>
+    @endif
 
     <x-card class="user-access-section" id="password" title="Password">
         <x-slot:info>

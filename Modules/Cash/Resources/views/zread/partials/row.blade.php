@@ -127,7 +127,7 @@
     </div>
 
     <div>
-        <x-table :count="$history->count()" procedure="agora.usp_Cash_ZreadTerminalHistory" dense
+        <x-table layout-key="Cash.zread.partials.row.1" :count="$history->count()" procedure="agora.usp_Cash_ZreadTerminalHistory" dense
                  empty="Nobody has been allocated to this terminal in the history window.">
             <x-slot:head>
                 <tr>

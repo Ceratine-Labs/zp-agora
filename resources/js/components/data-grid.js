@@ -57,6 +57,7 @@ class Grid {
         this.url = root.dataset.stateUrl;
         this.table = root.querySelector('table.dg');
         this.timer = null;
+        this.pendingSave = Promise.resolve();
 
         this.chooser();
         this.resizing();
@@ -120,10 +121,12 @@ class Grid {
                 // Fetch the chosen columns after saving: hidden cells are not
                 // rendered, and the cards and extract also need the new layout.
                 this.showColumn(box.value, box.checked);
+                this.root.inert = true;
                 if (await this.save(true)) window.location.reload();
                 else {
                     box.checked = !box.checked;
                     this.showColumn(box.value, box.checked);
+                    this.root.inert = false;
                 }
             });
         });
@@ -163,13 +166,24 @@ class Grid {
 
                 if (!go) return;
 
-                await fetch(this.url, {
-                    method: 'DELETE',
-                    headers: this.headers(),
-                    credentials: 'same-origin',
-                });
+                this.root.inert = true;
+                window.clearTimeout(this.timer);
+                await this.pendingSave;
 
-                window.location.reload();
+                try {
+                    const response = await fetch(this.url, {
+                        method: 'DELETE',
+                        headers: this.headers(),
+                        credentials: 'same-origin',
+                    });
+                    if (!response.ok) throw new Error('Reset failed');
+                    window.location.reload();
+                } catch (error) {
+                    this.root.inert = false;
+                    if (window.Agora && window.Agora.notify) {
+                        window.Agora.notify.toast('Your column layout could not be reset', 'error');
+                    }
+                }
             });
         }
 
@@ -187,9 +201,23 @@ class Grid {
         // waiting for the next click to pick it up.
         const rows = this.root.querySelector('[data-page-size]');
         if (rows) {
+            const originalSize = rows.value;
             rows.addEventListener('change', async () => {
-                await this.save(true);
-                window.location.reload();
+                this.root.inert = true;
+                if (await this.save(true)) window.location.reload();
+                else {
+                    rows.value = originalSize;
+                    this.root.inert = false;
+                }
+            });
+        }
+
+        const height = this.root.querySelector('[data-table-height]');
+        if (height) {
+            height.addEventListener('change', () => {
+                this.root.classList.remove('dg-height-compact', 'dg-height-normal', 'dg-height-large');
+                this.root.classList.add(`dg-height-${height.value}`);
+                this.save();
             });
         }
     }
@@ -373,12 +401,14 @@ class Grid {
     state() {
         const size = this.root.querySelector('[data-text-size]');
         const rows = this.root.querySelector('[data-page-size]');
+        const height = this.root.querySelector('[data-table-height]');
         const widths = this.widths();
 
         const state = {
             column_order: this.order(),
             hidden: this.hidden(),
             text_size: size ? size.value : 'normal',
+            table_height: height ? height.value : 'normal',
         };
 
         // Absent, not `{}` — an empty widths map is a state that keeps being
@@ -393,20 +423,27 @@ class Grid {
     save(immediate = false) {
         window.clearTimeout(this.timer);
 
-        if (immediate) return this.post();
+        if (immediate) return this.enqueueSave();
 
         return new Promise((resolve) => {
-            this.timer = window.setTimeout(() => resolve(this.post()), SAVE_AFTER_MS);
+            this.timer = window.setTimeout(() => resolve(this.enqueueSave()), SAVE_AFTER_MS);
         });
     }
 
-    async post() {
+    enqueueSave() {
+        const state = this.state();
+        const result = this.pendingSave.then(() => this.post(state));
+        this.pendingSave = result;
+        return result;
+    }
+
+    async post(state) {
         try {
             const response = await fetch(this.url, {
                 method: 'POST',
                 headers: this.headers(),
                 credentials: 'same-origin',
-                body: JSON.stringify(this.state()),
+                body: JSON.stringify(state),
             });
 
             if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);

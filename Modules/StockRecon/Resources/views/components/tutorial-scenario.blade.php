@@ -47,7 +47,7 @@
                 </div>
             </div>
 
-            <x-table :count="count($rows)" :aria-label="$scenario['title'].' — '.($state === 'before' ? 'original figures' : 'worked proposal')">
+            <x-table layout-key="StockRecon.components.tutorial-scenario.1" :count="count($rows)" :aria-label="$scenario['title'].' — '.($state === 'before' ? 'original figures' : 'worked proposal')">
                 <x-slot:head>
                     <tr>
                         <th scope="col">Shift</th>

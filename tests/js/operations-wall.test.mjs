@@ -7,6 +7,17 @@ import {
 const sites = [{ id: 2, name: 'Site two' }, { id: 7, name: 'Site seven' }];
 const screens = ['overview', 'fuel', 'shop', 'qsr', 'stock', 'cashups'].map((id) => ({ id }));
 
+test('overview includes permitted site work with its open count and oldest date', () => {
+    const overview = wallOverview({
+        screens: [], generatedAt: '2026-11-05T08:00:00Z', scope: { siteCount: 1 }, siteWorkAvailable: true,
+        siteWork: [{ id: 'queue-3-day-close', site: 'Site A', title: 'Days open', severity: 'warn',
+            value: '2', detail: 'Open: 2 · Oldest: 01 Oct 2026 · Last 90 days' }],
+    });
+    assert.equal(overview.status, 'live');
+    assert.equal(overview.items[0].value, '2');
+    assert.match(overview.items[0].detail, /Oldest: 01 Oct 2026/);
+});
+
 test('saved preferences accept only available sites and supported settings', () => {
     const value = wallPreferences({
         branches: [2, '2', '999', '<script>', 7],
@@ -17,8 +28,10 @@ test('saved preferences accept only available sites and supported settings', () 
     assert.equal(value.seconds, 25);
     assert.equal(value.autoReturn, false);
     assert.equal(value.scopeInvalid, false);
-    assert.equal(value.hideZero, false);
+    assert.equal(value.hideZero, true);
     assert.equal(wallPreferences({ hideZero: true }, sites).hideZero, true);
+    assert.equal(wallPreferences({}, sites).hideZero, true);
+    assert.equal(wallPreferences({ hideZero: false }, sites).hideZero, false);
     assert.equal(wallPreferences({ hideZero: 'false' }, sites).hideZero, false);
 });
 

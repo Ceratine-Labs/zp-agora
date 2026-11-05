@@ -119,7 +119,7 @@
     </x-card>
 
     <x-card title="Postings">
-        <x-table procedure="agora.usp_Debtors_GetStatement" :count="$lines->count()" dense tools
+        <x-table layout-key="Debtors.show.1" procedure="agora.usp_Debtors_GetStatement" :count="$lines->count()" dense tools
                  empty="Nothing was posted to this account in the period.">
             <x-slot:head>
                 <tr>
@@ -162,7 +162,7 @@
     </x-card>
 
     <x-card title="Mailed">
-        <x-table procedure="agora.usp_Debtors_GetStatement" :count="$sends->count()" dense
+        <x-table layout-key="Debtors.show.2" procedure="agora.usp_Debtors_GetStatement" :count="$sends->count()" dense
                  empty="No statement has been mailed for this account.">
             <x-slot:head>
                 <tr><th>When</th><th>Period</th><th class="num">Balance</th><th>To</th><th>Mode</th><th>How</th><th>Result</th><th>By</th></tr>

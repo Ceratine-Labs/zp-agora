@@ -202,7 +202,7 @@
          about rows on the page and should not cost a round trip. A filtered
          row's tick box is disabled, so it leaves the submission and the count
          above says so. --}}
-    <x-table :count="$run->lines->count()"
+    <x-table layout-key="Recon.partials.result.1" :count="$run->lines->count()"
              :procedure="$run->ProcedureName"
              :id="'recon-lines-'.$run->Id"
              tools

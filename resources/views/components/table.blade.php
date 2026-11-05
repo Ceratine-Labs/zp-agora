@@ -1,9 +1,10 @@
 {{--
     A rendered result set.
 
-    This is NOT <x-data-grid> (T014) — it has no header filters, no column
-    persistence and no export, and a screen that needs those must wait for the
-    grid rather than grow them here. What it does carry is the part of
+    This is NOT <x-data-grid> (T014) — it has no server-side header filters or
+    export. Signed-in users can save table appearance and column preferences;
+    the grid remains the right choice for server-paged result sets. It carries
+    the part of
     feature-rules §3 that applies to any table at all:
 
       - it scrolls inside its own container, so a wide result set never makes
@@ -25,7 +26,7 @@
     measurements that motivated it. Height in the head once, against width on
     every row forever.
 
-    `tools` is the one thing it has that the grid also has: click-to-sort and a
+    `tools` adds click-to-sort and a
     per-column filter row, done in the BROWSER over the rows already on the
     page. That is the right shape here and the wrong shape in the grid — see
     the head of `table-tools.js` for the whole argument — and it is opt-in
@@ -57,11 +58,28 @@
     'dense' => false,
     'fit' => false,
     'tools' => false,
+    'layoutKey' => null,
 ])
+
+@php
+    // The route and the headings identify the kind of table rather than a
+    // particular record, so the same preference follows the user to other
+    // records and other devices. Callers can name ambiguous tables explicitly.
+    // Include empty headings and spans: an optional selection column has no
+    // text, but changes every following column's position.
+    $layoutMarkup = preg_replace_callback('/<th\b([^>]*)>/i', static function ($match) {
+        preg_match('/\bcolspan=["\']?(\d+)/i', $match[1], $span);
+        return '|column:'.($span[1] ?? '1').'|';
+    }, (string) ($head ?? ''));
+    $layoutHead = trim(preg_replace('/\s+/u', ' ', str_replace(['▲', '▼'], '', strip_tags($layoutMarkup))));
+    $layoutName = $layoutKey ?? (string) request()->route()?->getName();
+    $layoutHash = hash('sha256', $layoutName.'|'.$layoutHead);
+    $layoutSignature = hash_hmac('sha256', $layoutHash, (string) config('app.key'));
+@endphp
 
 {{-- Attributes land on the TABLE, not the wrapper: `data-row-detail` and the
      like describe the grid itself, and row-detail.js looks for them there. --}}
-<div class="table-block">
+<div class="table-block" @auth data-table-layout-url="{{ route('app.table-layouts.show', ['key' => $layoutHash, 'signature' => $layoutSignature]) }}" data-table-layout-read-url="{{ route('app.table-layouts.read') }}" @endauth>
     <div class="table-scroll">
         <table {{ $attributes->merge(['class' => 'dt '.($dense ? 'dense ' : '').($fit ? 'fit' : '')]) }}
                @if ($tools) data-table-tools @endif>

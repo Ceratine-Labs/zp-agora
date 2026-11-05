@@ -80,7 +80,7 @@
     <x-card title="Depreciation by group"
             sub="As at the last month end on or before {{ \Illuminate\Support\Carbon::parse($asAt)->format('j M Y') }}"
             collapsible remember="assets.register.bygroup">
-        <x-table procedure="agora.usp_Assets_Depreciate" :count="$byGroup->count()" dense
+        <x-table layout-key="Assets.register.index.1" procedure="agora.usp_Assets_Depreciate" :count="$byGroup->count()" dense
                  empty="No assets on the register for these sites yet.">
             <x-slot:head>
                 <tr>

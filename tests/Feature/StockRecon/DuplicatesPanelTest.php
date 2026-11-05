@@ -231,10 +231,11 @@ class DuplicatesPanelTest extends TestCase
         $admin = $this->person('admin');
         $this->actingAs($admin)->get(route('app.stockrecon.run', $run))
             ->assertOk()
-            // Opens on All since 7 Oct 2026 (Ryan: "default the pills to all").
-            ->assertSee('data-tt-pills
-                        data-tt-pill-order="Balanced|Duplicate issue removed|', false)
-            ->assertSee('data-sort="Duplicate issue removed"', false)
+            ->assertSee('data-tt-pills="Balanced|Duplicate issue removed|Missing issue captured|Issue reduced|Short|Possible duplicate|Blocked|Hand amendment reversed|Unrecorded issue|Dormant"', false)
+            ->assertSee('data-tt-pill-order="Balanced|Duplicate issue removed|', false)
+            ->assertSee('data-sort="Duplicate issue removed"', false);
+        $this->get(route('app.stockrecon.run', [$run, 'scope' => 'all', 'empty' => 'show']))
+            ->assertOk()
             ->assertSee('data-sort="Possible duplicate"', false);
 
         // Switched off, a clear one is found and NOT taken out, so it is not

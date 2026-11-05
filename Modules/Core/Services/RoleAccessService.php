@@ -5,7 +5,6 @@ namespace Modules\Core\Services;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Modules\Core\Models\MenuItem;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\RoleMenuItem;
@@ -91,21 +90,14 @@ class RoleAccessService
                     throw ValidationException::withMessages(['Code' => 'That role code is already in use. Choose another.']);
                 }
                 $permissionIds = $this->validatedIds(Permission::query()->acrossBranches(), $data['permissions'] ?? [], 'permissions');
-                $menuIds = $this->validatedIds(MenuItem::query()->acrossBranches()->where('IsActive', true), $data['menu'] ?? [], 'menu');
                 $role->fill(['BranchId' => config('agora.group_branch_id'), 'Code' => $code,
                     'Name' => trim($data['Name']), 'IsManaged' => true])->save();
                 $affected = UserRole::query()->acrossBranches()->where('RoleId', $role->Id)
                     ->pluck('UserId')->map(fn ($value) => (int) $value)->all();
                 RolePermission::query()->acrossBranches()->where('RoleId', $role->Id)->delete();
-                RoleMenuItem::query()->acrossBranches()->where('RoleId', $role->Id)->delete();
                 foreach ($permissionIds as $permissionId) {
                     RolePermission::query()->acrossBranches()->create([
                         'BranchId' => config('agora.group_branch_id'), 'RoleId' => $role->Id, 'PermissionId' => $permissionId,
-                    ]);
-                }
-                foreach ($menuIds as $menuId) {
-                    RoleMenuItem::query()->acrossBranches()->create([
-                        'BranchId' => config('agora.group_branch_id'), 'RoleId' => $role->Id, 'MenuItemId' => $menuId,
                     ]);
                 }
                 $this->forget($affected);

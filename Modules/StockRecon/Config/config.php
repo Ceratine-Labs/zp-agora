@@ -249,17 +249,16 @@ return [
         ],
 
         /*
-        | Rule 10 of the client's pack: a site is analysed only up to its last
-        | complete recon day — every shift in on 95% of its lines, closings in,
-        | POS posted. Later days are held back and counted on the run, because
-        | balancing them would pin "the latest count" on one nobody has taken.
+        | An optional completeness check can hold back days with missing
+        | shifts, closings or POS. Leave it off by default so the preview
+        | includes the site's available records across the requested period.
         */
         'HoldBackIncomplete' => [
             'label' => 'Hold back days the recon has not finished',
-            'help' => 'On, a day with a shift missing, closings not captured or POS not posted — and every '
-                .'day after it — is left out of the run and counted on it, as the client\'s weekly pack does. '
-                .'Turn it off only to look at an unfinished week on purpose.',
-            'default' => 1,
+            'help' => 'When enabled, a day with a shift missing, closings not captured or POS not posted — and every '
+                .'day after it — is left out of the run and counted on it. With this off, review unfinished '
+                .'counts and POS data before amending.',
+            'default' => 0,
             'type' => 'bool',
         ],
 

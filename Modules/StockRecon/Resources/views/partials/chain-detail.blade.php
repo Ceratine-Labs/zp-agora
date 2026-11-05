@@ -194,7 +194,7 @@
          is read straight across; Amend, which only the amended side has, sits
          after them. --}}
     @php($dash = fn ($v) => abs((float) $v) < 0.0005 ? '—' : \App\Support\Format::qty($v))
-    <x-table :count="$shifts->count()" dense fit
+    <x-table layout-key="StockRecon.partials.chain-detail.1" :count="$shifts->count()" dense fit
              empty="This item has no other shift in the window.">
         <x-slot:head>
             <tr class="grp-head">
@@ -297,8 +297,13 @@
                     {{-- An over balanced by capturing its missing issue (13 Oct 2026). --}}
                     @if ($shift->QtyIssuedNew !== null && $shift->DupTier !== 'D1')
                         <x-chip tone="good" :dot="false"
-                                title="The over this shift sold or held without an issue, recorded as the issue it never got. Reversible from the run.">
-                            missing issue {{ \App\Support\Format::qty($shift->QtyIssued) }} → {{ \App\Support\Format::qty($shift->QtyIssuedNew) }}
+                                title="Agora proposes this issue adjustment; check the commit state to see whether it has been written. It is reversible from the run.">
+                            @if ((float) $shift->QtyIssuedNew < (float) $shift->QtyIssued)
+                                {{ $shift->AmendmentState === 'active' ? ($run->StampMode === 'live' ? 'Agora reduced issue' : 'Agora recorded issue reduction') : 'Agora proposes reducing issue' }}
+                            @else
+                                {{ $shift->AmendmentState === 'active' ? ($run->StampMode === 'live' ? 'Agora added missing issue' : 'Agora recorded missing issue') : 'Agora proposes missing issue' }}
+                            @endif
+                            {{ \App\Support\Format::qty($shift->QtyIssued) }} → {{ \App\Support\Format::qty($shift->QtyIssuedNew) }}
                         </x-chip>
                     @endif
                     {{-- A possible duplicate: its twin, why it is not clear, and

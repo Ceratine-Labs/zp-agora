@@ -135,7 +135,7 @@
         @foreach (['open' => [$open, 'Waiting and approved', 'Nothing is waiting at this site, and nothing approved is off a cashup.'],
                    'rest' => [$rest, 'Posted and declined', 'Nothing else was raised at this site in these days.']] as $key => [$rows, $title, $empty])
             <x-card :title="$title" flush style="margin-top:16px">
-                <x-table :count="$rows->count()" procedure="agora.usp_Cash_GetStaffShorts" dense tools :empty="$empty">
+                <x-table layout-key="Cash.staffshorts.index.1" :count="$rows->count()" procedure="agora.usp_Cash_GetStaffShorts" dense tools :empty="$empty">
                     <x-slot:head>
                         <tr>
                             <th>Short</th>

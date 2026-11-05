@@ -51,7 +51,7 @@
     @endif
 
     <x-card title="Comebacks by supplier" collapsible remember="assets.repairs.tally">
-        <x-table procedure="agora.usp_Assets_Comebacks" :count="$tally['suppliers']->count()" dense tools
+        <x-table layout-key="Assets.repairs.index.1" procedure="agora.usp_Assets_Comebacks" :count="$tally['suppliers']->count()" dense tools
                  empty="No job cards for these sites and dates.">
             <x-slot:head>
                 <tr>

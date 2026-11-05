@@ -1,8 +1,8 @@
 <x-app-shell :title="$role->exists ? 'Edit '.$role->Name : 'Create role'">
     <x-page-head eyebrow="Setup · Roles" :title="$role->exists ? 'Edit '.$role->Name : 'Create role'">
         <x-slot:info>
-            <p>Roles add permissions and menu entries to each assigned user's direct grants. Changing a role changes access for everyone assigned to it.</p>
-            <p>Site access and landing pages stay on the person. No menu ticks on either the person or their roles means the whole menu, subject to permissions.</p>
+            <p>Roles add permissions to each assigned user's direct grants. Changing a role changes access for everyone assigned to it.</p>
+            <p>Site access and landing pages stay on the person. Menus follow permissions.</p>
         </x-slot:info>
         <x-slot:actions><a class="btn" href="{{ route('app.setup.roles.index') }}">Back to roles</a></x-slot:actions>
     </x-page-head>
@@ -22,7 +22,11 @@
         <x-card title="Permissions" collapsible open>
             @foreach ($permissionGroups as $module => $permissions)
                 <h4 class="perm-module">{{ ucfirst($module) }}</h4>
-                <div class="role-list">
+                <div class="role-list" data-role-permission-group>
+                    <div class="menu-ticks-bulk">
+                        <button type="button" class="btn sm" data-select-permissions>Select all</button>
+                        <button type="button" class="btn sm" data-clear-permissions>Deselect all</button>
+                    </div>
                     @foreach ($permissions as $permission)
                         <label class="role-row">
                             <input type="checkbox" name="permissions[]" value="{{ $permission->Id }}" @checked(in_array((int) $permission->Id, array_map('intval', old('role_form') ? old('permissions', []) : $permissionIds), true))>
@@ -33,20 +37,18 @@
                 </div>
             @endforeach
         </x-card>
-        <x-card title="Menu entries" collapsible>
-            <p class="field-help">These entries combine with each user's direct menu ticks and other roles. Entries still require their own permissions.</p>
-            @foreach ($workspaces as $workspace)
-                <h4 class="perm-module">{{ $workspace['label'] }}</h4>
-                <div class="menu-ticks">
-                    @foreach ($workspace['rows'] as $row)
-                        <label class="role-row menu-tick" style="--depth: {{ $row['depth'] }}">
-                            <input type="checkbox" name="menu[]" value="{{ $row['item']->Id }}" @checked(in_array((int) $row['item']->Id, array_map('intval', old('role_form') ? old('menu', []) : $menuIds), true))>
-                            <span class="role-name">{{ $row['section']->Label }} · {{ $row['item']->Label }}</span>
-                        </label>
-                    @endforeach
-                </div>
-            @endforeach
-        </x-card>
         <div class="form-actions"><button class="btn-primary" type="submit">Save role</button></div>
     </form>
+    <script>
+        document.querySelectorAll('[data-role-permission-group]').forEach(function (group) {
+            function setPermissions(checked) {
+                group.querySelectorAll('input[name="permissions[]"]').forEach(function (box) {
+                    box.checked = checked;
+                    box.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
+            group.querySelector('[data-select-permissions]').addEventListener('click', function () { setPermissions(true); });
+            group.querySelector('[data-clear-permissions]').addEventListener('click', function () { setPermissions(false); });
+        });
+    </script>
 </x-app-shell>

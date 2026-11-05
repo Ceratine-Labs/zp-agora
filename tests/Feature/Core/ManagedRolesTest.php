@@ -4,6 +4,7 @@ namespace Tests\Feature\Core;
 
 use App\Support\ProcedureService;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Database\Seeders\AllPermissionsSeeder;
 use Modules\Core\Database\Seeders\ManagedRolesSeeder;
 use Modules\Core\Database\Seeders\RetireRolesSeeder;
 use Modules\Core\Models\MenuItem;
@@ -17,6 +18,9 @@ use Modules\Core\Models\UserRole;
 use Modules\Core\Services\MenuAccessService;
 use Modules\Core\Services\PermissionService;
 use Modules\Core\Services\RoleAccessService;
+use Modules\Reports\Database\Seeders\MyQueuePermissionsSeeder;
+use Modules\Reports\Database\Seeders\ReportViewPermissionsSeeder;
+use Modules\Reports\Services\MyQueueAccess;
 use Tests\Fixtures\GrantsAccess;
 use Tests\TestCase;
 
@@ -79,6 +83,101 @@ class ManagedRolesTest extends TestCase
             'Name' => 'TEST-role-'.uniqid(), 'Code' => 'TEST-'.uniqid(),
             'permissions' => array_map(fn ($code) => $this->permission($code), $codes), 'menu' => $menu,
         ]);
+    }
+
+    public function test_my_queue_event_visibility_follows_role_permissions(): void
+    {
+        app(MyQueuePermissionsSeeder::class)->run();
+        $person = $this->person();
+        $role = $this->role(['reports.queue-day-close.view', 'reports.queue-staff-shorts.view']);
+        app(RoleAccessService::class)->assign($person, [$role->Id]);
+        $this->assertSame(['day-close', 'staff-shorts'], app(MyQueueAccess::class)->allowed($person));
+        $this->assertSame([], app(MyQueueAccess::class)->allowed($this->person()));
+    }
+
+    public function test_my_queue_page_omits_events_without_role_access(): void
+    {
+        app(ReportViewPermissionsSeeder::class)->run();
+        app(MyQueuePermissionsSeeder::class)->run();
+        $person = $this->person();
+        $role = $this->role(['reports.my-queue.view', 'reports.queue-day-close.view']);
+        app(RoleAccessService::class)->assign($person, [$role->Id]);
+        $this->actingAs($person)->get(route('app.reports.show', ['report' => 'my-queue']))
+            ->assertOk()->assertSee('data-queue-total="day-close"', false)
+            ->assertDontSee('data-queue-total="staff-shorts"', false)
+            ->assertDontSee('data-queue-total="open-cashups"', false);
+    }
+
+    public function test_user_without_permissions_is_directed_to_access_required(): void
+    {
+        $person = $this->person();
+        $this->actingAs($person)->get(route('app.dashboard'))->assertRedirect(route('app.access-required'));
+        $this->get(route('app.setup.users.index'))->assertRedirect(route('app.access-required'));
+        $this->get(route('app.access-required'))->assertOk()->assertSee('You have no permissions in Agora')->assertSee('contact your administrator');
+        $this->getJson(route('app.dashboard'))->assertForbidden()->assertJsonPath('message', 'You have no permissions. Contact your administrator.');
+        $this->get(route('app.password.change'))->assertOk();
+    }
+
+    public function test_permissions_control_menu_entries_and_report_urls_without_menu_grants(): void
+    {
+        $person = $this->person();
+        $role = $this->role(['recon.runs.view', 'stockrecon.runs.view']);
+        app(RoleAccessService::class)->assign($person, [$role->Id]);
+        $recon = MenuItem::query()->acrossBranches()->where('RouteName', 'app.recon.index')->firstOrFail();
+        $users = MenuItem::query()->acrossBranches()->where('RouteName', 'app.setup.users.index')->firstOrFail();
+        $stock = MenuItem::query()->acrossBranches()->where('RouteName', 'app.stockrecon.index')->firstOrFail();
+        $access = app(MenuAccessService::class);
+        $access->setForUser($person, [(int) $users->Id]);
+
+        $this->assertTrue($access->mayView($person, $recon), 'Role permission grants its menu even with a different legacy tick.');
+        $this->assertTrue($access->mayView($person, $stock), 'Stock reconciliation permission grants its menu.');
+        $this->assertFalse($access->mayView($person, $users), 'Legacy menu tick must not grant a missing permission.');
+        $other = $this->person();
+        $this->assertFalse($access->mayView($other, $stock), 'No permission means no stock reconciliation menu.');
+        $this->actingAs($person)->get(route('app.reports.index'))->assertForbidden();
+        $this->get(route('app.reports.show', ['report' => 'stock-count']))->assertForbidden();
+    }
+
+    public function test_role_editor_has_independent_controls_for_each_permission_module(): void
+    {
+        $admin = $this->person('admin');
+        $html = $this->actingAs($admin)->get(route('app.setup.roles.create'))->assertOk()->getContent();
+        $doc = new \DOMDocument;
+        @$doc->loadHTML($html);
+        $xpath = new \DOMXPath($doc);
+        $groups = $xpath->query('//*[@data-role-permission-group]');
+        $this->assertGreaterThan(1, $groups->length);
+        foreach ($groups as $group) {
+            $this->assertSame(1, $xpath->query('.//button[@data-select-permissions]', $group)->length);
+            $this->assertSame(1, $xpath->query('.//button[@data-clear-permissions]', $group)->length);
+        }
+        $this->assertSame(0, $xpath->query('//input[@name="menu[]"]')->length);
+    }
+
+    public function test_all_permissions_grant_is_explicit_and_covers_new_permissions(): void
+    {
+        app(AllPermissionsSeeder::class)->run();
+        app(AllPermissionsSeeder::class)->run();
+        $this->assertSame(1, Permission::query()->acrossBranches()->where('Code', '*.*.*')->count());
+        $person = $this->person();
+        $this->assertSame([], app(PermissionService::class)->patternsFor($person));
+        $role = $this->role(['*.*.*']);
+        app(RoleAccessService::class)->assign($person, [$role->Id]);
+        $this->assertTrue(app(PermissionService::class)->userHas($person, 'stockrecon.runs.view'));
+        $this->assertTrue(app(PermissionService::class)->userHas($person, 'future.feature.view'));
+    }
+
+    public function test_each_report_has_its_own_menu_and_direct_url_permission(): void
+    {
+        app(ReportViewPermissionsSeeder::class)->run();
+        $person = $this->person();
+        $role = $this->role(['reports.stock-count.view']);
+        app(RoleAccessService::class)->assign($person, [$role->Id]);
+        $stock = MenuItem::query()->acrossBranches()->where('Url', '/app/reports/stock-count')->firstOrFail();
+        $cash = MenuItem::query()->acrossBranches()->where('Url', '/app/reports/drop-safe')->firstOrFail();
+        $this->assertTrue(app(MenuAccessService::class)->mayView($person, $stock));
+        $this->assertFalse(app(MenuAccessService::class)->mayView($person, $cash));
+        $this->actingAs($person)->get(route('app.reports.show', ['report' => 'drop-safe']))->assertForbidden();
     }
 
     public function test_migration_preserves_historical_roles_and_existing_version_audit(): void
@@ -193,24 +292,6 @@ class ManagedRolesTest extends TestCase
         $this->get(route('app.setup.roles.edit', $role->Id))->assertNotFound();
     }
 
-    public function test_menu_role_changes_reach_the_route_guard_and_keep_direct_ticks_separate(): void
-    {
-        $person = $this->person();
-        $menu = app(MenuAccessService::class);
-        $users = MenuItem::query()->acrossBranches()->where('RouteName', 'app.setup.users.index')->firstOrFail();
-        $roleMenu = MenuItem::query()->acrossBranches()->where('RouteName', 'app.setup.roles.index')->firstOrFail();
-        $role = $this->role(['*.*.view'], [$roleMenu->Id]);
-        $menu->setForUser($person, [$users->Id]);
-        app(RoleAccessService::class)->assign($person, [$role->Id]);
-        $this->assertTrue($menu->canReachRoute($person, 'app.setup.roles.index'));
-        $this->assertSame([$users->Id], $menu->userItemIdsFor($person));
-        app(RoleAccessService::class)->save($role->Id, ['Code' => $role->Code, 'Name' => $role->Name,
-            'permissions' => [$this->permission('*.*.view')], 'menu' => []]);
-        $this->assertFalse($menu->canReachRoute($person, 'app.setup.roles.index'));
-        $this->assertTrue($menu->canReachRoute($person, 'app.setup.users.index'));
-        $this->actingAs($person)->get(route('app.setup.roles.index'))->assertForbidden();
-    }
-
     public function test_role_admin_cannot_remove_their_own_last_access_and_rollback_clears_cache(): void
     {
         $actor = $this->person();
@@ -238,8 +319,8 @@ class ManagedRolesTest extends TestCase
         $this->get(route('app.setup.roles.edit', $role->Id))->assertOk();
         $subject = $this->person();
         $this->put(route('app.setup.users.roles.update', $subject->Id), ['roles' => [$role->Id]])->assertSessionHasNoErrors();
-        $this->get(route('app.setup.users.show', $subject->Id))->assertOk()->assertSee('From role')->assertSee('TEST Cash viewers');
-        $this->get(route('app.setup.users.edit', $subject->Id))->assertOk()->assertSee('Granted by role');
+        $this->get(route('app.setup.users.show', $subject->Id))->assertOk()->assertSee('Granted by role: TEST Cash viewers');
+        $this->get(route('app.setup.users.edit', $subject->Id))->assertOk()->assertSee('Granted by role: TEST Cash viewers')->assertSee('is-inherited');
         $this->delete(route('app.setup.roles.destroy', $role->Id))->assertSessionHasErrors('role');
         $this->post(route('app.setup.roles.store'), ['Code' => strtoupper($code), 'Name' => 'Duplicate'])->assertSessionHasErrors('Code');
         $this->put(route('app.setup.roles.update', $role->Id), ['Code' => $code, 'Name' => 'TEST', 'permissions' => [2147483647]])->assertSessionHasErrors('permissions');

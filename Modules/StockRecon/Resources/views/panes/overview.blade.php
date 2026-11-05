@@ -109,7 +109,7 @@
 </x-card>
 
     <x-card title="What this run was given" collapsible flush>
-        <x-table dense :count="count($run->params()) + 4">
+        <x-table layout-key="StockRecon.panes.overview.1" dense :count="count($run->params()) + 4">
             <x-slot:head>
                 <tr><th class="l">Argument</th><th class="l">Value</th></tr>
             </x-slot:head>

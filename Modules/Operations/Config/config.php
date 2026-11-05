@@ -19,7 +19,7 @@ return [
         ]],
         'stock' => ['title' => 'Stock', 'subtitle' => 'Top ten loss codes per site and import coverage', 'sources' => ['stock', 'loads'], 'reports' => ['stock-count'], 'gaps' => [
             'Action-pack progress and stock-take schedules are not connected.',
-            'Losses show amended quantities after good waste. No employee blame is inferred from an item loss.',
+            'Losses include only authorized good waste. No employee blame is inferred from an item loss.',
         ]],
         'cashups' => ['title' => 'Cash-ups', 'subtitle' => 'Yesterday’s cash-ups and day-close status', 'sources' => ['cash'], 'reports' => ['day-close', 'open-cashups', 'daily-banking'], 'gaps' => [
             'Submission and review timestamps are not connected: the 10:00 / 11:00 deadlines cannot be confirmed from captured cash-ups.',

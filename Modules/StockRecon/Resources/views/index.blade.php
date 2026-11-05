@@ -182,8 +182,8 @@
 
     <x-card title="Runs"
             :sub="$mine ? 'The balancing previews you have made' : 'Every balancing preview, whoever made it'"
-            flush>
-        <x-slot:actions>
+            flush collapsible remember="stockrecon.runs">
+        <div class="action-bar">
             <x-tabs label="Whose runs"
                     :active="$mine ? 'mine' : 'all'"
                     :items="[
@@ -201,7 +201,7 @@
                     <button type="submit" class="btn-ghost">Clear previews</button>
                 </form>
             @endif
-        </x-slot:actions>
+        </div>
 
         <x-data-grid :grid="$grid" :branches="$pinned ? null : $branches" />
     </x-card>

@@ -29,6 +29,8 @@
     'tone' => 'neutral',
     'stripe' => null,
     'href' => null,
+    'modal' => null,
+    'art' => null,
 ])
 
 @php
@@ -42,10 +44,11 @@
         fn ($line) => $line !== null && $line !== ''
     ));
 
-    $tag = $href ? 'a' : 'div';
+    $tag = $href ? 'a' : ($modal ? 'button' : 'div');
 @endphp
 
-<{{ $tag }} {{ $attributes->merge(['class' => 'kpi tone-'.$tone]) }} @if ($href) href="{{ $href }}" @endif>
+<{{ $tag }} {{ $attributes->merge(['class' => 'kpi tone-'.$tone]) }} @if ($href) href="{{ $href }}" @elseif ($modal) type="button" data-modal-open="{{ $modal }}" aria-haspopup="dialog" @endif>
+    @if ($art)<x-feature-art :art="['kind' => 'tool', 'variant' => $art]" class="kpi-art" />@endif
     @if ($stripeToken)<span class="stripe" style="background: var(--{{ $stripeToken }})"></span>@endif
     <div class="lbl">{{ $label }}</div>
     <div class="val">{{ $value }}@if ($unit)<small>{{ $unit }}</small>@endif</div>
@@ -57,4 +60,5 @@
         </div>
     @endif
     @isset($spark)<div class="spark">{{ $spark }}</div>@endisset
+    @if ($modal)<span class="kpi-detail-hint">View details <span aria-hidden="true">→</span></span>@endif
 </{{ $tag }}>

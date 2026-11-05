@@ -26,13 +26,13 @@ class UserBulkAccessService
             throw ValidationException::withMessages(['bulk' => 'Select between 1 and 200 different users.']);
         }
 
-        if (! in_array($action, ['add_roles', 'activate', 'deactivate', 'unlock'], true)) {
+        if (! in_array($action, ['add_roles', 'replace_roles', 'activate', 'deactivate', 'unlock'], true)) {
             throw ValidationException::withMessages(['bulk' => 'Choose one of the available actions.']);
         }
 
         try {
             return DB::connection(config('agora.connections.app'))->transaction(function () use ($userIds, $action, $roleIds, $actor): int {
-                if ($action === 'add_roles') {
+                if (in_array($action, ['add_roles', 'replace_roles'], true)) {
                     $valid = $this->roles->roles()->whereIn('Id', $roleIds)
                         ->orderBy('Id')->lockForUpdate()->pluck('Id');
                     if ($roleIds === [] || $valid->count() !== count(array_unique($roleIds))) {
@@ -47,10 +47,11 @@ class UserBulkAccessService
                 }
 
                 foreach ($people as $person) {
-                    if ($action === 'add_roles') {
-                        $this->roles->assign($person, array_values(array_unique([
-                            ...$this->roles->roleIdsFor($person), ...$roleIds,
-                        ])), $actor);
+                    if (in_array($action, ['add_roles', 'replace_roles'], true)) {
+                        $selected = $action === 'add_roles'
+                            ? array_values(array_unique([...$this->roles->roleIdsFor($person), ...$roleIds]))
+                            : $roleIds;
+                        $this->roles->assign($person, $selected, $actor);
                     } else {
                         $fields = match ($action) {
                             'activate' => ['IsActive' => true],
