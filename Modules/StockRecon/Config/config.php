@@ -208,7 +208,7 @@ return [
             // A number input's step defaults to 1, which makes 1.0 the only
             // legal value between 0.01 and 1.0 and 0.5 a refusal the browser
             // reports as "an invalid form control is not focusable".
-            'step' => 0.01,
+            'step' => 0.0001,
         ],
 
         'MaxAmendment' => [

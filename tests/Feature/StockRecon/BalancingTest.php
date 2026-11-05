@@ -153,16 +153,19 @@ class BalancingTest extends TestCase
         $original = (array) $table->where('BranchId', 2)->where('IsDefault', 1)->first();
         try {
             $profiles = app(BalancingProfileService::class);
-            $values = ['name' => $original['Name'], 'MaxAmendment' => 99.5, 'MaxAmendmentPct' => 0.5,
+            $values = ['name' => $original['Name'], 'MaxAmendment' => 99.5, 'MaxAmendmentPct' => 0.5555,
                 'MinShiftsInChain' => 2, 'KeepBreaksUpTo' => 3.5, 'HoldBackIncomplete' => 1, 'revision' => $original['Revision']];
             $profiles->save($values, -999, $original['Id']);
             $this->assertTrue((bool) $this->service->options()['HoldBackIncomplete']['default']);
+            $this->assertEqualsWithDelta(0.5555, (float) $this->service->options()['MaxAmendmentPct']['default'], 0.00001);
+            $this->assertEqualsWithDelta(0.0001, (float) $this->service->options()['MaxAmendmentPct']['step'], 0.00001);
             $values['revision']++;
             $values['HoldBackIncomplete'] = 0;
             $profiles->save($values, -999, $original['Id']);
             $run = $this->previewArea(self::SHELF_AREA);
             $row = $this->db()->table('agora.StockReconRunLine')->where('BranchId', self::BRANCH)->where('RunId', $run->Id)->first();
             $this->assertEqualsWithDelta(99.5, (float) $row->ProfileMaxAmendment, 0.001);
+            $this->assertEqualsWithDelta(0.5555, (float) $row->ProfileMaxAmendmentPct, 0.00001);
             $this->assertEqualsWithDelta(3.5, (float) $row->ProfileKeepBreaksUpTo, 0.001);
             $values['revision']++;
             $profiles->save($values, -999, $original['Id']);
