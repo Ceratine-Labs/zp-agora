@@ -125,9 +125,9 @@ class CountingAreaTest extends TestCase
 
     public function test_view_edit_save_and_direct_grid_endpoints_have_separate_access(): void
     {
-        $this->actingAs($this->person([]))->get(route('app.stockrecon.countingareas'))->assertForbidden();
-        $this->get(route('app.grids.extract', ['grid' => 'app.stockrecon.countingareas']))->assertForbidden();
-        $this->post(route('app.grids.columns.store', ['grid' => 'app.stockrecon.countingareas']), [])->assertForbidden();
+        $this->actingAs($this->person([]))->get(route('app.stockrecon.countingareas'))->assertRedirect(route('app.access-required'));
+        $this->getJson(route('app.grids.extract', ['grid' => 'app.stockrecon.countingareas']))->assertForbidden();
+        $this->postJson(route('app.grids.columns.store', ['grid' => 'app.stockrecon.countingareas']), [])->assertForbidden();
         $this->actingAs($this->person(['view']))->get($this->url('show'))->assertOk()->assertDontSee('Edit classification');
         $this->get($this->url('edit'))->assertForbidden();
         $this->put($this->url('update'), $this->input() + ['Authorized' => 1, 'Workspace' => 'ho'])->assertForbidden();
