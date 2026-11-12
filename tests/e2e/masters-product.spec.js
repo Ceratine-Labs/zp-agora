@@ -1,4 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { signInThroughTheForm } from './support/fixtures.js';
 
 /**
  * Setup → Trading rules → Stock recon master (T025).
@@ -164,5 +169,116 @@ test.describe('Critical lines', () => {
         // therefore 'hidden' to a visibility assertion, which is why this
         // asserts the sentence rather than the container.
         await expect(page.getByText('Nothing matched')).toBeVisible();
+    });
+});
+
+/**
+ * Setup → Trading rules → Fuel matrix (T025).
+ *
+ * The first block runs as the Auditor fixture against whatever the local
+ * stub holds, which carries no fuel prices: what it proves is the screen's
+ * shape — both procedures named, the price-change log and the summary
+ * present, no write control anywhere, the entry under Setup.
+ *
+ * The second block is the acceptance: Elephant Coast's August pump prices,
+ * captured read-only from the customer's BRN_FuelPrice and replayed into the
+ * local stub at TEST branch 999 by support/fuel-fixture.php, must show both
+ * August moves — 05 Aug ULP 95 25.54 → 25.02 and both diesels 27.77 → 29.01;
+ * 13 Aug both diesels 29.01 → 29.10. Opt-in, because it writes local fixture
+ * rows: AGORA_FUEL_E2E=1 with AGORA_FUEL_POS_EVIDENCE and
+ * AGORA_FUEL_DOE_EVIDENCE pointing at the two capture files.
+ */
+test.describe('Fuel matrix', () => {
+    test('the matrix names its procedures, logs pump moves and offers no write', async ({ page }) => {
+        const errors = [];
+        page.on('pageerror', (error) => errors.push(error.message));
+        await page.goto('/app/fuel/matrix?from=2026-08-01&to=2026-08-31');
+
+        await expect(page.getByRole('heading', { name: 'Fuel matrix', level: 1 })).toBeVisible();
+        await expect(page.getByText('usp_Fuel_GridPrices').first()).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Pump prices by grade' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Price-change log' })).toBeVisible();
+        await expect(page.getByText('agora.usp_Fuel_GetPriceMoves').first()).toBeVisible();
+
+        // feature-rules §4: prices are read-only today, so nothing in the page
+        // body edits, saves or deletes.
+        const main = page.locator('main');
+        for (const name of [/^Edit/, /^Save/, /^Delete/]) {
+            await expect(main.getByRole('button', { name })).toHaveCount(0);
+        }
+        await expect(main.locator('form[method="POST" i], [data-post]')).toHaveCount(0);
+
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+        expect(errors).toEqual([]);
+    });
+
+    test('Setup → Trading rules carries the fuel matrix beside the other masters', async ({ page, isMobile }) => {
+        test.skip(isMobile, 'the mega menu is the desktop navigation');
+        await page.goto('/app/master/stock');
+        await page.locator('[data-menu="setup"]').click();
+        const panel = page.locator('[data-panel="setup"]');
+        await expect(panel.getByRole('link', { name: 'Fuel matrix' }).first()).toHaveAttribute('href', /\/app\/fuel\/matrix/);
+        await expect(panel.getByRole('link', { name: 'Critical lines' }).first()).toBeVisible();
+    });
+
+    test.describe('August at Elephant Coast, replayed', () => {
+        test.use({ storageState: { cookies: [], origins: [] } });
+
+        test('both August pump moves are on the log, with the mid-day change marked', async ({ page, baseURL }, testInfo) => {
+            test.skip(process.env.AGORA_FUEL_E2E !== '1', 'Requires the explicit local replay of the read-only capture.');
+            expect(['127.0.0.1', 'localhost', '[::1]']).toContain(new URL(baseURL).hostname);
+            test.setTimeout(120_000);
+            const token = randomBytes(6).toString('hex');
+            const fixture = (action) => JSON.parse(execFileSync('php', [
+                fileURLToPath(new URL('./support/fuel-fixture.php', import.meta.url)), action, token,
+            ], { encoding: 'utf8', env: process.env }));
+            const prepared = fixture('prepare');
+            const errors = [];
+            page.on('pageerror', (error) => errors.push(error.message));
+            const evidence = { pos_rows: prepared.pos_rows, doe_rows: prepared.doe_rows, sql_host: prepared.sql_host, moves: [] };
+
+            try {
+                await signInThroughTheForm(page, prepared);
+                await page.waitForURL('**/app/fuel/matrix');
+                await page.goto('/app/fuel/matrix?from=2026-08-01&to=2026-08-31');
+
+                const log = page.locator('table[data-fuel-table="moves"]');
+                const row = (date, grade) => log.locator('tbody tr').filter({ hasText: date }).filter({ hasText: grade });
+                for (const [date, grade, from, to] of [
+                    ['2026-08-05', 'ULP 95 (1)', '25.54', '25.02'],
+                    ['2026-08-05', 'Diesel 10 ppm (2)', '27.77', '29.01'],
+                    ['2026-08-05', 'Diesel 10 ppm (5)', '27.77', '29.01'],
+                    ['2026-08-13', 'Diesel 10 ppm (2)', '29.01', '29.10'],
+                    ['2026-08-13', 'Diesel 10 ppm (5)', '29.01', '29.10'],
+                ]) {
+                    const move = row(date, grade);
+                    await expect(move).toHaveCount(1);
+                    await expect(move.locator('td').nth(3)).toHaveText(from);
+                    await expect(move.locator('td').nth(4)).toHaveText(to);
+                    evidence.moves.push({ date, grade, from, to });
+                }
+                await expect(log.locator('tbody tr:not(.tt-empty)')).toHaveCount(5);
+                await expect(row('2026-08-13', 'Diesel 10 ppm (2)')).toContainText('Old and new both recorded this day');
+                await expect(row('2026-08-05', 'ULP 95 (1)')).not.toContainText('Old and new');
+
+                const summary = page.locator('table[data-fuel-table="summary"] tbody tr').filter({ hasText: 'Diesel 10 ppm (2)' });
+                await expect(summary.locator('td').nth(3)).toHaveText('27.77');
+                await expect(summary.locator('td').nth(4)).toHaveText('29.10');
+                await expect(summary.locator('td').nth(7)).toHaveText('2');
+
+                // The DOE matrix above it still carries the one DOE move.
+                await expect(page.locator('[data-grid]')).toContainText('25.02');
+                await page.screenshot({ path: testInfo.outputPath(`fuel-matrix-moves-${testInfo.project.name}.png`), fullPage: true });
+                expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+                expect(errors).toEqual([]);
+            } finally {
+                await page.context().close();
+                evidence.cleanup = fixture('cleanup');
+                writeFileSync(testInfo.outputPath('fuel-matrix-evidence.json'), JSON.stringify(evidence, null, 2));
+                expect(evidence.cleanup.pos_remaining).toBe(0);
+                expect(evidence.cleanup.doe_remaining).toBe(0);
+                expect(evidence.cleanup.users_remaining).toBe(0);
+            }
+        });
     });
 });

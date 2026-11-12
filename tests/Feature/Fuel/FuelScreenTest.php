@@ -12,6 +12,7 @@ use Modules\Core\Models\User;
 use Modules\Core\Models\UserPermission;
 use Modules\Core\Services\NavigationModules;
 use Modules\Core\Services\PermissionService;
+use Modules\Fuel\Database\Seeders\FuelMatrixSetupMenuSeeder;
 use Modules\Fuel\Database\Seeders\FuelPermissionSeeder;
 use Modules\Fuel\Grids\FuelHistoryGrid;
 use Modules\Fuel\Services\FuelChart;
@@ -61,6 +62,22 @@ class FuelScreenTest extends TestCase
         $all = $this->get('/app/fuel/matrix?from=2026-08-01&to=2026-08-31')->assertOk()->viewData('pump');
         $this->assertSame([999], $all['summary']->pluck('BranchId')->map(fn (mixed $id) => (int) $id)->unique()->values()->all());
         $this->assertSame(0, $this->get('/app/fuel/matrix?from=2026-08-01&to=2026-08-31&branches[]=998')->assertOk()->viewData('pump')['moves']->count());
+    }
+
+    public function test_the_matrix_offers_nothing_a_reader_cannot_do_and_sits_in_setup(): void
+    {
+        $this->actingAs($this->reader(['fuel.prices.view']));
+        $html = $this->get('/app/fuel/matrix?branches[]=999&from=2026-08-01&to=2026-08-31')->assertOk()->getContent();
+        // Prices are read-only today: inside the page body there is no form
+        // that posts and no confirmation to raise (the shell's sign-out is not
+        // the screen's).
+        $main = (string) preg_replace('/^.*?<main\b|<\/main>.*$/s', '', (string) $html);
+        $this->assertStringContainsString('Price-change log', $main);
+        $this->assertDoesNotMatchRegularExpression('/method="POST"|data-confirm|data-post=/i', $main);
+        (new FuelMatrixSetupMenuSeeder)->run();
+        $item = DB::table('agora.MenuItem')->where('Path', 'trading-rules/fuel-matrix')->first();
+        $this->assertSame(['app.fuel.matrix', 'fuel.prices.view'], [$item->RouteName, $item->PermissionCode]);
+        $this->assertTrue((bool) $item->IsActive);
     }
 
     public function test_chart_includes_filtered_population_beyond_first_grid_page_and_preserves_nulls(): void
