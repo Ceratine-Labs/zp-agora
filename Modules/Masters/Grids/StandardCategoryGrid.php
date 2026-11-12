@@ -68,6 +68,27 @@ class StandardCategoryGrid extends ReferenceMasterGrid
         ];
     }
 
+    public function writeEntity(): ?string
+    {
+        return 'StandardCategory';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveStandardCategory';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'SupplierGLCode' => ['label' => 'Supplier GL', 'type' => 'text', 'column' => 'SupplierGLCode', 'max' => 20,
+                'help' => 'Digits only. The POS categories mapped to it keep their own GL codes.'],
+            'SalesGLCode' => ['label' => 'Sales GL', 'type' => 'text', 'column' => 'SalesGLCode', 'max' => 20],
+            'IsActive' => ['label' => 'Active', 'type' => 'bool', 'column' => 'IsActive',
+                'help' => 'Refused while active POS categories map to it. The name is not changed from Agora.'],
+        ];
+    }
+
     public function meanings(): array
     {
         return [

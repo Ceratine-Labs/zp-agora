@@ -56,12 +56,12 @@ class MasterWriteService
             'UserId' => Auth::user()?->Id,
             'Authorized' => (int) Gate::allows($definition->editPermission()),
             'WriteMode' => self::writeMode(),
-            'AllowedBranchIds' => $this->allowedCsv(),
+            'AllowedBranchIds' => $definition->perBranch() ? $this->allowedCsv() : null,
             'ReasonMin' => (int) config('masters.reason_min', 10),
         ]);
     }
 
-    public function reverse(int $branch, string $writeId, string $reason): object
+    public function reverse(ReferenceMasterGrid $definition, int $branch, string $writeId, string $reason): object
     {
         /** @var array<string, class-string> $grids */
         $grids = (array) config('grids.grids', []);
@@ -78,7 +78,7 @@ class MasterWriteService
             'UserId' => Auth::user()?->Id,
             'AuthorizedEntities' => $entities,
             'WriteMode' => self::writeMode(),
-            'AllowedBranchIds' => $this->allowedCsv(),
+            'AllowedBranchIds' => $definition->perBranch() ? $this->allowedCsv() : null,
             'ReasonMin' => (int) config('masters.reason_min', 10),
         ]);
     }
@@ -99,7 +99,7 @@ class MasterWriteService
             'BranchId' => (int) $row->BranchId,
             'Entity' => $definition->writeEntity(),
             'RowKey' => (string) $row->RowKey,
-            'AllowedBranchIds' => $this->allowedCsv(),
+            'AllowedBranchIds' => $definition->perBranch() ? $this->allowedCsv() : null,
         ])->groupBy(fn (object $w) => strtolower((string) $w->WriteId));
     }
 

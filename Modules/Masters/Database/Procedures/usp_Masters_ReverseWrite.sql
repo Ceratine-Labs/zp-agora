@@ -6,8 +6,11 @@
    value — exactly as it was stored (ExactJson) where PumpIT keeps a float —
    on the one row PumpIT's key names (KeyJson). No row is inserted or deleted.
 
-     CategoryGl  [PumpIT].dbo.SDK_CategoryGLCode MINGP, MAXGP, MINDaysCover,
-                 MAXDaysCover, IsActive
+     CategoryGl        [PumpIT].dbo.SDK_CategoryGLCode MINGP, MAXGP,
+                       MINDaysCover, MAXDaysCover, IsActive
+     ProfitCentre      [PumpIT].dbo.SS_ProfitCentre IsActive
+     StandardCategory  [PumpIT].dbo.SS_StandardCategory SupplierGLCode,
+                       SalesGLCode, IsActive
 
    All rows of the press (@WriteId) or none, in one transaction; each ledger
    row is marked reversed with who, when and why.
@@ -105,6 +108,48 @@ BEGIN
                IsActive     = ISNULL((SELECT CONVERT(BIT, r.PriorValue) FROM @Rows r WHERE r.Field = N'IsActive'), g.IsActive)
           FROM [PumpIT].dbo.SDK_CategoryGLCode g
          WHERE g.SSBranchId = @BranchId AND g.POSSystemId = @System AND g.Category = @Raw;
+    END
+    ELSE IF @Entity = N'ProfitCentre'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.SS_ProfitCentre') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for SS_ProfitCentre, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @Pc INT = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.ProfitCentreId');
+        DECLARE @PcActive BIT = (SELECT p.IsActive FROM [PumpIT].dbo.SS_ProfitCentre p WITH (UPDLOCK, HOLDLOCK) WHERE p.ProfitCentreId = @Pc);
+
+        IF @PcActive IS NULL OR EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'IsActive' AND r.NewValue <> CONVERT(NVARCHAR(10), CONVERT(INT, @PcActive)))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the profit centre since. Nothing was put back.', 1;
+
+        UPDATE [PumpIT].dbo.SS_ProfitCentre
+           SET IsActive = (SELECT CONVERT(BIT, r.PriorValue) FROM @Rows r WHERE r.Field = N'IsActive')
+         WHERE ProfitCentreId = @Pc;
+    END
+    ELSE IF @Entity = N'StandardCategory'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.SS_StandardCategory') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for SS_StandardCategory, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @Sc INT = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.StandardCategoryId');
+        DECLARE @ScSup VARCHAR(50), @ScSales VARCHAR(50), @ScActive BIT;
+        SELECT @ScSup = s.SupplierGLCode, @ScSales = s.SalesGLCode, @ScActive = s.IsActive
+        FROM [PumpIT].dbo.SS_StandardCategory s WITH (UPDLOCK, HOLDLOCK) WHERE s.StandardCategoryId = @Sc;
+
+        IF @ScActive IS NULL OR EXISTS (
+            SELECT 1 FROM @Rows r
+            WHERE ISNULL(r.NewValue, N'') <> ISNULL(CASE r.Field
+                WHEN N'SupplierGLCode' THEN LTRIM(RTRIM(@ScSup))
+                WHEN N'SalesGLCode'    THEN LTRIM(RTRIM(@ScSales))
+                WHEN N'IsActive'       THEN CONVERT(NVARCHAR(10), CONVERT(INT, @ScActive)) END, N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the standard category since. Nothing was put back.', 1;
+
+        UPDATE s
+           SET SupplierGLCode = ISNULL((SELECT CONVERT(VARCHAR(50), r.PriorValue) FROM @Rows r WHERE r.Field = N'SupplierGLCode'), s.SupplierGLCode),
+               SalesGLCode    = ISNULL((SELECT CONVERT(VARCHAR(50), r.PriorValue) FROM @Rows r WHERE r.Field = N'SalesGLCode'), s.SalesGLCode),
+               IsActive       = ISNULL((SELECT CONVERT(BIT, r.PriorValue) FROM @Rows r WHERE r.Field = N'IsActive'), s.IsActive)
+          FROM [PumpIT].dbo.SS_StandardCategory s
+         WHERE s.StandardCategoryId = @Sc;
     END
     ELSE
         THROW 51000, 'AGORA:NOT_FOUND:This change is of a kind Agora cannot put back.', 1;

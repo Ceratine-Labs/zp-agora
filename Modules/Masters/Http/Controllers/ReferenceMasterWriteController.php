@@ -53,7 +53,7 @@ class ReferenceMasterWriteController extends Controller
         $input = $request->validate(['Reason' => ['required', 'string', 'min:'.(int) config('masters.reason_min', 10), 'max:400']]);
 
         try {
-            $result = $this->writes->reverse($branch, (string) $request->route('write'), $input['Reason']);
+            $result = $this->writes->reverse($definition, $branch, (string) $request->route('write'), $input['Reason']);
         } catch (AgoraProcException $e) {
             return back()->withErrors(['refusal' => $e->getMessage()]);
         }

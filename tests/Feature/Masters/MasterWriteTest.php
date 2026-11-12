@@ -30,6 +30,10 @@ class MasterWriteTest extends TestCase
 
     private const KEY = '5:TEST-BAND';
 
+    private const CENTRE = 9901;
+
+    private const STANDARD = 9901;
+
     /** @var array<int, User> */
     private array $users = [];
 
@@ -51,6 +55,9 @@ class MasterWriteTest extends TestCase
         $this->cleanUp();
         $this->db()->statement("INSERT [PumpIT].dbo.SDK_CategoryGLCode (SSBranchId, POSSystemId, Category, StandardCategory, ProfitCentre,
             IsActive, MINGP, MAXGP, MINDaysCover, MAXDaysCover) VALUES (?, 5, 'TEST-BAND ', 'Bread', 'Conv Shop', 1, 10.800000000000001, 12, 0, 0)", [self::BRANCH]);
+        $this->db()->statement("INSERT [PumpIT].dbo.SS_ProfitCentre (ProfitCentreId, ProfitCentre, IsActive) VALUES (?, 'TEST-Centre', 1)", [self::CENTRE]);
+        $this->db()->statement("INSERT [PumpIT].dbo.SS_StandardCategory (StandardCategoryId, StandardCategory, SupplierGLCode, SalesGLCode, IsActive)
+            VALUES (?, 'TEST-Standard', '51019999', '41019999', 1)", [self::STANDARD]);
     }
 
     protected function tearDown(): void
@@ -163,6 +170,54 @@ class MasterWriteTest extends TestCase
         $this->assertCount(0, $this->ledger());
     }
 
+    public function test_a_profit_centre_is_switched_off_in_pumpit_but_never_while_in_use_and_never_renamed(): void
+    {
+        $this->actingAs($this->person(['profitcentres.view', 'profitcentres.edit']));
+        $show = route('app.setup.profit-centres.show', ['branch' => 2, 'key' => self::CENTRE]);
+        $edit = $this->get(route('app.setup.profit-centres.edit', ['branch' => 2, 'key' => self::CENTRE]))->assertOk()
+            ->assertSee('PumpIT dbo.SS_ProfitCentre', false);
+        $edit->assertDontSee('name="Name"', false);
+
+        // In use: an active category names it by text.
+        $this->db()->statement("UPDATE [PumpIT].dbo.SDK_CategoryGLCode SET ProfitCentre = 'TEST-Centre' WHERE SSBranchId = ? AND Category = 'TEST-BAND '", [self::BRANCH]);
+        $off = ['key' => (string) self::CENTRE, 'IsActive' => 0, 'ExpectedIsActive' => 1, 'Reason' => 'TEST-centre no longer trades'];
+        $this->put(route('app.setup.profit-centres.update', ['branch' => 2]), $off)->assertSessionHasErrors('refusal');
+        $this->assertTrue((bool) $this->db()->selectOne('SELECT IsActive FROM [PumpIT].dbo.SS_ProfitCentre WHERE ProfitCentreId = ?', [self::CENTRE])->IsActive);
+
+        $this->db()->statement("UPDATE [PumpIT].dbo.SDK_CategoryGLCode SET IsActive = 0 WHERE SSBranchId = ? AND Category = 'TEST-BAND '", [self::BRANCH]);
+        $this->put(route('app.setup.profit-centres.update', ['branch' => 2]), $off)->assertRedirect($show);
+        $this->assertFalse((bool) $this->db()->selectOne('SELECT IsActive FROM [PumpIT].dbo.SS_ProfitCentre WHERE ProfitCentreId = ?', [self::CENTRE])->IsActive);
+        $write = $this->db()->table('agora.MasterWrite')->where('Entity', 'ProfitCentre')->where('RowKey', (string) self::CENTRE)->first();
+        $this->assertSame(['IsActive', '1', '0', 'SS_ProfitCentre'], [$write->Field, $write->PriorValue, $write->NewValue, $write->PumpItTable]);
+        $this->get($show)->assertOk()->assertSee('Written to PumpIT')->assertSee('TEST-centre no longer trades');
+
+        $this->post(route('app.setup.profit-centres.writes.reverse', ['branch' => 2, 'write' => $write->WriteId]),
+            ['key' => (string) self::CENTRE, 'Reason' => 'TEST-it trades after all'])->assertRedirect($show);
+        $this->assertTrue((bool) $this->db()->selectOne('SELECT IsActive FROM [PumpIT].dbo.SS_ProfitCentre WHERE ProfitCentreId = ?', [self::CENTRE])->IsActive);
+        $this->assertSame('TEST-Centre', $this->db()->selectOne('SELECT ProfitCentre FROM [PumpIT].dbo.SS_ProfitCentre WHERE ProfitCentreId = ?', [self::CENTRE])->ProfitCentre);
+    }
+
+    public function test_a_standard_category_gl_change_writes_one_row_and_puts_back(): void
+    {
+        $this->actingAs($this->person(['standardcategories.view', 'standardcategories.edit']));
+        $update = route('app.setup.standard-categories.update', ['branch' => 2]);
+        $form = ['key' => (string) self::STANDARD, 'SupplierGLCode' => '51010209', 'SalesGLCode' => '41019999', 'IsActive' => 1,
+            'ExpectedSupplierGLCode' => '51019999', 'ExpectedSalesGLCode' => '41019999', 'ExpectedIsActive' => 1, 'Reason' => 'TEST-post to the shop GL'];
+
+        $this->put($update, array_replace($form, ['SupplierGLCode' => '51A10209']))->assertSessionHasErrors('refusal');
+        $this->put($update, array_replace($form, ['ExpectedSupplierGLCode' => '51000000']))->assertSessionHasErrors('refusal');
+        $this->put($update, $form)->assertSessionHasNoErrors();
+
+        $row = $this->db()->selectOne('SELECT StandardCategory, SupplierGLCode, SalesGLCode FROM [PumpIT].dbo.SS_StandardCategory WHERE StandardCategoryId = ?', [self::STANDARD]);
+        $this->assertSame(['TEST-Standard', '51010209', '41019999'], [$row->StandardCategory, $row->SupplierGLCode, $row->SalesGLCode]);
+        $writes = $this->db()->table('agora.MasterWrite')->where('Entity', 'StandardCategory')->where('RowKey', (string) self::STANDARD)->get();
+        $this->assertSame([['SupplierGLCode', '51019999', '51010209']], $writes->map(fn ($w) => [$w->Field, $w->PriorValue, $w->NewValue])->all());
+
+        $this->post(route('app.setup.standard-categories.writes.reverse', ['branch' => 2, 'write' => $writes->first()->WriteId]),
+            ['key' => (string) self::STANDARD, 'Reason' => 'TEST-wrong account, put back'])->assertSessionHasNoErrors();
+        $this->assertSame('51019999', $this->db()->selectOne('SELECT SupplierGLCode FROM [PumpIT].dbo.SS_StandardCategory WHERE StandardCategoryId = ?', [self::STANDARD])->SupplierGLCode);
+    }
+
     /** @param  array<string, mixed>  $parameters */
     private function assertRefused(string $code, array $parameters): void
     {
@@ -255,6 +310,9 @@ class MasterWriteTest extends TestCase
 
     private function cleanUp(): void
     {
+        $this->db()->table('agora.MasterWrite')->whereIn('Entity', ['ProfitCentre', 'StandardCategory'])->where('RowKey', (string) self::CENTRE)->delete();
+        $this->db()->statement('DELETE FROM [PumpIT].dbo.SS_ProfitCentre WHERE ProfitCentreId = ?', [self::CENTRE]);
+        $this->db()->statement('DELETE FROM [PumpIT].dbo.SS_StandardCategory WHERE StandardCategoryId = ?', [self::STANDARD]);
         $this->db()->table('agora.MasterWrite')->where('Entity', 'CategoryGl')->where('RowKey', self::KEY)->delete();
         $this->db()->statement("DELETE FROM [PumpIT].dbo.SDK_CategoryGLCode WHERE SSBranchId = ? AND POSSystemId = 5 AND Category = 'TEST-BAND '", [self::BRANCH]);
     }

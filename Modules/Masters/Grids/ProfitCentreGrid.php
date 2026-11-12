@@ -65,6 +65,24 @@ class ProfitCentreGrid extends ReferenceMasterGrid
         ];
     }
 
+    public function writeEntity(): ?string
+    {
+        return 'ProfitCentre';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveProfitCentre';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'IsActive' => ['label' => 'Active', 'type' => 'bool', 'column' => 'IsActive',
+                'help' => 'The name is not changed from Agora: PumpIT copies it onto every sale. Refused while active categories map to it.'],
+        ];
+    }
+
     public function meanings(): array
     {
         return [

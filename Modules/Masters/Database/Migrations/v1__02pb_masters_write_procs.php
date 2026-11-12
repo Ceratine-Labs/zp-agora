@@ -15,6 +15,8 @@ return new class extends ProcedureMigration
     {
         return [
             $this->path().'/usp_Masters_SaveCategoryBand.sql',
+            $this->path().'/usp_Masters_SaveProfitCentre.sql',
+            $this->path().'/usp_Masters_SaveStandardCategory.sql',
             $this->path().'/usp_Masters_ReverseWrite.sql',
             $this->path().'/usp_Masters_GetWrites.sql',
         ];

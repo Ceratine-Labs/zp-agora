@@ -23,7 +23,9 @@ class MasterWritePermissionSeeder extends Seeder
 
     /** @var array<string, string> resource => what editing it writes */
     public const PERMISSIONS = [
-        'categorygl' => 'Change a POS category\'s GP and days-cover band and active flag — written to PumpIT\'s SDK_CategoryGLCode; needs a reason',
+        'categorygl' => 'Change a POS category\'s GP and cover band and active flag in PumpIT (SDK_CategoryGLCode)',
+        'profitcentres' => 'Switch a profit centre on or off in PumpIT (SS_ProfitCentre)',
+        'standardcategories' => 'Change a standard category\'s GL codes or active flag in PumpIT (SS_StandardCategory)',
     ];
 
     public function run(): void
