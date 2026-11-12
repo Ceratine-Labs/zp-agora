@@ -33,7 +33,7 @@ class SiteMasterWritePermissionSeeder extends Seeder
         'tanks' => 'Rename a tank in PumpIT (BRN_Tank)',
         'pumps' => 'Change a pump\'s capture order or switch it on or off in PumpIT (BRN_Pump)',
         'meters' => 'Change a utility meter\'s description in PumpIT (BRN_UtilityMeter)',
-        'terminals' => 'Change a merchant or terminal number\'s description, or switch it on or off, in PumpIT (SS_Branch_*_MerchantNo / _TerminalNo)',
+        'terminals' => 'Change a merchant or terminal number\'s description or active flag in PumpIT (SS_Branch_*)',
     ];
 
     public function run(): void
