@@ -119,6 +119,233 @@ class BalancingTest extends TestCase
         $this->assertEqualsWithDelta(203, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 3)->QtyClose, 0.001);
     }
 
+    /**
+     * REWORK LOSE at Pongola, 4–10 Nov 2026, moved onto the fixture's dates
+     * (customer, 12 Nov: "the 60 should not have been inserted as a issue, had
+     * to be balance with the short"). The night of the 19th closes 12 where 74
+     * was due, the day of the 20th does not trade and signs off 12 / 12, and
+     * the night of the 20th opens 72. The dormant shift between the short and
+     * the opening must not hide the pair.
+     */
+    public function test_opening_break_pairs_with_the_short_before_a_dormant_shift(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [109, 0, 98, 6], 3 => [98, 0, 95, 2]],
+            '2026-07-18' => [1 => [95, 0, 95, 4], 3 => [95, 0, 88, 5]],
+            '2026-07-19' => [1 => [88, 0, 85, 3], 3 => [85, 0, 12, 11]],
+            '2026-07-20' => [1 => [12, 0, 12, 0], 3 => [72, 0, 72, 9]],
+            '2026-07-21' => [1 => [72, 0, 72, 1], 3 => [72, 0, 61, 2]],
+            '2026-07-22' => [1 => [61, 0, 58, 3], 3 => [58, 0, 58, 0]],
+            '2026-07-23' => [1 => [58, 0, 57, 1], 3 => [57, 0, 55, 2]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 20]);
+        $run = $this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'),
+            Carbon::parse('2026-07-23'), note: 'TEST-opening-dormant')->load('lines');
+
+        $short = $this->lineAt($run, '2026-07-19', 3);
+        $dormant = $this->lineAt($run, '2026-07-20', 1);
+        $opening = $this->lineAt($run, '2026-07-20', 3);
+
+        $this->assertFalse((bool) $short->ChainBlocked, $short->Outcome);
+        $this->assertTrue((bool) $dormant->IsDormant);
+
+        // The miscounted closing goes to what was due; the short is gone.
+        $this->assertEqualsWithDelta(74, (float) $short->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $short->QtyVarNew, 0.001);
+        // The shift that did not trade moves with it and carries nothing.
+        $this->assertEqualsWithDelta(74, (float) $dormant->QtyOpenNew, 0.001);
+        $this->assertEqualsWithDelta(74, (float) $dormant->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $dormant->QtyVarNew, 0.001);
+        // What the short did not need stays on the opening shift, its count unmoved.
+        $this->assertEqualsWithDelta(74, (float) $opening->QtyOpenNew, 0.001);
+        $this->assertEqualsWithDelta(72, (float) $opening->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(7, (float) $opening->QtyVarNew, 0.001);
+
+        // No issue anywhere on the chain, and the chain total is what was counted.
+        $this->assertSame(0, $run->lines->whereNotNull('QtyIssuedNew')->count());
+        $this->assertEqualsWithDelta(-5, $run->lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.001);
+        $this->assertEqualsWithDelta(-5, (float) $short->ChainNetVar, 0.001);
+
+        // The stretches either side balance as they did before.
+        $this->assertEqualsWithDelta(-2, (float) $this->lineAt($run, '2026-07-17', 1)->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(101, (float) $this->lineAt($run, '2026-07-17', 1)->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $this->lineAt($run, '2026-07-21', 1)->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(-8, (float) $this->lineAt($run, '2026-07-21', 3)->QtyVarNew, 0.001);
+
+        // The run as it was saved before this rule: the short left standing,
+        // the 60 issued at the opening. It is refused, not written.
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $short->Id)->update(['QtyVarNew' => -62]);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $opening->Id)->update(['QtyIssuedNew' => 60]);
+        try {
+            $this->service->commit($run);
+            $this->fail('A saved run that issues at an opening after a dormant shift, the short still standing, must be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('before offsetting a previous short', $e->getMessage());
+        }
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $short->Id)->update(['QtyVarNew' => 0]);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $opening->Id)->update(['QtyIssuedNew' => null]);
+
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(74, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(74, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 1)->QtyOpen, 0.001);
+        $this->assertEqualsWithDelta(74, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 1)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(74, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 3)->QtyOpen, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 3)->QtyIssued, 0.001);
+        $this->service->reverse($run->fresh(), 'TEST-opening-dormant reversal');
+        $this->assertEqualsWithDelta(12, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(12, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 1)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(72, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 3)->QtyOpen, 0.001);
+    }
+
+    /**
+     * Where the over at the opening is bigger than the short before it, the
+     * short goes to nil first and the rest is an over like any other: its
+     * missing issue is captured, and the commit writes it. Until 12 Nov 2026
+     * the commit read "a short before an opening that issues" off the count
+     * alone and refused this run every time it was previewed again.
+     */
+    public function test_opening_break_over_beyond_the_short_is_captured_and_commits(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [100, 0, 90, 10], 3 => [90, 0, 70, 10]],
+            '2026-07-18' => [1 => [140, 0, 131, 9], 3 => [131, 0, 121, 10]],
+            '2026-07-19' => [1 => [121, 0, 111, 10], 3 => [111, 0, 101, 10]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 20]);
+        $run = $this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'),
+            Carbon::parse('2026-07-19'), note: 'TEST-opening-over')->load('lines');
+
+        $short = $this->lineAt($run, '2026-07-17', 3);
+        $opening = $this->lineAt($run, '2026-07-18', 1);
+        $this->assertFalse((bool) $short->ChainBlocked, $short->Outcome);
+        $this->assertEqualsWithDelta(80, (float) $short->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $short->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(80, (float) $opening->QtyOpenNew, 0.001);
+        $this->assertEqualsWithDelta(60, (float) $opening->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $opening->QtyVarNew, 0.001);
+
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(80, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(80, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyOpen, 0.001);
+        $this->assertEqualsWithDelta(60, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
+        $this->service->reverse($run->fresh(), 'TEST-opening-over reversal');
+        $this->assertEqualsWithDelta(70, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
+    }
+
+    /**
+     * ENGEN DIESELUBE 500ML at Engen Manguzi, 2–6 Nov 2026, moved onto the
+     * fixture's dates (customer, 12 Nov: "the -10 amendment is wrong"). No
+     * break and no dormant shift: the night of the 18th counts 16 where 26
+     * was due, the day of the 19th trades on from the 16, and the night of
+     * the 19th counts 23 from an opening of 14 — over by exactly one issue
+     * multiple. The 10 were there all along: the over is the short coming
+     * back, not an issue nobody wrote up.
+     */
+    public function test_an_exact_over_an_earlier_short_needs_balances_and_is_not_issued(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [30, 0, 30, 0], 3 => [30, 0, 28, 2]],
+            '2026-07-18' => [1 => [28, 0, 27, 1], 3 => [27, 0, 16, 1]],
+            '2026-07-19' => [1 => [16, 0, 14, 2], 3 => [14, 0, 23, 1]],
+            '2026-07-20' => [1 => [23, 0, 21, 2], 3 => [21, 0, 20, 1]],
+            '2026-07-21' => [1 => [20, 0, 13, 5], 3 => [13, 0, 12, 3]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 10]);
+        $run = $this->previewArea(self::SHELF_AREA);
+
+        $short = $this->lineAt($run, '2026-07-18', 3);
+        $between = $this->lineAt($run, '2026-07-19', 1);
+        $over = $this->lineAt($run, '2026-07-19', 3);
+
+        $this->assertFalse((bool) $short->ChainBlocked, $short->Outcome);
+        $this->assertEqualsWithDelta(-10, (float) $short->QtyVar, 0.001);
+        $this->assertEqualsWithDelta(10, (float) $over->QtyVar, 0.001);
+
+        // The two closings between the short and the over move; the over's own count stands.
+        $this->assertEqualsWithDelta(26, (float) $short->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(26, (float) $between->QtyOpenNew, 0.001);
+        $this->assertEqualsWithDelta(24, (float) $between->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(24, (float) $over->QtyOpenNew, 0.001);
+        $this->assertEqualsWithDelta(23, (float) $over->QtyCloseNew, 0.001);
+
+        // Nothing is issued and nobody is left short: the chain is nil.
+        $this->assertSame(0, $run->lines->whereNotNull('QtyIssuedNew')->count());
+        foreach ($run->lines as $line) {
+            $this->assertEqualsWithDelta(0, (float) $line->QtyVarNew, 0.001, $line->TransactionDate->toDateString().' shift '.$line->ShiftNo);
+        }
+
+        // The run as it was saved before this rule: the short left standing,
+        // the over captured as an issue of 10. It is refused, not written.
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $short->Id)->update(['QtyVarNew' => -10]);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $over->Id)->update(['QtyIssuedNew' => 10]);
+        try {
+            $this->service->commit($run);
+            $this->fail('A saved run that issues an over an earlier short needs must be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('an earlier short on the item needs', $e->getMessage());
+        }
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $short->Id)->update(['QtyVarNew' => 0]);
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $over->Id)->update(['QtyIssuedNew' => null]);
+
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(26, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(24, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(24, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 3)->QtyOpen, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 3)->QtyIssued, 0.001);
+        $this->service->reverse($run->fresh(), 'TEST-short-before-over reversal');
+        $this->assertEqualsWithDelta(16, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(14, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyClose, 0.001);
+    }
+
+    /**
+     * In whole multiples, because an issue is. Short 10, then an over of 20
+     * on a multiple of 10: one multiple is the short coming back and balances
+     * through the closings between; the other is captured as the issue. A
+     * short smaller than a multiple takes nothing from an exact over — that
+     * is test_an_exact_missing_issue_is_identified_before_balancing_nearby_shorts.
+     */
+    public function test_an_exact_over_gives_an_earlier_short_whole_multiples_and_captures_the_rest(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [200, 0, 195, 5], 3 => [195, 0, 180, 5]],
+            '2026-07-18' => [1 => [180, 0, 175, 5], 3 => [175, 0, 170, 5]],
+            '2026-07-19' => [1 => [170, 0, 185, 5], 3 => [185, 0, 180, 5]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 10]);
+        $run = $this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'),
+            Carbon::parse('2026-07-19'), note: 'TEST-short-then-two-multiples')->load('lines');
+
+        $short = $this->lineAt($run, '2026-07-17', 3);
+        $over = $this->lineAt($run, '2026-07-19', 1);
+        $this->assertFalse((bool) $short->ChainBlocked, $short->Outcome);
+        $this->assertEqualsWithDelta(-10, (float) $short->QtyVar, 0.001);
+        $this->assertEqualsWithDelta(20, (float) $over->QtyVar, 0.001);
+
+        $this->assertEqualsWithDelta(190, (float) $short->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $short->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(180, (float) $over->QtyOpenNew, 0.001);
+        $this->assertEqualsWithDelta(10, (float) $over->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $over->QtyVarNew, 0.001);
+        $this->assertSame(1, $run->lines->whereNotNull('QtyIssuedNew')->count());
+
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(190, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(180, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyOpen, 0.001);
+        $this->assertEqualsWithDelta(10, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyIssued, 0.001);
+        $this->service->reverse($run->fresh(), 'TEST-short-then-two-multiples reversal');
+        $this->assertEqualsWithDelta(180, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-17', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyIssued, 0.001);
+    }
+
     public function test_completed_area_with_no_current_item_counts_refuses_preview(): void
     {
         $this->seedShelfChain(['2026-06-11' => [3 => [30, 0, 30, 0]]]);
@@ -2298,7 +2525,10 @@ class BalancingTest extends TestCase
         $this->assertEqualsWithDelta(10, (float) $issue->QtyVar, 0.001);
         $this->assertEqualsWithDelta(10, (float) $issue->QtyIssuedNew, 0.001);
         $this->assertEqualsWithDelta(0, (float) $issue->QtyVarNew, 0.001);
-        $this->assertEqualsWithDelta(-1, (float) $this->lineAt($run, '2026-07-18', 3)->QtyVarNew, 0.001);
+        // The 1 short after it balances against the 1 over that follows (chain
+        // short carry, 5 Nov 2026), on counts alone: the issue stays whole.
+        $this->assertEqualsWithDelta(0, (float) $this->lineAt($run, '2026-07-18', 3)->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(29, (float) $this->lineAt($run, '2026-07-18', 3)->QtyCloseNew, 0.001);
         $this->service->commit($run);
         $this->assertEqualsWithDelta(10, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
         $again = $this->lineAt($this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'), Carbon::parse('2026-07-23'), note: 'TEST-missing issue repeat')->load('lines'), '2026-07-18', 1);

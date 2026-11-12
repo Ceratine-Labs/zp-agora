@@ -325,20 +325,83 @@ BEGIN
 
     /* An older preview can have captured an issue from an opening correction
        while the preceding shift remained short. Re-preview instead of writing
-       that stale proposal. */
+       that stale proposal.
+
+       "Preceding" is the last shift that traded, as the preview reads it
+       since 12 Nov 2026 (Pongola, REWORK LOSE): a dormant shift between the
+       short and the opening carries the miscount forward and hides neither.
+       A dormant row with a break of its own ends the look-back.
+
+       And "remained short" is read off what the run proposes, not only off
+       the count: where the over at the opening is bigger than the short, the
+       preview takes the short to nil first and what is left is an over like
+       any other, whose missing issue may be captured. Read off the count
+       alone, that run was refused here and previewed again for ever. */
     IF EXISTS (
-        SELECT 1 FROM (
-            SELECT rl.*,
-                   LAG(rl.QtyVar + rl.ChainBreak) OVER (PARTITION BY rl.AreaNo, rl.StockItemNo, rl.ContinuitySegment ORDER BY rl.TransactionDate, rl.ShiftNo) AS PriorVariance
-            FROM agora.StockReconRunLine rl WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
-        ) r
-        WHERE r.ChainBreak > @eps AND r.PriorVariance < -@eps AND r.QtyIssuedNew > r.QtyIssued + @eps
+        SELECT 1
+        FROM agora.StockReconRunLine r
+        CROSS APPLY (
+            SELECT TOP 1 x.QtyVar + x.ChainBreak AS PriorVariance, x.QtyVarNew AS PriorVarianceNew
+            FROM agora.StockReconRunLine x
+            WHERE x.BranchId = r.BranchId AND x.RunId = r.RunId
+              AND x.AreaNo = r.AreaNo AND x.StockItemNo = r.StockItemNo AND x.ContinuitySegment = r.ContinuitySegment
+              AND (x.TransactionDate < r.TransactionDate
+                   OR (x.TransactionDate = r.TransactionDate AND x.ShiftNo < r.ShiftNo))
+              AND (x.IsDormant = 0 OR x.FlagChainBroken = 1)
+            ORDER BY x.TransactionDate DESC, x.ShiftNo DESC
+        ) p
+        WHERE r.BranchId = @BranchId AND r.RunId = @RunId
+          AND r.ChainBreak > @eps AND p.PriorVariance < -@eps AND p.PriorVarianceNew < -@eps
+          AND r.QtyIssuedNew > r.QtyIssued + @eps
           AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
               WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
                 AND selected.AreaNo = r.AreaNo AND selected.StockItemNo = r.StockItemNo AND selected.ContinuitySegment = r.ContinuitySegment
                 AND selected.Selected = 1 AND selected.WouldAmend = 1
                 AND selected.CommitState IN ('pending', 'skipped'))
     ) THROW 51000, 'AGORA:STALE_OPENING_ISSUE:This saved run may issue stock before offsetting a previous short. Preview again.', 1;
+
+    /* The same staleness with no break in the chain (12 Nov 2026, Engen
+       Manguzi, DIESELUBE 500ML): a run saved before that day captures an over
+       of exactly one issue multiple as a missing issue while the short that
+       over is the return of still stands earlier on the item. The preview now
+       leaves such an over for the balancing; a saved run that still issues it
+       is refused.
+
+       Read off what the run leaves standing: the item's variance, summed over
+       every shift before the issue, is short by a whole issue multiple or
+       more. A run the preview makes today never trips it — before balancing,
+       an over gives up every whole multiple the chain is short of and
+       captures only the rest, so what is left short before it is less than
+       one multiple, and balancing only ever lifts that total towards nil; an
+       issue captured after balancing sits on a chain that ends over, where
+       every short has gone to nil. Only on a chain with no break: at a break
+       the closing before it is pinned, so a short on one side and an issue on
+       the other is what the preview itself produces. */
+    IF EXISTS (
+        SELECT 1
+        FROM agora.StockReconRunLine r
+        CROSS APPLY (
+            SELECT SUM(x.QtyVarNew) AS StandingBefore
+            FROM agora.StockReconRunLine x
+            WHERE x.BranchId = r.BranchId AND x.RunId = r.RunId
+              AND x.AreaNo = r.AreaNo AND x.StockItemNo = r.StockItemNo AND x.ContinuitySegment = r.ContinuitySegment
+              AND (x.TransactionDate < r.TransactionDate
+                   OR (x.TransactionDate = r.TransactionDate AND x.ShiftNo < r.ShiftNo))
+        ) p
+        WHERE r.BranchId = @BranchId AND r.RunId = @RunId
+          AND r.QtyIssuedNew > r.QtyIssued + @eps
+          AND r.IssueMultiple > 1
+          AND p.StandingBefore <= -r.IssueMultiple + @eps
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconRunLine broken
+              WHERE broken.BranchId = r.BranchId AND broken.RunId = r.RunId
+                AND broken.AreaNo = r.AreaNo AND broken.StockItemNo = r.StockItemNo AND broken.ContinuitySegment = r.ContinuitySegment
+                AND broken.FlagChainBroken = 1)
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+                AND selected.AreaNo = r.AreaNo AND selected.StockItemNo = r.StockItemNo AND selected.ContinuitySegment = r.ContinuitySegment
+                AND selected.Selected = 1 AND selected.WouldAmend = 1
+                AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:STALE_SHORT_ISSUE:This saved run captures an issue that an earlier short on the item needs. Preview again.', 1;
 
     /* A balanced chain may offset a counted short against a later over, but
        must never increase that short or turn an over into a new short.
@@ -355,17 +418,27 @@ BEGIN
                 AND selected.AreaNo = changed.AreaNo AND selected.StockItemNo = changed.StockItemNo AND selected.ContinuitySegment = changed.ContinuitySegment
                 AND selected.Selected = 1 AND selected.WouldAmend = 1
                 AND selected.CommitState IN ('pending', 'skipped'))
+          /* Not the two ends of an opening-break pair — the opening, and the
+             last shift that traded before it (see above). */
           AND NOT EXISTS (
-              SELECT 1 FROM (
-                  SELECT x.AreaNo, x.StockItemNo, x.ContinuitySegment, x.TransactionDate, x.ShiftNo, x.ChainBreak, x.QtyVar,
-                         LAG(x.QtyVar + x.ChainBreak) OVER (PARTITION BY x.AreaNo, x.StockItemNo, x.ContinuitySegment ORDER BY x.TransactionDate, x.ShiftNo) AS PriorVariance,
-                         LAG(x.TransactionDate) OVER (PARTITION BY x.AreaNo, x.StockItemNo, x.ContinuitySegment ORDER BY x.TransactionDate, x.ShiftNo) AS PriorDate,
-                         LAG(x.ShiftNo) OVER (PARTITION BY x.AreaNo, x.StockItemNo, x.ContinuitySegment ORDER BY x.TransactionDate, x.ShiftNo) AS PriorShift
-                  FROM agora.StockReconRunLine x WHERE x.BranchId = @BranchId AND x.RunId = @RunId
-              ) o WHERE o.AreaNo = changed.AreaNo AND o.StockItemNo = changed.StockItemNo AND o.ContinuitySegment = changed.ContinuitySegment
-                  AND o.ChainBreak > @eps AND o.PriorVariance < -@eps AND o.QtyVar + o.ChainBreak > @eps
+              SELECT 1
+              FROM agora.StockReconRunLine o
+              CROSS APPLY (
+                  SELECT TOP 1 x.TransactionDate AS PriorDate, x.ShiftNo AS PriorShift,
+                               x.QtyVar + x.ChainBreak AS PriorVariance
+                  FROM agora.StockReconRunLine x
+                  WHERE x.BranchId = o.BranchId AND x.RunId = o.RunId
+                    AND x.AreaNo = o.AreaNo AND x.StockItemNo = o.StockItemNo AND x.ContinuitySegment = o.ContinuitySegment
+                    AND (x.TransactionDate < o.TransactionDate
+                         OR (x.TransactionDate = o.TransactionDate AND x.ShiftNo < o.ShiftNo))
+                    AND (x.IsDormant = 0 OR x.FlagChainBroken = 1)
+                  ORDER BY x.TransactionDate DESC, x.ShiftNo DESC
+              ) p
+              WHERE o.BranchId = @BranchId AND o.RunId = @RunId
+                  AND o.AreaNo = changed.AreaNo AND o.StockItemNo = changed.StockItemNo AND o.ContinuitySegment = changed.ContinuitySegment
+                  AND o.ChainBreak > @eps AND p.PriorVariance < -@eps AND o.QtyVar + o.ChainBreak > @eps
                   AND ((changed.TransactionDate = o.TransactionDate AND changed.ShiftNo = o.ShiftNo)
-                    OR (changed.TransactionDate = o.PriorDate AND changed.ShiftNo = o.PriorShift))
+                    OR (changed.TransactionDate = p.PriorDate AND changed.ShiftNo = p.PriorShift))
           )
     ) THROW 51000, 'AGORA:SHORT_MOVED:This saved run increases a shift shortage or creates a new one. Preview again and review the chain.', 1;
 

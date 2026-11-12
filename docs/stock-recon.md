@@ -49,8 +49,9 @@ The customer does not permit an over on one shift to cancel a short on another.
 This supersedes the historical cross-shift balancing examples below. An existing
 short stays on its shift unless a permitted issue correction on that same shift
 changes it, except when a corrected high opening reveals an over needed by the
-immediately preceding short (5 November 2026). That pair balances before any
-missing issue is proposed. Eligible issue increases and reductions are assessed independently
+preceding short (5 November 2026; "preceding" is the last shift that traded,
+since 12 November 2026). That pair balances before any missing issue is
+proposed. Eligible issue increases and reductions are assessed independently
 on each interior shift, including when their chain total is zero. If repairing
 an opening would move or create a short, the entire chain is held for count
 review, except for that opening-break pair. Older saved previews which move a
@@ -67,6 +68,74 @@ shift configuration, including the continuation from the count before the window
 A net-zero chain can therefore still contain both an over and a short; it is not
 fully balanced unless each variance is resolved by a valid correction. Where
 counts cannot resolve the chain under this rule, the residuals remain visible.
+
+### A short before an over balances with it (12 November 2026)
+
+Two pieces of customer feedback on the same day, one rule: **an over that an
+earlier short needs is that short coming back, not an issue nobody wrote up.**
+(`v1__14pzz`; `BalancingTest::test_opening_break_pairs_with_the_short_before_a_dormant_shift`,
+`…_an_exact_over_an_earlier_short_needs_balances_and_is_not_issued`.)
+
+**Through a dormant shift (Pongola, REWORK LOSE, 4–10 Nov:** *"the 60 should
+not have been inserted as a issue, had to be balance with the short"***).** The
+6 Nov night closed 12 where 74 was due, short 62. The 7 Nov day did not trade
+and signed off 12 / 12. The 7 Nov night opened 72. The opening-break pair of
+5 Nov read the row immediately before the opening, the dormant one, so the pair
+was missed, the chain split at the break, and the 60 that reappeared was
+proposed as a missing issue beside a short of 62.
+
+* The pair is now the opening and the **last shift that traded** before it. A
+  dormant shift carries the miscounted closing forward unchanged, so every
+  dormant shift between the two joins the pair's stretch and moves with the
+  corrected closing (rule 3). A dormant row with a break of its own ends the
+  look-back.
+* Reached through a dormant shift, the pair forms only where the short is one
+  the shift **counted** (no break of its own) and the stretch that short closes
+  is itself **short in total**. A short the over just before it already covers
+  is left with that over; a shift short only because its own opening was raised
+  (S10a, stock that vanished between shifts) stays held for count review. A
+  pair with nothing between its two ends is exactly as it was on 5 Nov.
+  Measured against the previous procedures on six branch-months of the local
+  copy (about 1,180 chains): three chains change, all this shape — D SODA and
+  LEAN MINCE at branch 18, PALL MALL XL BLAST at branch 13.
+* A dormant shift inside a pair is not judged by the share cap
+  (`MaxAmendmentPct`): it inherits the correction of the shift that counted,
+  where the cap has already judged it, and "what this shift held" is the
+  miscount itself. Read there, +62 against a holding of 12 held the chain back
+  as F1.
+* The result on that chain: 6 Nov night 12 → 74 and nil, 7 Nov day 74 / 74,
+  7 Nov night opens 74 and keeps its count of 72, over 7. No issue: 7 is below
+  the multiple of 20. The chain total stays −5.
+
+**With no break at all (Engen Manguzi, DIESELUBE 500ML, multiple 10:** *"the
+−10 amendment is wrong"***).** The 3 Nov night counted 16 where 26 was due, the
+day traded on from the 16, and the 4 Nov night counted 23 from an opening of 14.
+The over was exactly one issue multiple, so the early exact-issue pass captured
+it as a missing issue and the short of 10 stayed against two people.
+
+* Before balancing, an exact over now **gives up every whole issue multiple the
+  chain is already short of** when it arrives, and captures only the rest. What
+  it gives up is balanced by the counts between the two. Short 10 then over 10:
+  nothing is issued, the chain is nil. Short 10 then over 20: one multiple
+  balances, the other is the issue. Short 3 then over 10: the issue is captured
+  whole and the 3 stays, as on 2 Nov, because netting them would leave an over
+  of 7 that is no multiple of anything.
+* "Short of" is the chain's running total before the over, after the issue
+  reductions of the same pass and without what earlier overs captured. The
+  chain's exact overs are therefore decided in order, earliest first.
+
+**At commit.** `STALE_OPENING_ISSUE` reads "preceding" as the last shift that
+traded, and only while that short still stands in the run: where the over at
+the opening is bigger than the short, the short goes to nil first and the rest
+may be captured as an issue and written. `STALE_SHORT_ISSUE` refuses a saved run
+that still captures an issue while the item, on a chain with no break, stands
+short by a whole multiple or more before it. A run made before 12 Nov with
+either shape must be previewed again.
+
+**What it does not undo.** An issue already written to PumpIT by an earlier run
+stays there until that run is reversed. A fresh preview over it reads the
+counts from the originals but PumpIT's issue as keyed, so the chain is held
+(F3) until the capture is reversed or Reset to original puts the issue back.
 
 ## The one fact everything follows from
 
@@ -1016,7 +1085,9 @@ automatic issue change. No issues are added or reduced on the first or last shif
 chain. Older saved proposals that break these rules require a fresh preview.
 An exact whole-multiple over or short on an unbroken chain with no duplicate
 candidate is identified on its own shift before balancing, independently of
-the net chain variance. An issue can be reduced only by a
+the net chain variance — except that, since 12 Nov 2026, an over first gives up
+every whole multiple the chain is already short of when it arrives (see *A
+short before an over balances with it*). An issue can be reduced only by a
 whole multiple that is already present. The proposal identifies additions and
 reductions by Agora; the audit trail distinguishes reductions from confirmed
 duplicates. A chain containing a proposed issue change must be committed as a

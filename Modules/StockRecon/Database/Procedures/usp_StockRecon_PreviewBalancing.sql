@@ -968,47 +968,259 @@ BEGIN
         WHERE DupTier = 'D1';
 
     /* A corrected opening may reveal the over that the preceding shift needs.
-       Only those chains use the cross-shift offset rule below. */
-    ;WITH neighbours AS (
-        SELECT AreaNo, StockItemNo, ContinuitySegment, TransactionDate, ShiftNo, QtyVarRep,
-               LAG(QtyVarRep) OVER (PARTITION BY AreaNo, StockItemNo, ContinuitySegment ORDER BY TransactionDate, ShiftNo) AS PriorVariance,
-               LAG(TransactionDate) OVER (PARTITION BY AreaNo, StockItemNo, ContinuitySegment ORDER BY TransactionDate, ShiftNo) AS PriorDate,
-               LAG(ShiftNo) OVER (PARTITION BY AreaNo, StockItemNo, ContinuitySegment ORDER BY TransactionDate, ShiftNo) AS PriorShift
-        FROM #rep
-    )
-    SELECT r.AreaNo, r.StockItemNo, r.TransactionDate, r.ShiftNo, n.PriorDate, n.PriorShift INTO #openingOffset
-    FROM #rep r JOIN neighbours n ON n.AreaNo = r.AreaNo AND n.StockItemNo = r.StockItemNo
-      AND n.TransactionDate = r.TransactionDate AND n.ShiftNo = r.ShiftNo
-    WHERE r.ChainBreak > @tol AND n.PriorVariance < -@eps AND n.QtyVarRep > @eps;
+       Only those chains use the cross-shift offset rule below.
 
-    SELECT DISTINCT AreaNo, StockItemNo, TransactionDate, ShiftNo INTO #offsetShift
-    FROM (SELECT AreaNo, StockItemNo, TransactionDate, ShiftNo FROM #openingOffset
-          UNION ALL
-          SELECT AreaNo, StockItemNo, PriorDate, PriorShift FROM #openingOffset) p;
+       "PRECEDING" IS THE LAST SHIFT THAT TRADED (customer, Pongola, 12 Nov
+       2026: "the 60 should not have been inserted as a issue, had to be
+       balance with the short"). REWORK LOSE, 6 Nov night: closed 12 where 74
+       was due, short 62. The day shift after it did not trade and signed off
+       12 / 12. The next night opened 72. Read against the row immediately
+       before the opening — the dormant one, variance nil — the pair was
+       missed, the chain split at the break, and the 60 that reappeared was
+       proposed as a missing issue beside a short of 62.
+
+       A dormant shift carries the miscounted closing forward unchanged; by
+       rule 3 of ours it inherits the amendment of the active shift before it.
+       So it does not stand between a short and the opening that proves the
+       miscount, and it joins the pair's stretch. A dormant row with a break
+       of its own ends the look-back: its opening is a count that disagrees.
+
+       AND THE SHORT MUST STILL NEED IT. The pair is cut out of the chain as a
+       stretch of its own, so a short that an over just before it already
+       covers would be taken away from that over and leave it stranded: on
+       the local copy of Pongola, ANTIFREEZE 18–25 Aug counted +1 then −1,
+       sat dormant for a week and opened 4 up — paired, the +1 was left over
+       on its own shift where it had balanced to nil. So where a dormant
+       shift lies between, the stretch the short closes must itself be short
+       in total. A pair with nothing between its two ends is left exactly as
+       it was on 5 Nov: asking this of it re-cuts chains nobody complained
+       about (branch 23, Sep: the same totals, three times the closings
+       moved).
+
+       And through a dormant shift the short must be one the shift COUNTED —
+       no break of its own. A shift short only because its own opening was
+       raised to the previous closing (S10a: stock that vanished between
+       shifts) and an opening that brings it back days later is stock out of
+       the count for a while, not a miscounted closing; that chain stays held
+       for count review as it was (Engen Bethlehem, Aug: eighteen chains of
+       weighed raw materials would otherwise have left review in one month).
+
+       That stretch runs up to and including the short, from the later of:
+       the last break before it that splits the chain, and the shift after
+       the opening of the pair before it — a pair is cut out, so what follows
+       it starts afresh, and the over at that pair's opening covers nothing
+       after it. Each decision therefore rests on the pairs before it, and
+       they are taken in order. */
+    IF OBJECT_ID('tempdb..#openingPair') IS NOT NULL DROP TABLE #openingPair;
+
+    SELECT r.AreaNo, r.StockItemNo, r.ContinuitySegment, r.TransactionDate, r.ShiftNo,
+           p.TransactionDate AS PriorDate, p.ShiftNo AS PriorShift,
+           ROW_NUMBER() OVER (PARTITION BY r.AreaNo, r.StockItemNo, r.ContinuitySegment
+                              ORDER BY r.TransactionDate, r.ShiftNo) AS PairNo,
+           /* Nothing between the short and the opening. */
+           CONVERT(bit, CASE WHEN EXISTS (
+                   SELECT 1 FROM #rep m
+                   WHERE m.AreaNo = r.AreaNo AND m.StockItemNo = r.StockItemNo AND m.ContinuitySegment = r.ContinuitySegment
+                     AND (m.TransactionDate > p.TransactionDate
+                          OR (m.TransactionDate = p.TransactionDate AND m.ShiftNo > p.ShiftNo))
+                     AND (m.TransactionDate < r.TransactionDate
+                          OR (m.TransactionDate = r.TransactionDate AND m.ShiftNo < r.ShiftNo)))
+               THEN 0 ELSE 1 END) AS Adjacent,
+           p.LinkBroken AS PriorBroken,
+           CONVERT(bit, 0) AS IsPair
+    INTO #openingPair
+    FROM #rep r
+    CROSS APPLY (
+        SELECT TOP 1 x.TransactionDate, x.ShiftNo, x.QtyVarRep, x.LinkBroken
+        FROM #rep x
+        WHERE x.AreaNo = r.AreaNo AND x.StockItemNo = r.StockItemNo AND x.ContinuitySegment = r.ContinuitySegment
+          AND (x.TransactionDate < r.TransactionDate
+               OR (x.TransactionDate = r.TransactionDate AND x.ShiftNo < r.ShiftNo))
+          AND (x.IsDormant = 0 OR x.LinkBroken = 1)
+        ORDER BY x.TransactionDate DESC, x.ShiftNo DESC
+    ) p
+    WHERE r.ChainBreak > @tol AND r.QtyVarRep > @eps AND p.QtyVarRep < -@eps;
+
+    DECLARE @PairNo INT = 1,
+            @LastPairNo INT = ISNULL((SELECT MAX(PairNo) FROM #openingPair), 0);
+
+    WHILE @PairNo <= @LastPairNo
+    BEGIN
+        UPDATE c SET c.IsPair = 1
+        FROM #openingPair c
+        /* The last break at or before the short that splits the chain —
+           not one a pair already decided runs through. */
+        OUTER APPLY (
+            SELECT TOP 1 b.TransactionDate, b.ShiftNo
+            FROM #rep b
+            WHERE b.AreaNo = c.AreaNo AND b.StockItemNo = c.StockItemNo AND b.ContinuitySegment = c.ContinuitySegment
+              AND (b.TransactionDate < c.PriorDate
+                   OR (b.TransactionDate = c.PriorDate AND b.ShiftNo <= c.PriorShift))
+              AND b.LinkBroken = 1 AND b.BreakKept = 0
+              AND NOT EXISTS (SELECT 1 FROM #openingPair e
+                              WHERE e.AreaNo = b.AreaNo AND e.StockItemNo = b.StockItemNo
+                                AND e.ContinuitySegment = b.ContinuitySegment AND e.IsPair = 1
+                                AND e.TransactionDate = b.TransactionDate AND e.ShiftNo = b.ShiftNo)
+            ORDER BY b.TransactionDate DESC, b.ShiftNo DESC
+        ) split
+        /* The opening of the pair before this one. */
+        OUTER APPLY (
+            SELECT TOP 1 e.TransactionDate, e.ShiftNo
+            FROM #openingPair e
+            WHERE e.AreaNo = c.AreaNo AND e.StockItemNo = c.StockItemNo AND e.ContinuitySegment = c.ContinuitySegment
+              AND e.IsPair = 1 AND e.PairNo < c.PairNo
+            ORDER BY e.PairNo DESC
+        ) earlier
+        CROSS APPLY (
+            SELECT SUM(x.QtyVarRep) AS Standing
+            FROM #rep x
+            WHERE x.AreaNo = c.AreaNo AND x.StockItemNo = c.StockItemNo AND x.ContinuitySegment = c.ContinuitySegment
+              AND (x.TransactionDate < c.PriorDate
+                   OR (x.TransactionDate = c.PriorDate AND x.ShiftNo <= c.PriorShift))
+              AND (split.TransactionDate IS NULL
+                   OR x.TransactionDate > split.TransactionDate
+                   OR (x.TransactionDate = split.TransactionDate AND x.ShiftNo >= split.ShiftNo))
+              AND (earlier.TransactionDate IS NULL
+                   OR x.TransactionDate > earlier.TransactionDate
+                   OR (x.TransactionDate = earlier.TransactionDate AND x.ShiftNo > earlier.ShiftNo))
+        ) stretch
+        WHERE c.PairNo = @PairNo
+          AND (c.Adjacent = 1 OR (c.PriorBroken = 0 AND stretch.Standing < -@eps));
+
+        SET @PairNo = @PairNo + 1;
+    END
+
+    SELECT AreaNo, StockItemNo, ContinuitySegment, TransactionDate, ShiftNo, PriorDate, PriorShift
+    INTO #openingOffset
+    FROM #openingPair
+    WHERE IsPair = 1;
+
+    /* The pair, and every dormant shift between its two ends. */
+    SELECT DISTINCT r.AreaNo, r.StockItemNo, r.TransactionDate, r.ShiftNo INTO #offsetShift
+    FROM #rep r
+    JOIN #openingOffset o
+      ON o.AreaNo = r.AreaNo AND o.StockItemNo = r.StockItemNo AND o.ContinuitySegment = r.ContinuitySegment
+     AND (r.TransactionDate > o.PriorDate OR (r.TransactionDate = o.PriorDate AND r.ShiftNo >= o.PriorShift))
+     AND (r.TransactionDate < o.TransactionDate OR (r.TransactionDate = o.TransactionDate AND r.ShiftNo <= o.ShiftNo));
 
     /* Preserve the existing per-shift issue correction on other chains. */
     IF @CaptureMissingIssues = 1
     BEGIN
+        IF OBJECT_ID('tempdb..#preIssue') IS NOT NULL DROP TABLE #preIssue;
+
         ;WITH totals AS (
             SELECT AreaNo, StockItemNo, ContinuitySegment, MAX(CONVERT(int, LinkBroken)) AS HasBreak,
                    MAX(CASE WHEN DupTier IS NOT NULL THEN 1 ELSE 0 END) AS HasDuplicate,
                    MAX(CASE WHEN AuthorizedGoodWaste > @eps THEN 1 ELSE 0 END) AS HasAuthorizedWaste
             FROM #rep GROUP BY AreaNo, StockItemNo, ContinuitySegment
-        ), candidates AS (
-            SELECT r.AreaNo, r.StockItemNo, r.TransactionDate, r.ShiftNo,
-                   CONVERT(decimal(18,4), ROUND(r.QtyVarRep / NULLIF(i.Mult, 0), 0) * i.Mult) AS Amount
-            FROM #rep r JOIN totals t ON t.AreaNo = r.AreaNo AND t.StockItemNo = r.StockItemNo AND t.ContinuitySegment = r.ContinuitySegment
-            JOIN #item i ON i.AreaNo = r.AreaNo AND i.StockItemNo = r.StockItemNo
-            WHERE t.HasBreak = 0 AND t.HasDuplicate = 0 AND t.HasAuthorizedWaste = 0
-              AND r.IsFirstInWindow = 0 AND r.IsLastInWindow = 0 AND r.IsDormant = 0
-              AND i.Mult > 1 AND ABS(r.QtyVarRep) >= i.Mult
-              AND (r.QtyVarRep > 0 OR r.QtyIssued >= ABS(r.QtyVarRep))
-              AND ABS(r.QtyVarRep - ROUND(r.QtyVarRep / NULLIF(i.Mult, 0), 0) * i.Mult) <= @eps
         )
-        UPDATE r SET r.PreIssue = c.Amount, r.QtyIssued = r.QtyIssued + c.Amount,
-                     r.QtyVarRep = r.QtyVarRep - c.Amount
-        FROM #rep r JOIN candidates c ON c.AreaNo = r.AreaNo AND c.StockItemNo = r.StockItemNo
-          AND c.TransactionDate = r.TransactionDate AND c.ShiftNo = r.ShiftNo;
+        SELECT r.AreaNo, r.StockItemNo, r.ContinuitySegment, r.TransactionDate, r.ShiftNo,
+               CONVERT(decimal(18,4), ROUND(r.QtyVarRep / NULLIF(i.Mult, 0), 0) * i.Mult) AS Amount,
+               i.Mult,
+               /* What is written to the issue. The whole of it on a
+                  reduction; on an over, what no earlier short needs — set
+                  below from the chain's running total before the over and
+                  where it sits among the chain's exact overs. */
+               CONVERT(decimal(18,4), ROUND(r.QtyVarRep / NULLIF(i.Mult, 0), 0) * i.Mult) AS Capture,
+               CONVERT(decimal(18,4), 0) AS RunningBefore,
+               CONVERT(int, 0)           AS OverNo
+        INTO #preIssue
+        FROM #rep r JOIN totals t ON t.AreaNo = r.AreaNo AND t.StockItemNo = r.StockItemNo AND t.ContinuitySegment = r.ContinuitySegment
+        JOIN #item i ON i.AreaNo = r.AreaNo AND i.StockItemNo = r.StockItemNo
+        WHERE t.HasBreak = 0 AND t.HasDuplicate = 0 AND t.HasAuthorizedWaste = 0
+          AND r.IsFirstInWindow = 0 AND r.IsLastInWindow = 0 AND r.IsDormant = 0
+          AND i.Mult > 1 AND ABS(r.QtyVarRep) >= i.Mult
+          AND (r.QtyVarRep > 0 OR r.QtyIssued >= ABS(r.QtyVarRep))
+          AND ABS(r.QtyVarRep - ROUND(r.QtyVarRep / NULLIF(i.Mult, 0), 0) * i.Mult) <= @eps;
+
+        /* AN OVER AN EARLIER SHORT NEEDS IS NOT A MISSING ISSUE (customer, 12
+           Nov 2026, Engen Manguzi, DIESELUBE 500ML, multiple 10: "the -10
+           amendment is wrong"). The night of 3 Nov counted 16 where 26 was
+           due, short 10; the day shift traded on from the 16; the night of
+           4 Nov counted 23 from an opening of 14, over 10. Nothing was issued:
+           the 10 were there all along and the chain is nil. Read shift by
+           shift, the over was exactly one issue multiple, so it was captured
+           as a missing issue and the short of 10 stayed against the two
+           people on that shift — stock invented on paper to explain a
+           miscount.
+
+           So an exact over is captured before balancing only for what the
+           chain is not already short of when it arrives. A whole multiple the
+           chain is short of is the short coming back, and it is left for the
+           balancing below, which moves the closings between the two.
+
+           "Short of" is the chain's running total before the over, on the
+           basis balancing works from: after the issue reductions among these
+           candidates, and without what earlier overs had captured here — an
+           issue captured is stock explained, not stock found. That last part
+           makes each decision depend on the ones before it, so the chain's
+           exact overs are taken in order, earliest first.
+
+           In whole multiples, because an issue is: short 10 then over 20 on
+           a multiple of 10 leaves one multiple to the short and captures the
+           other. And a chain short by LESS than a multiple still has its
+           exact over captured whole, the smaller short staying where it was
+           counted — netting those would leave an over that is no multiple of
+           anything and can never be captured (the rule of 2 Nov). */
+        ;WITH basis AS (
+            SELECT r.AreaNo, r.StockItemNo, r.ContinuitySegment, r.TransactionDate, r.ShiftNo,
+                   r.QtyVarRep - CASE WHEN c.Amount < 0 THEN c.Amount ELSE 0 END AS V
+            FROM #rep r
+            LEFT JOIN #preIssue c ON c.AreaNo = r.AreaNo AND c.StockItemNo = r.StockItemNo
+              AND c.TransactionDate = r.TransactionDate AND c.ShiftNo = r.ShiftNo
+            WHERE EXISTS (SELECT 1 FROM #preIssue o
+                          WHERE o.AreaNo = r.AreaNo AND o.StockItemNo = r.StockItemNo
+                            AND o.ContinuitySegment = r.ContinuitySegment AND o.Amount > 0)
+        ), running AS (
+            SELECT b.AreaNo, b.StockItemNo, b.TransactionDate, b.ShiftNo,
+                   ISNULL(SUM(b.V) OVER (PARTITION BY b.AreaNo, b.StockItemNo, b.ContinuitySegment
+                                         ORDER BY b.TransactionDate, b.ShiftNo
+                                         ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS RunningBefore
+            FROM basis b
+        ), numbered AS (
+            SELECT c.AreaNo, c.StockItemNo, c.TransactionDate, c.ShiftNo,
+                   ROW_NUMBER() OVER (PARTITION BY c.AreaNo, c.StockItemNo, c.ContinuitySegment
+                                      ORDER BY c.TransactionDate, c.ShiftNo) AS OverNo
+            FROM #preIssue c
+            WHERE c.Amount > 0
+        )
+        UPDATE c SET c.RunningBefore = x.RunningBefore, c.OverNo = n.OverNo
+        FROM #preIssue c
+        JOIN running x ON x.AreaNo = c.AreaNo AND x.StockItemNo = c.StockItemNo
+          AND x.TransactionDate = c.TransactionDate AND x.ShiftNo = c.ShiftNo
+        JOIN numbered n ON n.AreaNo = c.AreaNo AND n.StockItemNo = c.StockItemNo
+          AND n.TransactionDate = c.TransactionDate AND n.ShiftNo = c.ShiftNo;
+
+        /* One pass per exact over on the busiest chain — one or two as a
+           rule, never more than the window has shifts. */
+        DECLARE @OverNo INT = 1,
+                @LastOverNo INT = ISNULL((SELECT MAX(OverNo) FROM #preIssue), 0);
+
+        WHILE @OverNo <= @LastOverNo
+        BEGIN
+            /* Short = how far below nil the chain stands before this over.
+               The over gives up the whole multiples of it that fit — never
+               more than itself — and captures the rest. */
+            UPDATE c SET c.Capture = c.Amount
+                         - FLOOR((CASE WHEN s.Short < c.Amount THEN s.Short ELSE c.Amount END + @eps) / c.Mult) * c.Mult
+            FROM #preIssue c
+            OUTER APPLY (SELECT SUM(p.Capture) AS Captured
+                         FROM #preIssue p
+                         WHERE p.AreaNo = c.AreaNo AND p.StockItemNo = c.StockItemNo
+                           AND p.ContinuitySegment = c.ContinuitySegment
+                           AND p.OverNo > 0 AND p.OverNo < c.OverNo) earlier
+            CROSS APPLY (SELECT CASE WHEN c.RunningBefore - ISNULL(earlier.Captured, 0) < 0
+                                     THEN -(c.RunningBefore - ISNULL(earlier.Captured, 0)) ELSE 0 END AS Short) s
+            WHERE c.OverNo = @OverNo;
+
+            SET @OverNo = @OverNo + 1;
+        END
+
+        UPDATE r SET r.PreIssue = c.Capture, r.QtyIssued = r.QtyIssued + c.Capture,
+                     r.QtyVarRep = r.QtyVarRep - c.Capture
+        FROM #rep r JOIN #preIssue c ON c.AreaNo = r.AreaNo AND c.StockItemNo = r.StockItemNo
+          AND c.TransactionDate = r.TransactionDate AND c.ShiftNo = r.ShiftNo
+        WHERE ABS(c.Capture) > @eps;
     END
 
     /* A CHAIN WHOSE TOTAL IS NIL RUNS THROUGH EVERY BREAK (Ryan, 7 Oct 2026:
@@ -1029,16 +1241,13 @@ BEGIN
     WHERE r.LinkBroken = 1 AND r.BreakKept = 0;
 
     /* Repairing an overstated opening can expose the over that the preceding
-       shift's short needs. Let that pair balance across the opening break. */
-    ;WITH neighbours AS (
-        SELECT AreaNo, StockItemNo, ContinuitySegment, TransactionDate, ShiftNo, QtyVarRep,
-               LAG(QtyVarRep) OVER (PARTITION BY AreaNo, StockItemNo, ContinuitySegment ORDER BY TransactionDate, ShiftNo) AS PriorVariance
-        FROM #rep
-    )
+       shift's short needs. Let that pair balance across the opening break.
+       The pairs found above, so both read "preceding" the same way: a chain
+       with a break takes no issue correction in between, so nothing a pair
+       was found on has moved. */
     UPDATE r SET BreakKept = 1
-    FROM #rep r JOIN neighbours n ON n.AreaNo = r.AreaNo AND n.StockItemNo = r.StockItemNo
-      AND n.TransactionDate = r.TransactionDate AND n.ShiftNo = r.ShiftNo
-    WHERE r.ChainBreak > @tol AND n.PriorVariance < -@eps AND n.QtyVarRep > @eps;
+    FROM #rep r JOIN #openingOffset o ON o.AreaNo = r.AreaNo AND o.StockItemNo = r.StockItemNo
+      AND o.TransactionDate = r.TransactionDate AND o.ShiftNo = r.ShiftNo;
 
     /* Segments and sequence numbers. A repaired break starts a new segment, so
        the closing before it is the last closing of the segment before — pinned,
@@ -1276,8 +1485,15 @@ BEGIN
                /* F1 — the plausibility caps, both halves. */
                CONVERT(bit, CASE WHEN ABS(ch.AmendClose) > ch.CfgMaxAmendment THEN 1 ELSE 0 END)
                                                                            AS FlagBigAmendment,
+               /* Not on a dormant shift inside an opening-break pair (12 Nov
+                  2026). It inherits the correction of the shift that counted,
+                  where the cap has already judged it against what that shift
+                  held; "what this shift held" is the miscount itself — 12
+                  carried forward where 74 was due — so the share read here
+                  held back the very chain the pair exists to balance. */
                CONVERT(bit, CASE WHEN ch.OpenRep + ch.QtyIssued > 0
                                   AND ABS(ch.AmendClose) > ch.CfgMaxAmendmentPct * (ch.OpenRep + ch.QtyIssued)
+                                  AND NOT (ch.IsDormant = 1 AND ch.InOpeningOffset = 1)
                                  THEN 1 ELSE 0 END)                        AS FlagPctAmendment,
                CONVERT(bit, CASE WHEN ch.QtyClose + ch.AmendClose < -@eps THEN 1 ELSE 0 END)
                                                                            AS FlagNegativeClose,
