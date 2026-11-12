@@ -1,0 +1,27 @@
+// Fuel keeps the shared grid and chart components; only page composition lives here.
+.fuel-matrix {
+    margin-block-end: 1rem;
+}
+
+.fuel-metric-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-block-end: 1rem;
+
+    .is-active {
+        border-color: var(--brand);
+        background: var(--brand-soft);
+        color: var(--brand);
+    }
+}
+
+.fuel-source-note {
+    color: var(--muted);
+    font-size: .8125rem;
+}
+
+.fuel-source-detail {
+    padding: 1rem;
+    overflow-wrap: anywhere;
+}

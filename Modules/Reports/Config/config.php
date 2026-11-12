@@ -45,6 +45,33 @@ return [
     'export_ceiling' => 100000,
 
     'reports' => [
+        'fuel-history' => [
+            'label' => 'Fuel price history',
+            'summary' => 'Source POS observations with cost, price and margin; conflicting prices remain separate.',
+            'group' => 'Fuel',
+            // FuelMenuSeeder owns its navigation, outside the Today menu.
+            'menu' => null,
+            'procedure' => 'usp_Fuel_GridHistory',
+            'scope' => [
+                'date_mode' => 'range', 'lookback_days' => 365,
+                'help' => 'Dates limit the trading date. Source date is shown separately; no daily winner or missing margin is inferred.',
+                'search_placeholder' => 'Site, grade or POS identifier…',
+            ],
+            'blurb' => 'Distinct source-keyed BRN_FuelPrice observations. Use Fuel → Fuel price history for typed filters, charts and source details.',
+            'was' => [],
+            'columns' => [
+                ['key' => 'BranchName', 'label' => 'Site', 'type' => 'text', 'sort' => 'BranchName'],
+                ['key' => 'FuelTypeNo', 'label' => 'Grade no', 'type' => 'number', 'sort' => 'FuelTypeNo'],
+                ['key' => 'FuelTypeDescription', 'label' => 'Grade', 'type' => 'text', 'sort' => 'FuelTypeDescription'],
+                ['key' => 'TradingDate', 'label' => 'Trading date', 'type' => 'date', 'sort' => 'TradingDate'],
+                ['key' => 'SourceDate', 'label' => 'Source date', 'type' => 'date', 'sort' => 'SourceDate'],
+                ['key' => 'SellingPrice', 'label' => 'Sell / ℓ', 'type' => 'money', 'sort' => 'SellingPrice'],
+                ['key' => 'CostPrice', 'label' => 'Cost / ℓ', 'type' => 'money', 'sort' => 'CostPrice'],
+                ['key' => 'Margin', 'label' => 'Margin / ℓ', 'type' => 'money', 'sort' => 'Margin'],
+                ['key' => 'IsFleetCard', 'label' => 'Fleet', 'type' => 'bool', 'sort' => 'IsFleetCard'],
+                ['key' => 'SourceNote', 'label' => 'Source notes', 'type' => 'text'],
+            ],
+        ],
 
         /* ---------------------------------------------------------- The day */
 

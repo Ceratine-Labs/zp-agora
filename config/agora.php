@@ -54,6 +54,13 @@ $landingModules = [
         'route_prefixes' => ['app.reports.'],
         'preferred_routes' => ['app.reports.index'],
     ],
+    'fuel' => [
+        'label' => 'Fuel',
+        'description' => 'DOE price periods, POS price observations and margin history.',
+        'art' => 'reports',
+        'route_prefixes' => ['app.fuel.'],
+        'preferred_routes' => ['app.fuel.matrix', 'app.fuel.history'],
+    ],
     'products' => [
         'label' => 'Products',
         'description' => 'Stock items, critical lines and product settings.',

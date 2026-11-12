@@ -14,7 +14,7 @@ class NavigationModules
     private const LABELS = ['operations' => 'Operations', 'cash' => 'Cashups', 'recon' => 'Bank recon', 'stockrecon' => 'Stock recon'];
 
     private const REPORT_MODULES = [
-        'my-queue' => 'operations',
+        'my-queue' => 'operations', 'fuel-history' => 'fuel',
         'unallocated-zreads' => 'cash', 'open-cashups' => 'cash', 'staff-shorts' => 'cash', 'drop-safe' => 'cash', 'daily-banking' => 'cash',
         'stock-count' => 'stockrecon', 'utility-meters' => 'utilities',
     ];
@@ -26,7 +26,8 @@ class NavigationModules
         'recon' => ['bank-recon', 'recon', 'recon-dashboard', 'recon-trace', 'settlement'],
         'stockrecon' => ['stock', 'stock-recon', 'stockrecon', 'recon-centre', 'counting', 'stock-count', 'stock-counts', 'stock-variance', 'count-exceptions', 'balancing', 'area-locks', 'month-end', 'counting-areas'],
         'utilities' => ['utilities', 'meters', 'utility-meters', 'utility-reading', 'utility-readings'],
-        'products' => ['products', 'critical-lines', 'categories', 'standard-categories', 'fuel-matrix', 'suppliers', 'production', 'pre-production', 'butchery'],
+        'fuel' => ['fuel-matrix', 'fuel-history', 'fuel-history-report'],
+        'products' => ['products', 'critical-lines', 'categories', 'standard-categories', 'suppliers', 'production', 'pre-production', 'butchery'],
         'debtors' => ['debtors', 'debtors-statements', 'account-customers'],
         'assets' => ['assets', 'equipment', 'asset-movement', 'asset-repairs', 'asset-masters'],
         'access' => ['users', 'roles', 'employees', 'branches', 'profit-centres', 'expense-codes'],

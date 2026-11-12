@@ -21,6 +21,8 @@ use Modules\Core\Grids\RoleGrid;
 use Modules\Core\Grids\SettingGrid;
 use Modules\Core\Grids\UserGrid;
 use Modules\Debtors\Grids\DebtorAccountGrid;
+use Modules\Fuel\Grids\FuelHistoryGrid;
+use Modules\Fuel\Grids\FuelPriceGrid;
 use Modules\Masters\Grids\BranchMasterGrid;
 use Modules\People\Grids\EmployeeAreaGrid;
 use Modules\People\Grids\EmployeeGrid;
@@ -105,6 +107,8 @@ return [
     | registered outside local and testing.
     */
     'grids' => [
+        'app.fuel.matrix' => FuelPriceGrid::class,
+        'app.fuel.history' => FuelHistoryGrid::class,
         'app.setup.users' => UserGrid::class,
         'app.setup.roles' => RoleGrid::class,
         'app.setup.settings' => SettingGrid::class,

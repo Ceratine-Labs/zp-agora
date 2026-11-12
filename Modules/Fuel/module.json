@@ -1,0 +1,9 @@
+{
+    "name": "Fuel",
+    "alias": "fuel",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 45,
+    "requires": [],
+    "providers": ["Modules\\Fuel\\Providers\\FuelServiceProvider"]
+}
