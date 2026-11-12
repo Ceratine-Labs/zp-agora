@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Masters\Http\Controllers\BranchController;
 use Modules\Masters\Http\Controllers\BranchGroupingController;
 use Modules\Masters\Http\Controllers\ReferenceMasterController;
+use Modules\Masters\Http\Controllers\ReferenceMasterWriteController;
 
 // Registered under the /app prefix with the web middleware stack by
 // ModuleServiceProvider — do not repeat the prefix here.
@@ -44,12 +45,10 @@ Route::middleware('auth')->prefix('setup')->name('setup.')->group(function () {
     /*
      | ---- T022: the reference masters -----------------------------------------
      |
-     | slug => permission resource. Each is a READ-ONLY listing over PumpIT
-     | (Masters v1__02a says why), so each has exactly one permission,
-     | masters.{resource}.view, and two routes: the listing and one record
+     | slug => permission resource. Each lists a PumpIT master through
+     | masters.{resource}.view, with two routes: the listing and one record
      | (`{branch}?key=` — the record's identity within its branch, as the
-     | procedure's RowKey). There is no edit, save or delete: those happen in
-     | PumpIT until a master is adopted or migrated by name.
+     | procedure's RowKey). Edits are the write-backs below.
      |
      | The grid behind each is registered in config/grids.php as
      | app.setup.{slug}; the procedure refuses without the view permission too.
@@ -73,5 +72,23 @@ Route::middleware('auth')->prefix('setup')->name('setup.')->group(function () {
             ->defaults('resource', $slug)->middleware("can:masters.{$resource}.view")->name("{$slug}.index");
         Route::get("{$slug}/{branch}", [ReferenceMasterController::class, 'show'])
             ->defaults('resource', $slug)->middleware("can:masters.{$resource}.view")->whereNumber('branch')->name("{$slug}.show");
+    }
+
+    /*
+     | The masters that write back to PumpIT (CLAUDE.md rule 1, PM decision
+     | 01a1cecf-8e08): masters.{resource}.edit opens the form, saves it and
+     | puts a press back. The controller 404s every one of these while
+     | masters.write_mode is not 'live'. No delete: no PumpIT row is removed.
+     */
+    foreach ([
+        'categories' => 'categorygl',
+    ] as $slug => $resource) {
+        Route::get("{$slug}/{branch}/edit", [ReferenceMasterWriteController::class, 'edit'])
+            ->defaults('resource', $slug)->middleware("can:masters.{$resource}.edit")->whereNumber('branch')->name("{$slug}.edit");
+        Route::put("{$slug}/{branch}", [ReferenceMasterWriteController::class, 'update'])
+            ->defaults('resource', $slug)->middleware("can:masters.{$resource}.edit")->whereNumber('branch')->name("{$slug}.update");
+        Route::post("{$slug}/{branch}/writes/{write}/reverse", [ReferenceMasterWriteController::class, 'reverse'])
+            ->defaults('resource', $slug)->middleware("can:masters.{$resource}.edit")->whereNumber('branch')
+            ->whereUuid('write')->name("{$slug}.writes.reverse");
     }
 });

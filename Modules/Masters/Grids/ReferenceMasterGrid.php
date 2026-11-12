@@ -95,6 +95,39 @@ abstract class ReferenceMasterGrid extends GridDefinition
         return $this->noun();
     }
 
+    /**
+     * The master as agora.MasterWrite names it, where it can be edited — a
+     * write back to PumpIT (CLAUDE.md rule 1). Null: a read-only listing.
+     */
+    public function writeEntity(): ?string
+    {
+        return null;
+    }
+
+    /** The procedure that writes one record back to PumpIT. */
+    public function saveProcedure(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * The values an edit may change, by the listing's column name (which is
+     * also the save procedure's parameter, and `Expected{name}` its stale
+     * check): `['label', 'type' => decimal|bool|text, 'column' => the PumpIT
+     * column, 'min', 'max', 'step', 'help']`.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function editableFields(): array
+    {
+        return [];
+    }
+
+    public function editPermission(): string
+    {
+        return 'masters.'.$this->resource().'.edit';
+    }
+
     public function key(): string
     {
         return 'app.setup.'.$this->slug();

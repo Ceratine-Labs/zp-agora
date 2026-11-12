@@ -6,6 +6,7 @@ use App\Grid\GridService;
 use App\Http\Controllers\Controller;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Modules\Masters\Services\MasterWriteService;
 use Modules\Masters\Services\ReferenceMasterService;
 
 /**
@@ -14,12 +15,12 @@ use Modules\Masters\Services\ReferenceMasterService;
  * also its GridKey's last part, and everything that differs between masters
  * is declared on its ReferenceMasterGrid.
  *
- * Read-only by design — there is no edit, save or delete route for any of
- * these, because the truth is PumpIT's (v1__02a).
+ * The edits are ReferenceMasterWriteController's: they write PumpIT's own
+ * table back (CLAUDE.md rule 1), for the masters whose definition says so.
  */
 class ReferenceMasterController extends Controller
 {
-    public function __construct(private ReferenceMasterService $masters) {}
+    public function __construct(private ReferenceMasterService $masters, private MasterWriteService $writes) {}
 
     public function index(Request $request, GridService $grids): View
     {
@@ -42,6 +43,7 @@ class ReferenceMasterController extends Controller
 
         return view($request->ajax() ? 'masters::reference.detail' : 'masters::reference.show', $record + [
             'definition' => $definition,
+            'writes' => $this->writes->writes($definition, $record['row']),
         ]);
     }
 }

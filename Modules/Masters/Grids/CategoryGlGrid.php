@@ -86,6 +86,28 @@ class CategoryGlGrid extends ReferenceMasterGrid
         return [['The same category at your other sites', 'No other site you can see carries this POS category.']];
     }
 
+    public function writeEntity(): ?string
+    {
+        return 'CategoryGl';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveCategoryBand';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'MinGP' => ['label' => 'Min GP %', 'type' => 'decimal', 'column' => 'MINGP', 'min' => 0, 'max' => 100, 'step' => '0.01',
+                'help' => 'Below this, the category\'s lines are a margin exception. 0 and 0 is no band.'],
+            'MaxGP' => ['label' => 'Max GP %', 'type' => 'decimal', 'column' => 'MAXGP', 'min' => 0, 'max' => 100, 'step' => '0.01'],
+            'MinDaysCover' => ['label' => 'Min days cover', 'type' => 'decimal', 'column' => 'MINDaysCover', 'min' => 0, 'max' => 366, 'step' => '0.5'],
+            'MaxDaysCover' => ['label' => 'Max days cover', 'type' => 'decimal', 'column' => 'MAXDaysCover', 'min' => 0, 'max' => 366, 'step' => '0.5'],
+            'IsActive' => ['label' => 'Active', 'type' => 'bool', 'column' => 'IsActive'],
+        ];
+    }
+
     public function rowClass(object $row): ?string
     {
         return (($row->IsActive ?? false) && ($row->GpBand ?? null) === 'Missing') ? 'is-warn' : null;

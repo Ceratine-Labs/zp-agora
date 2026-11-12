@@ -298,7 +298,7 @@ class ReferenceMastersTest extends TestCase
         // Somebody who may see the branches, but not this master.
         $this->actingAs($this->person(['branches.view']));
         $this->get(route("app.setup.{$slug}.index", $query))->assertForbidden();
-        $this->get(route('app.grids.extract', ['grid' => "app.setup.{$slug}"] + $query))->assertStatus(422);
+        $this->get(route('app.grids.extract', ['grid' => "app.setup.{$slug}"] + $query))->assertForbidden();
 
         $this->actingAs($this->person(["{$resource}.view"]));
         $this->get(route("app.setup.{$slug}.index", $query))->assertOk()->assertSee(Str::after($procedure, 'agora.'));
