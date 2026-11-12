@@ -124,13 +124,28 @@ abstract class ReferenceMasterGrid extends GridDefinition
      * The values an edit may change, by the listing's column name (which is
      * also the save procedure's parameter, and `Expected{name}` its stale
      * check): `['label', 'type' => decimal|bool|text, 'column' => the PumpIT
-     * column, 'min', 'max', 'step', 'help']`.
+     * column, 'min', 'max', 'step', 'help', 'on', 'off' (a bool's words in
+     * the confirmation), 'optional' (a bool fieldsFor() may leave out)]`.
      *
      * @return array<string, array<string, mixed>>
      */
     public function editableFields(): array
     {
         return [];
+    }
+
+    /**
+     * The fields the edit form draws for THIS record: editableFields() unless
+     * a master narrows it per row (a cash-device number has no active flag)
+     * or words a field for the row (where its deposits will land). A field
+     * the form leaves out must be `'optional' => true` in editableFields(),
+     * so its absence reads as "not offered", never as "switched off".
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function fieldsFor(object $row): array
+    {
+        return $this->editableFields();
     }
 
     public function editPermission(): string

@@ -40,6 +40,11 @@ class MasterWriteTest extends TestCase
     /** BRN_TransactionType.TypeCode is two characters. */
     private const TYPE = 'T9';
 
+    /** The same Smart ATM number at another site, for the one-active-row guard. */
+    private const OTHER_TERMINAL = 9902;
+
+    private const OTHER_BRANCH = 14;
+
     /** BRN_Tank.TankNo and BRN_Pump.PumpNo are four. */
     private const FORECOURT = 'TT99';
 
@@ -82,6 +87,8 @@ class MasterWriteTest extends TestCase
             [self::SITE_NO, self::BRANCH]);
         $this->db()->statement("INSERT [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo (SMARTATMTerminalNoId, SSBranchId, SMARTATM_TerminalNo, Description, IsActive)
             VALUES (?, ?, 'TEST99', 'TEST-Terminal', 1)", [self::SITE_NO, self::BRANCH]);
+        $this->db()->statement("INSERT [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo (SMARTATMTerminalNoId, SSBranchId, SMARTATM_TerminalNo, Description, IsActive)
+            VALUES (?, ?, 'TEST99', 'TEST-Terminal there', 0)", [self::OTHER_TERMINAL, self::OTHER_BRANCH]);
         $this->db()->statement("INSERT [PumpIT].dbo.BRN_Pump (SSBranchId, PumpNo, FuelTypeNo, TankNo, IsActive, [Order], POSType, POSIdentifier)
             VALUES (?, ?, ?, ?, 1, 7, 'WINBRANCH', '9999')", [self::BRANCH, self::FORECOURT, self::SITE_NO, self::FORECOURT]);
     }
@@ -465,7 +472,7 @@ class MasterWriteTest extends TestCase
         $this->assertSame('TEST-Meter', $this->db()->selectOne('SELECT Description FROM [PumpIT].dbo.BRN_UtilityMeter WHERE UtilityMeterId = ?', [self::SITE_NO])->Description);
     }
 
-    public function test_a_terminal_description_names_its_own_table_and_never_offers_the_number_or_active_flag(): void
+    public function test_a_terminal_description_names_its_own_table_and_never_offers_the_number(): void
     {
         $this->actingAs($this->person(['terminals.view', 'terminals.edit']));
         $key = 'SMARTATM:'.self::SITE_NO;
@@ -473,23 +480,80 @@ class MasterWriteTest extends TestCase
         $show = route('app.setup.terminals.show', ['branch' => self::BRANCH, 'key' => $key]);
         $edit = $this->get(route('app.setup.terminals.edit', ['branch' => self::BRANCH, 'key' => $key]))->assertOk()
             ->assertSee('PumpIT dbo.SS_Branch_SMARTATM_TerminalNo', false);
-        foreach (['Number', 'Active', 'IsActive'] as $never) {
+        foreach (['Number', 'Active', 'SMARTATM_TerminalNo'] as $never) {
             $edit->assertDontSee('name="'.$never.'"', false);
         }
 
         $this->assertSiteRefused('NOT_FOUND', 'agora.usp_Masters_SaveTerminal',
             array_replace($this->siteProc('Terminal', ['Description' => 'TEST-x']), ['Key' => 'BANK:'.self::SITE_NO]));
         $this->put($update, ['key' => $key, 'Description' => 'TEST-Terminal shop safe', 'ExpectedDescription' => 'TEST-Terminal',
-            'Reason' => 'TEST-name the safe it sits in'])->assertRedirect($show);
+            'IsActive' => 1, 'ExpectedIsActive' => 1, 'Reason' => 'TEST-name the safe it sits in'])->assertRedirect($show);
         $row = $this->db()->selectOne('SELECT Description, SMARTATM_TerminalNo, IsActive FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo WHERE SMARTATMTerminalNoId = ?', [self::SITE_NO]);
         $this->assertSame(['TEST-Terminal shop safe', 'TEST99', true], [$row->Description, $row->SMARTATM_TerminalNo, (bool) $row->IsActive]);
         $write = $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('Entity', 'Terminal')->where('RowKey', $key)->sole();
-        $this->assertSame(['SS_Branch_SMARTATM_TerminalNo', 'Smart ATM terminal TEST99'], [$write->PumpItTable, $write->RowLabel]);
+        $this->assertSame(['Description', 'SS_Branch_SMARTATM_TerminalNo', 'Smart ATM terminal TEST99'], [$write->Field, $write->PumpItTable, $write->RowLabel]);
 
         $this->post(route('app.setup.terminals.writes.reverse', ['branch' => self::BRANCH, 'write' => $write->WriteId]),
             ['key' => $key, 'Reason' => 'TEST-back to the old name'])->assertRedirect($show);
         $this->assertSame('TEST-Terminal', $this->db()->selectOne('SELECT Description FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo WHERE SMARTATMTerminalNoId = ?',
             [self::SITE_NO])->Description);
+    }
+
+    public function test_a_terminal_is_never_active_at_two_sites_and_the_confirmation_says_where_deposits_land(): void
+    {
+        $this->actingAs($this->person(['terminals.view', 'terminals.edit']));
+        $here = 'SMARTATM:'.self::SITE_NO;
+        $there = 'SMARTATM:'.self::OTHER_TERMINAL;
+        $site = $this->db()->selectOne('SELECT Name FROM agora.Branch WHERE BranchId = ?', [self::BRANCH])->Name;
+        $other = $this->db()->selectOne('SELECT Name FROM agora.Branch WHERE BranchId = ?', [self::OTHER_BRANCH])->Name;
+
+        // The warning, in plain words, on the flag's own confirmation line.
+        $this->get(route('app.setup.terminals.edit', ['branch' => self::BRANCH, 'key' => $here]))->assertOk()
+            ->assertSee('data-diff-field="IsActive"', false)
+            ->assertSee('data-diff-on="On (Smart ATM deposits under TEST99 are assigned to '.e($site).')"', false)
+            ->assertSee('data-diff-off="Off (Smart ATM deposits under TEST99 are left unassigned)"', false);
+        $this->get(route('app.setup.terminals.edit', ['branch' => self::OTHER_BRANCH, 'key' => $there]))->assertOk()
+            ->assertSee('Smart ATM deposits under TEST99 are assigned to '.e($other), false);
+
+        // A cash-device number has no flag to switch.
+        $this->assertSiteRefused('NO_FLAG', 'agora.usp_Masters_SaveTerminal', array_replace($this->siteProc('Terminal'),
+            ['Key' => 'CASHDEVICE:'.self::SITE_NO, 'IsActive' => 1, 'ExpectedIsActive' => 0]));
+
+        // On at the other site while it is active here: refused, naming this site.
+        $on = ['BranchId' => self::OTHER_BRANCH, 'Key' => $there, 'Description' => 'TEST-Terminal there', 'ExpectedDescription' => 'TEST-Terminal there',
+            'IsActive' => 1, 'ExpectedIsActive' => 0, 'Reason' => 'TEST-the safe moved there', 'UserId' => null, 'Authorized' => 1, 'WriteMode' => 'live'];
+        try {
+            app(ProcedureService::class)->write('agora.usp_Masters_SaveTerminal', $on);
+            $this->fail('A second active row under one number must be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('TERMINAL_ACTIVE_ELSEWHERE', $e->code());
+            $this->assertStringContainsString($site, $e->getMessage());
+        }
+        $this->assertFalse($this->otherActive());
+
+        // Off here, then on there: one active row throughout.
+        $this->put(route('app.setup.terminals.update', ['branch' => self::BRANCH]), ['key' => $here, 'Description' => 'TEST-Terminal',
+            'ExpectedDescription' => 'TEST-Terminal', 'IsActive' => 0, 'ExpectedIsActive' => 1, 'Reason' => 'TEST-the safe is leaving'])->assertSessionHasNoErrors();
+        $off = $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('Entity', 'Terminal')->where('RowKey', $here)->sole();
+        $this->assertSame(['IsActive', '1', '0'], [$off->Field, $off->PriorValue, $off->NewValue]);
+        app(ProcedureService::class)->write('agora.usp_Masters_SaveTerminal', $on);
+        $this->assertTrue($this->otherActive());
+
+        // Putting the switch-off back would make two active rows: refused.
+        $this->post(route('app.setup.terminals.writes.reverse', ['branch' => self::BRANCH, 'write' => $off->WriteId]),
+            ['key' => $here, 'Reason' => 'TEST-it never left'])->assertSessionHasErrors('refusal');
+        $this->assertFalse((bool) $this->db()->selectOne('SELECT IsActive FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo WHERE SMARTATMTerminalNoId = ?', [self::SITE_NO])->IsActive);
+
+        // Once the other site lets it go, it goes back.
+        $this->db()->statement('UPDATE [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo SET IsActive = 0 WHERE SMARTATMTerminalNoId = ?', [self::OTHER_TERMINAL]);
+        $this->post(route('app.setup.terminals.writes.reverse', ['branch' => self::BRANCH, 'write' => $off->WriteId]),
+            ['key' => $here, 'Reason' => 'TEST-it never left'])->assertSessionHasNoErrors();
+        $this->assertTrue((bool) $this->db()->selectOne('SELECT IsActive FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo WHERE SMARTATMTerminalNoId = ?', [self::SITE_NO])->IsActive);
+    }
+
+    private function otherActive(): bool
+    {
+        return (bool) $this->db()->selectOne('SELECT IsActive FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo WHERE SMARTATMTerminalNoId = ?', [self::OTHER_TERMINAL])->IsActive;
     }
 
     /**
@@ -510,7 +574,7 @@ class MasterWriteTest extends TestCase
             'Tank' => ['TankDescription' => 'TEST-Tank'],
             'Pump' => ['PumpOrder' => 7, 'IsActive' => 1],
             'UtilityMeter' => ['MeterDescription' => 'TEST-Meter'],
-            'Terminal' => ['Description' => 'TEST-Terminal'],
+            'Terminal' => ['Description' => 'TEST-Terminal', 'IsActive' => 1],
             default => throw new \InvalidArgumentException("No TEST row for {$entity}."),
         };
         $expected = [];
@@ -652,7 +716,8 @@ class MasterWriteTest extends TestCase
         $this->db()->statement('DELETE FROM [PumpIT].dbo.BRN_Tank WHERE SSBranchId = ? AND TankNo = ?', [self::BRANCH, self::FORECOURT]);
         $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('Entity', 'Terminal')->where('RowKey', 'SMARTATM:'.self::SITE_NO)->delete();
         $this->db()->statement('DELETE FROM [PumpIT].dbo.BRN_UtilityMeter WHERE UtilityMeterId = ?', [self::SITE_NO]);
-        $this->db()->statement('DELETE FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo WHERE SMARTATMTerminalNoId = ?', [self::SITE_NO]);
+        $this->db()->table('agora.MasterWrite')->where('BranchId', self::OTHER_BRANCH)->where('Entity', 'Terminal')->where('RowKey', 'SMARTATM:'.self::OTHER_TERMINAL)->delete();
+        $this->db()->statement('DELETE FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo WHERE SMARTATMTerminalNoId IN (?, ?)', [self::SITE_NO, self::OTHER_TERMINAL]);
         $this->db()->statement('DELETE FROM [PumpIT].dbo.BRN_TransactionType WHERE SSBranchId = ? AND TypeCode = ?', [self::BRANCH, self::TYPE]);
         foreach (['BRN_Expenses' => 'ExpenseNo', 'BRN_Tills' => 'TillNo', 'BRN_Shifts' => 'ShiftNo', 'BRN_FuelType' => 'FuelTypeNo'] as $table => $key) {
             $this->db()->statement("DELETE FROM [PumpIT].dbo.{$table} WHERE SSBranchId = ? AND {$key} = ?", [self::BRANCH, self::SITE_NO]);

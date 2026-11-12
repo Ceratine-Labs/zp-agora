@@ -85,7 +85,7 @@ class ReferenceMasterWriteController extends Controller
 
         foreach ($definition->editableFields() as $name => $field) {
             $shape = match ($field['type'] ?? 'text') {
-                'bool' => ['required', 'boolean'],
+                'bool' => [($field['optional'] ?? false) ? 'nullable' : 'required', 'boolean'],
                 'decimal' => ['required', 'numeric'],
                 default => ['nullable', 'string', 'max:'.(int) ($field['max'] ?? 100)],
             };

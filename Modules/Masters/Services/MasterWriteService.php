@@ -107,7 +107,8 @@ class MasterWriteService
     private function value(array $field, mixed $value): mixed
     {
         return match ($field['type'] ?? 'text') {
-            'bool' => (int) (bool) $value,
+            // An optional flag the form left out is not offered: NULL, not off.
+            'bool' => $value === null && ($field['optional'] ?? false) ? null : (int) (bool) $value,
             'decimal' => is_numeric($value) ? (string) $value : null,
             default => $value === null ? null : trim((string) $value),
         };

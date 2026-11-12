@@ -84,7 +84,9 @@ class TerminalGrid extends ReferenceMasterGrid
     {
         return [
             'Description' => ['label' => 'Description', 'type' => 'text', 'column' => 'Description', 'max' => 50,
-                'help' => 'The number itself, and whether it is active, decide where the bank\'s and the device supplier\'s settlements land, so neither is changed from here.'],
+                'help' => 'The number itself is what the bank\'s and the device supplier\'s settlements arrive under, so it is not changed from here.'],
+            'IsActive' => ['label' => 'Active', 'type' => 'bool', 'column' => 'IsActive', 'optional' => true,
+                'help' => 'Decides which site PumpIT assigns this number\'s deposits to. Refused while the number is active at another site.'],
         ];
     }
 
@@ -96,5 +98,36 @@ class TerminalGrid extends ReferenceMasterGrid
             'Cash device terminal' => 'dbo.SS_Branch_CASHDEVICE_TerminalNo',
             default => $this->legacySource(),
         };
+    }
+
+    /**
+     * A cash-device number has no active flag. On the others the flag's
+     * words in the confirmation say, in plain words, where the number's
+     * deposits land (Ryan, 12 Nov 2026): sp_Check_SMARTATM_TerminalNo assigns
+     * a file to a site only while exactly one active row carries its number.
+     */
+    public function fieldsFor(object $row): array
+    {
+        $fields = $this->editableFields();
+        if (($row->Kind ?? null) === 'Cash device terminal') {
+            unset($fields['IsActive']);
+
+            return $fields;
+        }
+
+        $what = ($row->Kind ?? null) === 'Smart ATM terminal' ? 'Smart ATM deposits' : 'settlements';
+        $number = trim((string) ($row->Number ?? ''));
+        $site = (string) ($row->BranchName ?? 'this site');
+        $elsewhere = trim((string) ($row->ActiveElsewhere ?? ''));
+
+        $fields['IsActive']['on'] = "On ({$what} under {$number} are assigned to {$site})";
+        $fields['IsActive']['off'] = $elsewhere === ''
+            ? "Off ({$what} under {$number} are left unassigned)"
+            : "Off ({$what} under {$number} go to {$elsewhere})";
+        $fields['IsActive']['help'] = "Switched on, PumpIT assigns {$what} under {$number} to {$site}. Switched off, they are left "
+            .($elsewhere === '' ? 'unassigned.' : "to {$elsewhere}, where it is also active.")
+            .' Refused while the number is active at another site.';
+
+        return $fields;
     }
 }

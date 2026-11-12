@@ -22,7 +22,10 @@
      UtilityMeter      [PumpIT].dbo.BRN_UtilityMeter Description
      Terminal          [PumpIT].dbo.SS_Branch_ABSA_MerchantNo,
                        SS_Branch_SMARTATM_TerminalNo or
-                       SS_Branch_CASHDEVICE_TerminalNo Description
+                       SS_Branch_CASHDEVICE_TerminalNo Description, and
+                       IsActive on the first two — refused
+                       (TERMINAL_ACTIVE_ELSEWHERE) where putting a number back
+                       on would leave two active rows under it
 
    A text column is put back exactly as it was stored, trailing spaces and
    all; a NULL prior goes back as NULL.
@@ -37,6 +40,8 @@
                        masters the caller may edit (masters.{resource}.edit)
      ALREADY_REVERSED  nothing of this press is still in force
      TRIGGER_ON        a PumpIT trigger is switched on for the table
+     TERMINAL_ACTIVE_ELSEWHERE  putting a merchant or terminal number back on
+                       while another active row carries it
      MOVED             PumpIT no longer holds what the press wrote — somebody
                        changed it since — so putting the prior back would undo
                        their change too. Nothing is written.
@@ -358,28 +363,65 @@ BEGIN
                    WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.' + @TeTable) AND t.is_disabled = 0)
             THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for this table, which would write beyond it. Nothing was put back.', 1;
 
-        DECLARE @TeFound BIT, @TeCur NVARCHAR(50);
+        DECLARE @TeFound BIT, @TeCur NVARCHAR(50), @TeNumber NVARCHAR(12), @TeActive BIT;
         IF @TeKind = N'ABSA'
-            SELECT @TeFound = 1, @TeCur = a.[Description] FROM [PumpIT].dbo.SS_Branch_ABSA_MerchantNo a WITH (UPDLOCK, HOLDLOCK)
+            SELECT @TeFound = 1, @TeCur = a.[Description], @TeNumber = a.ABSA_MerchantNo, @TeActive = a.IsActive
+            FROM [PumpIT].dbo.SS_Branch_ABSA_MerchantNo a WITH (UPDLOCK, HOLDLOCK)
             WHERE a.ABSAMerchantNoId = @TeId AND a.SSBranchId = @BranchId;
         ELSE IF @TeKind = N'SMARTATM'
-            SELECT @TeFound = 1, @TeCur = s.[Description] FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo s WITH (UPDLOCK, HOLDLOCK)
+            SELECT @TeFound = 1, @TeCur = s.[Description], @TeNumber = s.SMARTATM_TerminalNo, @TeActive = s.IsActive
+            FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo s WITH (UPDLOCK, HOLDLOCK)
             WHERE s.SMARTATMTerminalNoId = @TeId AND s.SSBranchId = @BranchId;
         ELSE
-            SELECT @TeFound = 1, @TeCur = c.[Description] FROM [PumpIT].dbo.SS_Branch_CASHDEVICE_TerminalNo c WITH (UPDLOCK, HOLDLOCK)
+            SELECT @TeFound = 1, @TeCur = c.[Description], @TeNumber = c.CASHDEVICE_TerminalNo
+            FROM [PumpIT].dbo.SS_Branch_CASHDEVICE_TerminalNo c WITH (UPDLOCK, HOLDLOCK)
             WHERE c.CASHDEVICETerminalNoId = @TeId AND c.SSBranchId = @BranchId;
 
-        IF @TeFound IS NULL OR EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'Description'
-                                       AND ISNULL(r.NewValue, N'') <> ISNULL(LTRIM(RTRIM(@TeCur)), N''))
-            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the description since. Nothing was put back.', 1;
+        IF @TeFound IS NULL OR EXISTS (
+            SELECT 1 FROM @Rows r
+            WHERE ISNULL(r.NewValue, N'') <> ISNULL(CASE r.Field
+                WHEN N'Description' THEN LTRIM(RTRIM(@TeCur))
+                WHEN N'IsActive'    THEN CONVERT(NVARCHAR(10), CONVERT(INT, @TeActive)) END, N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the number since. Nothing was put back.', 1;
 
+        DECLARE @TeHasDesc BIT = IIF(EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'Description'), 1, 0);
         DECLARE @TePrior NVARCHAR(50) = (SELECT CONVERT(NVARCHAR(50), r.PriorValue) FROM @Rows r WHERE r.Field = N'Description');
+        DECLARE @TePriorActive BIT = (SELECT CONVERT(BIT, r.PriorValue) FROM @Rows r WHERE r.Field = N'IsActive');
+
+        -- Putting a number back ON must not leave two active rows under it.
+        IF @TePriorActive = 1
+        BEGIN
+            DECLARE @TeElsewhere NVARCHAR(400);
+            IF @TeKind = N'ABSA'
+                SELECT @TeElsewhere = STRING_AGG(CONVERT(NVARCHAR(400), COALESCE(b.Name, CONCAT(N'branch ', o.SSBranchId))), N', ')
+                FROM [PumpIT].dbo.SS_Branch_ABSA_MerchantNo o WITH (UPDLOCK, HOLDLOCK)
+                LEFT JOIN agora.Branch b ON b.BranchId = o.SSBranchId
+                WHERE o.IsActive = 1 AND o.ABSAMerchantNoId <> @TeId AND LTRIM(RTRIM(o.ABSA_MerchantNo)) = LTRIM(RTRIM(@TeNumber));
+            ELSE
+                SELECT @TeElsewhere = STRING_AGG(CONVERT(NVARCHAR(400), COALESCE(b.Name, CONCAT(N'branch ', o.SSBranchId))), N', ')
+                FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo o WITH (UPDLOCK, HOLDLOCK)
+                LEFT JOIN agora.Branch b ON b.BranchId = o.SSBranchId
+                WHERE o.IsActive = 1 AND o.SMARTATMTerminalNoId <> @TeId AND LTRIM(RTRIM(o.SMARTATM_TerminalNo)) = LTRIM(RTRIM(@TeNumber));
+            IF @TeElsewhere IS NOT NULL
+            BEGIN
+                DECLARE @TeMsg NVARCHAR(2048) = CONCAT(N'AGORA:TERMINAL_ACTIVE_ELSEWHERE:', LTRIM(RTRIM(@TeNumber)),
+                    N' is now active at ', @TeElsewhere, N'. Putting this change back would leave two active rows under one number. Nothing was put back.');
+                THROW 51000, @TeMsg, 1;
+            END
+        END
+
         IF @TeKind = N'ABSA'
-            UPDATE [PumpIT].dbo.SS_Branch_ABSA_MerchantNo SET [Description] = @TePrior WHERE ABSAMerchantNoId = @TeId AND SSBranchId = @BranchId;
+            UPDATE [PumpIT].dbo.SS_Branch_ABSA_MerchantNo
+               SET [Description] = CASE WHEN @TeHasDesc = 1 THEN @TePrior ELSE [Description] END, IsActive = ISNULL(@TePriorActive, IsActive)
+             WHERE ABSAMerchantNoId = @TeId AND SSBranchId = @BranchId;
         ELSE IF @TeKind = N'SMARTATM'
-            UPDATE [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo SET [Description] = @TePrior WHERE SMARTATMTerminalNoId = @TeId AND SSBranchId = @BranchId;
+            UPDATE [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo
+               SET [Description] = CASE WHEN @TeHasDesc = 1 THEN @TePrior ELSE [Description] END, IsActive = ISNULL(@TePriorActive, IsActive)
+             WHERE SMARTATMTerminalNoId = @TeId AND SSBranchId = @BranchId;
         ELSE
-            UPDATE [PumpIT].dbo.SS_Branch_CASHDEVICE_TerminalNo SET [Description] = @TePrior WHERE CASHDEVICETerminalNoId = @TeId AND SSBranchId = @BranchId;
+            UPDATE [PumpIT].dbo.SS_Branch_CASHDEVICE_TerminalNo
+               SET [Description] = CASE WHEN @TeHasDesc = 1 THEN @TePrior ELSE [Description] END
+             WHERE CASHDEVICETerminalNoId = @TeId AND SSBranchId = @BranchId;
     END
     ELSE
         THROW 51000, 'AGORA:NOT_FOUND:This change is of a kind Agora cannot put back.', 1;

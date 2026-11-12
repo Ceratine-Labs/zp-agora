@@ -34,12 +34,12 @@
         <input type="hidden" name="key" value="{{ $row->RowKey }}">
         <x-card :title="$title" :sub="'Written to '.$table">
             <div class="field-row">
-                @foreach ($definition->editableFields() as $name => $field)
+                @foreach ($definition->fieldsFor($row) as $name => $field)
                     @php($current = $row->{$name} ?? null)
                     <input type="hidden" name="Expected{{ $name }}" value="{{ ($field['type'] ?? 'text') === 'bool' ? (int) $current : $current }}">
                     @if (($field['type'] ?? 'text') === 'bool')
                         <x-field :name="$name" type="bool" :label="$field['label']" :placeholder="$field['label']" :help="$field['help'] ?? null"
-                                 :data-diff-field="$field['column']" :data-diff-old="(int) $current" data-diff-on="Yes" data-diff-off="No"
+                                 :data-diff-field="$field['column']" :data-diff-old="(int) $current" :data-diff-on="$field['on'] ?? 'Yes'" :data-diff-off="$field['off'] ?? 'No'"
                                  :value="(bool) old($name, $current)" />
                     @else
                         <x-field :name="$name" :type="($field['type'] ?? 'text') === 'decimal' ? 'number' : 'text'" :label="$field['label']"

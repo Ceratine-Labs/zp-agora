@@ -29,6 +29,8 @@ return new class extends ProcedureMigration
             $this->path().'/usp_Masters_ReverseWrite.sql',
             // The category listing names its POS system (1 Aura … 10 Nights Bridge).
             $this->path().'/usp_Masters_GridCategoryGlCodes.sql',
+            // The terminal listing carries its active flag and where else the number is active.
+            $this->path().'/usp_Masters_GridTerminals.sql',
         ];
     }
 };

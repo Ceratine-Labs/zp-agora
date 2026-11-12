@@ -7,6 +7,9 @@
      Cash device terminal   SS_Branch_CASHDEVICE_TerminalNo  (10)
    unioned in agora.vw_MasterTerminal. The cash-device table records no
    active flag, so Active reads "Not recorded" there rather than claiming one.
+   IsActive is the flag itself (NULL for a cash device), and ActiveElsewhere
+   names the other sites where the same number of the same kind is active —
+   the edit's confirmation uses both to say where deposits will land.
 
    PER BRANCH. Refuses without @BranchIds (MASTERS_BRANCH). RowKey is
    TerminalKey ('ABSA:12', 'SMARTATM:3', 'CASHDEVICE:7'): the kind and that
@@ -14,7 +17,7 @@
 
    @Authorized is masters.terminals.view. The same filtered set drives the
    page, the total and the CSV extract. Read by
-   Modules/Masters/Grids/TerminalGrid. Deployed by v1__02pa. Reads
+   Modules/Masters/Grids/TerminalGrid. Deployed by v1__02pa, and again by v1__02pd. Reads
    agora.vw_MasterTerminal. */
 CREATE OR ALTER PROCEDURE agora.usp_Masters_GridTerminals
     @BranchIds NVARCHAR(MAX) = NULL,
@@ -67,11 +70,17 @@ BEGIN
            t.Kind,
            t.Number,
            t.[Description],
-           CASE WHEN t.IsActive IS NULL THEN N'Not recorded' WHEN t.IsActive = 1 THEN N'Yes' ELSE N'No' END AS Active
+           CASE WHEN t.IsActive IS NULL THEN N'Not recorded' WHEN t.IsActive = 1 THEN N'Yes' ELSE N'No' END AS Active,
+           t.IsActive,
+           e.Sites AS ActiveElsewhere
     INTO #Rows
     FROM agora.vw_MasterTerminal t
     JOIN @Visible v ON v.BranchId = t.BranchId
     LEFT JOIN agora.Branch b ON b.BranchId = t.BranchId
+    OUTER APPLY (SELECT STRING_AGG(CONVERT(NVARCHAR(400), COALESCE(ob.Name, CONCAT(N'branch ', o.BranchId))), N', ') AS Sites
+                 FROM agora.vw_MasterTerminal o
+                 LEFT JOIN agora.Branch ob ON ob.BranchId = o.BranchId
+                 WHERE o.Kind = t.Kind AND o.Number = t.Number AND o.TerminalKey <> t.TerminalKey AND o.IsActive = 1) e
     WHERE (@Key IS NULL OR t.TerminalKey = @Key)
       AND (@Search IS NULL OR t.Number LIKE '%' + @Search + '%' OR t.[Description] LIKE '%' + @Search + '%');
 
