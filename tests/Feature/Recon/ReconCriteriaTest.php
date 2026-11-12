@@ -38,6 +38,8 @@ class ReconCriteriaTest extends TestCase
     protected function tearDown(): void
     {
         ReconCriteria::query()->acrossBranches()->where('Reason', 'like', 'TEST-%')->delete();
+        DB::connection(config('agora.connections.app'))->table('agora.MasterChange')
+            ->where('Entity', 'ReconCriteria')->where('Reason', 'like', 'TEST-%')->delete();
 
         parent::tearDown();
     }

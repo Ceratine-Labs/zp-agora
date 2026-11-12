@@ -3,8 +3,9 @@
  *
  * Read by:  Setup -> Trading rules -> Stock recon master, the batch action on
  *           a ticked selection (T025).
- * Writes:   agora.StockItem — AND NOTHING ELSE, exactly as
- *           usp_Product_SaveStockItem does. PumpIT.dbo.STK_StockMaster is the
+ * Writes:   agora.StockItem and its agora.MasterChange rows, one per line
+ *           whose flag moved (T027), in one transaction — AND NOTHING ELSE,
+ *           exactly as usp_Product_SaveStockItem does. PumpIT.dbo.STK_StockMaster is the
  *           customer's table and is read-only to Agora for ever.
  * Reads:    agora.vw_StockItem (what is IN FORCE).
  *
@@ -134,6 +135,28 @@ BEGIN
         THROW 51000, 'AGORA:OVERRIDE_PARKED:Some of the selected lines have a parked Agora override. Restore or clear those one at a time first — a batch action will not put a parked row back in force.', 1;
 
     DECLARE @Now datetime2(0) = SYSDATETIME();
+    /* agora.MasterChange is UTC, like every other writer of it. */
+    DECLARE @NowUtc datetime2(0) = SYSUTCDATETIME();
+
+    /* One transaction for the overrides and their change log (T027): what
+       was in force for each line before, so the log can say what moved. */
+    BEGIN TRANSACTION;
+
+    SELECT t.BranchId, t.StockItemNo,
+           CONVERT(nvarchar(400), CASE @Flag WHEN 'IsActive'                 THEN v.IsActive
+                                        WHEN 'IsMonitoredItem'          THEN v.IsMonitoredItem
+                                        WHEN 'IsDoCloseQtyCalc'         THEN v.IsDoCloseQtyCalc
+                                        WHEN 'IsAllowNegativeQtyIssued' THEN v.IsAllowNegativeQtyIssued
+                                        WHEN 'IsAllowNegativeQtyClose'  THEN v.IsAllowNegativeQtyClose
+                                        WHEN 'IsStockItemPreProduction' THEN v.IsStockItemPreProduction
+                                        WHEN 'IsPreProductionItem'      THEN v.IsPreProductionItem END) AS PriorValue,
+           CONVERT(nvarchar(20), CASE WHEN o.Id IS NULL THEN N'None' WHEN o.IsParked = 1 THEN N'Parked' ELSE N'In force' END) AS PriorOverride
+    INTO #Before
+    FROM @Items t
+    JOIN [agora].[vw_StockItem] v
+      ON v.BranchId = t.BranchId AND v.StockItemNo = t.StockItemNo
+    LEFT JOIN [agora].[StockItem] o
+      ON o.BranchId = t.BranchId AND o.StockItemNo = t.StockItemNo;
 
     /* ---- lines Agora does not hold yet: write the override ------------- */
 
@@ -186,6 +209,34 @@ BEGIN
         ON t.BranchId = o.BranchId AND t.StockItemNo = o.StockItemNo;
 
     DECLARE @Updated int = @@ROWCOUNT;
+
+    /* ---- one agora.MasterChange row per line whose flag moved, and one
+       where the line became Agora's (Override None → In force) ----------- */
+
+    INSERT INTO [agora].[MasterChange] (BranchId, Entity, EntityId, Field, PriorValue, NewValue, Reason, Source, CreatedAt, CreatedBy)
+    SELECT o.BranchId, N'StockItem', o.Id, c.Field, c.PriorValue, c.NewValue, @Reason, N'edit', @NowUtc, @UserId
+    FROM #Before b
+    JOIN [agora].[StockItem] o
+      ON o.BranchId = b.BranchId AND o.StockItemNo = b.StockItemNo
+    JOIN [agora].[vw_StockItem] v
+      ON v.BranchId = b.BranchId AND v.StockItemNo = b.StockItemNo
+    CROSS APPLY (VALUES
+        (N'Override', b.PriorOverride,
+                      CONVERT(nvarchar(400), CASE WHEN o.IsParked = 1 THEN N'Parked' ELSE N'In force' END)),
+        (CONVERT(nvarchar(40), @Flag), b.PriorValue,
+                      CONVERT(nvarchar(400), CASE @Flag WHEN 'IsActive'                 THEN v.IsActive
+                                        WHEN 'IsMonitoredItem'          THEN v.IsMonitoredItem
+                                        WHEN 'IsDoCloseQtyCalc'         THEN v.IsDoCloseQtyCalc
+                                        WHEN 'IsAllowNegativeQtyIssued' THEN v.IsAllowNegativeQtyIssued
+                                        WHEN 'IsAllowNegativeQtyClose'  THEN v.IsAllowNegativeQtyClose
+                                        WHEN 'IsStockItemPreProduction' THEN v.IsStockItemPreProduction
+                                        WHEN 'IsPreProductionItem'      THEN v.IsPreProductionItem END))
+    ) c (Field, PriorValue, NewValue)
+    WHERE c.PriorValue COLLATE Latin1_General_BIN2 <> c.NewValue COLLATE Latin1_General_BIN2
+       OR (c.PriorValue IS NULL AND c.NewValue IS NOT NULL)
+       OR (c.PriorValue IS NOT NULL AND c.NewValue IS NULL);
+
+    COMMIT TRANSACTION;
 
     SELECT CONVERT(bit, 1) AS Ok,
            'FLAGGED' AS Code,

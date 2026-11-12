@@ -1,7 +1,9 @@
 /*
  * agora.usp_Recon_SaveCriteria — change, park or restore one extraction rule.
  *
- * Writes:  agora.ReconCriteria — and NOTHING ELSE. In particular it never
+ * Writes:  agora.ReconCriteria, and one agora.MasterChange row per position
+ *          the write moved (Entity 'ReconCriteria', T027) in the same
+ *          transaction — and NOTHING ELSE. In particular it never
  *          touches PumpIT.dbo.BRN_AutoReconCriteria, which is the customer's
  *          table and is read-only to Agora for ever. That is the whole reason
  *          this table exists (Ryan's decision, 8 September 2026).
@@ -65,7 +67,8 @@ BEGIN
     IF @ReconArea NOT IN ('ABSA', 'FNB', 'CashMachine', 'CashBags', 'SmartATM')
         THROW 51000, 'AGORA:UNKNOWN_AREA:That is not a reconciliation area.', 1;
 
-    /* UTC, the application's clock — see usp_Recon_Commit. */
+    /* UTC, the application's clock — see usp_Recon_Commit. agora.MasterChange
+       is stamped with the same instant. */
     DECLARE @Now datetime2(0) = SYSUTCDATETIME();
 
     /*
@@ -100,13 +103,63 @@ BEGIN
                 AND BankReconArea = @ReconArea AND ProcessOrder = @ProcessOrder))
     );
 
-    /* ---- park / unpark ---------------------------------------------------- */
+    /* ---- park / unpark: the override must exist -------------------------- */
+
+    IF @Action IN ('park', 'unpark') AND @Existing IS NULL
+        THROW 51000, 'AGORA:NOTHING_TO_PARK:There is no Agora override on that rule — what is in force is the customer''s own row, and Agora does not change that.', 1;
+
+    /* ---- save: the preview's own test, run early ------------------------- */
+
+    IF @Action NOT IN ('park', 'unpark')
+    BEGIN
+        IF @ProcessOrder IS NULL OR @ProcessOrder < 1
+            THROW 51000, 'AGORA:BAD_PROCESS_ORDER:Process order starts at 1 — it is the order the rules are tried in.', 1;
+
+        IF @BankStartPosition IS NULL OR @BankStartPosition < 1
+            THROW 51000, 'AGORA:BAD_START:The bank extraction has to start at character 1 or later.', 1;
+
+        /*
+         * The same reading every preview makes: BANK_EndPosition is a LENGTH in
+         * some areas and an END POSITION in others and the column does not say
+         * which (finding 9). Read as an end position where that is arithmetically
+         * possible, as a length otherwise — and refuse now what a preview would
+         * refuse later.
+         */
+        DECLARE @ResolvedLen int =
+            CASE WHEN @BankEndPosition >= @BankStartPosition
+                 THEN @BankEndPosition - @BankStartPosition + 1
+                 ELSE @BankEndPosition END;
+
+        IF @ResolvedLen IS NULL OR @ResolvedLen <= 0
+            THROW 51000, 'AGORA:BAD_LENGTH:That start and end resolve to a length of zero or less, and every preview refuses such a rule at run time. Read as an end position where one is possible, as a length otherwise.', 1;
+    END
+
+    /* ---- the write, and one agora.MasterChange row per position it moved -
+
+       Before and after are the rule IN FORCE, as agora.vw_AutoReconCriteria
+       resolves it: the active override, else the customer's rule it names.
+       So a new override's "before" is the customer's rule, and a park shows
+       the customer's positions coming back. The override's own state is one
+       more field, Override: None, In force or Parked (T027). One
+       transaction, so the change log and the rule cannot disagree. */
+
+    BEGIN TRANSACTION;
+
+    SELECT TOP 1 x.* INTO #Before FROM (
+        SELECT 1 AS Pri, r.BANK_StartPosition, r.BANK_EndPosition, r.BANK_StartPosition2, r.BANK_EndPosition2, r.MOPS_StartPosition, r.MOPS_EndPosition, r.FILTER_Value, r.FILTER_StartPosition, r.FILTER_EndPosition
+        FROM agora.ReconCriteria r WHERE r.BranchId = @BranchId AND r.Id = @Existing AND r.IsActive = 1
+        UNION ALL
+        SELECT 2, l.BANK_StartPosition, l.BANK_EndPosition, l.BANK_StartPosition2, l.BANK_EndPosition2, l.MOPS_StartPosition, l.MOPS_EndPosition, l.FILTER_Value, l.FILTER_StartPosition, l.FILTER_EndPosition
+        FROM agora.vw_LegacyReconCriteria l
+        WHERE @LegacyAutoReconId IS NOT NULL AND l.AutoReconId = @LegacyAutoReconId AND l.BranchId = @BranchId
+    ) x ORDER BY x.Pri;
+    DECLARE @OverrideBefore nvarchar(20) = ISNULL((
+        SELECT CASE WHEN IsActive = 1 THEN N'In force' ELSE N'Parked' END
+        FROM agora.ReconCriteria WHERE BranchId = @BranchId AND Id = @Existing), N'None');
+    DECLARE @Code varchar(20), @Message nvarchar(400);
 
     IF @Action IN ('park', 'unpark')
     BEGIN
-        IF @Existing IS NULL
-            THROW 51000, 'AGORA:NOTHING_TO_PARK:There is no Agora override on that rule — what is in force is the customer''s own row, and Agora does not change that.', 1;
-
         UPDATE agora.ReconCriteria
         SET IsActive = CASE WHEN @Action = 'park' THEN 0 ELSE 1 END,
             Reason = @Reason,
@@ -114,39 +167,12 @@ BEGIN
             UpdatedBy = @UserId
         WHERE Id = @Existing;
 
-        SELECT CONVERT(bit, 1) AS Ok,
-               CASE WHEN @Action = 'park' THEN 'PARKED' ELSE 'RESTORED' END AS Code,
-               CASE WHEN @Action = 'park'
-                    THEN 'The override is switched off. What is in force is the customer''s own rule, or nothing where they have none.'
-                    ELSE 'The override is switched back on.' END AS Message,
-               @Existing AS Id;
-        RETURN;
+        SELECT @Code = CASE WHEN @Action = 'park' THEN 'PARKED' ELSE 'RESTORED' END,
+               @Message = CASE WHEN @Action = 'park'
+                    THEN N'The override is switched off. What is in force is the customer''s own rule, or nothing where they have none.'
+                    ELSE N'The override is switched back on.' END;
     END
-
-    /* ---- save ------------------------------------------------------------- */
-
-    IF @ProcessOrder IS NULL OR @ProcessOrder < 1
-        THROW 51000, 'AGORA:BAD_PROCESS_ORDER:Process order starts at 1 — it is the order the rules are tried in.', 1;
-
-    IF @BankStartPosition IS NULL OR @BankStartPosition < 1
-        THROW 51000, 'AGORA:BAD_START:The bank extraction has to start at character 1 or later.', 1;
-
-    /*
-     * The same reading every preview makes: BANK_EndPosition is a LENGTH in
-     * some areas and an END POSITION in others and the column does not say
-     * which (finding 9). Read as an end position where that is arithmetically
-     * possible, as a length otherwise — and refuse now what a preview would
-     * refuse later.
-     */
-    DECLARE @ResolvedLen int =
-        CASE WHEN @BankEndPosition >= @BankStartPosition
-             THEN @BankEndPosition - @BankStartPosition + 1
-             ELSE @BankEndPosition END;
-
-    IF @ResolvedLen IS NULL OR @ResolvedLen <= 0
-        THROW 51000, 'AGORA:BAD_LENGTH:That start and end resolve to a length of zero or less, and every preview refuses such a rule at run time. Read as an end position where one is possible, as a length otherwise.', 1;
-
-    IF @Existing IS NULL
+    ELSE IF @Existing IS NULL
     BEGIN
         INSERT INTO agora.ReconCriteria
             (BranchId, BankReconArea, ProcessOrder, LegacyAutoReconId,
@@ -163,7 +189,7 @@ BEGIN
                   carries the id. Falling back to the triple is for a caller
                   that did not, and it is NOT unique: branch 23 has two FNB
                   rules both at ProcessOrder 1, so TOP 1 would pick one of them
-                  arbitrarily. Refused below rather than guessed. */
+                  arbitrarily. Refused above rather than guessed. */
                @LegacyAutoReconId,
                @BankStartPosition, @BankEndPosition, @BankStartPosition2, @BankEndPosition2,
                @MopsStartPosition, @MopsEndPosition,
@@ -172,30 +198,67 @@ BEGIN
 
         SET @Existing = SCOPE_IDENTITY();
 
-        SELECT CONVERT(bit, 1) AS Ok, 'CREATED' AS Code,
-               'The override is in force. Every preview and both drills resolve to it from now on.' AS Message,
-               @Existing AS Id;
-        RETURN;
+        SELECT @Code = 'CREATED',
+               @Message = N'The override is in force. Every preview and both drills resolve to it from now on.';
+    END
+    ELSE
+    BEGIN
+        UPDATE agora.ReconCriteria
+        SET BANK_StartPosition   = @BankStartPosition,
+            BANK_EndPosition     = @BankEndPosition,
+            BANK_StartPosition2  = @BankStartPosition2,
+            BANK_EndPosition2    = @BankEndPosition2,
+            MOPS_StartPosition   = @MopsStartPosition,
+            MOPS_EndPosition     = @MopsEndPosition,
+            FILTER_Value         = @FilterValue,
+            FILTER_StartPosition = @FilterStartPosition,
+            FILTER_EndPosition   = @FilterEndPosition,
+            IsActive             = 1,
+            Reason               = @Reason,
+            CopiedFromBranchId   = @CopiedFromBranchId,
+            UpdatedAt            = @Now,
+            UpdatedBy            = @UserId
+        WHERE Id = @Existing;
+
+        SELECT @Code = 'UPDATED',
+               @Message = N'The override is in force. Every preview and both drills resolve to it from now on.';
     END
 
-    UPDATE agora.ReconCriteria
-    SET BANK_StartPosition   = @BankStartPosition,
-        BANK_EndPosition     = @BankEndPosition,
-        BANK_StartPosition2  = @BankStartPosition2,
-        BANK_EndPosition2    = @BankEndPosition2,
-        MOPS_StartPosition   = @MopsStartPosition,
-        MOPS_EndPosition     = @MopsEndPosition,
-        FILTER_Value         = @FilterValue,
-        FILTER_StartPosition = @FilterStartPosition,
-        FILTER_EndPosition   = @FilterEndPosition,
-        IsActive             = 1,
-        Reason               = @Reason,
-        CopiedFromBranchId   = @CopiedFromBranchId,
-        UpdatedAt            = @Now,
-        UpdatedBy            = @UserId
-    WHERE Id = @Existing;
+    SELECT TOP 1 x.* INTO #After FROM (
+        SELECT 1 AS Pri, r.BANK_StartPosition, r.BANK_EndPosition, r.BANK_StartPosition2, r.BANK_EndPosition2, r.MOPS_StartPosition, r.MOPS_EndPosition, r.FILTER_Value, r.FILTER_StartPosition, r.FILTER_EndPosition
+        FROM agora.ReconCriteria r WHERE r.BranchId = @BranchId AND r.Id = @Existing AND r.IsActive = 1
+        UNION ALL
+        SELECT 2, l.BANK_StartPosition, l.BANK_EndPosition, l.BANK_StartPosition2, l.BANK_EndPosition2, l.MOPS_StartPosition, l.MOPS_EndPosition, l.FILTER_Value, l.FILTER_StartPosition, l.FILTER_EndPosition
+        FROM agora.vw_LegacyReconCriteria l
+        WHERE @LegacyAutoReconId IS NOT NULL AND l.AutoReconId = @LegacyAutoReconId AND l.BranchId = @BranchId
+    ) x ORDER BY x.Pri;
+    DECLARE @OverrideAfter nvarchar(20) = ISNULL((
+        SELECT CASE WHEN IsActive = 1 THEN N'In force' ELSE N'Parked' END
+        FROM agora.ReconCriteria WHERE BranchId = @BranchId AND Id = @Existing), N'None');
 
-    SELECT CONVERT(bit, 1) AS Ok, 'UPDATED' AS Code,
-           'The override is in force. Every preview and both drills resolve to it from now on.' AS Message,
-           @Existing AS Id;
+    /* Binary comparison, so a change of case in a filter value is a change. */
+    INSERT INTO agora.MasterChange (BranchId, Entity, EntityId, Field, PriorValue, NewValue, Reason, Source, CreatedAt, CreatedBy)
+    SELECT @BranchId, N'ReconCriteria', @Existing, c.Field, c.PriorValue, c.NewValue, @Reason, N'edit', @Now, @UserId
+    FROM (SELECT 1 AS One) one
+    LEFT JOIN #Before b ON 1 = 1
+    LEFT JOIN #After a ON 1 = 1
+    CROSS APPLY (VALUES
+        (N'Override', @OverrideBefore, @OverrideAfter),
+        (N'BANK_StartPosition', CONVERT(nvarchar(400), b.BANK_StartPosition), CONVERT(nvarchar(400), a.BANK_StartPosition)),
+        (N'BANK_EndPosition', CONVERT(nvarchar(400), b.BANK_EndPosition), CONVERT(nvarchar(400), a.BANK_EndPosition)),
+        (N'BANK_StartPosition2', CONVERT(nvarchar(400), b.BANK_StartPosition2), CONVERT(nvarchar(400), a.BANK_StartPosition2)),
+        (N'BANK_EndPosition2', CONVERT(nvarchar(400), b.BANK_EndPosition2), CONVERT(nvarchar(400), a.BANK_EndPosition2)),
+        (N'MOPS_StartPosition', CONVERT(nvarchar(400), b.MOPS_StartPosition), CONVERT(nvarchar(400), a.MOPS_StartPosition)),
+        (N'MOPS_EndPosition', CONVERT(nvarchar(400), b.MOPS_EndPosition), CONVERT(nvarchar(400), a.MOPS_EndPosition)),
+        (N'FILTER_Value', CONVERT(nvarchar(400), b.FILTER_Value), CONVERT(nvarchar(400), a.FILTER_Value)),
+        (N'FILTER_StartPosition', CONVERT(nvarchar(400), b.FILTER_StartPosition), CONVERT(nvarchar(400), a.FILTER_StartPosition)),
+        (N'FILTER_EndPosition', CONVERT(nvarchar(400), b.FILTER_EndPosition), CONVERT(nvarchar(400), a.FILTER_EndPosition))
+    ) c (Field, PriorValue, NewValue)
+    WHERE c.PriorValue COLLATE Latin1_General_BIN2 <> c.NewValue COLLATE Latin1_General_BIN2
+       OR (c.PriorValue IS NULL AND c.NewValue IS NOT NULL)
+       OR (c.PriorValue IS NOT NULL AND c.NewValue IS NULL);
+
+    COMMIT TRANSACTION;
+
+    SELECT CONVERT(bit, 1) AS Ok, @Code AS Code, @Message AS Message, @Existing AS Id;
 END

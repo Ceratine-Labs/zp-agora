@@ -287,6 +287,7 @@ class SaveStockItemTest extends TestCase
     private function cleanUp(): void
     {
         $this->db()->table('agora.StockItem')->where('BranchId', self::BRANCH)->delete();
+        $this->db()->table('agora.MasterChange')->where('BranchId', self::BRANCH)->where('Entity', 'StockItem')->delete();
         $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)->delete();
         $this->db()->table('PumpIT.dbo.STK_Area')->where('SSBranchId', self::BRANCH)->delete();
     }

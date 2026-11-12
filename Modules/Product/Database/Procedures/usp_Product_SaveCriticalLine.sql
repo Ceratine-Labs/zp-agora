@@ -2,7 +2,9 @@
  * agora.usp_Product_SaveCriticalLine — put a line on the critical list, take it
  * off, or restore the customer's answer.
  *
- * Writes:  agora.StockItemCritical — AND NOTHING ELSE. PumpIT's
+ * Writes:  agora.StockItemCritical, and one agora.MasterChange row per field
+ *          the write moved (Entity 'CriticalLine', T027) in the same
+ *          transaction — AND NOTHING ELSE. PumpIT's
  *          STK_StockMasterCritical is the customer's and is read-only to Agora.
  * Reads:   agora.vw_StockItemPos (to refuse a code the site does not sell),
  *          agora.Branch.
@@ -72,6 +74,8 @@ BEGIN
         THROW 51000, 'AGORA:REASON_REQUIRED:Say why. A change to the critical list with no reason is one nobody can explain later.', 1;
 
     DECLARE @Now datetime2(0) = SYSDATETIME();
+    /* agora.MasterChange is UTC, like every other writer of it. */
+    DECLARE @NowUtc datetime2(0) = SYSUTCDATETIME();
     DECLARE @Existing bigint = (
         SELECT Id FROM [agora].[StockItemCritical]
         WHERE BranchId = @BranchId AND PosSystem = @PosSystem AND PosCode = @PosCode
@@ -84,15 +88,6 @@ BEGIN
 
         IF EXISTS (SELECT 1 FROM [agora].[StockItemCritical] WHERE Id = @Existing AND BranchId = @BranchId AND IsParked = 1)
             THROW 51000, 'AGORA:NOTHING_TO_PARK:That override is already parked.', 1;
-
-        UPDATE [agora].[StockItemCritical]
-           SET IsParked = 1, Reason = @Reason, UpdatedAt = @Now, UpdatedBy = @UserId
-         WHERE BranchId = @BranchId AND Id = @Existing;
-
-        SELECT CONVERT(bit, 1) AS Ok, 'PARKED' AS Code,
-               'The override is switched off. This line reads from the customer''s critical list again.' AS Message,
-               @Existing AS Id;
-        RETURN;
     END
 
     IF @Action = 'unpark'
@@ -102,46 +97,67 @@ BEGIN
 
         IF NOT EXISTS (SELECT 1 FROM [agora].[StockItemCritical] WHERE Id = @Existing AND BranchId = @BranchId AND IsParked = 1)
             THROW 51000, 'AGORA:NOTHING_TO_UNPARK:That override is already in force.', 1;
-
-        UPDATE [agora].[StockItemCritical]
-           SET IsParked = 0, Reason = @Reason, UpdatedAt = @Now, UpdatedBy = @UserId
-         WHERE BranchId = @BranchId AND Id = @Existing;
-
-        SELECT CONVERT(bit, 1) AS Ok, 'UNPARKED' AS Code,
-               'The override is in force again.' AS Message,
-               @Existing AS Id;
-        RETURN;
     END
 
     IF @Action = 'remove'
         SET @IsActive = 0;
 
-    IF @Action NOT IN ('save', 'remove')
+    IF @Action NOT IN ('save', 'remove', 'park', 'unpark')
         THROW 51000, 'AGORA:BAD_ACTION:Action must be save, remove, park or unpark.', 1;
 
-    /*
-     * The code has to be one the site sells. Checked against the POS cost
-     * file and NOT against the stock master — see the header: a third of the
-     * live list has no stock master row and is perfectly legitimate.
-     */
-    IF NOT EXISTS (
-        SELECT 1 FROM [agora].[vw_StockItemPos] p
-        WHERE p.BranchId = @BranchId AND p.PosSystem = @PosSystem AND p.PosCode = @PosCode
-    )
-        THROW 51000, 'AGORA:UNKNOWN_POS_CODE:This site''s POS file has no such code on that POS system. A critical line for a code the till does not know is an alert that can never clear.', 1;
-
-    /* Where the caller left the description or category out, take the POS
-       file's rather than writing a NULL — an override replaces its legacy row
-       whole, so a NULL here would blank what the customer had. */
-    IF @Description IS NULL OR @Category IS NULL
+    IF @Action IN ('save', 'remove')
     BEGIN
-        SELECT @Description = ISNULL(@Description, LEFT(p.PosDescription, 50)),
-               @Category = ISNULL(@Category, LEFT(p.Category, 20))
-        FROM [agora].[vw_StockItemPos] p
-        WHERE p.BranchId = @BranchId AND p.PosSystem = @PosSystem AND p.PosCode = @PosCode;
+        /*
+         * The code has to be one the site sells. Checked against the POS cost
+         * file and NOT against the stock master — see the header: a third of the
+         * live list has no stock master row and is perfectly legitimate.
+         */
+        IF NOT EXISTS (
+            SELECT 1 FROM [agora].[vw_StockItemPos] p
+            WHERE p.BranchId = @BranchId AND p.PosSystem = @PosSystem AND p.PosCode = @PosCode
+        )
+            THROW 51000, 'AGORA:UNKNOWN_POS_CODE:This site''s POS file has no such code on that POS system. A critical line for a code the till does not know is an alert that can never clear.', 1;
+
+        /* Where the caller left the description or category out, take the POS
+           file's rather than writing a NULL — an override replaces its legacy row
+           whole, so a NULL here would blank what the customer had. */
+        IF @Description IS NULL OR @Category IS NULL
+        BEGIN
+            SELECT @Description = ISNULL(@Description, LEFT(p.PosDescription, 50)),
+                   @Category = ISNULL(@Category, LEFT(p.Category, 20))
+            FROM [agora].[vw_StockItemPos] p
+            WHERE p.BranchId = @BranchId AND p.PosSystem = @PosSystem AND p.PosCode = @PosCode;
+        END
     END
 
-    IF @Existing IS NULL
+    /* ---- the write, and one agora.MasterChange row per field it moved ---
+
+       Before and after are read from agora.vw_StockItemCritical, what is IN
+       FORCE, so a new override's "before" is the customer's own row and a park
+       shows the customer's answer coming back. The override's own state is one
+       more field, Override: None, In force or Parked (T027). */
+
+    BEGIN TRANSACTION;
+
+    SELECT v.* INTO #Before FROM [agora].[vw_StockItemCritical] v
+    WHERE v.BranchId = @BranchId AND v.PosSystem = @PosSystem AND v.PosCode = @PosCode;
+    DECLARE @OverrideBefore nvarchar(20) = ISNULL((
+        SELECT CASE WHEN IsParked = 1 THEN N'Parked' ELSE N'In force' END
+        FROM [agora].[StockItemCritical] WHERE BranchId = @BranchId AND Id = @Existing), N'None');
+    DECLARE @Code varchar(20), @Message nvarchar(400);
+
+    IF @Action IN ('park', 'unpark')
+    BEGIN
+        UPDATE [agora].[StockItemCritical]
+           SET IsParked = CASE WHEN @Action = 'park' THEN 1 ELSE 0 END, Reason = @Reason, UpdatedAt = @Now, UpdatedBy = @UserId
+         WHERE BranchId = @BranchId AND Id = @Existing;
+
+        SELECT @Code = CASE WHEN @Action = 'park' THEN 'PARKED' ELSE 'UNPARKED' END,
+               @Message = CASE WHEN @Action = 'park'
+                    THEN N'The override is switched off. This line reads from the customer''s critical list again.'
+                    ELSE N'The override is in force again.' END;
+    END
+    ELSE IF @Existing IS NULL
     BEGIN
         INSERT INTO [agora].[StockItemCritical]
             (BranchId, PosSystem, PosCode, Description, Category, IsActive, IsParked, Reason,
@@ -152,33 +168,54 @@ BEGIN
 
         SET @Existing = SCOPE_IDENTITY();
 
-        SELECT CONVERT(bit, 1) AS Ok,
-               CASE WHEN @Action = 'remove' THEN 'REMOVED' ELSE 'CREATED' END AS Code,
-               CASE WHEN @Action = 'remove'
-                    THEN 'The line is off the critical list. It stays in the customer''s own list and can be put back.'
-                    ELSE 'The override is in force. This line is on the critical list from now on.'
-               END AS Message,
-               @Existing AS Id;
-        RETURN;
+        SELECT @Code = CASE WHEN @Action = 'remove' THEN 'REMOVED' ELSE 'CREATED' END,
+               @Message = CASE WHEN @Action = 'remove'
+                    THEN N'The line is off the critical list. It stays in the customer''s own list and can be put back.'
+                    ELSE N'The override is in force. This line is on the critical list from now on.' END;
+    END
+    ELSE
+    BEGIN
+        UPDATE [agora].[StockItemCritical]
+           SET Description = @Description,
+               Category    = @Category,
+               IsActive    = @IsActive,
+               /* A save on a parked override brings it back — editing something
+                  and having it stay invisible is not an outcome anyone means. */
+               IsParked    = 0,
+               Reason      = @Reason,
+               UpdatedAt   = @Now,
+               UpdatedBy   = @UserId
+         WHERE BranchId = @BranchId AND Id = @Existing;
+
+        SELECT @Code = CASE WHEN @Action = 'remove' THEN 'REMOVED' ELSE 'UPDATED' END,
+               @Message = CASE WHEN @Action = 'remove'
+                    THEN N'The line is off the critical list. It stays in the customer''s own list and can be put back.'
+                    ELSE N'The override is in force.' END;
     END
 
-    UPDATE [agora].[StockItemCritical]
-       SET Description = @Description,
-           Category    = @Category,
-           IsActive    = @IsActive,
-           /* A save on a parked override brings it back — editing something
-              and having it stay invisible is not an outcome anyone means. */
-           IsParked    = 0,
-           Reason      = @Reason,
-           UpdatedAt   = @Now,
-           UpdatedBy   = @UserId
-     WHERE BranchId = @BranchId AND Id = @Existing;
+    SELECT v.* INTO #After FROM [agora].[vw_StockItemCritical] v
+    WHERE v.BranchId = @BranchId AND v.PosSystem = @PosSystem AND v.PosCode = @PosCode;
+    DECLARE @OverrideAfter nvarchar(20) = ISNULL((
+        SELECT CASE WHEN IsParked = 1 THEN N'Parked' ELSE N'In force' END
+        FROM [agora].[StockItemCritical] WHERE BranchId = @BranchId AND Id = @Existing), N'None');
 
-    SELECT CONVERT(bit, 1) AS Ok,
-           CASE WHEN @Action = 'remove' THEN 'REMOVED' ELSE 'UPDATED' END AS Code,
-           CASE WHEN @Action = 'remove'
-                THEN 'The line is off the critical list. It stays in the customer''s own list and can be put back.'
-                ELSE 'The override is in force.'
-           END AS Message,
-           @Existing AS Id;
+    /* Binary comparison, so a change of case in a description is a change. */
+    INSERT INTO [agora].[MasterChange] (BranchId, Entity, EntityId, Field, PriorValue, NewValue, Reason, Source, CreatedAt, CreatedBy)
+    SELECT @BranchId, N'CriticalLine', @Existing, c.Field, c.PriorValue, c.NewValue, @Reason, N'edit', @NowUtc, @UserId
+    FROM (SELECT 1 AS One) one
+    LEFT JOIN #Before b ON 1 = 1
+    LEFT JOIN #After a ON 1 = 1
+    CROSS APPLY (VALUES
+        (N'Override',    @OverrideBefore, @OverrideAfter),
+        (N'Description', CONVERT(nvarchar(400), b.Description), CONVERT(nvarchar(400), a.Description)),
+        (N'Category',    CONVERT(nvarchar(400), b.Category),    CONVERT(nvarchar(400), a.Category)),
+        (N'IsActive',    CONVERT(nvarchar(400), b.IsActive),    CONVERT(nvarchar(400), a.IsActive))
+    ) c (Field, PriorValue, NewValue)
+    WHERE c.PriorValue COLLATE Latin1_General_BIN2 <> c.NewValue COLLATE Latin1_General_BIN2
+       OR (c.PriorValue IS NULL AND c.NewValue IS NOT NULL)
+       OR (c.PriorValue IS NOT NULL AND c.NewValue IS NULL);
+
+    COMMIT TRANSACTION;
+
+    SELECT CONVERT(bit, 1) AS Ok, @Code AS Code, @Message AS Message, @Existing AS Id;
 END

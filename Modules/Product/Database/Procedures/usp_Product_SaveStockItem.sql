@@ -1,7 +1,9 @@
 /* ============================================================================
  * agora.usp_Product_SaveStockItem — change, add, park or restore one stock line.
  *
- * Writes:  agora.StockItem — AND NOTHING ELSE. In particular it never touches
+ * Writes:  agora.StockItem, and one agora.MasterChange row per field the write
+ *          moved (Entity 'StockItem', EntityId = agora.StockItem.Id) in the same
+ *          transaction (T027) — AND NOTHING ELSE. In particular it never touches
  *          PumpIT.dbo.STK_StockMaster, which is the customer's table and is
  *          read-only to Agora for ever. That is the whole reason agora.StockItem
  *          exists (Ryan's decision, 20 September 2026).
@@ -127,6 +129,9 @@ BEGIN
         THROW 51000, 'AGORA:REASON_REQUIRED:Say why. An override with no reason is a change nobody can explain later.', 1;
 
     DECLARE @Now datetime2(0) = SYSDATETIME();
+    /* agora.MasterChange is UTC, like every other writer of it (the
+       Master data changes grid moves it to SAST). */
+    DECLARE @NowUtc datetime2(0) = SYSUTCDATETIME();
     DECLARE @Existing bigint = (
         SELECT Id FROM [agora].[StockItem]
         WHERE BranchId = @BranchId AND StockItemNo = @StockItemNo
@@ -142,14 +147,6 @@ BEGIN
         IF EXISTS (SELECT 1 FROM [agora].[StockItem] WHERE Id = @Existing AND BranchId = @BranchId AND IsParked = 1)
             THROW 51000, 'AGORA:NOTHING_TO_PARK:That override is already parked.', 1;
 
-        UPDATE [agora].[StockItem]
-           SET IsParked = 1, Reason = @Reason, UpdatedAt = @Now, UpdatedBy = @UserId
-         WHERE BranchId = @BranchId AND Id = @Existing;
-
-        SELECT CONVERT(bit, 1) AS Ok, 'PARKED' AS Code,
-               'The override is switched off. This line reads from the customer''s master again, and the row stays here with the reason.' AS Message,
-               @Existing AS Id;
-        RETURN;
     END
 
     IF @Action = 'unpark'
@@ -175,14 +172,6 @@ BEGIN
         )
             THROW 51000, 'AGORA:POS_CODE_TAKEN:Another live line at this site already uses that POS code on that POS system. Restoring this override would put two lines on one till code.', 1;
 
-        UPDATE [agora].[StockItem]
-           SET IsParked = 0, Reason = @Reason, UpdatedAt = @Now, UpdatedBy = @UserId
-         WHERE BranchId = @BranchId AND Id = @Existing;
-
-        SELECT CONVERT(bit, 1) AS Ok, 'UNPARKED' AS Code,
-               'The override is in force again.' AS Message,
-               @Existing AS Id;
-        RETURN;
     END
 
     /* ---- retire: save, with the one column PumpIT has nowhere to put ---- */
@@ -252,40 +241,77 @@ BEGIN
 
     /* ---- save (and retire, which has just filled itself in) ------------ */
 
-    IF @Action NOT IN ('save', 'retire')
+    IF @Action NOT IN ('save', 'retire', 'park', 'unpark')
         THROW 51000, 'AGORA:BAD_ACTION:Action must be save, retire, park or unpark.', 1;
 
-    IF @StockItemDescription IS NULL
-        THROW 51000, 'AGORA:DESCRIPTION_REQUIRED:A stock line needs a description — it is what the counter reads on the sheet.', 1;
+    IF @Action IN ('save', 'retire')
+    BEGIN
+        IF @StockItemDescription IS NULL
+            THROW 51000, 'AGORA:DESCRIPTION_REQUIRED:A stock line needs a description — it is what the counter reads on the sheet.', 1;
 
-    IF @UOMCode IS NULL
-        THROW 51000, 'AGORA:UOM_REQUIRED:A unit of measure is required.', 1;
+        IF @UOMCode IS NULL
+            THROW 51000, 'AGORA:UOM_REQUIRED:A unit of measure is required.', 1;
 
-    IF @PriceType IS NULL OR @PriceType NOT IN ('Selling Price', 'Set Price', 'Factor')
-        THROW 51000, 'AGORA:BAD_PRICE_TYPE:Price type must be Selling Price, Set Price or Factor.', 1;
+        IF @PriceType IS NULL OR @PriceType NOT IN ('Selling Price', 'Set Price', 'Factor')
+            THROW 51000, 'AGORA:BAD_PRICE_TYPE:Price type must be Selling Price, Set Price or Factor.', 1;
 
-    IF @PosSystem IS NULL OR @PosSystem NOT IN ('ARCH', 'WINBRANCH', 'AURA', 'NAMOS', 'PILOT', 'ARCHLIQ')
-        THROW 51000, 'AGORA:BAD_POS_SYSTEM:POS system must be one of ARCH, WINBRANCH, AURA, NAMOS, PILOT or ARCHLIQ.', 1;
+        IF @PosSystem IS NULL OR @PosSystem NOT IN ('ARCH', 'WINBRANCH', 'AURA', 'NAMOS', 'PILOT', 'ARCHLIQ')
+            THROW 51000, 'AGORA:BAD_POS_SYSTEM:POS system must be one of ARCH, WINBRANCH, AURA, NAMOS, PILOT or ARCHLIQ.', 1;
 
-    /* The area is per branch — AreaNo 1 is a different shelf at every site —
-       so it is checked against THIS branch's areas and not against a list. */
-    IF @AreaNo IS NULL OR NOT EXISTS (
-        SELECT 1 FROM [agora].[vw_StockArea] a WHERE a.BranchId = @BranchId AND a.AreaNo = @AreaNo
-    )
-        THROW 51000, 'AGORA:NO_SUCH_AREA:That counting area does not exist at this site. Areas are numbered per site.', 1;
+        /* The area is per branch — AreaNo 1 is a different shelf at every site —
+           so it is checked against THIS branch's areas and not against a list. */
+        IF @AreaNo IS NULL OR NOT EXISTS (
+            SELECT 1 FROM [agora].[vw_StockArea] a WHERE a.BranchId = @BranchId AND a.AreaNo = @AreaNo
+        )
+            THROW 51000, 'AGORA:NO_SUCH_AREA:That counting area does not exist at this site. Areas are numbered per site.', 1;
 
-    /* The POS code rule — see the header. Checked against what is IN FORCE,
-       excluding this line itself. */
-    IF @POSCode IS NOT NULL AND EXISTS (
-        SELECT 1 FROM [agora].[vw_StockItem] v
-        WHERE v.BranchId = @BranchId
-          AND v.PosSystem = @PosSystem
-          AND v.POSCode = @POSCode
-          AND v.StockItemNo <> @StockItemNo
-    )
-        THROW 51000, 'AGORA:POS_CODE_TAKEN:Another line at this site already uses that POS code on that POS system.', 1;
+        /* The POS code rule — see the header. Checked against what is IN FORCE,
+           excluding this line itself. */
+        IF @POSCode IS NOT NULL AND EXISTS (
+            SELECT 1 FROM [agora].[vw_StockItem] v
+            WHERE v.BranchId = @BranchId
+              AND v.PosSystem = @PosSystem
+              AND v.POSCode = @POSCode
+              AND v.StockItemNo <> @StockItemNo
+        )
+            THROW 51000, 'AGORA:POS_CODE_TAKEN:Another line at this site already uses that POS code on that POS system.', 1;
+    END
 
-    IF @Existing IS NULL
+    /* ---- the write, and one agora.MasterChange row per field it moved ---
+
+       Before and after are read from agora.vw_StockItem, what is IN FORCE:
+       a new override's "before" is the customer's own row, and parking one
+       puts the customer's values back, so both show as the change they are at
+       the counter. The override's own state is one more field, Override:
+       None, In force or Parked. Same transaction, so the change log and the
+       row cannot disagree. */
+
+    BEGIN TRANSACTION;
+
+    SELECT v.* INTO #Before FROM [agora].[vw_StockItem] v WHERE v.BranchId = @BranchId AND v.StockItemNo = @StockItemNo;
+    DECLARE @OverrideBefore nvarchar(20) = ISNULL((
+        SELECT CASE WHEN IsParked = 1 THEN N'Parked' ELSE N'In force' END
+        FROM [agora].[StockItem] WHERE BranchId = @BranchId AND StockItemNo = @StockItemNo), N'None');
+    DECLARE @Code varchar(20), @Message nvarchar(400);
+
+    IF @Action = 'park'
+    BEGIN
+        UPDATE [agora].[StockItem]
+           SET IsParked = 1, Reason = @Reason, UpdatedAt = @Now, UpdatedBy = @UserId
+         WHERE BranchId = @BranchId AND Id = @Existing;
+
+        SELECT @Code = 'PARKED',
+               @Message = N'The override is switched off. This line reads from the customer''s master again, and the row stays here with the reason.';
+    END
+    ELSE IF @Action = 'unpark'
+    BEGIN
+        UPDATE [agora].[StockItem]
+           SET IsParked = 0, Reason = @Reason, UpdatedAt = @Now, UpdatedBy = @UserId
+         WHERE BranchId = @BranchId AND Id = @Existing;
+
+        SELECT @Code = 'UNPARKED', @Message = N'The override is in force again.';
+    END
+    ELSE IF @Existing IS NULL
     BEGIN
         INSERT INTO [agora].[StockItem]
             (BranchId, StockItemNo, StockItemDescription, AreaNo, [Location], POSCode,
@@ -304,51 +330,91 @@ BEGIN
 
         SET @Existing = SCOPE_IDENTITY();
 
-        SELECT CONVERT(bit, 1) AS Ok,
-               CASE WHEN @Action = 'retire' THEN 'RETIRED' ELSE 'CREATED' END AS Code,
-               CASE WHEN @Action = 'retire'
-                    THEN 'The line is retired in Agora. It stays in the customer''s estate and in every count that references it.'
-                    ELSE 'The override is in force. This screen and every read of the stock master resolve to it from now on.'
-               END AS Message,
-               @Existing AS Id;
-        RETURN;
+        SELECT @Code = CASE WHEN @Action = 'retire' THEN 'RETIRED' ELSE 'CREATED' END,
+               @Message = CASE WHEN @Action = 'retire'
+                    THEN N'The line is retired in Agora. It stays in the customer''s estate and in every count that references it.'
+                    ELSE N'The override is in force. This screen and every read of the stock master resolve to it from now on.'
+               END;
+    END
+    ELSE
+    BEGIN
+        UPDATE [agora].[StockItem]
+           SET StockItemDescription     = @StockItemDescription,
+               AreaNo                   = @AreaNo,
+               [Location]               = @PosSystem,
+               POSCode                  = @POSCode,
+               SellingPrice             = @SellingPrice,
+               PriceType                = @PriceType,
+               Factor                   = @Factor,
+               UOMCode                  = @UOMCode,
+               IssueMultiple            = @IssueMultiple,
+               IssueMultiplePercentage  = @IssueMultiplePercentage,
+               QtyVarAllowance          = @QtyVarAllowance,
+               IsMonitoredItem          = @IsMonitoredItem,
+               IsDoCloseQtyCalc         = @IsDoCloseQtyCalc,
+               IsAllowNegativeQtyIssued = @IsAllowNegativeQtyIssued,
+               IsAllowNegativeQtyClose  = @IsAllowNegativeQtyClose,
+               IsStockItemPreProduction = @IsStockItemPreProduction,
+               IsPreProductionItem      = @IsPreProductionItem,
+               PreProductionTypeNo      = @PreProductionTypeNo,
+               Ratio                    = @Ratio,
+               ProduceLimitPercentage   = @ProduceLimitPercentage,
+               IsActive                 = @IsActive,
+               /* A save on a parked override brings it back — editing something
+                  and having it stay invisible is not an outcome anyone means. */
+               IsParked                 = 0,
+               Reason                   = @Reason,
+               UpdatedAt                = @Now,
+               UpdatedBy                = @UserId
+         WHERE BranchId = @BranchId AND Id = @Existing;
+
+        SELECT @Code = CASE WHEN @Action = 'retire' THEN 'RETIRED' ELSE 'UPDATED' END,
+               @Message = CASE WHEN @Action = 'retire'
+                    THEN N'The line is retired in Agora. It stays in the customer''s estate and in every count that references it.'
+                    ELSE N'The override is in force. This screen and every read of the stock master resolve to it from now on.'
+               END;
     END
 
-    UPDATE [agora].[StockItem]
-       SET StockItemDescription     = @StockItemDescription,
-           AreaNo                   = @AreaNo,
-           [Location]               = @PosSystem,
-           POSCode                  = @POSCode,
-           SellingPrice             = @SellingPrice,
-           PriceType                = @PriceType,
-           Factor                   = @Factor,
-           UOMCode                  = @UOMCode,
-           IssueMultiple            = @IssueMultiple,
-           IssueMultiplePercentage  = @IssueMultiplePercentage,
-           QtyVarAllowance          = @QtyVarAllowance,
-           IsMonitoredItem          = @IsMonitoredItem,
-           IsDoCloseQtyCalc         = @IsDoCloseQtyCalc,
-           IsAllowNegativeQtyIssued = @IsAllowNegativeQtyIssued,
-           IsAllowNegativeQtyClose  = @IsAllowNegativeQtyClose,
-           IsStockItemPreProduction = @IsStockItemPreProduction,
-           IsPreProductionItem      = @IsPreProductionItem,
-           PreProductionTypeNo      = @PreProductionTypeNo,
-           Ratio                    = @Ratio,
-           ProduceLimitPercentage   = @ProduceLimitPercentage,
-           IsActive                 = @IsActive,
-           /* A save on a parked override brings it back — editing something
-              and having it stay invisible is not an outcome anyone means. */
-           IsParked                 = 0,
-           Reason                   = @Reason,
-           UpdatedAt                = @Now,
-           UpdatedBy                = @UserId
-     WHERE BranchId = @BranchId AND Id = @Existing;
+    SELECT v.* INTO #After FROM [agora].[vw_StockItem] v WHERE v.BranchId = @BranchId AND v.StockItemNo = @StockItemNo;
+    DECLARE @OverrideAfter nvarchar(20) = ISNULL((
+        SELECT CASE WHEN IsParked = 1 THEN N'Parked' ELSE N'In force' END
+        FROM [agora].[StockItem] WHERE BranchId = @BranchId AND StockItemNo = @StockItemNo), N'None');
 
-    SELECT CONVERT(bit, 1) AS Ok,
-           CASE WHEN @Action = 'retire' THEN 'RETIRED' ELSE 'UPDATED' END AS Code,
-           CASE WHEN @Action = 'retire'
-                THEN 'The line is retired in Agora. It stays in the customer''s estate and in every count that references it.'
-                ELSE 'The override is in force. This screen and every read of the stock master resolve to it from now on.'
-           END AS Message,
-           @Existing AS Id;
+    /* Binary comparison, so a change of case in a description is a change. */
+    INSERT INTO [agora].[MasterChange] (BranchId, Entity, EntityId, Field, PriorValue, NewValue, Reason, Source, CreatedAt, CreatedBy)
+    SELECT @BranchId, N'StockItem', @Existing, c.Field, c.PriorValue, c.NewValue, @Reason, N'edit', @NowUtc, @UserId
+    FROM (SELECT 1 AS One) one
+    LEFT JOIN #Before b ON 1 = 1
+    LEFT JOIN #After a ON 1 = 1
+    CROSS APPLY (VALUES
+        (N'Override',                 @OverrideBefore, @OverrideAfter),
+        (N'StockItemDescription',     CONVERT(nvarchar(400), b.StockItemDescription),     CONVERT(nvarchar(400), a.StockItemDescription)),
+        (N'AreaNo',                   CONVERT(nvarchar(400), b.AreaNo),                   CONVERT(nvarchar(400), a.AreaNo)),
+        (N'PosSystem',                CONVERT(nvarchar(400), b.PosSystem),                CONVERT(nvarchar(400), a.PosSystem)),
+        (N'POSCode',                  CONVERT(nvarchar(400), b.POSCode),                  CONVERT(nvarchar(400), a.POSCode)),
+        (N'SellingPrice',             CONVERT(nvarchar(400), b.SellingPrice),             CONVERT(nvarchar(400), a.SellingPrice)),
+        (N'PriceType',                CONVERT(nvarchar(400), b.PriceType),                CONVERT(nvarchar(400), a.PriceType)),
+        (N'Factor',                   CONVERT(nvarchar(400), b.Factor),                   CONVERT(nvarchar(400), a.Factor)),
+        (N'UOMCode',                  CONVERT(nvarchar(400), b.UOMCode),                  CONVERT(nvarchar(400), a.UOMCode)),
+        (N'IssueMultiple',            CONVERT(nvarchar(400), b.IssueMultiple),            CONVERT(nvarchar(400), a.IssueMultiple)),
+        (N'IssueMultiplePercentage',  CONVERT(nvarchar(400), b.IssueMultiplePercentage),  CONVERT(nvarchar(400), a.IssueMultiplePercentage)),
+        (N'QtyVarAllowance',          CONVERT(nvarchar(400), b.QtyVarAllowance),          CONVERT(nvarchar(400), a.QtyVarAllowance)),
+        (N'IsMonitoredItem',          CONVERT(nvarchar(400), b.IsMonitoredItem),          CONVERT(nvarchar(400), a.IsMonitoredItem)),
+        (N'IsDoCloseQtyCalc',         CONVERT(nvarchar(400), b.IsDoCloseQtyCalc),         CONVERT(nvarchar(400), a.IsDoCloseQtyCalc)),
+        (N'IsAllowNegativeQtyIssued', CONVERT(nvarchar(400), b.IsAllowNegativeQtyIssued), CONVERT(nvarchar(400), a.IsAllowNegativeQtyIssued)),
+        (N'IsAllowNegativeQtyClose',  CONVERT(nvarchar(400), b.IsAllowNegativeQtyClose),  CONVERT(nvarchar(400), a.IsAllowNegativeQtyClose)),
+        (N'IsStockItemPreProduction', CONVERT(nvarchar(400), b.IsStockItemPreProduction), CONVERT(nvarchar(400), a.IsStockItemPreProduction)),
+        (N'IsPreProductionItem',      CONVERT(nvarchar(400), b.IsPreProductionItem),      CONVERT(nvarchar(400), a.IsPreProductionItem)),
+        (N'PreProductionTypeNo',      CONVERT(nvarchar(400), b.PreProductionTypeNo),      CONVERT(nvarchar(400), a.PreProductionTypeNo)),
+        (N'Ratio',                    CONVERT(nvarchar(400), b.Ratio),                    CONVERT(nvarchar(400), a.Ratio)),
+        (N'ProduceLimitPercentage',   CONVERT(nvarchar(400), b.ProduceLimitPercentage),   CONVERT(nvarchar(400), a.ProduceLimitPercentage)),
+        (N'IsActive',                 CONVERT(nvarchar(400), b.IsActive),                 CONVERT(nvarchar(400), a.IsActive))
+    ) c (Field, PriorValue, NewValue)
+    WHERE c.PriorValue COLLATE Latin1_General_BIN2 <> c.NewValue COLLATE Latin1_General_BIN2
+       OR (c.PriorValue IS NULL AND c.NewValue IS NOT NULL)
+       OR (c.PriorValue IS NOT NULL AND c.NewValue IS NULL);
+
+    COMMIT TRANSACTION;
+
+    SELECT CONVERT(bit, 1) AS Ok, @Code AS Code, @Message AS Message, @Existing AS Id;
 END

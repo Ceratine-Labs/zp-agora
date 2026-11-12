@@ -19,13 +19,17 @@ use Tests\TestCase;
  * The acceptance: changing a category's MinGP through
  * usp_Masters_SaveCategoryBand shows in the Master data changes grid with
  * before/after, the user and the reason. Also an Agora-only change (a site's
- * own setting value, agora.MasterChange), a site master's label (Reports
- * v1__22q), the branch scope, the refusal, the screens and the menu.
+ * own setting value, agora.MasterChange), the overrides Agora holds over
+ * PumpIT's rows (stock lines, a batch flag, critical lines, bank recon rules),
+ * a site master's label (Reports v1__22q), the branch scope, the refusal, the
+ * screens and the menu.
  *
  * WRITES THE LOCAL CONTAINER AND PUMPIT STUB ONLY — every connection is pinned
  * to the container and asserted loopback. Its rows are its own: category
- * 'TEST-MCHG ' and till 9902 at branch 13 in the stub, TEST- branch 979 and
- * its setting value in Agora, a TEST- user and that user's activity. All are
+ * 'TEST-MCHG ' and till 9902 at branch 13 in the stub; TEST- branch 979 with
+ * its setting value, stock lines, critical line and recon rule in Agora and
+ * its stock master, area and POS rows in the stub; a TEST- user and that
+ * user's activity. All are
  * deleted, with their ledger rows, in tearDown.
  */
 class MasterChangesTest extends TestCase
@@ -167,6 +171,109 @@ class MasterChangesTest extends TestCase
             [$row->Entity, $row->Action, $row->Field, $row->PriorValue, $row->NewValue]);
     }
 
+    public function test_a_stock_line_override_logs_each_field_it_moved_and_a_park_logs_the_way_back(): void
+    {
+        $this->seedStockLine('T1', '1200');
+        $line = ['BranchId' => self::SITE, 'StockItemNo' => 'T1', 'Action' => 'save', 'StockItemDescription' => 'TEST-PIE CHICKEN 200G',
+            'AreaNo' => 1, 'PosSystem' => 'WINBRANCH', 'POSCode' => '1200', 'SellingPrice' => 31.5, 'PriceType' => 'Set Price', 'Factor' => 0,
+            'UOMCode' => 'Each', 'IssueMultiple' => 1, 'IssueMultiplePercentage' => 0, 'QtyVarAllowance' => 0, 'IsMonitoredItem' => 0,
+            'IsDoCloseQtyCalc' => 1, 'IsAllowNegativeQtyIssued' => 0, 'IsAllowNegativeQtyClose' => 0, 'IsStockItemPreProduction' => 0,
+            'IsPreProductionItem' => 0, 'PreProductionTypeNo' => 0, 'Ratio' => 0, 'ProduceLimitPercentage' => 0, 'IsActive' => 1,
+            'Reason' => 'TEST-the 200g pack', 'UserId' => (int) $this->user->Id];
+        $this->assertSame('CREATED', $this->procedures()->write('agora.usp_Product_SaveStockItem', $line)->Code);
+
+        $changes = $this->changesOf('Stock line');
+        $this->assertSame(['Override', 'SellingPrice', 'StockItemDescription'], array_keys($changes), 'Only what moved: the other nineteen were sent as they were.');
+        $this->assertSame(['None', 'In force', 'Stock line override added'], $changes['Override']);
+        $this->assertSame(['TEST-PIE CHICKEN', 'TEST-PIE CHICKEN 200G', 'Stock line changed'], $changes['StockItemDescription']);
+        $this->assertEqualsWithDelta([29.99, 31.5], [(float) $changes['SellingPrice'][0], (float) $changes['SellingPrice'][1]], 0.0001);
+        $row = $this->masterChanges(['BranchIds' => (string) self::SITE, 'Search' => 'StockItemDescription'])[0]->sole();
+        $this->assertSame(['T1 · TEST-PIE CHICKEN 200G', 'TEST-the 200g pack', 'TEST-Master changes', 'Agora', 'MasterChange'],
+            [$row->RowKey, $row->Reason, $row->ChangedBy, $row->Source, $row->Ledger]);
+
+        $this->procedures()->write('agora.usp_Product_SaveStockItem', ['BranchId' => self::SITE, 'StockItemNo' => 'T1', 'Action' => 'park',
+            'Reason' => 'TEST-back to the customer row', 'UserId' => (int) $this->user->Id]);
+        $parked = $this->changesOf('Stock line', 'TEST-back to the customer row');
+        $this->assertSame(['In force', 'Parked', 'Stock line override parked'], $parked['Override']);
+        $this->assertSame(['TEST-PIE CHICKEN 200G', 'TEST-PIE CHICKEN'], array_slice($parked['StockItemDescription'], 0, 2));
+    }
+
+    public function test_a_batch_flag_logs_one_row_per_line_whose_flag_moved(): void
+    {
+        $this->seedStockLine('T2', '1201');
+        $this->seedStockLine('T3', '1202');
+        $this->procedures()->write('agora.usp_Product_SetStockItemFlag', [
+            'ItemsJson' => json_encode([['BranchId' => self::SITE, 'StockItemNo' => 'T2'], ['BranchId' => self::SITE, 'StockItemNo' => 'T3']]),
+            'Flag' => 'IsMonitoredItem', 'Value' => 1, 'Reason' => 'TEST-monitor the pies', 'UserId' => (int) $this->user->Id,
+        ]);
+
+        [$rows, $total] = $this->masterChanges(['BranchIds' => (string) self::SITE, 'Search' => 'TEST-monitor the pies']);
+        $this->assertSame(4, $total, 'Two lines, each: the override it became and the flag.');
+        $byLine = [];
+        foreach ($rows as $row) {
+            $byLine[$row->RowKey][$row->Field] = [$row->PriorValue, $row->NewValue];
+        }
+        ksort($byLine);
+        $this->assertSame([
+            'T2 · TEST-PIE CHICKEN' => ['IsMonitoredItem' => ['0', '1'], 'Override' => ['None', 'In force']],
+            'T3 · TEST-PIE CHICKEN' => ['IsMonitoredItem' => ['0', '1'], 'Override' => ['None', 'In force']],
+        ], array_map(function (array $fields): array {
+            ksort($fields);
+
+            return $fields;
+        }, $byLine));
+
+        // Switched on again: nothing moved, nothing logged.
+        $this->procedures()->write('agora.usp_Product_SetStockItemFlag', [
+            'ItemsJson' => json_encode([['BranchId' => self::SITE, 'StockItemNo' => 'T2']]),
+            'Flag' => 'IsMonitoredItem', 'Value' => 1, 'Reason' => 'TEST-monitor it again', 'UserId' => (int) $this->user->Id,
+        ]);
+        $this->assertSame(0, $this->masterChanges(['BranchIds' => (string) self::SITE, 'Search' => 'TEST-monitor it again'])[1]);
+    }
+
+    public function test_a_critical_line_logs_its_fields_and_taking_it_off_the_list(): void
+    {
+        $this->db()->table('PumpIT.dbo.DBF_STDB')->insert(['SSBranchId' => self::SITE, 'CODE' => '1200', 'LOCATION' => 'WINBRANCH', 'DESC' => 'TEST-PIE CHICKEN',
+            'CAT' => 'TEST', 'STDCOST' => 10, 'STDSELL' => 15, 'QTY' => 4, 'M_SOLD' => 0, 'L_SOLD' => null, 'PACKSIZE' => 1, 'VATCODE' => 'A']);
+        $critical = ['BranchId' => self::SITE, 'PosSystem' => 'WINBRANCH', 'PosCode' => '1200', 'Description' => 'TEST-CRITICAL PIE',
+            'Reason' => 'TEST-never out of pies', 'UserId' => (int) $this->user->Id];
+        $this->procedures()->write('agora.usp_Product_SaveCriticalLine', $critical + ['Action' => 'save']);
+
+        $added = $this->changesOf('Critical line', 'TEST-never out of pies');
+        $this->assertSame(['None', 'In force', 'Critical line override added'], $added['Override']);
+        $this->assertSame([null, 'TEST-CRITICAL PIE'], array_slice($added['Description'], 0, 2), 'Nothing on the customer\'s list before.');
+        $this->assertSame([null, 'TEST'], array_slice($added['Category'], 0, 2), 'The category taken from the POS file.');
+        $row = $this->masterChanges(['BranchIds' => (string) self::SITE, 'Search' => 'TEST-never out of pies',
+            'FiltersJson' => json_encode([['column' => 'Field', 'type' => 'text', 'op' => 'eq', 'value' => 'Description']])])[0]->sole();
+        $this->assertSame('WINBRANCH 1200 · TEST-CRITICAL PIE', $row->RowKey);
+
+        $this->procedures()->write('agora.usp_Product_SaveCriticalLine', array_replace($critical, ['Reason' => 'TEST-pies are seasonal']) + ['Action' => 'remove']);
+        $this->assertSame(['IsActive' => ['1', '0', 'Critical line changed']], $this->changesOf('Critical line', 'TEST-pies are seasonal'));
+    }
+
+    public function test_a_recon_rule_override_logs_its_positions_and_a_park_logs_them_going(): void
+    {
+        $rule = ['BranchId' => self::SITE, 'ReconArea' => 'FNB', 'ProcessOrder' => 1, 'BankStartPosition' => 1, 'BankEndPosition' => 10,
+            'UserId' => (int) $this->user->Id];
+        $this->procedures()->write('agora.usp_Recon_SaveCriteria', $rule + ['Action' => 'save', 'Reason' => 'TEST-the reference is ten long']);
+
+        $this->assertSame([
+            'BANK_EndPosition' => [null, '10', 'Recon rule changed'],
+            'BANK_StartPosition' => [null, '1', 'Recon rule changed'],
+            'Override' => ['None', 'In force', 'Recon rule override added'],
+        ], $this->sorted($this->changesOf('Recon rule', 'TEST-the reference is ten long')), 'A rule the site never had: every position from nothing.');
+        $row = $this->masterChanges(['BranchIds' => (string) self::SITE, 'Search' => 'TEST-the reference is ten long'])[0]->first();
+        $this->assertSame('FNB rule 1', $row->RowKey);
+
+        $this->procedures()->write('agora.usp_Recon_SaveCriteria', array_replace($rule, ['BankEndPosition' => 12]) + ['Action' => 'save', 'Reason' => 'TEST-twelve after all']);
+        $this->assertSame(['BANK_EndPosition' => ['10', '12', 'Recon rule changed']], $this->changesOf('Recon rule', 'TEST-twelve after all'));
+
+        $this->procedures()->write('agora.usp_Recon_SaveCriteria', $rule + ['Action' => 'park', 'Reason' => 'TEST-park the rule']);
+        $parked = $this->sorted($this->changesOf('Recon rule', 'TEST-park the rule'));
+        $this->assertSame(['In force', 'Parked', 'Recon rule override parked'], $parked['Override']);
+        $this->assertSame(['12', null], array_slice($parked['BANK_EndPosition'], 0, 2), 'Parked, and the site has no rule of its own to fall back to.');
+    }
+
     public function test_the_procedures_refuse_without_the_permission(): void
     {
         foreach (['agora.usp_Reports_GridMasterChanges', 'agora.usp_Reports_GridUserActivity'] as $procedure) {
@@ -238,6 +345,52 @@ class MasterChangesTest extends TestCase
         return [$sets[0], (int) $sets[1]->first()->TotalRows];
     }
 
+    /**
+     * One master's changes on the TEST- site, by field: [before, after, action].
+     *
+     * @return array<string, array{0: ?string, 1: ?string, 2: string}>
+     */
+    private function changesOf(string $entity, ?string $reason = null): array
+    {
+        $rows = $this->masterChanges(['BranchIds' => (string) self::SITE, 'Search' => $reason,
+            'FiltersJson' => json_encode([['column' => 'Entity', 'type' => 'set', 'in' => [$entity]]])])[0];
+        $changes = [];
+        foreach ($rows->sortBy('LedgerId') as $row) {
+            if ($reason === null || $row->Reason === $reason) {
+                $changes[$row->Field] = [$row->PriorValue, $row->NewValue, $row->Action];
+            }
+        }
+        ksort($changes);
+
+        return $changes;
+    }
+
+    /**
+     * @param  array<string, array{0: ?string, 1: ?string, 2: string}>  $changes
+     * @return array<string, array{0: ?string, 1: ?string, 2: string}>
+     */
+    private function sorted(array $changes): array
+    {
+        ksort($changes);
+
+        return $changes;
+    }
+
+    /** A customer stock line at the TEST- site, in its TEST- area. */
+    private function seedStockLine(string $itemNo, string $posCode): void
+    {
+        if (! $this->db()->table('PumpIT.dbo.STK_Area')->where('SSBranchId', self::SITE)->exists()) {
+            $this->db()->table('PumpIT.dbo.STK_Area')->insert(['SSBranchId' => self::SITE, 'AreaNo' => 1, 'AreaDescription' => 'TEST-Shop floor',
+                'AreaGroup' => 'Retail Items', 'DayShift' => 1, 'AfternoonShift' => 0, 'NightShift' => 0, 'ShowReport' => 1, 'IsCaptureWaste' => 0]);
+        }
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->insert(['SSBranchId' => self::SITE, 'StockItemNo' => $itemNo,
+            'StockItemDescription' => 'TEST-PIE CHICKEN', 'AreaNo' => 1, 'Location' => 'WINBRANCH', 'POSCode' => $posCode, 'SellingPrice' => 29.99,
+            'PriceType' => 'Set Price', 'Factor' => 0, 'UOMCode' => 'Each', 'IssueMultiple' => 1, 'IssueMultiplePercentage' => 0, 'QtyVarAllowance' => 0,
+            'isMonitoredItem' => 0, 'IsDoCloseQtyCalc' => 1, 'IsAllowNegativeQtyIssued' => 0, 'IsAllowNegativeQtyClose' => 0,
+            'IsStockItemPreProduction' => 0, 'isPreProductionItem' => 0, 'PreProductionTypeNo' => 0, 'Ratio' => 0, 'ProduceLimitPercentage' => 0,
+            'CreateDateTime' => '2026-01-01 00:00:00']);
+    }
+
     /** @param  array<int, string>  $codes */
     private function grant(array $codes): void
     {
@@ -257,6 +410,12 @@ class MasterChangesTest extends TestCase
         $this->db()->statement('DELETE FROM [PumpIT].dbo.BRN_Tills WHERE SSBranchId = ? AND TillNo = ?', [self::BRANCH, self::TILL]);
         $this->db()->table('agora.MasterChange')->where('BranchId', self::SITE)->delete();
         $this->db()->table('agora.Setting')->where('BranchId', self::SITE)->delete();
+        foreach (['StockItem', 'StockItemCritical', 'ReconCriteria'] as $table) {
+            $this->db()->table('agora.'.$table)->where('BranchId', self::SITE)->delete();
+        }
+        foreach (['STK_StockMaster', 'STK_Area', 'DBF_STDB', 'STK_StockMasterCritical'] as $table) {
+            $this->db()->table('PumpIT.dbo.'.$table)->where('SSBranchId', self::SITE)->delete();
+        }
         $this->db()->table('agora.Branch')->where('BranchId', self::SITE)->delete();
 
         $users = User::query()->acrossBranches()->where('EmailAddress', 'like', 'TEST-master-changes-%')->pluck('Id');

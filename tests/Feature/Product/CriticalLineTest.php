@@ -266,6 +266,7 @@ class CriticalLineTest extends TestCase
     private function cleanUp(): void
     {
         $this->db()->table('agora.StockItemCritical')->where('BranchId', self::BRANCH)->delete();
+        $this->db()->table('agora.MasterChange')->where('BranchId', self::BRANCH)->where('Entity', 'CriticalLine')->delete();
         $this->db()->table('PumpIT.dbo.STK_StockMasterCritical')->where('SSBranchId', self::BRANCH)->delete();
         $this->db()->table('PumpIT.dbo.DBF_STDB')->where('SSBranchId', self::BRANCH)->delete();
         $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)->delete();

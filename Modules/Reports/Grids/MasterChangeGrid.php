@@ -33,7 +33,7 @@ class MasterChangeGrid extends GridDefinition
     public const PERMISSION = 'reports.master-changes.view';
 
     public const ENTITIES = [
-        'Branch', 'Region', 'Brand', 'Format', 'Setting',
+        'Branch', 'Region', 'Brand', 'Format', 'Setting', 'Stock line', 'Critical line', 'Recon rule',
         'Category band', 'Profit centre', 'Standard category', 'Expense code', 'Till', 'Shift',
         'Transaction type', 'Fuel type', 'Tank', 'Pump', 'Utility meter', 'Merchant or terminal number',
         'Employee', 'Employee area', 'Employee post', 'Supplier', 'Customer',
