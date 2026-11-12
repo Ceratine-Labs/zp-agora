@@ -78,4 +78,22 @@ class UtilityMeterGrid extends ReferenceMasterGrid
     {
         return [['Last ten readings', 'No reading has been captured on this meter.']];
     }
+
+    public function writeEntity(): ?string
+    {
+        return 'UtilityMeter';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveUtilityMeter';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'MeterDescription' => ['label' => 'Description', 'type' => 'text', 'column' => 'Description', 'max' => 50,
+                'help' => 'The meter row only. The meter number is what every reading carries, so it is not changed; readings are captured on Utilities.'],
+        ];
+    }
 }

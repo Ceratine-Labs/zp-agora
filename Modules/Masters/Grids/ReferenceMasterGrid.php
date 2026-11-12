@@ -104,6 +104,16 @@ abstract class ReferenceMasterGrid extends GridDefinition
         return null;
     }
 
+    /**
+     * The PumpIT table an edit of this record writes, as the confirmation
+     * names it. One table for every master but the merchant and terminal
+     * numbers, which are three.
+     */
+    public function writeTable(object $row): string
+    {
+        return $this->legacySource();
+    }
+
     /** The procedure that writes one record back to PumpIT. */
     public function saveProcedure(): ?string
     {

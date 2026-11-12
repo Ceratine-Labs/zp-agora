@@ -28,10 +28,13 @@ return [
     | cash.*.write_mode are: Agora starting to write the production ERP is a
     | commit with a name on it.
     |
-    |   'live'  an edit writes the master's PumpIT table — SDK_CategoryGLCode's
-    |           GP and days-cover band and active flag — every prior value
-    |           recorded first in agora.MasterWrite, and Put back reverses a
-    |           press
+    |   'live'  an edit writes the master's PumpIT table — SDK_CategoryGLCode,
+    |           SS_ProfitCentre, SS_StandardCategory, BRN_Expenses, BRN_Tills,
+    |           BRN_Shifts, BRN_TransactionType, BRN_FuelType, BRN_Tank,
+    |           BRN_Pump, BRN_UtilityMeter and the merchant / terminal number
+    |           tables, each over its narrowest columns (CLAUDE.md rule 1) —
+    |           every prior value recorded first in agora.MasterWrite, and Put
+    |           back reverses a press
     |   'off'   the masters are read-only listings: no write procedure is
     |           called and the Edit and Put back controls are not drawn
     |

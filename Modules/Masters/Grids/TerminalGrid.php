@@ -69,4 +69,32 @@ class TerminalGrid extends ReferenceMasterGrid
             'Active' => 'The cash-device table records no active flag, so it says Not recorded rather than guessing.',
         ];
     }
+
+    public function writeEntity(): ?string
+    {
+        return 'Terminal';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveTerminal';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'Description' => ['label' => 'Description', 'type' => 'text', 'column' => 'Description', 'max' => 50,
+                'help' => 'The number itself, and whether it is active, decide where the bank\'s and the device supplier\'s settlements land, so neither is changed from here.'],
+        ];
+    }
+
+    public function writeTable(object $row): string
+    {
+        return match ($row->Kind ?? null) {
+            'ABSA merchant' => 'dbo.SS_Branch_ABSA_MerchantNo',
+            'Smart ATM terminal' => 'dbo.SS_Branch_SMARTATM_TerminalNo',
+            'Cash device terminal' => 'dbo.SS_Branch_CASHDEVICE_TerminalNo',
+            default => $this->legacySource(),
+        };
+    }
 }

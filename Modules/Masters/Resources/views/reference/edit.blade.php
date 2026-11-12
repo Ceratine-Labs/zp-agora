@@ -9,14 +9,15 @@
     $title = $definition->recordTitle($row);
     $site = $definition->perBranch() ? ($row->BranchName ?? 'branch '.$row->BranchId) : 'the group';
     $show = $definition->rowUrl($row);
-    $what = 'PumpIT '.$definition->legacySource().' · '.$title.' at '.$site;
+    $table = $definition->writeTable($row);
+    $what = 'PumpIT '.$table.' · '.$title.' at '.$site;
     // 19.0000 reads as 19 in the box and in the confirmation; 10 stays 10.
     $plain = fn ($v) => is_numeric($v) && str_contains((string) $v, '.') ? rtrim(rtrim((string) $v, '0'), '.') : (string) ($v ?? '');
 @endphp
 <x-app-shell :title="'Edit '.$title">
     <x-page-head :eyebrow="$definition->eyebrow().' · '.$definition->title()" :title="'Edit '.$title" :blurb="$definition->noun().' · '.$site">
         <x-slot:info>
-            <p>These changes are written to PumpIT's {{ $definition->legacySource() }}, because PumpIT still trades on it. Each value is recorded first, with your reason, so the change can be put back from this record's page.</p>
+            <p>These changes are written to PumpIT's {{ $table }}, because PumpIT still trades on it. Each value is recorded first, with your reason, so the change can be put back from this record's page.</p>
         </x-slot:info>
         <x-slot:actions><a class="btn" href="{{ $show }}">Back to {{ strtolower($definition->noun()) }}</a></x-slot:actions>
     </x-page-head>
@@ -31,7 +32,7 @@
           data-diff="{{ $what }}" data-diff-note="Each change and your reason are recorded, and can be put back.">
         @csrf @method('PUT')
         <input type="hidden" name="key" value="{{ $row->RowKey }}">
-        <x-card :title="$title" :sub="'Written to '.$definition->legacySource()">
+        <x-card :title="$title" :sub="'Written to '.$table">
             <div class="field-row">
                 @foreach ($definition->editableFields() as $name => $field)
                     @php($current = $row->{$name} ?? null)

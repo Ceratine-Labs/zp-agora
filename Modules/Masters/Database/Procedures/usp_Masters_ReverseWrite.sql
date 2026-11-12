@@ -19,6 +19,10 @@
      FuelType          [PumpIT].dbo.BRN_FuelType FuelTypeDescription
      Tank              [PumpIT].dbo.BRN_Tank TankDescription
      Pump              [PumpIT].dbo.BRN_Pump [Order], IsActive
+     UtilityMeter      [PumpIT].dbo.BRN_UtilityMeter Description
+     Terminal          [PumpIT].dbo.SS_Branch_ABSA_MerchantNo,
+                       SS_Branch_SMARTATM_TerminalNo or
+                       SS_Branch_CASHDEVICE_TerminalNo Description
 
    A text column is put back exactly as it was stored, trailing spaces and
    all; a NULL prior goes back as NULL.
@@ -321,6 +325,61 @@ BEGIN
                                THEN (SELECT CONVERT(BIT, r.PriorValue) FROM @Rows r WHERE r.Field = N'IsActive') ELSE p.IsActive END
           FROM [PumpIT].dbo.BRN_Pump p
          WHERE p.SSBranchId = @BranchId AND p.PumpNo = @PuNo;
+    END
+    ELSE IF @Entity = N'UtilityMeter'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.BRN_UtilityMeter') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for BRN_UtilityMeter, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @UmKey INT = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.UtilityMeterId');
+        DECLARE @UmFound BIT, @UmCur NVARCHAR(50);
+        SELECT @UmFound = 1, @UmCur = x.Description
+        FROM [PumpIT].dbo.BRN_UtilityMeter x WITH (UPDLOCK, HOLDLOCK) WHERE x.UtilityMeterId = @UmKey AND x.SSBranchId = @BranchId;
+
+        IF @UmFound IS NULL OR EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'Description'
+                                       AND ISNULL(r.NewValue, N'') <> ISNULL(LTRIM(RTRIM(@UmCur)), N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the meter since. Nothing was put back.', 1;
+
+        UPDATE x SET Description = (SELECT CONVERT(NVARCHAR(50), r.PriorValue) FROM @Rows r WHERE r.Field = N'Description')
+          FROM [PumpIT].dbo.BRN_UtilityMeter x
+         WHERE x.UtilityMeterId = @UmKey AND x.SSBranchId = @BranchId;
+    END
+    ELSE IF @Entity = N'Terminal'
+    BEGIN
+        DECLARE @TeJson NVARCHAR(400) = (SELECT TOP 1 KeyJson FROM @Rows);
+        DECLARE @TeKind NVARCHAR(20) = JSON_VALUE(@TeJson, '$.Kind'), @TeId INT = JSON_VALUE(@TeJson, '$.Id');
+        DECLARE @TeTable SYSNAME = CASE @TeKind WHEN N'ABSA' THEN N'SS_Branch_ABSA_MerchantNo'
+                                               WHEN N'SMARTATM' THEN N'SS_Branch_SMARTATM_TerminalNo'
+                                               WHEN N'CASHDEVICE' THEN N'SS_Branch_CASHDEVICE_TerminalNo' END;
+        IF @TeTable IS NULL
+            THROW 51000, 'AGORA:NOT_FOUND:This change is of a kind Agora cannot put back.', 1;
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.' + @TeTable) AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for this table, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @TeFound BIT, @TeCur NVARCHAR(50);
+        IF @TeKind = N'ABSA'
+            SELECT @TeFound = 1, @TeCur = a.[Description] FROM [PumpIT].dbo.SS_Branch_ABSA_MerchantNo a WITH (UPDLOCK, HOLDLOCK)
+            WHERE a.ABSAMerchantNoId = @TeId AND a.SSBranchId = @BranchId;
+        ELSE IF @TeKind = N'SMARTATM'
+            SELECT @TeFound = 1, @TeCur = s.[Description] FROM [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo s WITH (UPDLOCK, HOLDLOCK)
+            WHERE s.SMARTATMTerminalNoId = @TeId AND s.SSBranchId = @BranchId;
+        ELSE
+            SELECT @TeFound = 1, @TeCur = c.[Description] FROM [PumpIT].dbo.SS_Branch_CASHDEVICE_TerminalNo c WITH (UPDLOCK, HOLDLOCK)
+            WHERE c.CASHDEVICETerminalNoId = @TeId AND c.SSBranchId = @BranchId;
+
+        IF @TeFound IS NULL OR EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'Description'
+                                       AND ISNULL(r.NewValue, N'') <> ISNULL(LTRIM(RTRIM(@TeCur)), N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the description since. Nothing was put back.', 1;
+
+        DECLARE @TePrior NVARCHAR(50) = (SELECT CONVERT(NVARCHAR(50), r.PriorValue) FROM @Rows r WHERE r.Field = N'Description');
+        IF @TeKind = N'ABSA'
+            UPDATE [PumpIT].dbo.SS_Branch_ABSA_MerchantNo SET [Description] = @TePrior WHERE ABSAMerchantNoId = @TeId AND SSBranchId = @BranchId;
+        ELSE IF @TeKind = N'SMARTATM'
+            UPDATE [PumpIT].dbo.SS_Branch_SMARTATM_TerminalNo SET [Description] = @TePrior WHERE SMARTATMTerminalNoId = @TeId AND SSBranchId = @BranchId;
+        ELSE
+            UPDATE [PumpIT].dbo.SS_Branch_CASHDEVICE_TerminalNo SET [Description] = @TePrior WHERE CASHDEVICETerminalNoId = @TeId AND SSBranchId = @BranchId;
     END
     ELSE
         THROW 51000, 'AGORA:NOT_FOUND:This change is of a kind Agora cannot put back.', 1;
