@@ -20,6 +20,9 @@ return new class extends ProcedureMigration
             $this->path().'/usp_Masters_GridTills.sql',
             $this->path().'/usp_Masters_GridShifts.sql',
             $this->path().'/usp_Masters_GridTransactionTypes.sql',
+            $this->path().'/usp_Masters_GridFuelTypes.sql',
+            $this->path().'/usp_Masters_GridTanks.sql',
+            $this->path().'/usp_Masters_GridPumps.sql',
         ];
     }
 };

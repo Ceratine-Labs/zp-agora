@@ -35,6 +35,9 @@ class ReferenceMastersPermissionSeeder extends Seeder
         'tills' => 'See the tills at each site, their POS and when each last cashed up',
         'shifts' => 'See the shifts at each site and when each last cashed up',
         'transactiontypes' => 'See the purchase-request transaction types and document counters at each site',
+        'fueltypes' => 'See the fuel grades at each forecourt, their POS codes and pumps',
+        'tanks' => 'See the tanks at each forecourt and the pumps drawing from them',
+        'pumps' => 'See every pump, its reading order, grade and tank, per forecourt',
     ];
 
     public function run(): void

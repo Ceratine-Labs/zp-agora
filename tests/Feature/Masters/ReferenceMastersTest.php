@@ -178,6 +178,31 @@ class ReferenceMastersTest extends TestCase
         $this->assertPerBranchListing('transaction-types', 'transactiontypes', 'agora.usp_Masters_GridTransactionTypes', 'vw_MasterTransactionType', 'TypeDescription');
     }
 
+    public function test_fuel_types_tanks_and_pumps_join_at_the_same_site(): void
+    {
+        $this->assertPerBranchListing('fuel-types', 'fueltypes', 'agora.usp_Masters_GridFuelTypes', 'vw_MasterFuelType', 'FuelTypeDescription');
+        $this->assertPerBranchListing('tanks', 'tanks', 'agora.usp_Masters_GridTanks', 'vw_MasterTank', 'TankDescription');
+        $this->assertPerBranchListing('pumps', 'pumps', 'agora.usp_Masters_GridPumps', 'vw_MasterPump', 'PumpNo');
+
+        // Every pump resolves to a grade and a tank AT ITS OWN SITE, and the
+        // per-site join cannot fan out: one row per (site, pump).
+        $sites = implode(',', $this->db()->table('agora.Branch')->pluck('BranchId')->all());
+        $pumps = $this->rows('agora.usp_Masters_GridPumps', $sites);
+        $this->assertSame((int) $this->db()->selectOne('SELECT COUNT(*) AS n FROM agora.vw_MasterPump p
+            WHERE EXISTS (SELECT 1 FROM agora.Branch b WHERE b.BranchId = p.BranchId)')->n, $pumps->count());
+        $this->assertSame($pumps->count(), $pumps->map(fn ($p) => $p->BranchId.':'.$p->PumpNo)->unique()->count());
+        $this->assertNotContains(null, $pumps->pluck('FuelTypeDescription')->all());
+        $this->assertNotContains(null, $pumps->pluck('TankDescription')->all());
+
+        // A grade's pump count is its pumps at that site, and its record lists them.
+        $branch = $this->someBranch('vw_MasterPump');
+        $grade = $this->rows('agora.usp_Masters_GridFuelTypes', $branch)->sortByDesc('PumpCount')->first();
+        $this->assertSame((int) $grade->PumpCount, $pumps->where('BranchId', (int) $branch)->where('FuelTypeNo', (int) $grade->FuelTypeNo)->count());
+        $this->actingAs($this->person(['fueltypes.view']));
+        $this->get(route('app.setup.fuel-types.show', ['branch' => $branch, 'key' => $grade->RowKey]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->assertSee('POS identifier')->assertSee($pumps->where('BranchId', (int) $branch)->where('FuelTypeNo', (int) $grade->FuelTypeNo)->first()->PumpNo);
+    }
+
     /**
      * What every per-branch master must do: refuse without a branch, list
      * exactly the chosen site's rows — the count the view holds for it — and
