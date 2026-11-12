@@ -5,8 +5,12 @@
             <p>PumpIT keeps trading on these rows — the cashup's Suppliers and Expenses legs and the till's paid-outs resolve a supplier through them — so Agora reads them and does not change them. Codes are APS-#### (mostly stock suppliers) or APE-#### (mostly expense creditors).</p>
         </x-slot:info>
         <x-slot:actions>
+            @if (\Modules\Partners\Services\PartnerWriteService::may('suppliers', 'create'))
+                <a class="btn-primary" href="{{ route('app.setup.suppliers.create') }}">New supplier</a>
+            @endif
             @can('partners.customers.view')<a class="btn" href="{{ route('app.setup.customers.index') }}">Account customers</a>@endcan
         </x-slot:actions>
     </x-page-head>
+    @if (session('status'))<x-notice tone="good" title="Saved">{{ session('status') }}</x-notice>@endif
     <x-data-grid :grid="$grid" :branches="$branches" surface />
 </x-app-shell>

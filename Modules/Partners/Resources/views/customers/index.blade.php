@@ -5,6 +5,9 @@
             <p>Where a debtor's statement goes is Agora's own address list, kept with the Debtors statements and changed on the debtor's statement. PumpIT keeps trading on these rows — the cashup's Debtors leg resolves an account sale through them — so Agora reads them and does not change them.</p>
         </x-slot:info>
         <x-slot:actions>
+            @if (\Modules\Partners\Services\PartnerWriteService::may('customers', 'create'))
+                <a class="btn-primary" href="{{ route('app.setup.customers.create') }}">New customer</a>
+            @endif
             @if ($includesControls)
                 <a class="btn" href="{{ route('app.setup.customers.index') }}">Hide payment-control accounts</a>
             @else
@@ -14,5 +17,6 @@
             @can('partners.suppliers.view')<a class="btn" href="{{ route('app.setup.suppliers.index') }}">Suppliers</a>@endcan
         </x-slot:actions>
     </x-page-head>
+    @if (session('status'))<x-notice tone="good" title="Saved">{{ session('status') }}</x-notice>@endif
     <x-data-grid :grid="$grid" :branches="$branches" surface />
 </x-app-shell>

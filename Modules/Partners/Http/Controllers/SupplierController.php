@@ -10,13 +10,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Modules\Core\Models\Branch;
 use Modules\Partners\Services\PartnerService;
+use Modules\Partners\Services\PartnerWriteService;
 
 /**
  * Setup → Trading rules → Suppliers (T024): the list and one supplier.
  *
- * Read-only. There is no create, edit or delete — the rows are PumpIT's
- * BRN_Suppliers, and whether Agora writes them back, keeps its own or leaves
- * them alone is waiting on Ryan.
+ * The page lists what Agora has written to PumpIT for the supplier; the
+ * edit, the new supplier and Put back are SupplierEditController's.
  */
 class SupplierController extends Controller
 {
@@ -30,8 +30,14 @@ class SupplierController extends Controller
         ]);
     }
 
-    public function show(int $branch, string $code, Request $request): View
+    public function show(int $branch, string $code, Request $request, PartnerWriteService $writes): View
     {
-        return view($request->ajax() ? 'partners::suppliers.detail' : 'partners::suppliers.show', $this->service->supplier($branch, $code));
+        $data = $this->service->supplier($branch, $code);
+
+        if ($request->ajax()) {
+            return view('partners::suppliers.detail', $data);
+        }
+
+        return view('partners::suppliers.show', $data + ['changes' => $writes->changes('Supplier', $branch, $code)]);
     }
 }

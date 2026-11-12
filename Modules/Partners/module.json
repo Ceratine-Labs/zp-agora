@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "enabled": true,
     "order": 4,
-    "requires": ["Core", "Debtors"],
+    "requires": ["Core", "Debtors", "People"],
     "providers": [
         "Modules\\Partners\\Providers\\PartnersServiceProvider"
     ]

@@ -11,13 +11,15 @@ use Illuminate\Http\Request;
 use Modules\Core\Models\Branch;
 use Modules\Partners\Grids\CustomerGrid;
 use Modules\Partners\Services\PartnerService;
+use Modules\Partners\Services\PartnerWriteService;
 
 /**
  * Setup → Trading rules → Account customers (T024): the list and one customer.
  *
- * Read-only. The rows are PumpIT's BRN_Customers; where a statement goes is
- * the Debtors module's, edited on the debtor's statement, and this links
- * there rather than offering a second form for it.
+ * The rows are PumpIT's BRN_Customers; the edit, the new customer and Put
+ * back are CustomerEditController's. Where a statement goes is the Debtors
+ * module's, edited on the debtor's statement, and this links there rather
+ * than offering a second form for it.
  */
 class CustomerController extends Controller
 {
@@ -32,10 +34,17 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function show(int $branch, string $code, Request $request): View
+    public function show(int $branch, string $code, Request $request, PartnerWriteService $writes): View
     {
-        return view($request->ajax() ? 'partners::customers.detail' : 'partners::customers.show', [
-            'customer' => $this->service->customer($branch, $code),
+        $customer = $this->service->customer($branch, $code);
+
+        if ($request->ajax()) {
+            return view('partners::customers.detail', ['customer' => $customer]);
+        }
+
+        return view('partners::customers.show', [
+            'customer' => $customer,
+            'changes' => $writes->changes('Customer', $branch, $code),
         ]);
     }
 }

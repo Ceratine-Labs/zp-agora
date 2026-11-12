@@ -16,13 +16,15 @@
        the highest at ANY site plus one. A per-branch maximum would hand site
        A a code that already means a different supplier at site B.
 
-   Result: one row (Series, LastCode, NextCode, CodesInSeries). NextCode is
-   NULL when the series is full (9999) or @Series is not one of the two.
+   Result: one row (Series, LastCode, NextCode, CodesInSeries, Sites). NextCode
+   is NULL when the series is full (9999) or @Series is not one of the two.
+   Sites is how many of Agora's branches carry the supplier list — the rows a
+   new code is inserted as.
 
-   NOT YET A WRITE PATH. Whoever saves a new supplier must take the number
-   again inside its own transaction (UPDLOCK on the series) and run
-   agora.usp_Partners_CheckCode with @Throw = 1 — this read can be raced.
-   Read by Modules/Partners/Services/PartnerService. Deployed by v1__04p. */
+   On a screen this only proposes, and can be raced. agora.usp_Partners_AddSupplier
+   calls it again inside its own transaction, after taking the series lock,
+   and that is the number it writes.
+   Read by Modules/Partners/Services/PartnerService. Deployed by v1__04p, and again by v1__04pa (Sites). */
 CREATE OR ALTER PROCEDURE agora.usp_Partners_NextSupplierCode
     @Series NVARCHAR(3) = N'APS'
 AS
@@ -43,5 +45,7 @@ BEGIN
                 ELSE @Series + N'-' + RIGHT(N'0000' + CONVERT(NVARCHAR(4), @Last), 4) END AS LastCode,
            CASE WHEN @Series NOT IN (N'APS', N'APE') OR ISNULL(@Last, 0) >= 9999 THEN NULL
                 ELSE @Series + N'-' + RIGHT(N'0000' + CONVERT(NVARCHAR(4), ISNULL(@Last, 0) + 1), 4) END AS NextCode,
-           ISNULL(@Count, 0) AS CodesInSeries;
+           ISNULL(@Count, 0) AS CodesInSeries,
+           (SELECT COUNT(DISTINCT s.BranchId) FROM agora.vw_PartnerSupplier s
+            JOIN agora.Branch b ON b.BranchId = s.BranchId) AS Sites;
 END

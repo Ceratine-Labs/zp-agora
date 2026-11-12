@@ -254,14 +254,25 @@ class PartnersMasterTest extends TestCase
         }
     }
 
-    public function test_no_partners_procedure_or_view_writes_anything(): void
+    /**
+     * Only the named writes write. Every other Partners procedure — the grids,
+     * the pages, the search, the next codes, the guard, the changes list —
+     * reads, and writes nothing but its own table variables.
+     */
+    public function test_only_the_named_write_procedures_write_anything(): void
     {
+        $writers = ['usp_Partners_SaveSupplier', 'usp_Partners_AddSupplier', 'usp_Partners_SaveCustomer',
+            'usp_Partners_AddCustomer', 'usp_Partners_ReverseWrite'];
+
         foreach (glob(base_path('Modules/Partners/Database/Procedures/*.sql')) ?: [] as $file) {
+            if (in_array(basename($file, '.sql'), $writers, true)) {
+                continue;
+            }
             $sql = (string) file_get_contents($file);
-            $this->assertDoesNotMatchRegularExpression('/\b(UPDATE|DELETE|MERGE|TRUNCATE)\b/i', $sql, basename($file));
-            preg_match_all('/\bINSERT\s+(?:INTO\s+)?(\S+)/i', $sql, $targets);
+            $this->assertDoesNotMatchRegularExpression('/\b(UPDATE|MERGE|TRUNCATE)\b/i', $sql, basename($file));
+            preg_match_all('/\b(?:INSERT\s+(?:INTO\s+)?|DELETE\s+\w+\s+FROM\s+|DELETE\s+(?:FROM\s+)?)(\S+)/i', $sql, $targets);
             foreach ($targets[1] as $target) {
-                $this->assertMatchesRegularExpression('/^[@#]/', $target, basename($file).' inserts only into its own table variables');
+                $this->assertMatchesRegularExpression('/^[@#]/', $target, basename($file).' writes only its own table variables');
             }
         }
     }

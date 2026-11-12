@@ -20,7 +20,11 @@ import { test } from './support/fixtures.js';
  *  - nothing scrolls the window sideways on a phone.
  *
  * READ-ONLY. The suite signs in as the shared Playwright auditor, which holds
- * partners.*.view through *.*.view. The fixtures are the customer's own
+ * partners.*.view through *.*.view and none of the write permissions — so the
+ * Edit / New supplier / New customer controls of the named write (T024, PM
+ * decision 01a1cecf-8e08) are not drawn and their routes refuse, and that is
+ * asserted. The writes themselves are proved against the local PumpIT stub in
+ * tests/Feature/Partners/PartnersWriteTest. The fixtures are the customer's own
  * rows: APS-0640 Arendale is on the live list (12 Nov 2026) and on the local
  * stub. The rules themselves are proved in
  * tests/Feature/Partners/PartnersMasterTest. Nothing in this module writes
@@ -70,6 +74,8 @@ test.describe('trading partners', () => {
         await expect(page.getByText('POS account').first()).toBeVisible();
         await expect(page.getByText('At the other sites')).toBeVisible();
         await expect(page.getByRole('link', { name: 'Back to suppliers' })).toBeVisible();
+        await expect(page.getByRole('link', { name: 'Edit supplier' })).toHaveCount(0);
+        await expect(page.getByText('Changes written to PumpIT')).toBeVisible();
     });
 
     test('account customers open on trading accounts; payment controls are one press away', async ({ signedIn: page, isMobile }) => {
@@ -84,6 +90,18 @@ test.describe('trading partners', () => {
         await expect(page.getByRole('link', { name: 'Hide payment-control accounts' })).toBeVisible();
 
         expect(await sidewaysOverflow(page), 'the window does not scroll sideways').toBeLessThanOrEqual(1);
+    });
+
+    test('an auditor is offered no write to PumpIT and the write routes refuse', async ({ signedIn: page }) => {
+        await page.goto('/app/setup/suppliers');
+        await expect(page.getByRole('link', { name: 'New supplier' })).toHaveCount(0);
+        await page.goto('/app/setup/customers');
+        await expect(page.getByRole('link', { name: 'New customer' })).toHaveCount(0);
+
+        for (const path of ['/app/setup/suppliers/create', '/app/setup/customers/create']) {
+            const response = await page.request.get(path, { maxRedirects: 0 });
+            expect(response.status(), path).not.toBe(200);
+        }
     });
 
     test('the palette source answers a supplier name', async ({ signedIn: page }) => {
