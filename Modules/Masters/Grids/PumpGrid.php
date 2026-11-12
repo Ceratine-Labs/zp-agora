@@ -76,4 +76,24 @@ class PumpGrid extends ReferenceMasterGrid
             'TankDescription' => 'The tank, joined at this site.',
         ];
     }
+
+    public function writeEntity(): ?string
+    {
+        return 'Pump';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SavePump';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'PumpOrder' => ['label' => 'Capture order', 'type' => 'decimal', 'column' => 'Order', 'min' => 0, 'max' => 999, 'step' => '1',
+                'help' => 'Where PumpIT\'s daily meter-reading capture lists this pump.'],
+            'IsActive' => ['label' => 'Active', 'type' => 'bool', 'column' => 'IsActive',
+                'help' => 'Switched off, PumpIT stops asking for this pump\'s daily meter reading. Its fuel type, tank and POS link stay as they are.'],
+        ];
+    }
 }

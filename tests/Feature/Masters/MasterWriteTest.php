@@ -40,6 +40,9 @@ class MasterWriteTest extends TestCase
     /** BRN_TransactionType.TypeCode is two characters. */
     private const TYPE = 'T9';
 
+    /** BRN_Tank.TankNo and BRN_Pump.PumpNo are four. */
+    private const FORECOURT = 'TT99';
+
     /** @var array<int, User> */
     private array $users = [];
 
@@ -72,6 +75,11 @@ class MasterWriteTest extends TestCase
             [self::BRANCH, self::SITE_NO]);
         $this->db()->statement("INSERT [PumpIT].dbo.BRN_TransactionType (SSBranchId, TypeCode, TypeDescription, AlpNum, HighNum) VALUES (?, ?, 'TEST-Type', 'TT', 41)",
             [self::BRANCH, self::TYPE]);
+        $this->db()->statement("INSERT [PumpIT].dbo.BRN_FuelType (SSBranchId, FuelTypeNo, FuelTypeDescription, IsFleetCard, POSType, POSIdentifier, HandlingFee)
+            VALUES (?, ?, 'TEST-Fuel', 0, 'WINBRANCH', '99', 0.5)", [self::BRANCH, self::SITE_NO]);
+        $this->db()->statement("INSERT [PumpIT].dbo.BRN_Tank (SSBranchId, TankNo, TankDescription) VALUES (?, ?, 'TEST-Tank')", [self::BRANCH, self::FORECOURT]);
+        $this->db()->statement("INSERT [PumpIT].dbo.BRN_Pump (SSBranchId, PumpNo, FuelTypeNo, TankNo, IsActive, [Order], POSType, POSIdentifier)
+            VALUES (?, ?, ?, ?, 1, 7, 'WINBRANCH', '9999')", [self::BRANCH, self::FORECOURT, self::SITE_NO, self::FORECOURT]);
     }
 
     protected function tearDown(): void
@@ -367,6 +375,67 @@ class MasterWriteTest extends TestCase
             [self::BRANCH, self::TYPE])->TypeDescription);
     }
 
+    public function test_a_fuel_type_is_renamed_at_one_site_and_its_pos_link_fleet_flag_and_fee_stay(): void
+    {
+        $this->actingAs($this->person(['fueltypes.view', 'fueltypes.edit']));
+        $update = route('app.setup.fuel-types.update', ['branch' => self::BRANCH]);
+        $show = route('app.setup.fuel-types.show', ['branch' => self::BRANCH, 'key' => self::SITE_NO]);
+        $edit = $this->get(route('app.setup.fuel-types.edit', ['branch' => self::BRANCH, 'key' => self::SITE_NO]))->assertOk()
+            ->assertSee('PumpIT dbo.BRN_FuelType', false);
+        foreach (['POSIdentifier', 'IsFleetCard', 'HandlingFee', 'CostPrice', 'SellingPrice'] as $never) {
+            $edit->assertDontSee('name="'.$never.'"', false);
+        }
+
+        // The same name twice at one site is PumpIT's own (a fleet grade beside the forecourt one), so it is not refused.
+        $this->put($update, ['key' => (string) self::SITE_NO, 'FuelTypeDescription' => 'TEST-Fuel ULP 95', 'ExpectedFuelTypeDescription' => 'TEST-Fuel',
+            'Reason' => 'TEST-name the grade properly'])->assertRedirect($show);
+        $row = $this->db()->selectOne('SELECT FuelTypeDescription, POSIdentifier, IsFleetCard, HandlingFee FROM [PumpIT].dbo.BRN_FuelType WHERE SSBranchId = ? AND FuelTypeNo = ?',
+            [self::BRANCH, self::SITE_NO]);
+        $this->assertSame(['TEST-Fuel ULP 95', '99', false, 0.5], [$row->FuelTypeDescription, $row->POSIdentifier, (bool) $row->IsFleetCard, round((float) $row->HandlingFee, 4)]);
+        $write = $this->siteLedger('FuelType')->sole();
+        $this->assertSame(['SSBranchId' => self::BRANCH, 'FuelTypeNo' => self::SITE_NO], (array) json_decode($write->KeyJson));
+        $this->assertSame(1, $this->db()->table('agora.MasterWrite')->where('WriteId', $write->WriteId)->count(), 'One site\'s row, not every site\'s fuel type '.self::SITE_NO.'.');
+
+        $this->post(route('app.setup.fuel-types.writes.reverse', ['branch' => self::BRANCH, 'write' => $write->WriteId]),
+            ['key' => (string) self::SITE_NO, 'Reason' => 'TEST-keep the PumpIT name'])->assertRedirect($show);
+        $this->assertSame('TEST-Fuel', $this->db()->selectOne('SELECT FuelTypeDescription FROM [PumpIT].dbo.BRN_FuelType WHERE SSBranchId = ? AND FuelTypeNo = ?',
+            [self::BRANCH, self::SITE_NO])->FuelTypeDescription);
+    }
+
+    public function test_a_tank_is_renamed_and_a_pump_reordered_and_switched_off_without_moving_its_mapping(): void
+    {
+        $this->actingAs($this->person(['tanks.view', 'tanks.edit', 'pumps.view', 'pumps.edit']));
+
+        $this->assertSiteRefused('DESCRIPTION', 'agora.usp_Masters_SaveTank',
+            array_replace($this->siteProc('Tank', ['TankDescription' => ' ']), ['Key' => self::FORECOURT]));
+        $this->put(route('app.setup.tanks.update', ['branch' => self::BRANCH]), ['key' => self::FORECOURT, 'TankDescription' => 'TEST-Tank 50 ppm',
+            'ExpectedTankDescription' => 'TEST-Tank', 'Reason' => 'TEST-the tank was relined'])->assertSessionHasNoErrors();
+        $this->assertSame('TEST-Tank 50 ppm', $this->db()->selectOne('SELECT TankDescription FROM [PumpIT].dbo.BRN_Tank WHERE SSBranchId = ? AND TankNo = ?',
+            [self::BRANCH, self::FORECOURT])->TankDescription);
+
+        $update = route('app.setup.pumps.update', ['branch' => self::BRANCH]);
+        $show = route('app.setup.pumps.show', ['branch' => self::BRANCH, 'key' => self::FORECOURT]);
+        $edit = $this->get(route('app.setup.pumps.edit', ['branch' => self::BRANCH, 'key' => self::FORECOURT]))->assertOk()
+            ->assertSee('PumpIT dbo.BRN_Pump', false)->assertSee('data-diff-field="Order"', false);
+        foreach (['FuelTypeNo', 'TankNo', 'POSIdentifier'] as $never) {
+            $edit->assertDontSee('name="'.$never.'"', false);
+        }
+        $form = ['key' => self::FORECOURT, 'PumpOrder' => 2, 'IsActive' => 0, 'ExpectedPumpOrder' => 7, 'ExpectedIsActive' => 1, 'Reason' => 'TEST-pump taken out of service'];
+        $this->put($update, array_replace($form, ['PumpOrder' => 2.5]))->assertSessionHasErrors('refusal');
+        $this->put($update, array_replace($form, ['ExpectedPumpOrder' => 8]))->assertSessionHasErrors('refusal');
+        $this->put($update, $form)->assertRedirect($show);
+        $row = $this->db()->selectOne('SELECT [Order] AS PumpOrder, IsActive, FuelTypeNo, TankNo, POSIdentifier FROM [PumpIT].dbo.BRN_Pump WHERE SSBranchId = ? AND PumpNo = ?',
+            [self::BRANCH, self::FORECOURT]);
+        $this->assertSame([2, false, self::SITE_NO, self::FORECOURT, '9999'], [(int) $row->PumpOrder, (bool) $row->IsActive, (int) $row->FuelTypeNo, $row->TankNo, $row->POSIdentifier]);
+        $writes = $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('Entity', 'Pump')->where('RowKey', self::FORECOURT)->orderBy('Id')->get();
+        $this->assertSame([['Order', '7', '2'], ['IsActive', '1', '0']], $writes->map(fn ($w) => [$w->Field, $w->PriorValue, $w->NewValue])->all());
+
+        $this->post(route('app.setup.pumps.writes.reverse', ['branch' => self::BRANCH, 'write' => $writes->first()->WriteId]),
+            ['key' => self::FORECOURT, 'Reason' => 'TEST-back in service'])->assertRedirect($show);
+        $row = $this->db()->selectOne('SELECT [Order] AS PumpOrder, IsActive FROM [PumpIT].dbo.BRN_Pump WHERE SSBranchId = ? AND PumpNo = ?', [self::BRANCH, self::FORECOURT]);
+        $this->assertSame([7, true], [(int) $row->PumpOrder, (bool) $row->IsActive]);
+    }
+
     /**
      * The save procedure's parameters for one of the site masters' TEST
      * rows, with every value as setUp left it and the given changes.
@@ -381,6 +450,9 @@ class MasterWriteTest extends TestCase
             'Till' => ['TillDescription' => 'TEST-Till'],
             'Shift' => ['ShiftDescription' => 'TEST-Shift', 'IsActive' => 1],
             'TransactionType' => ['TypeDescription' => 'TEST-Type'],
+            'FuelType' => ['FuelTypeDescription' => 'TEST-Fuel'],
+            'Tank' => ['TankDescription' => 'TEST-Tank'],
+            'Pump' => ['PumpOrder' => 7, 'IsActive' => 1],
             default => throw new \InvalidArgumentException("No TEST row for {$entity}."),
         };
         $expected = [];
@@ -517,8 +589,11 @@ class MasterWriteTest extends TestCase
         $this->db()->statement("DELETE FROM [PumpIT].dbo.BRN_TransactionLine WHERE SSBranchId = ? AND TransactionNo = 'TEST-PR1'", [self::BRANCH]);
         $this->db()->statement("DELETE FROM [PumpIT].dbo.BRN_Transaction WHERE SSBranchId = ? AND TransactionNo = 'TEST-PR1'", [self::BRANCH]);
         $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('Entity', 'TransactionType')->where('RowKey', self::TYPE)->delete();
+        $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->whereIn('Entity', ['Tank', 'Pump'])->where('RowKey', self::FORECOURT)->delete();
+        $this->db()->statement('DELETE FROM [PumpIT].dbo.BRN_Pump WHERE SSBranchId = ? AND PumpNo = ?', [self::BRANCH, self::FORECOURT]);
+        $this->db()->statement('DELETE FROM [PumpIT].dbo.BRN_Tank WHERE SSBranchId = ? AND TankNo = ?', [self::BRANCH, self::FORECOURT]);
         $this->db()->statement('DELETE FROM [PumpIT].dbo.BRN_TransactionType WHERE SSBranchId = ? AND TypeCode = ?', [self::BRANCH, self::TYPE]);
-        foreach (['BRN_Expenses' => 'ExpenseNo', 'BRN_Tills' => 'TillNo', 'BRN_Shifts' => 'ShiftNo'] as $table => $key) {
+        foreach (['BRN_Expenses' => 'ExpenseNo', 'BRN_Tills' => 'TillNo', 'BRN_Shifts' => 'ShiftNo', 'BRN_FuelType' => 'FuelTypeNo'] as $table => $key) {
             $this->db()->statement("DELETE FROM [PumpIT].dbo.{$table} WHERE SSBranchId = ? AND {$key} = ?", [self::BRANCH, self::SITE_NO]);
         }
         $this->db()->table('agora.MasterWrite')->whereIn('Entity', ['ProfitCentre', 'StandardCategory'])->where('RowKey', (string) self::CENTRE)->delete();

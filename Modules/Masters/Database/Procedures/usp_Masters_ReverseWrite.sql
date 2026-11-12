@@ -16,6 +16,9 @@
      Till              [PumpIT].dbo.BRN_Tills TillDescription
      Shift             [PumpIT].dbo.BRN_Shifts ShiftDescription, IsActive
      TransactionType   [PumpIT].dbo.BRN_TransactionType TypeDescription
+     FuelType          [PumpIT].dbo.BRN_FuelType FuelTypeDescription
+     Tank              [PumpIT].dbo.BRN_Tank TankDescription
+     Pump              [PumpIT].dbo.BRN_Pump [Order], IsActive
 
    A text column is put back exactly as it was stored, trailing spaces and
    all; a NULL prior goes back as NULL.
@@ -254,6 +257,70 @@ BEGIN
         UPDATE x SET TypeDescription = (SELECT CONVERT(NVARCHAR(50), r.PriorValue) FROM @Rows r WHERE r.Field = N'TypeDescription')
           FROM [PumpIT].dbo.BRN_TransactionType x
          WHERE x.SSBranchId = @BranchId AND x.TypeCode = @TtKey;
+    END
+    ELSE IF @Entity = N'FuelType'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.BRN_FuelType') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for BRN_FuelType, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @FtKey INT = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.FuelTypeNo');
+        DECLARE @FtFound BIT, @FtCur NVARCHAR(35);
+        SELECT @FtFound = 1, @FtCur = x.FuelTypeDescription
+        FROM [PumpIT].dbo.BRN_FuelType x WITH (UPDLOCK, HOLDLOCK) WHERE x.SSBranchId = @BranchId AND x.FuelTypeNo = @FtKey;
+
+        IF @FtFound IS NULL OR EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'FuelTypeDescription'
+                                       AND ISNULL(r.NewValue, N'') <> ISNULL(LTRIM(RTRIM(@FtCur)), N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the fuel type since. Nothing was put back.', 1;
+
+        UPDATE x SET FuelTypeDescription = (SELECT CONVERT(NVARCHAR(35), r.PriorValue) FROM @Rows r WHERE r.Field = N'FuelTypeDescription')
+          FROM [PumpIT].dbo.BRN_FuelType x
+         WHERE x.SSBranchId = @BranchId AND x.FuelTypeNo = @FtKey;
+    END
+    ELSE IF @Entity = N'Tank'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.BRN_Tank') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for BRN_Tank, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @TkKey NVARCHAR(4) = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.TankNo');
+        DECLARE @TkFound BIT, @TkCur NVARCHAR(50);
+        SELECT @TkFound = 1, @TkCur = x.TankDescription
+        FROM [PumpIT].dbo.BRN_Tank x WITH (UPDLOCK, HOLDLOCK) WHERE x.SSBranchId = @BranchId AND x.TankNo = @TkKey;
+
+        IF @TkFound IS NULL OR EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'TankDescription'
+                                       AND ISNULL(r.NewValue, N'') <> ISNULL(LTRIM(RTRIM(@TkCur)), N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the tank since. Nothing was put back.', 1;
+
+        UPDATE x SET TankDescription = (SELECT CONVERT(NVARCHAR(50), r.PriorValue) FROM @Rows r WHERE r.Field = N'TankDescription')
+          FROM [PumpIT].dbo.BRN_Tank x
+         WHERE x.SSBranchId = @BranchId AND x.TankNo = @TkKey;
+    END
+    ELSE IF @Entity = N'Pump'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.BRN_Pump') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for BRN_Pump, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @PuNo NVARCHAR(4) = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.PumpNo');
+        DECLARE @PuFound BIT, @PuOrder INT, @PuActive BIT;
+        SELECT @PuFound = 1, @PuOrder = p.[Order], @PuActive = p.IsActive
+        FROM [PumpIT].dbo.BRN_Pump p WITH (UPDLOCK, HOLDLOCK) WHERE p.SSBranchId = @BranchId AND p.PumpNo = @PuNo;
+
+        IF @PuFound IS NULL OR EXISTS (
+            SELECT 1 FROM @Rows r
+            WHERE ISNULL(r.NewValue, N'') <> ISNULL(CASE r.Field
+                WHEN N'Order'    THEN CONVERT(NVARCHAR(10), @PuOrder)
+                WHEN N'IsActive' THEN CONVERT(NVARCHAR(10), CONVERT(INT, @PuActive)) END, N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the pump since. Nothing was put back.', 1;
+
+        UPDATE p
+           SET [Order]  = CASE WHEN EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'Order')
+                               THEN (SELECT CONVERT(INT, r.PriorValue) FROM @Rows r WHERE r.Field = N'Order') ELSE p.[Order] END,
+               IsActive = CASE WHEN EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'IsActive')
+                               THEN (SELECT CONVERT(BIT, r.PriorValue) FROM @Rows r WHERE r.Field = N'IsActive') ELSE p.IsActive END
+          FROM [PumpIT].dbo.BRN_Pump p
+         WHERE p.SSBranchId = @BranchId AND p.PumpNo = @PuNo;
     END
     ELSE
         THROW 51000, 'AGORA:NOT_FOUND:This change is of a kind Agora cannot put back.', 1;

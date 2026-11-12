@@ -75,4 +75,22 @@ class TankGrid extends ReferenceMasterGrid
     {
         return [['Pumps', 'No pump draws from this tank.']];
     }
+
+    public function writeEntity(): ?string
+    {
+        return 'Tank';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveTank';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'TankDescription' => ['label' => 'Tank name', 'type' => 'text', 'column' => 'TankDescription', 'max' => 50,
+                'help' => 'PumpIT names a tank by its number everywhere else, so pumps and dips follow.'],
+        ];
+    }
 }

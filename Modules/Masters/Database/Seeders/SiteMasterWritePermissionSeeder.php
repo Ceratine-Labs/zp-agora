@@ -29,6 +29,9 @@ class SiteMasterWritePermissionSeeder extends Seeder
         'tills' => 'Rename a till in PumpIT (BRN_Tills)',
         'shifts' => 'Rename a shift or switch it on or off in PumpIT (BRN_Shifts)',
         'transactiontypes' => 'Rename a transaction type in PumpIT (BRN_TransactionType)',
+        'fueltypes' => 'Rename a fuel type in PumpIT (BRN_FuelType)',
+        'tanks' => 'Rename a tank in PumpIT (BRN_Tank)',
+        'pumps' => 'Change a pump\'s capture order or switch it on or off in PumpIT (BRN_Pump)',
     ];
 
     public function run(): void

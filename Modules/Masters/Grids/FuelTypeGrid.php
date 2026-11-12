@@ -81,4 +81,22 @@ class FuelTypeGrid extends ReferenceMasterGrid
     {
         return [['Pumps', 'No pump at this site dispenses this grade.']];
     }
+
+    public function writeEntity(): ?string
+    {
+        return 'FuelType';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveFuelType';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'FuelTypeDescription' => ['label' => 'Fuel type name', 'type' => 'text', 'column' => 'FuelTypeDescription', 'max' => 35,
+                'help' => 'This site\'s row only. Pumps, tanks and prices name the fuel type by number, so they follow. The POS link, fleet-card flag and handling fee are not changed from here.'],
+        ];
+    }
 }
