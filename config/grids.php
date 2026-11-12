@@ -23,7 +23,22 @@ use Modules\Core\Grids\UserGrid;
 use Modules\Debtors\Grids\DebtorAccountGrid;
 use Modules\Fuel\Grids\FuelHistoryGrid;
 use Modules\Fuel\Grids\FuelPriceGrid;
+use Modules\Masters\Grids\BankAccountGrid;
 use Modules\Masters\Grids\BranchMasterGrid;
+use Modules\Masters\Grids\CategoryGlGrid;
+use Modules\Masters\Grids\ExpenseGrid;
+use Modules\Masters\Grids\FuelTypeGrid;
+use Modules\Masters\Grids\ProfitCentreGrid;
+use Modules\Masters\Grids\PumpGrid;
+use Modules\Masters\Grids\ShiftGrid;
+use Modules\Masters\Grids\StandardCategoryGrid;
+use Modules\Masters\Grids\TankGrid;
+use Modules\Masters\Grids\TerminalGrid;
+use Modules\Masters\Grids\TillGrid;
+use Modules\Masters\Grids\TransactionTypeGrid;
+use Modules\Masters\Grids\UtilityMeterGrid;
+use Modules\Partners\Grids\CustomerGrid;
+use Modules\Partners\Grids\SupplierGrid;
 use Modules\People\Grids\EmployeeAreaGrid;
 use Modules\People\Grids\EmployeeGrid;
 use Modules\People\Grids\EmployeePostGrid;
@@ -35,6 +50,8 @@ use Modules\Recon\Grids\ReconMopsSideGrid;
 use Modules\Recon\Grids\ReconOutstandingGrid;
 use Modules\Recon\Grids\ReconRunGrid;
 use Modules\Recon\Grids\ReconRunLineGrid;
+use Modules\Reports\Grids\MasterChangeGrid;
+use Modules\Reports\Grids\UserActivityGrid;
 use Modules\StockRecon\Grids\CountingAreaGrid;
 use Modules\StockRecon\Grids\StockReconExceptionGrid;
 use Modules\StockRecon\Grids\StockReconRunGrid;
@@ -113,30 +130,30 @@ return [
         'app.setup.roles' => RoleGrid::class,
         'app.setup.settings' => SettingGrid::class,
         'app.setup.branches' => BranchMasterGrid::class,
-        'app.setup.profit-centres' => \Modules\Masters\Grids\ProfitCentreGrid::class,
-        'app.setup.standard-categories' => \Modules\Masters\Grids\StandardCategoryGrid::class,
-        'app.setup.categories' => \Modules\Masters\Grids\CategoryGlGrid::class,
-        'app.setup.expense-codes' => \Modules\Masters\Grids\ExpenseGrid::class,
-        'app.setup.tills' => \Modules\Masters\Grids\TillGrid::class,
-        'app.setup.shifts' => \Modules\Masters\Grids\ShiftGrid::class,
-        'app.setup.transaction-types' => \Modules\Masters\Grids\TransactionTypeGrid::class,
-        'app.setup.fuel-types' => \Modules\Masters\Grids\FuelTypeGrid::class,
-        'app.setup.tanks' => \Modules\Masters\Grids\TankGrid::class,
-        'app.setup.pumps' => \Modules\Masters\Grids\PumpGrid::class,
-        'app.setup.meters' => \Modules\Masters\Grids\UtilityMeterGrid::class,
-        'app.setup.terminals' => \Modules\Masters\Grids\TerminalGrid::class,
-        'app.setup.statement-criteria' => \Modules\Masters\Grids\ReconCriteriaGrid::class,
-        'app.setup.bank-accounts' => \Modules\Masters\Grids\BankAccountGrid::class,
+        'app.setup.profit-centres' => ProfitCentreGrid::class,
+        'app.setup.standard-categories' => StandardCategoryGrid::class,
+        'app.setup.categories' => CategoryGlGrid::class,
+        'app.setup.expense-codes' => ExpenseGrid::class,
+        'app.setup.tills' => TillGrid::class,
+        'app.setup.shifts' => ShiftGrid::class,
+        'app.setup.transaction-types' => TransactionTypeGrid::class,
+        'app.setup.fuel-types' => FuelTypeGrid::class,
+        'app.setup.tanks' => TankGrid::class,
+        'app.setup.pumps' => PumpGrid::class,
+        'app.setup.meters' => UtilityMeterGrid::class,
+        'app.setup.terminals' => TerminalGrid::class,
+        'app.setup.statement-criteria' => Modules\Masters\Grids\ReconCriteriaGrid::class,
+        'app.setup.bank-accounts' => BankAccountGrid::class,
         'app.setup.employees' => EmployeeGrid::class,
         'app.setup.employee-posts' => EmployeePostGrid::class,
         'app.setup.employee-areas' => EmployeeAreaGrid::class,
-        'app.setup.suppliers' => \Modules\Partners\Grids\SupplierGrid::class,
-        'app.setup.customers' => \Modules\Partners\Grids\CustomerGrid::class,
+        'app.setup.suppliers' => SupplierGrid::class,
+        'app.setup.customers' => CustomerGrid::class,
 
         // Setup → Governance (T027): every master change, field by field, and
         // the sign-ins — over the audit tables, through Reports' procedures.
-        'app.setup.master-changes' => \Modules\Reports\Grids\MasterChangeGrid::class,
-        'app.setup.user-activity' => \Modules\Reports\Grids\UserActivityGrid::class,
+        'app.setup.master-changes' => MasterChangeGrid::class,
+        'app.setup.user-activity' => UserActivityGrid::class,
 
         // The per-branch stock master: the customer's row unless Agora holds
         // a live override for it, with cost, GP, stock on hand and last
