@@ -1577,13 +1577,23 @@ class BalancingTest extends TestCase
         $this->assertTrue($broken->BreakKept, 'A two-unit break is kept.');
         $this->assertEqualsWithDelta(-2.0, (float) $broken->ChainBreak, 0.005);
         $this->assertSame('S10a', $broken->ExceptionCode, 'A kept break is still on the exceptions tab.');
-        $this->assertStringStartsWith('Unrecorded issue', $broken->Outcome, 'The residual over stays visible.');
+        $this->assertStringStartsWith('Break -2.000 kept', $broken->Outcome, 'The qty is on the row.');
         $this->assertNull($broken->AuditCode, 'S13 does not read a break that small.');
 
+        // Every shift 1 short here is followed by a shift 3 over, and a counted
+        // short offsets the over after it: chain short carry (v1__14pzx, the
+        // engine since 3-8 Nov 2026; usp_StockRecon_Commit: "a balanced chain may
+        // offset a counted short against a later over"), and the customer's
+        // rule of 12 Nov 2026 (docs/stock-recon.md, "A short before an over
+        // balances with it"). That retired the 2 Nov assertion that the closing
+        // stays at 30 and the over stays visible.
         $this->assertTrue($lines->every(fn ($l) => ! $l->ChainBlocked), 'The chain is not split, so no stretch of it ends over.');
-        $this->assertEqualsWithDelta(30.0, (float) $lines['2026-07-19/1']->QtyCloseNew, 0.005);
-        $this->assertEqualsWithDelta(30.0, (float) $broken->QtyOpenNew, 0.005, 'A safe opening repair follows the preceding count.');
-        $this->assertTrue($lines->contains(fn ($l) => (float) $l->QtyVarNew > 0.005), 'The over is not used to cancel a short.');
+        $this->assertEqualsWithDelta(39.0, (float) $lines['2026-07-19/1']->QtyCloseNew, 0.005,
+            'The closing before a kept break moves: the chain balances through it.');
+        $this->assertEqualsWithDelta(39.0, (float) $broken->QtyOpenNew, 0.005, 'The opening follows it.');
+        $this->assertTrue($lines->every(fn ($l) => (float) $l->QtyVarNew <= 0.005), 'No shift ends over.');
+        $this->assertTrue($lines->every(fn ($l) => (float) $l->AmendClose >= -0.005),
+            'Only a short reaches forward to an over: no closing is lowered onto a later short.');
         $this->assertEqualsWithDelta(-5.0, $lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.001, 'The invariant still holds.');
         $this->assertSame(1, (int) $run->fresh()->KeptBreaks);
 
@@ -1624,9 +1634,12 @@ class BalancingTest extends TestCase
         $this->assertFalse((bool) $next->FlagSoldMoreThanOnHand);
         $this->assertFalse((bool) $next->ChainBlocked, 'A chain whose total is nil is not held back by a miscount.');
         $this->assertEqualsWithDelta(0.0, (float) $miscount->ChainNetVar, 0.001);
-        $this->assertEqualsWithDelta(0.0, (float) $miscount->QtyCloseNew, 0.005);
-        $this->assertEqualsWithDelta(-2.0, (float) $miscount->QtyVarNew, 0.005);
-        $this->assertEqualsWithDelta(2.0, (float) $next->QtyVarNew, 0.005);
+        // The opening-break pair (5 Nov 2026, docs/stock-recon.md "Shift
+        // shortages"): the night's opening, repaired down to the day's 0, shows
+        // the over the short before it needs, and the two balance. That retired
+        // the 2 Nov assertion that the -2 and the +2 both stay.
+        $this->assertEqualsWithDelta(2.0, (float) $miscount->QtyCloseNew, 0.005, 'The miscounted closing goes 0 → 2, as head office did by hand.');
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
     }
 
     /**
@@ -1676,9 +1689,14 @@ class BalancingTest extends TestCase
         $this->assertFalse((bool) $over->FlagCloseExceedsOnHand, 'The short before it covers the over: nothing came from nowhere.');
         $this->assertFalse((bool) $over->ChainBlocked, 'A chain whose total is nil is not held back by one miscount.');
         $this->assertEqualsWithDelta(0.0, (float) $over->ChainNetVar, 0.001);
-        $this->assertEqualsWithDelta(1.0, (float) $miscount->QtyCloseNew, 0.005);
-        $this->assertEqualsWithDelta(-2.0, (float) $miscount->QtyVarNew, 0.005);
-        $this->assertEqualsWithDelta(2.0, (float) $over->QtyVarNew, 0.005);
+        // A counted short offsets the over after it: chain short carry (v1__14pzx,
+        // the engine since 3-8 Nov 2026; usp_StockRecon_Commit: "a balanced chain
+        // may offset a counted short against a later over"), and the customer's
+        // rule of 12 Nov 2026 for this very shape, short then over with no break
+        // (docs/stock-recon.md, Engen Manguzi). That retired the 2 Nov assertion
+        // that the -2 and the +2 both stay.
+        $this->assertEqualsWithDelta(3.0, (float) $miscount->QtyCloseNew, 0.005, 'The miscounted closing goes 1 → 3.');
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
     }
 
     /**
@@ -2805,15 +2823,18 @@ class BalancingTest extends TestCase
      * balanced ("don't hold chains back"), so it is reported and the chain
      * balances.
      *
-     * The multiple comes from agora.StockIssueMultiple — head office's
-     * workbook — because PumpIT's own column is empty on the pack's sites.
+     * The multiple is the stock recon master's. Since the 3-8 Nov 2026 engine
+     * (docs/stock-recon.md, "Issue multiples", and rule 5) the current master
+     * value wins, an explicit 0 or 1 included, and head office's workbook
+     * (agora.StockIssueMultiple) fills in only where the master has none —
+     * test_missing_issues_use_current_master_multiples_only_on_interior_shifts.
+     * The local stub's column is NOT NULL DEFAULT 0, so a workbook row alone no
+     * longer makes this a pack of 10.
      */
     public function test_an_over_of_a_whole_pack_is_reported_and_the_chain_still_balances(): void
     {
-        $this->db()->table(config('agora.schema').'.StockIssueMultiple')->insert([
-            'BranchId' => self::BRANCH, 'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM,
-            'IssueMultiple' => 10, 'IsWeighed' => 0, 'Workbook' => 'TEST-multiples',
-        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::ITEM)->update(['IssueMultiple' => 10]);
 
         $run = $this->preview();
         $lines = $run->lines->where('StockItemNo', self::ITEM);
@@ -3027,22 +3048,31 @@ class BalancingTest extends TestCase
 
         // T = 89: the counted -5 plus the 94 the last shift sold beyond its stock.
         $last = $lines->first(fn ($l) => $l->TransactionDate->toDateString() === '2026-07-21' && $l->ShiftNo === 3);
-        $this->assertEqualsWithDelta((float) $last->QtyVar, (float) $last->QtyVarNew, 0.005, 'The over stays on the shift that sold it.');
+        // Every short on this chain comes before an over, and a counted short
+        // offsets the over after it: chain short carry (v1__14pzx, the engine
+        // since 3-8 Nov 2026; usp_StockRecon_Commit: "a balanced chain may
+        // offset a counted short against a later over"), and the customer's rule
+        // of 12 Nov 2026 (docs/stock-recon.md, "A short before an over balances
+        // with it"). That retired the 2 Nov assertion that every counted variance
+        // stays where it was and nothing is written.
+        $this->assertEqualsWithDelta(89.0, (float) $last->QtyVarNew, 0.005, 'The whole over stays on the shift that sold it.');
         $this->assertSame('unrecorded', $last->outcomeKey());
         $this->assertStringStartsWith('Unrecorded issue, over left', $last->Outcome);
         $this->assertEqualsWithDelta(0.0, (float) $last->AmendClose, 0.005, 'The latest count stands.');
 
         foreach ($lines->reject(fn ($l) => $l->Id === $last->Id) as $l) {
-            $this->assertEqualsWithDelta((float) $l->QtyVar, (float) $l->QtyVarNew, 0.005,
-                "{$l->TransactionDate->toDateString()} shift {$l->ShiftNo}: its counted variance stays on that shift.");
+            $this->assertEqualsWithDelta(0.0, (float) $l->QtyVarNew, 0.005,
+                "{$l->TransactionDate->toDateString()} shift {$l->ShiftNo}: every other shift balances to nil.");
             if ((float) $l->QtyVar < -0.005) {
                 $this->assertGreaterThanOrEqual((float) $l->QtyVar - 0.005, (float) $l->QtyVarNew, 'A short never grows.');
             }
         }
+        $this->assertTrue($lines->every(fn ($l) => (float) $l->AmendClose >= -0.005),
+            'Only a short reaches forward to an over: no closing is lowered onto a later short.');
 
         $this->assertEqualsWithDelta((float) $last->ChainNetVar, (float) $lines->sum(fn ($l) => (float) $l->QtyVarNew), 0.005,
             'Redistributed, never reduced: T is what is left.');
-        $this->assertFalse($lines->contains(fn ($l) => $l->isWritable()), 'No unsupported count movement is proposed.');
+        $this->assertTrue($lines->contains(fn ($l) => $l->isWritable()), 'And the press writes it.');
     }
 
     /**
