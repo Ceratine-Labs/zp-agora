@@ -91,6 +91,74 @@ class ReferenceMastersTest extends TestCase
         unset($page);
     }
 
+    public function test_standard_categories_list_all_fifty_four_with_the_shared_gl_pair(): void
+    {
+        $this->assertListingGuarded('standard-categories', 'standardcategories', 'agora.usp_Masters_GridStandardCategories');
+        $this->actingAs($this->person(['standardcategories.view']));
+
+        $rows = $this->rows('agora.usp_Masters_GridStandardCategories');
+        $this->assertCount(54, $rows, 'SS_StandardCategory holds 54.');
+
+        // The pair most of the shop posts to: every one of them names the others.
+        $pair = $rows->where('SupplierGLCode', '51010209')->where('SalesGLCode', '41010209');
+        $this->assertGreaterThan(10, $pair->count());
+        $this->assertSame([$pair->count() - 1], $pair->pluck('SharedGlCount')->map(fn ($n) => (int) $n)->unique()->values()->all());
+
+        $tobacco = $rows->firstWhere('StandardCategory', 'Tobacco');
+        $this->assertSame(
+            (int) $this->db()->selectOne("SELECT COUNT(*) AS n FROM agora.vw_MasterCategoryGl WHERE StandardCategory = 'Tobacco' AND IsActive = 1")->n,
+            (int) $tobacco->CategoryCount
+        );
+
+        $this->get(route('app.setup.standard-categories.index', ['f' => ['SupplierGLCode' => ['q' => '51010209', 'eq' => '1']]]))
+            ->assertOk()->assertSee('Grocery Foods')->assertDontSee('Diesel 50');
+        $this->get(route('app.setup.standard-categories.show', ['branch' => 2, 'key' => $tobacco->RowKey]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->assertSee('POS categories mapped')->assertSee('51010209');
+    }
+
+    public function test_category_gl_codes_need_a_branch_and_highlight_a_missing_gp_band(): void
+    {
+        $this->assertListingGuarded('categories', 'categorygl', 'agora.usp_Masters_GridCategoryGlCodes', '13');
+        $this->actingAs($this->person(['categorygl.view']));
+
+        // Per branch: no branch in scope is a refusal, on the page and in the procedure.
+        $this->get(route('app.setup.categories.index'))->assertOk()->assertSee('Choose a branch');
+        $this->assertRefused('agora.usp_Masters_GridCategoryGlCodes', 'MASTERS_BRANCH');
+
+        $all = $this->db()->selectOne('SELECT COUNT(*) AS n, SUM(CASE WHEN IsActive = 1 AND ISNULL(MinGP, 0) = 0 AND ISNULL(MaxGP, 0) = 0 THEN 1 ELSE 0 END) AS missing
+            FROM agora.vw_MasterCategoryGl g WHERE EXISTS (SELECT 1 FROM agora.Branch b WHERE b.BranchId = g.BranchId)');
+        $branches = implode(',', $this->db()->table('agora.Branch')->pluck('BranchId')->all());
+        $this->assertCount((int) $all->n, $this->rows('agora.usp_Masters_GridCategoryGlCodes', $branches));
+        $missing = $this->rows('agora.usp_Masters_GridCategoryGlCodes', $branches, ['FiltersJson' => json_encode([
+            ['column' => 'GpBand', 'type' => 'set', 'in' => ['Missing']], ['column' => 'IsActive', 'type' => 'set', 'in' => ['Yes']],
+        ])]);
+        $this->assertCount((int) $all->missing, $missing, 'Every active category with MinGP = MaxGP = 0, and nothing else.');
+
+        $baobab = $this->rows('agora.usp_Masters_GridCategoryGlCodes', '13');
+        $this->assertSame([13], $baobab->pluck('BranchId')->map(fn ($id) => (int) $id)->unique()->values()->all(), 'One site in scope, one site listed.');
+
+        $page = $this->get(route('app.setup.categories.index', ['branches' => [13]]))->assertOk()->assertSee('Baobab Convenience Centre');
+        if ($baobab->contains('GpBand', 'Missing')) {
+            $page->assertSee('is-warn', false);
+        }
+        $csv = $this->get(route('app.grids.extract', ['grid' => 'app.setup.categories', 'branches' => [13]]))->assertOk()->streamedContent();
+        $this->assertStringContainsString('Baobab Convenience Centre', $csv);
+
+        $one = $baobab->first();
+        $this->get(route('app.setup.categories.show', ['branch' => 13, 'key' => $one->RowKey]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->assertSee($one->Category)->assertSee('The same category at your other sites');
+    }
+
+    private function assertRefused(string $procedure, string $code, ?string $branches = null): void
+    {
+        try {
+            $this->rows($procedure, $branches);
+            $this->fail("{$procedure} must refuse with {$code}.");
+        } catch (AgoraProcException $e) {
+            $this->assertSame($code, $e->code());
+        }
+    }
+
     /**
      * The three checks every listing shares: no permission is no screen and
      * no extract, the permission is the screen, and the procedure itself

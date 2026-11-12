@@ -29,6 +29,8 @@ class ReferenceMastersPermissionSeeder extends Seeder
     /** @var array<string, string> resource => what the view permission lets a person see */
     public const PERMISSIONS = [
         'profitcentres' => 'See the profit centres, the sites running each and the POS categories mapped to it',
+        'standardcategories' => 'See the standard categories, their supplier and sales GL codes and the POS categories mapped to each',
+        'categorygl' => 'See every POS category\'s standard category, profit centre, GL codes and GP / days-cover band, per branch',
     ];
 
     public function run(): void

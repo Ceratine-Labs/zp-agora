@@ -56,6 +56,8 @@ Route::middleware('auth')->prefix('setup')->name('setup.')->group(function () {
      */
     foreach ([
         'profit-centres' => 'profitcentres',
+        'standard-categories' => 'standardcategories',
+        'categories' => 'categorygl',
     ] as $slug => $resource) {
         Route::get($slug, [ReferenceMasterController::class, 'index'])
             ->defaults('resource', $slug)->middleware("can:masters.{$resource}.view")->name("{$slug}.index");
