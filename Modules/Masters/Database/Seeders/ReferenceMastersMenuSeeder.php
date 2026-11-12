@@ -40,6 +40,7 @@ class ReferenceMastersMenuSeeder extends Seeder
         'business/profit-centres' => ['business', 'Profit centres', 'profit-centres', 'profitcentres', 20],
         'business/categories' => ['business', 'Categories and GP bands', 'categories', 'categorygl', 30],
         'business/standard-categories' => ['business', 'Standard categories', 'standard-categories', 'standardcategories', 40],
+        'trading-rules/expense-codes' => ['trading-rules', 'Expense codes', 'expense-codes', 'expenses', 60],
     ];
 
     public function run(): void

@@ -149,6 +149,56 @@ class ReferenceMastersTest extends TestCase
             ->assertOk()->assertSee($one->Category)->assertSee('The same category at your other sites');
     }
 
+    public function test_expense_codes_need_a_branch_and_name_the_approver(): void
+    {
+        $this->assertPerBranchListing('expense-codes', 'expenses', 'agora.usp_Masters_GridExpenses', 'vw_Expense', 'ExpenseDescription');
+
+        $rows = $this->rows('agora.usp_Masters_GridExpenses', $this->someBranch('vw_Expense'));
+        $this->assertNotContains(null, $rows->pluck('ApproverName')->all(), 'Every code names its approver, by name or by PumpIT id.');
+        $this->assertSame([], $rows->pluck('Vat')->map(fn ($v) => (int) $v)->unique()->diff([0, 15])->values()->all());
+    }
+
+    /**
+     * What every per-branch master must do: refuse without a branch, list
+     * exactly the chosen site's rows — the count the view holds for it — and
+     * hand the same rows to the extract and one of them to the detail panel.
+     */
+    private function assertPerBranchListing(string $slug, string $resource, string $procedure, string $view, string $titleColumn): void
+    {
+        $branch = $this->someBranch($view);
+        $this->assertListingGuarded($slug, $resource, $procedure, $branch);
+        $this->actingAs($this->person(["{$resource}.view"]));
+
+        $this->get(route("app.setup.{$slug}.index"))->assertOk()->assertSee('Choose a branch');
+        $this->assertRefused($procedure, 'MASTERS_BRANCH');
+        $this->getJson(route('app.grids.extract', ['grid' => "app.setup.{$slug}"]))->assertStatus(422);
+
+        $rows = $this->rows($procedure, $branch);
+        $this->assertSame((int) $this->db()->selectOne("SELECT COUNT(*) AS n FROM agora.{$view} WHERE BranchId = ?", [$branch])->n, $rows->count());
+        $this->assertSame([(int) $branch], $rows->pluck('BranchId')->map(fn ($id) => (int) $id)->unique()->values()->all());
+
+        $one = $rows->first();
+        $this->get(route("app.setup.{$slug}.index", ['branches' => [$branch]]))->assertOk()->assertSee((string) $one->{$titleColumn});
+        $csv = $this->get(route('app.grids.extract', ['grid' => "app.setup.{$slug}", 'branches' => [$branch]]))->assertOk()->streamedContent();
+        $this->assertStringContainsString((string) $one->{$titleColumn}, $csv);
+
+        $this->get(route("app.setup.{$slug}.show", ['branch' => $branch, 'key' => $one->RowKey]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->assertSee((string) $one->{$titleColumn})->assertDontSee('<!DOCTYPE', false);
+        $this->get(route("app.setup.{$slug}.show", ['branch' => $branch, 'key' => $one->RowKey]))->assertOk()->assertSee('Kept in');
+        $this->get(route("app.setup.{$slug}.show", ['branch' => $branch, 'key' => 'TEST-no-such-row']))->assertNotFound();
+    }
+
+    /** The agora.Branch site carrying the most rows of a view: real, and never empty. */
+    private function someBranch(string $view): string
+    {
+        $row = $this->db()->selectOne("SELECT TOP 1 v.BranchId FROM agora.{$view} v
+            WHERE EXISTS (SELECT 1 FROM agora.Branch b WHERE b.BranchId = v.BranchId)
+            GROUP BY v.BranchId ORDER BY COUNT(*) DESC, v.BranchId");
+        $this->assertNotNull($row, "agora.{$view} has rows locally — run php artisan agora:sync-local-masters.");
+
+        return (string) $row->BranchId;
+    }
+
     private function assertRefused(string $procedure, string $code, ?string $branches = null): void
     {
         try {
