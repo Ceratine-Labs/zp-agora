@@ -21,6 +21,7 @@ use Tests\TestCase;
  * before/after, the user and the reason. Also an Agora-only change (a site's
  * own setting value, agora.MasterChange), the overrides Agora holds over
  * PumpIT's rows (stock lines, a batch flag, critical lines, bank recon rules),
+ * a counting area's confirmation from its own ledger,
  * a site master's label (Reports v1__22q), the branch scope, the refusal, the
  * screens and the menu.
  *
@@ -274,6 +275,33 @@ class MasterChangesTest extends TestCase
         $this->assertSame(['12', null], array_slice($parked['BANK_EndPosition'], 0, 2), 'Parked, and the site has no rule of its own to fall back to.');
     }
 
+    public function test_a_counting_area_confirmation_shows_from_its_own_ledger(): void
+    {
+        $this->db()->table('PumpIT.dbo.STK_Area')->insert(['SSBranchId' => self::SITE, 'AreaNo' => 801, 'AreaDescription' => 'TEST-Bakery',
+            'AreaGroup' => 'Food Items', 'DayShift' => 1, 'AfternoonShift' => 0, 'NightShift' => 0, 'ShowReport' => 1, 'IsCaptureWaste' => 1]);
+        $prior = $this->db()->selectOne('SELECT IsPreparedFood, FoodBasis FROM agora.vw_StockAreaFood WHERE BranchId = ? AND AreaNo = 801', [self::SITE]);
+        $area = ['BranchId' => self::SITE, 'AreaNo' => 801, 'Confirm' => 1, 'UserId' => (int) $this->user->Id, 'Authorized' => 1, 'Workspace' => 'ho'];
+        $this->procedures()->write('agora.usp_StockRecon_SaveCountingArea', $area + ['IsPreparedFood' => 1 - (int) $prior->IsPreparedFood,
+            'ExpectedVersion' => 'new', 'ExpectedFood' => (int) $prior->IsPreparedFood, 'Reason' => 'TEST-the bakery only reheats']);
+
+        $changed = $this->changesOf('Counting area', 'TEST-the bakery only reheats');
+        $this->assertSame([
+            'FoodBasis' => [$prior->FoodBasis, 'Head-office confirmation', 'Counting area changed'],
+            'IsPreparedFood' => [(string) (int) $prior->IsPreparedFood, (string) (1 - (int) $prior->IsPreparedFood), 'Counting area changed'],
+        ], $changed);
+        $row = $this->masterChanges(['BranchIds' => (string) self::SITE, 'Search' => 'TEST-the bakery only reheats'])[0]->first();
+        $this->assertSame(['Area 801 · TEST-Bakery', 'TEST-Master changes', 'Agora', 'StockAreaSettingChange'],
+            [$row->RowKey, $row->ChangedBy, $row->Source, $row->Ledger]);
+
+        // Confirmed again as it stands: one row, saying so, and no basis row — it did not move.
+        $version = $this->db()->selectOne('SELECT CONVERT(varchar(18), CONVERT(binary(8), RowVer), 1) AS v FROM agora.StockAreaSetting WHERE BranchId = ? AND AreaNo = 801', [self::SITE])->v;
+        $now = 1 - (int) $prior->IsPreparedFood;
+        $this->procedures()->write('agora.usp_StockRecon_SaveCountingArea', $area + ['IsPreparedFood' => $now,
+            'ExpectedVersion' => $version, 'ExpectedFood' => $now, 'Reason' => 'TEST-checked again at month end']);
+        $this->assertSame(['IsPreparedFood' => [(string) $now, (string) $now, 'Counting area confirmed']],
+            $this->changesOf('Counting area', 'TEST-checked again at month end'));
+    }
+
     public function test_the_procedures_refuse_without_the_permission(): void
     {
         foreach (['agora.usp_Reports_GridMasterChanges', 'agora.usp_Reports_GridUserActivity'] as $procedure) {
@@ -410,7 +438,7 @@ class MasterChangesTest extends TestCase
         $this->db()->statement('DELETE FROM [PumpIT].dbo.BRN_Tills WHERE SSBranchId = ? AND TillNo = ?', [self::BRANCH, self::TILL]);
         $this->db()->table('agora.MasterChange')->where('BranchId', self::SITE)->delete();
         $this->db()->table('agora.Setting')->where('BranchId', self::SITE)->delete();
-        foreach (['StockItem', 'StockItemCritical', 'ReconCriteria'] as $table) {
+        foreach (['StockItem', 'StockItemCritical', 'ReconCriteria', 'StockAreaSettingChange', 'StockAreaSetting'] as $table) {
             $this->db()->table('agora.'.$table)->where('BranchId', self::SITE)->delete();
         }
         foreach (['STK_StockMaster', 'STK_Area', 'DBF_STDB', 'STK_StockMasterCritical'] as $table) {

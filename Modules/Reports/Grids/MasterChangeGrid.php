@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Gate;
  * Setup → Governance → Master data changes (T027).
  *
  * Every change to a master, one row per field: Agora's own masters from
- * agora.MasterChange and PumpIT's, written back, from the master ledgers of
+ * agora.MasterChange (and counting areas from agora.StockAreaSettingChange)
+ * and PumpIT's, written back, from the master ledgers of
  * agora.vw_PumpItChange (MasterWrite, PeopleWrite, PartnersWrite). The
  * procedure is agora.usp_Reports_GridMasterChanges; it filters, sorts and
  * pages, and refuses without the view permission, so the extract follows the
@@ -33,13 +34,16 @@ class MasterChangeGrid extends GridDefinition
     public const PERMISSION = 'reports.master-changes.view';
 
     public const ENTITIES = [
-        'Branch', 'Region', 'Brand', 'Format', 'Setting', 'Stock line', 'Critical line', 'Recon rule',
+        'Branch', 'Region', 'Brand', 'Format', 'Setting', 'Stock line', 'Critical line', 'Recon rule', 'Counting area',
         'Category band', 'Profit centre', 'Standard category', 'Expense code', 'Till', 'Shift',
         'Transaction type', 'Fuel type', 'Tank', 'Pump', 'Utility meter', 'Merchant or terminal number',
         'Employee', 'Employee area', 'Employee post', 'Supplier', 'Customer',
     ];
 
     public const SOURCES = ['Agora', 'Agora (copied from PumpIT)', 'PumpIT write-back'];
+
+    /** The ledgers of PumpIT write-backs, which the audit trail opens. */
+    public const PUMPIT_LEDGERS = ['MasterWrite', 'PeopleWrite', 'PartnersWrite'];
 
     public function __construct(protected BranchContext $context) {}
 
@@ -97,7 +101,7 @@ class MasterChangeGrid extends GridDefinition
             new GridColumn('Change', 'Before → after', wide: true, visible: false),
             new GridColumn('PumpItTable', 'PumpIT table', sort: 'PumpItTable', mono: true, visible: false),
             new GridColumn('Ref', 'Press', mono: true, visible: false),
-            new GridColumn('Ledger', 'Ledger', filter: 'set', options: ['MasterChange', 'MasterWrite', 'PeopleWrite', 'PartnersWrite'], visible: false),
+            new GridColumn('Ledger', 'Ledger', filter: 'set', options: ['MasterChange', 'StockAreaSettingChange', 'MasterWrite', 'PeopleWrite', 'PartnersWrite'], visible: false),
             new GridColumn('LedgerId', 'Ledger row', format: 'number', visible: false),
         ];
     }
@@ -115,7 +119,7 @@ class MasterChangeGrid extends GridDefinition
     /** The record changed, where it has a page of its own (feature-rules §3.7). */
     public function rowUrl(object $row): ?string
     {
-        if (($row->Ledger ?? null) !== 'MasterChange') {
+        if (in_array($row->Ledger ?? null, self::PUMPIT_LEDGERS, true)) {
             return $this->detailUrl($row);
         }
 
@@ -131,7 +135,7 @@ class MasterChangeGrid extends GridDefinition
     /** A write-back opens the way the audit trail opens it. */
     public function detailUrl(object $row): ?string
     {
-        if (($row->Ledger ?? 'MasterChange') === 'MasterChange' || ! Gate::allows('reports.audit-trail.view')) {
+        if (! in_array($row->Ledger ?? null, self::PUMPIT_LEDGERS, true) || ! Gate::allows('reports.audit-trail.view')) {
             return null;
         }
 

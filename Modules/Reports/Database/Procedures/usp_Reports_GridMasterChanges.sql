@@ -15,7 +15,8 @@
                 regions, brands, formats), system settings, and the overrides
                 Agora holds over PumpIT's rows: stock lines, critical lines and
                 bank recon rules. Source 'edit' is a screen; 'migrate' is the
-                one-off copy from PumpIT.
+                one-off copy from PumpIT. And agora.StockAreaSettingChange,
+                the counting areas' prepared-food confirmations.
      PumpIT     agora.vw_PumpItChange, restricted to the master ledgers —
      write-back MasterWrite (categories, profit centres, standard categories,
                 expense codes, tills, shifts, transaction types, fuel types,
@@ -36,7 +37,7 @@
    @AllowedBranchIds is the caller's sites (BranchContext); the branches
    picked are narrowed to it, and none left means no rows. The same
    filtered set drives the page, the total and the extract. Deployed by
-   v1__22ph, and again by v1__22pi.
+   v1__22ph, and again by v1__22pi and v1__22pj.
 
    READ-ONLY.
 
@@ -177,6 +178,39 @@ BEGIN
                                                              ELSE mc.Entity END) AS Label) el
     WHERE mc.CreatedAt >= DATEADD(minute, -@Sast, @From) AND mc.CreatedAt < DATEADD(minute, -@Sast, @To)
       AND (@AllBranches = 1 OR mc.BranchId IN (SELECT BranchId FROM @Branch));
+
+    /* Counting areas: the prepared-food classification head office confirms
+       (usp_StockRecon_SaveCountingArea), from its own ledger,
+       agora.StockAreaSettingChange — one row per confirmation, holding the
+       prior classification and its basis. A confirmation that keeps the
+       classification is still a row: it is what the ledger records. The basis
+       is a second field where it moved (the new one is always head office's). */
+    INSERT INTO #Rows (BranchId, BranchName, ChangedAt, ChangedById, ChangedBy, Entity, Action, RowKey, Field, PriorValue, NewValue,
+                       Change, Reason, Source, State, PumpItTable, Ref, Ledger, LedgerId)
+    SELECT ac.BranchId,
+           ISNULL(sb.Name, CONCAT(N'Site ', ac.BranchId)),
+           CONVERT(datetime2(0), DATEADD(minute, @Sast, ac.CreatedAt)),
+           ac.CreatedBy, cu.UserName,
+           N'Counting area',
+           CASE WHEN f.Field = N'IsPreparedFood' AND f.PriorValue = f.NewValue THEN N'Counting area confirmed'
+                ELSE N'Counting area changed' END,
+           ISNULL(CONCAT_WS(N' · ', CONCAT(N'Area ', ac.AreaNo), sa.AreaDescription), CONCAT(N'Area ', ac.AreaNo)),
+           f.Field, f.PriorValue, f.NewValue,
+           CONCAT(f.Field, N' ', ISNULL(NULLIF(f.PriorValue, N''), N'blank'), N' → ', ISNULL(NULLIF(f.NewValue, N''), N'blank')),
+           ac.Reason, N'Agora', N'active', NULL,
+           CONCAT(N'Area ', ac.AreaNo),
+           N'StockAreaSettingChange', ac.Id
+    FROM agora.StockAreaSettingChange ac
+    LEFT JOIN agora.vw_StockArea sa ON sa.BranchId = ac.BranchId AND sa.AreaNo = ac.AreaNo
+    LEFT JOIN agora.vw_Branch sb ON sb.BranchId = ac.BranchId
+    OUTER APPLY (SELECT TOP 1 u.UserName FROM agora.[User] u WHERE u.Id = ac.CreatedBy) cu
+    CROSS APPLY (VALUES
+        (N'IsPreparedFood', CONVERT(nvarchar(400), ac.PriorIsPreparedFood), CONVERT(nvarchar(400), ac.NewIsPreparedFood)),
+        (N'FoodBasis',      CONVERT(nvarchar(400), ac.PriorFoodBasis),      CONVERT(nvarchar(400), N'Head-office confirmation'))
+    ) f (Field, PriorValue, NewValue)
+    WHERE ac.CreatedAt >= DATEADD(minute, -@Sast, @From) AND ac.CreatedAt < DATEADD(minute, -@Sast, @To)
+      AND (@AllBranches = 1 OR ac.BranchId IN (SELECT BranchId FROM @Branch))
+      AND (f.Field = N'IsPreparedFood' OR ISNULL(f.PriorValue, N'') <> f.NewValue);
 
     /* PumpIT's masters, written back: the master ledgers' rows of the audit
        trail, with each ledger row's own field, before and after. */
