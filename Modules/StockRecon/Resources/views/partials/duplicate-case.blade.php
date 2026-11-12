@@ -62,8 +62,8 @@
                 .'looks the same.',
             'Result' => match ($case->State) {
                 'will_remove' => ($stampMode === 'live'
-                        ? 'The issue is set to 0 in PumpIT when this run is committed'
-                        : 'The issue is recorded as 0 in Agora when this run is committed (journal mode: PumpIT does not change)')
+                        ? 'The issue is set to 0 in PumpIT when this run is posted'
+                        : 'The issue is recorded as 0 in Agora when this run is posted (journal mode: PumpIT does not change)')
                     .' — '.$issueValue.' not charged.',
                 'removed' => ($case->AmendmentStampMode === 'live'
                         ? 'Set to 0 in PumpIT on '.$when($case->AmendedAt).' by '.$who($case->AmendedBy)
@@ -72,7 +72,7 @@
                 'reversed' => 'Set to 0 on '.$when($case->AmendedAt).' by '.$who($case->AmendedBy).', then reversed on '
                     .$when($case->ReversedAt).' by '.$who($case->ReversedBy).': the issue of '.$issue.' is back.',
                 'skipped' => 'Not written at the commit: '.$case->BlockReason,
-                'left_out' => 'Not written: this run was committed without this shift.',
+                'left_out' => 'Not written: this run was posted without this shift.',
                 default => 'Not corrected: '.(Str::after((string) ($case->DupReason ?: 'Not removed: the run did not take it out'), 'Not removed: '))
                     .'.',
             },

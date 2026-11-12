@@ -486,7 +486,7 @@
                 <button type="submit" class="btn-ghost">Reverse</button>
             </form>
             <p class="field-help">
-                Committed {{ $run->CommittedAt?->diffForHumans() }} —
+                Posted {{ $run->CommittedAt?->diffForHumans() }} —
                 {{ \App\Support\Format::n($run->CommittedRows) }} {{ Str::plural('shift', $run->CommittedRows) }},
                 {{ \App\Support\Format::n($run->CommittedUnits, 3) }} units{{ $run->StampMode === 'journal' ? ', recorded in Agora only' : ', written to PumpIT' }}.
             </p>

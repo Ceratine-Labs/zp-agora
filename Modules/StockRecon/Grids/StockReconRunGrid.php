@@ -8,6 +8,7 @@ use App\Grid\GridFilter;
 use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
 use App\Support\BranchContext;
+use Modules\StockRecon\Models\StockReconRun;
 
 /**
  * The balancing runs made at a site — the centre's Runs tab, and its hub.
@@ -98,8 +99,11 @@ class StockReconRunGrid extends GridDefinition
             'Note' => new GridFilter(column: 'Note', type: 'text'),
             'BranchName' => new GridFilter(column: 'BranchName', type: 'text'),
             'AreaName' => new GridFilter(column: 'AreaName', type: 'text'),
+            // The stored value is what the procedure filters on; the tick list
+            // reads the word the chip shows ('committed' reads "Posted").
             'Status' => new GridFilter(column: 'Status', type: 'set',
-                options: ['previewing', 'previewed', 'committed', 'reversed', 'failed']),
+                options: array_keys(StockReconRun::STATUS_LABELS),
+                labels: StockReconRun::STATUS_LABELS),
             'RunBy' => new GridFilter(column: 'RunBy', type: 'text'),
         ];
     }

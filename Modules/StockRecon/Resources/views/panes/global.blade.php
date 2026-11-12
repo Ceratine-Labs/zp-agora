@@ -20,7 +20,7 @@
 </div>
 <p class="muted">Same site, period and areas as this saved run. Quantities are the run’s snapshot;
     product grouping, ratios and production records are current reference data.
-    After proposed balancing includes any proposed missing-issue or duplicate corrections, whether committed or not.</p>
+    After proposed balancing includes any proposed missing-issue or duplicate corrections, whether posted or not.</p>
 @if ($run->AreaNo !== null)
     <p class="muted">This run covers one counting area. Preview every counting area to compare across areas.</p>
 @endif

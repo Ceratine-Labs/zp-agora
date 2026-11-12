@@ -94,10 +94,10 @@ class StockReconHelper
             'Run status' => $run->CommitKind === 'reset'
                 ? 'This run records Reset to original'.($run->Status === 'reversed' ? ', since reversed' : '').'. Its line commit states refer to the reset operation. The saved balancing proposals were not the reset writes; their quantities and outcomes remain the earlier calculation.'
                 : match ($run->Status) {
-                    'committed' => 'This run has been committed. Read the shift commit states: the run may include unticked or skipped proposals. Use a fresh preview for further amendments.',
+                    'committed' => 'This run has been posted. Read the shift commit states: the run may include unticked or skipped proposals. Use a fresh preview for further amendments.',
                     'reversed' => 'This run was reversed. Its proposals may be pending again; the saved calculation has not become a fresh source reading.',
                     'previewed' => 'This is a saved preview. Proposed outcomes are not evidence that a stock change was posted.',
-                    default => 'This run is recorded as '.$run->Status.'. Read its result before treating any proposal as complete.',
+                    default => 'This run is recorded as '.$run->statusLabel().'. Read its result before treating any proposal as complete.',
                 },
             'Review next' => $run->CommitKind === 'reset'
                 ? 'Read the reset entries in the Audit trail for the exact before-and-after values and skips. Open the fresh preview created after the reset, or prepare another preview to read the current source. Do not use the old proposed balancing figures to verify reset writes.'

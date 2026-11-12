@@ -122,7 +122,22 @@ BEGIN
                and the filter above then matches what is on screen. */
             ISNULL(NULLIF(LTRIM(RTRIM(r.Note)), ''),
                    CONVERT(nvarchar(10), r.FromDate, 120) + ' to ' + CONVERT(nvarchar(10), r.ToDate, 120)) AS Note,
-            r.FromDate, r.ToDate, r.[Status], r.StampMode, r.ProcedureName,
+            r.FromDate, r.ToDate,
+            /* The word the chip and the extract show; the stored value rides
+               along as StatusCode, which is what the Status filter compares.
+               'committed' reads "Posted" (Tessa Coetzee, Ngwenya Convenience,
+               12 Nov 2026). The same map is StockReconRun::STATUS_LABELS —
+               change one, change the other. */
+            CASE r.[Status]
+                WHEN 'previewing' THEN 'Previewing'
+                WHEN 'previewed'  THEN 'Previewed'
+                WHEN 'committed'  THEN 'Posted'
+                WHEN 'reversed'   THEN 'Reversed'
+                WHEN 'failed'     THEN 'Failed'
+                ELSE r.[Status]
+            END AS [Status],
+            r.[Status] AS StatusCode,
+            r.StampMode, r.ProcedureName,
             r.TotalRows, r.DormantRows, r.ChainCount, r.BalanceableChains, r.BlockedChains,
             r.AmendedRows, r.UnitsAmended,
             r.OverRowsBefore, r.OverRowsAfter, r.ShortRowsBefore, r.ShortRowsAfter,
@@ -165,10 +180,10 @@ BEGIN
                                      ELSE                        CASE WHEN base.AreaName   LIKE '%'+@fArea  +'%' THEN 1 ELSE 0 END END) = 1)
       AND (@fRunBy  IS NULL OR (CASE WHEN @fRunByOp  = 'eq' THEN CASE WHEN base.RunBy      =        @fRunBy       THEN 1 ELSE 0 END
                                      ELSE                        CASE WHEN base.RunBy      LIKE '%'+@fRunBy +'%' THEN 1 ELSE 0 END END) = 1)
-      AND (@fStatusAny = 0 OR base.[Status] IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'Status'));
+      AND (@fStatusAny = 0 OR base.StatusCode IN (SELECT [Value] FROM @FilterSet WHERE [Column] = 'Status'));
 
     SELECT
-        Id, Note, BranchId, BranchName, AreaNo, AreaName, FromDate, ToDate, [Status], RunBy, CreatedAt,
+        Id, Note, BranchId, BranchName, AreaNo, AreaName, FromDate, ToDate, [Status], StatusCode, RunBy, CreatedAt,
         TotalRows, DormantRows, ChainCount, BalanceableChains, BlockedChains, AmendedRows, UnitsAmended,
         OverRowsBefore, OverRowsAfter, ShortRowsBefore, ShortRowsAfter,
         NetOverUnits, NetOverValue, ShortValueAfter,

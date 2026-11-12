@@ -33,11 +33,15 @@ final class GridFilter
      * @param  string  $column  the column key this filters
      * @param  string  $type  text|number|date|set
      * @param  array<int, string>  $options  the tick list, for a set filter
+     * @param  array<string, string>  $labels  what the tick list SHOWS for a value, where that
+     *                                         differs from the value the source filters on
+     *                                         (a stored 'committed' read as "Posted")
      */
     public function __construct(
         public string $column,
         public string $type,
         public array $options = [],
+        public array $labels = [],
     ) {
         if (! in_array($type, ['text', 'number', 'date', 'set'], true)) {
             throw new \InvalidArgumentException("Unknown filter type [{$type}] on [{$column}].");

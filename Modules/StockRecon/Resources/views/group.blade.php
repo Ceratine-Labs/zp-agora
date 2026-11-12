@@ -10,7 +10,7 @@
                 @if ($results->where('Status', 'failed')->isNotEmpty())<button type="button" class="btn-ghost" data-stock-group-retry>Retry failed sites</button>@endif
             @endcan
             @foreach ($results as $result)
-                <x-card :title="$result->BranchName" :sub="$result->Status">
+                <x-card :title="$result->BranchName" :sub="\Modules\StockRecon\Models\StockReconRun::labelFor($result->Status)">
                     <div data-stock-group-site data-state="{{ $result->Status }}" data-name="{{ $result->BranchName }}" data-url="{{ route('app.stockrecon.groups.branch', [$group->GroupRef, $result->BranchId]) }}">
                         <p data-stock-group-result>{{ $result->FailureMessage ?: ($result->Status === 'pending' ? 'Waiting to preview.' : $result->TotalRows.' shifts; '.$result->AmendedRows.' proposed amendments; '.$result->BlockedChains.' blocked chains.') }}</p>
                         @if ($result->RunId && $result->Status !== 'failed')

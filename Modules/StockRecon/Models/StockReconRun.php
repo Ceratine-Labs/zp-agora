@@ -143,6 +143,34 @@ class StockReconRun extends BaseModel
         return $this->Status === 'committed';
     }
 
+    /**
+     * What a person reads for each stored Status — the one place the wording
+     * lives in PHP. usp_StockRecon_GridRuns carries the same map for the runs
+     * grid and its extract; change one, change the other.
+     *
+     * The stored value stays 'committed' (procedures, refusals and the Mine /
+     * open queries compare against it); only the word on screen is "Posted"
+     * (Tessa Coetzee, Ngwenya Convenience, 12 Nov 2026: "Can we change
+     * committed to Posted").
+     */
+    public const STATUS_LABELS = [
+        'previewing' => 'Previewing',
+        'previewed' => 'Previewed',
+        'committed' => 'Posted',
+        'reversed' => 'Reversed',
+        'failed' => 'Failed',
+    ];
+
+    public static function labelFor(?string $status): string
+    {
+        return self::STATUS_LABELS[(string) $status] ?? ucfirst((string) $status);
+    }
+
+    public function statusLabel(): string
+    {
+        return self::labelFor($this->Status);
+    }
+
     /** A run that can still be pressed: previewed, or reversed and back on the table. */
     public function isOpen(): bool
     {

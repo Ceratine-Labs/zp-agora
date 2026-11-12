@@ -17,7 +17,7 @@
             <x-fact label="Period" :value="$run->FromDate->format('d M Y').' to '.$run->ToDate->format('d M Y')" />
             <x-fact label="Counting area" :value="$run->AreaNo ?? 'Every area'" />
             <x-fact label="Preview saved" :value="\App\Support\BusinessDate::show($run->CreatedAt)" />
-            <x-fact label="Run status now" :value="$run->Status">The status can change after the snapshot was saved.</x-fact>
+            <x-fact label="Run status now" :value="$run->statusLabel()">The status can change after the snapshot was saved.</x-fact>
             <x-fact label="Recorded operation" :value="$run->CommitKind === 'reset' ? 'Reset to original' : ($run->CommittedAt ? 'Balancing amendment' : 'Preview only')" />
             <x-fact label="Saved stamp mode" :value="$run->StampMode" />
             <x-fact label="Complete through" :value="$run->CompleteTo?->format('d M Y') ?? 'Not recorded'" />

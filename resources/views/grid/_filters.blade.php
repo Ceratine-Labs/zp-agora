@@ -53,7 +53,7 @@
                         data-select data-placeholder="Any"
                         aria-label="Filter {{ $column->label }}">
                     @foreach ($spec->options as $option)
-                        <option value="{{ $option }}" @selected(in_array((string) $option, $chosen, true))>{{ $option }}</option>
+                        <option value="{{ $option }}" @selected(in_array((string) $option, $chosen, true))>{{ $spec->labels[$option] ?? $option }}</option>
                     @endforeach
                 </select>
             @else

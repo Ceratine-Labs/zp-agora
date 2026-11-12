@@ -45,7 +45,7 @@
 
     @if (session('discarded') !== null)
         <x-notice tone="info"
-                  :title="session('discarded') === 0 ? 'Nothing to discard' : session('discarded').' '.Str::plural('preview', session('discarded')).' discarded — committed runs kept'"
+                  :title="session('discarded') === 0 ? 'Nothing to discard' : session('discarded').' '.Str::plural('preview', session('discarded')).' discarded — posted runs kept'"
                   style="margin-bottom:16px" />
     @endif
 
@@ -194,7 +194,7 @@
             @if ($context->id() !== null)
                 <form method="POST" action="{{ route('app.stockrecon.clear') }}" data-loader="Clearing previews…"
                       data-confirm="Discard every preview you have made for this site?"
-                      data-confirm-text="Previews only. Nothing in PumpIT is affected — a preview is a record of a read — and any run you have committed is kept."
+                      data-confirm-text="Previews only. Nothing in PumpIT is affected — a preview is a record of a read — and any run you have posted is kept."
                       data-confirm-action="Discard previews" data-confirm-danger>
                     @csrf
                     @method('DELETE')
