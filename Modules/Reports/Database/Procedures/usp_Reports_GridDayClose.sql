@@ -22,8 +22,9 @@
      HOImport               87   SiteClosedOff        0   ReadyToImport   0
      PastelImport            0
 
-   So DayBalance is the close, NOT SiteClosedOff — which is set on 13 rows in
-   the table's entire history, all of them in 2023. A report built on the
+   So DayBalance is the close, NOT SiteClosedOff — which is set on 23 rows in
+   the table's entire history, 2023-06 to 2024-06 (re-measured 12 Nov 2026,
+   docs/reference/pumpit-dead-columns.md). A report built on the
    obviously-named column would have said every site is open, every day, for
    three years. FNBRecon is included in the sequence but marked, because its 90
    is the same population as the six FNB branches that cannot reconcile at all
