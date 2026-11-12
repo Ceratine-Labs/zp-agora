@@ -3,6 +3,7 @@
 namespace Modules\Cash\Grids\Deductions;
 
 use App\Grid\GridColumn;
+use Modules\Core\Facades\Settings;
 
 /**
  * Deductions → Cash Short Deductions Per Employee (T041, tab 1).
@@ -34,7 +35,7 @@ class CashShortGrid extends DeductionGrid
 
     protected function extraArguments(): array
     {
-        return ['Leniency' => (float) config('cash.deductions.cash_leniency', 3.00)];
+        return ['Leniency' => (float) Settings::for(null, 'cash.deductions.cash_leniency')];
     }
 
     protected function statKeys(): array

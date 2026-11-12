@@ -5,6 +5,7 @@ namespace Modules\Cash\Services;
 use App\Support\ProcedureService;
 use Illuminate\Support\Collection;
 use Modules\Cash\Support\CashupScope;
+use Modules\Core\Facades\Settings;
 
 /**
  * Daily banking and cashups (T037): the seam between the screens and the
@@ -38,9 +39,10 @@ class CashupService
         return config('cash.cashup.write_mode') === 'live' ? 'live' : 'off';
     }
 
-    public function varianceTolerance(): float
+    /** cash.cashup.variance_tolerance (T026): the site's own value, else the group's. */
+    public function varianceTolerance(?int $branchId = null): float
     {
-        return (float) config('cash.cashup.variance_tolerance', 150.00);
+        return (float) Settings::for($branchId, 'cash.cashup.variance_tolerance');
     }
 
     /**
@@ -214,7 +216,7 @@ class CashupService
     {
         return $this->procedures->write('usp_Cash_ConfirmCashup', $this->key($scope) + [
             'Note' => $note,
-            'VarianceTolerance' => $this->varianceTolerance(),
+            'VarianceTolerance' => $this->varianceTolerance($scope->branchId),
             'UserId' => $userId,
         ]);
     }
@@ -236,9 +238,9 @@ class CashupService
      * @param  Collection<int, object>  $zreads
      * @return array<string, int|float>
      */
-    public function summary(Collection $cashups, Collection $zreads): array
+    public function summary(Collection $cashups, Collection $zreads, ?int $branchId = null): array
     {
-        $tolerance = $this->varianceTolerance();
+        $tolerance = $this->varianceTolerance($branchId);
 
         return [
             'cashups' => $cashups->count(),
@@ -257,14 +259,14 @@ class CashupService
      * The tone of a variance chip: good inside a rand, warn inside the
      * tolerance, crit beyond it.
      */
-    public function varianceTone(float|string|null $variance): string
+    public function varianceTone(float|string|null $variance, ?int $branchId = null): string
     {
         $abs = abs((float) $variance);
 
         return match (true) {
             $variance === null => 'neutral',
             $abs < 1.0 => 'good',
-            $abs <= $this->varianceTolerance() => 'warn',
+            $abs <= $this->varianceTolerance($branchId) => 'warn',
             default => 'crit',
         };
     }

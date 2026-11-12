@@ -89,7 +89,7 @@ class UtilitiesController extends Controller
             'maySave' => (bool) $user?->can('utilities.readings.save'),
             'mayEdit' => (bool) $user?->can('utilities.readings.edit'),
             'untariffed' => $this->service->typesWithoutTariff(),
-            'zeroRunRule' => $this->service->zeroRunRule(),
+            'zeroRunRule' => $this->service->zeroRunRule($branchId),
             'grid' => $this->grids->build(
                 $this->registry->findOrFail('app.utilities.index'),
                 $request,

@@ -69,7 +69,7 @@ class TillBalanceController extends Controller
             'balances' => $period['balances'],
             'summary' => $this->service->summary($period['cashups'], $period['balances']),
             'writeMode' => $this->service->writeMode(),
-            'floor' => $this->service->varianceFloor(),
+            'floor' => $this->service->varianceFloor($scope->branchId),
         ]);
     }
 

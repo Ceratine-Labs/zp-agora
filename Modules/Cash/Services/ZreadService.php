@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Cash\Support\ZreadKey;
 use Modules\Cash\Support\ZreadScope;
+use Modules\Core\Facades\Settings;
 
 /**
  * Z-read allocation (T036): the seam between the screen and the procedures.
@@ -30,18 +31,19 @@ class ZreadService
     /**
      * The four numbers the proposer runs on, as the procedures name them.
      *
-     * config('cash.zread') today, agora.Setting once T026 exists — this is
-     * the one method that changes when it does.
+     * The shares and the history are settings (T026): the site's own value,
+     * else the group's, else the Cash config literal. The shift numbers and the
+     * excluded locations are not thresholds and stay in config.
      *
      * @return array{CertainShare: float, LikelyShare: float, ShiftShare: float, HistoryDays: int, DayShiftNo: int, NightShiftNo: int, SequenceExcluded: string}
      */
-    public function priors(): array
+    public function priors(?int $branchId = null): array
     {
         return [
-            'CertainShare' => (float) config('cash.zread.certain_share', 0.75),
-            'LikelyShare' => (float) config('cash.zread.likely_share', 0.60),
-            'ShiftShare' => (float) config('cash.zread.shift_share', 0.60),
-            'HistoryDays' => (int) config('cash.zread.history_days', 90),
+            'CertainShare' => (float) Settings::for($branchId, 'cash.zread.certain_share'),
+            'LikelyShare' => (float) Settings::for($branchId, 'cash.zread.likely_share'),
+            'ShiftShare' => (float) Settings::for($branchId, 'cash.zread.shift_share'),
+            'HistoryDays' => (int) Settings::for($branchId, 'cash.zread.history_days'),
             'DayShiftNo' => (int) config('cash.zread.day_shift_no', 1),
             'NightShiftNo' => (int) config('cash.zread.night_shift_no', 3),
             'SequenceExcluded' => implode(',', (array) config('cash.zread.sequence_excluded_locations', ['ARCH'])),
@@ -62,9 +64,9 @@ class ZreadService
     }
 
     /** certain | likely | review — what Auto-allocate stages without a person. */
-    public function threshold(): string
+    public function threshold(?int $branchId = null): string
     {
-        $threshold = (string) config('cash.zread.auto_accept', 'certain');
+        $threshold = (string) Settings::for($branchId, 'cash.zread.auto_accept_confidence');
 
         return in_array($threshold, ['certain', 'likely', 'review'], true) ? $threshold : 'certain';
     }
@@ -82,7 +84,7 @@ class ZreadService
             'DateTo' => $scope->to,
             'Location' => $scope->location,
             'Replay' => $replay ? 1 : 0,
-            ...$this->priors(),
+            ...$this->priors($scope->branchId),
         ]);
     }
 
@@ -95,7 +97,7 @@ class ZreadService
             'DateTo' => $key->date,
             'Location' => $key->location !== '' ? $key->location : null,
             'Replay' => 0,
-            ...$this->priors(),
+            ...$this->priors($key->branchId),
         ])->first(fn (object $row) => $key->matches($row));
     }
 
@@ -132,7 +134,7 @@ class ZreadService
             'Location' => $key->location,
             'TerminalNo' => $key->terminal,
             'AsOf' => $key->date,
-            'HistoryDays' => $this->priors()['HistoryDays'],
+            'HistoryDays' => $this->priors($key->branchId)['HistoryDays'],
         ]);
     }
 
@@ -144,8 +146,8 @@ class ZreadService
             'DateFrom' => $scope->from,
             'DateTo' => $scope->to,
             'Location' => $scope->location,
-            'Threshold' => $this->threshold(),
-            ...$this->priors(),
+            'Threshold' => $this->threshold($scope->branchId),
+            ...$this->priors($scope->branchId),
             'UserId' => $userId,
         ]);
     }
@@ -157,7 +159,7 @@ class ZreadService
             ...$key->procedureParameters(),
             'ZReadDate' => $key->date,
             'Source' => 'accepted',
-            ...$this->priors(),
+            ...$this->priors($key->branchId),
             'UserId' => $userId,
         ]);
     }
@@ -172,7 +174,7 @@ class ZreadService
             'TillNo' => $tillNo,
             'ShiftNo' => $shiftNo,
             'EmployeeCode' => $employeeCode,
-            ...$this->priors(),
+            ...$this->priors($key->branchId),
             'UserId' => $userId,
         ]);
     }

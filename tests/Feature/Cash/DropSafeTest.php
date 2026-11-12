@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Cash\Grids\DropSafeGrid;
 use Modules\Cash\Services\DropSafeService;
+use Modules\Core\Facades\Settings;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserBranch;
@@ -75,6 +76,9 @@ class DropSafeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Thresholds are settings since T026; these tests drive them through config([...]),
+        // which is the code default Settings answers with when the table is faked out.
+        Settings::fake();
 
         $this->skipUnlessLocalStub('This fixture writes bags and collections into the PumpIT stub.');
 

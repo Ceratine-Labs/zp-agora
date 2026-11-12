@@ -5,6 +5,7 @@ namespace Tests\Feature\Utilities;
 use App\Exceptions\AgoraProcException;
 use App\Support\ProcedureService;
 use Illuminate\Support\Carbon;
+use Modules\Core\Facades\Settings;
 use Modules\Utilities\Services\UtilitiesService;
 use Tests\TestCase;
 
@@ -30,6 +31,9 @@ class UtilityReadingsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Thresholds are settings since T026; these tests drive them through config([...]),
+        // which is the code default Settings answers with when the table is faked out.
+        Settings::fake();
 
         $this->skipUnlessLocalStub('This fixture writes meter readings into the PumpIT stub.');
         $this->service = new UtilitiesService;

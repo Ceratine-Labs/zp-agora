@@ -18,6 +18,7 @@ use Modules\Cash\Grids\StaffShortGrid;
 use Modules\Cash\Grids\ZreadGrid;
 use Modules\Cash\Grids\ZreadNoCashupGrid;
 use Modules\Core\Grids\RoleGrid;
+use Modules\Core\Grids\SettingGrid;
 use Modules\Core\Grids\UserGrid;
 use Modules\Debtors\Grids\DebtorAccountGrid;
 use Modules\Masters\Grids\BranchMasterGrid;
@@ -106,6 +107,7 @@ return [
     'grids' => [
         'app.setup.users' => UserGrid::class,
         'app.setup.roles' => RoleGrid::class,
+        'app.setup.settings' => SettingGrid::class,
         'app.setup.branches' => BranchMasterGrid::class,
         'app.setup.profit-centres' => \Modules\Masters\Grids\ProfitCentreGrid::class,
         'app.setup.standard-categories' => \Modules\Masters\Grids\StandardCategoryGrid::class,

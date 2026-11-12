@@ -169,7 +169,7 @@ class DropSafeController extends Controller
             'editing' => $editing,
             'voiding' => $voiding,
             'writeMode' => $this->service->writeMode(),
-            'threshold' => $this->service->threshold(),
+            'threshold' => $this->service->threshold($scope->branchId),
         ];
     }
 

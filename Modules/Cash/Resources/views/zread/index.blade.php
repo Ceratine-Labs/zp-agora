@@ -31,13 +31,13 @@
         <x-slot:info>
             <p>A Z-read arrives from the till with a number and an operator ID, nothing else. Allocating it says which
                till, which shift and who was on it. The system proposes from the site's last
-               {{ config('cash.zread.history_days') }} days of allocations, made here and on PumpIT's ZREAD Update
+               {{ \Modules\Core\Facades\Settings::for($scope->branchId, 'cash.zread.history_days') }} days of allocations, made here and on PumpIT's ZREAD Update
                screen — let it propose, and only touch the ones it cannot call.</p>
             <p><strong>Certain</strong>: this terminal and operator ID carried the same till, shift and person on at
-               least {{ (int) round(config('cash.zread.certain_share') * 100) }}% of prior Z-reads.
+               least {{ (int) round(\Modules\Core\Facades\Settings::for($scope->branchId, 'cash.zread.certain_share') * 100) }}% of prior Z-reads.
                <strong>Likely</strong>: the operator ID was the same person on at least
-               {{ (int) round(config('cash.zread.likely_share') * 100) }}%, and the shift only when that operator ID runs
-               one shift at least {{ (int) round(config('cash.zread.shift_share') * 100) }}% of the time.
+               {{ (int) round(\Modules\Core\Facades\Settings::for($scope->branchId, 'cash.zread.likely_share') * 100) }}%, and the shift only when that operator ID runs
+               one shift at least {{ (int) round(\Modules\Core\Facades\Settings::for($scope->branchId, 'cash.zread.shift_share') * 100) }}% of the time.
                <strong>Review</strong>: no settled person, but somebody usually works this terminal on that shift.
                <strong>Needs a person</strong>: nothing to go on, usually an operator ID the site has never
                allocated.</p>

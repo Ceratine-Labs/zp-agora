@@ -54,13 +54,12 @@ return [
         'stamp_mode' => 'live',
 
         /*
-        | THE PRIORS, and why they are here rather than in agora.Setting.
-        |
-        | Plan §3.4 says a proposer "reads the auto-accept threshold from
-        | agora.Setting". agora.Setting is T026 and is not built, so the four
-        | numbers and the threshold live here, each under the key it will
-        | carry there (`setting`), and ZreadService is the only thing that
-        | reads them. Moving them is one method, not a hunt.
+        | THE PRIORS. Since T026 the four numbers and the threshold are
+        | SETTINGS, read through Settings::for() from agora.Setting under the
+        | key on each line (`setting`) and edited on Setup -> System defaults
+        | and thresholds. These literals are the shipped default the seeder
+        | wrote, and the fallback before it runs; changing one here changes
+        | nothing on a database that already has the row.
         |
         | The values are the plan's, unchanged (T036):
         |
@@ -385,9 +384,9 @@ return [
         | client and into the column's name (ReasonIfAmountMoreThanR2000), and
         | the customer's data shows it enforced — every bag over R2,000.00 since
         | October 2023 carries a reason bar one; a bag of exactly R2,000.00
-        | needs none. Here it lives under the key agora.Setting will carry (T026,
-        | not built), and DropSafeService is the only thing that reads it. The
-        | procedures carry the same number as a parameter default.
+        | needs none. It is a setting (T026) under the key below, read through
+        | Settings::for(); this literal is its shipped default. The procedures
+        | carry the same number as a parameter default.
         */
         'reason_threshold' => 2000.00,   // setting: cash.dropsafe.reason_threshold
 

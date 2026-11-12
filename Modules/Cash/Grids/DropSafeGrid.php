@@ -7,6 +7,7 @@ use App\Grid\GridDefinition;
 use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
 use App\Support\BranchContext;
+use Modules\Core\Facades\Settings;
 
 /**
  * Cash → Drop safe bags (T039): every bag dropped into a site's manual safe —
@@ -97,7 +98,7 @@ class DropSafeGrid extends GridDefinition
             acceptsFilters: true,
             extra: [
                 'AllowedBranchIds' => $allowed === [] ? null : implode(',', $allowed),
-                'Threshold' => (float) config('cash.dropsafe.reason_threshold', 2000.00),
+                'Threshold' => (float) Settings::for(null, 'cash.dropsafe.reason_threshold'),
             ],
         );
     }

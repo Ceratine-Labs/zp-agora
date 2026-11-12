@@ -80,7 +80,7 @@ class ZreadController extends Controller
             'pinned' => $context->isBranchWorkspace(),
             'locations' => (array) config('cash.zread.locations', []),
             'summary' => $this->service->summary($rows),
-            'threshold' => $this->service->threshold(),
+            'threshold' => $this->service->threshold($scope->branchId),
             'stampMode' => $this->service->stampMode(),
             'refusal' => $refusal,
             'commits' => $scope->isChosen() && $refusal === null ? $this->service->commits($scope) : collect(),

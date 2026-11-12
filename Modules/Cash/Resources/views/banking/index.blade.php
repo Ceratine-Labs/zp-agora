@@ -115,7 +115,7 @@
                  'note' => $notCaptured->count() > 0 ? $notCaptured->count().' Z-read(s) not cashed up' : 'every allocated Z-read cashed up',
                  'tone' => $notCaptured->count() > 0 ? 'warn' : 'neutral'],
                 ['label' => 'Net variance', 'value' => \App\Support\Format::r($summary['variance']),
-                 'tone' => $service->varianceTone($summary['variance'])],
+                 'tone' => $service->varianceTone($summary['variance'], $scope->branchId)],
                 ['label' => 'Beyond ±R'.\App\Support\Format::n($tolerance), 'value' => \App\Support\Format::n($summary['beyond']),
                  'tone' => $summary['beyond'] > 0 ? 'crit' : 'good'],
                 ['label' => 'To confirm', 'value' => \App\Support\Format::n($summary['toConfirm']),
@@ -147,7 +147,7 @@
                         <td>{{ $c->EmployeeName ?? $c->EmployeeCode }}</td>
                         <td class="num">{{ \App\Support\Format::r($c->ZRead) }}</td>
                         <td class="num">{{ \App\Support\Format::r($c->ActualTotal) }}</td>
-                        <td class="num"><x-chip :tone="$service->varianceTone($c->Variance)" :dot="false">{{ \App\Support\Format::r($c->Variance) }}</x-chip></td>
+                        <td class="num"><x-chip :tone="$service->varianceTone($c->Variance, $scope->branchId)" :dot="false">{{ \App\Support\Format::r($c->Variance) }}</x-chip></td>
                         <td><x-chip :tone="\Modules\Cash\Services\CashupService::zreadTone($c->ZreadCheck)">{{ $c->ZreadCheck }}</x-chip></td>
                         <td><x-chip :tone="\Modules\Cash\Services\CashupService::statusTone($c->Status)">{{ $c->Status }}</x-chip></td>
                     </tr>

@@ -14,7 +14,7 @@
                until the security company collects it; then it names the collection and the security company's bag it
                went in — the reference the bank statement quotes.</p>
             <p><strong>Cashup</strong> says whether the bag is on a cashup's cash bags yet; that does not take it out
-               of the safe. A bag over {{ \App\Support\Format::r(config('cash.dropsafe.reason_threshold', 2000)) }}
+               of the safe. A bag over {{ \App\Support\Format::r(\Modules\Core\Facades\Settings::for(null, 'cash.dropsafe.reason_threshold')) }}
                with no reason is flagged under its amount.</p>
         </x-slot:info>
         <x-slot:actions>

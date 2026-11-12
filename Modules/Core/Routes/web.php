@@ -10,6 +10,7 @@ use Modules\Core\Http\Controllers\LandingStubController;
 use Modules\Core\Http\Controllers\ModuleMenuController;
 use Modules\Core\Http\Controllers\PreferenceController;
 use Modules\Core\Http\Controllers\RoleAdminController;
+use Modules\Core\Http\Controllers\SettingController;
 use Modules\Core\Http\Controllers\UserAdminController;
 use Modules\Core\Http\Middleware\AuthorizeAccessGrid;
 
@@ -81,6 +82,26 @@ Route::middleware('auth')->group(function () {
         // safe to repeat by refreshing.
         Route::post('users/{user}/password', [UserAdminController::class, 'updatePassword'])
             ->middleware('can:setup.users.edit')->whereNumber('user')->name('users.password.update');
+
+        /*
+         | ---- T026: system defaults and thresholds ---------------------------
+         |
+         | Setup -> The business. One permission per action (feature-rules §4):
+         | view the listing and a setting; edit a value (the group's or a
+         | site's own); save a site's own value; delete one. The key carries
+         | dots (cash.dropsafe.reason_threshold), so the placeholder allows them.
+         */
+        Route::get('settings', [SettingController::class, 'index'])
+            ->middleware('can:setup.settings.view')->name('settings.index');
+        Route::prefix('settings/{key}')->where(['key' => '[A-Za-z0-9_.]+'])->name('settings.')->group(function () {
+            Route::get('/', [SettingController::class, 'show'])->middleware('can:setup.settings.view')->name('show');
+            Route::get('edit', [SettingController::class, 'edit'])->middleware('can:setup.settings.edit')->name('edit');
+            Route::put('/', [SettingController::class, 'update'])->middleware('can:setup.settings.edit')->name('update');
+            Route::get('overrides/create', [SettingController::class, 'create'])->middleware('can:setup.settings.save')->name('overrides.create');
+            Route::post('overrides', [SettingController::class, 'store'])->middleware('can:setup.settings.save')->name('overrides.store');
+            Route::delete('overrides/{branch}', [SettingController::class, 'destroy'])
+                ->middleware('can:setup.settings.delete')->whereNumber('branch')->name('overrides.destroy');
+        });
     });
 
     Route::get('console', [LandingStubController::class, 'console'])->name('console');

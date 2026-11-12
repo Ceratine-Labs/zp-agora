@@ -63,7 +63,7 @@
                 {{-- Variance first: on a phone the facts stack, and it is the one
                      figure the card is for. --}}
                 <x-facts>
-                    <x-fact label="Variance" :value="\App\Support\Format::r($c->Variance)" :tone="$service->varianceTone($c->Variance)" />
+                    <x-fact label="Variance" :value="\App\Support\Format::r($c->Variance)" :tone="$service->varianceTone($c->Variance, $scope->branchId)" />
                     <x-fact label="Z read" :value="\App\Support\Format::r($c->ZRead)" />
                     <x-fact label="Actual" :value="\App\Support\Format::r($c->ActualTotal)" />
                 </x-facts>

@@ -7,6 +7,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Modules\Cash\Services\StaffShortService;
+use Modules\Core\Facades\Settings;
 use Throwable;
 
 /**
@@ -79,6 +80,11 @@ class ReconMatchService
             'ReconArea' => $area,
             'FromDate' => $from->toDateString(),
             'ToDate' => $to->endOfDay()->toDateTimeString(),
+            // Settings (T026), the site's own else the group's; the seeded
+            // values are the procedure's own parameter defaults.
+            'MaxLagDays' => (int) Settings::for($branchId, 'recon.suggest.max_lag_days'),
+            'CloseMax' => (float) Settings::for($branchId, 'recon.suggest.close_max'),
+            'ClosePct' => (float) Settings::for($branchId, 'recon.suggest.close_pct'),
         ]);
 
         $members = ($sets[1] ?? collect())->groupBy('SuggestionNo');

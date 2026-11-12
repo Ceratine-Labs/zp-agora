@@ -5,12 +5,14 @@
 | Utilities (T056)
 |--------------------------------------------------------------------------
 |
-| Three of these are SETTINGS that live here only because the Settings screen
-| (T026) is not built yet. They are named as the Settings keys will be named,
-| so moving them is a change of where they are read from and nothing else:
+| Two of these are SETTINGS (T026): read through Settings::for() from
+| agora.Setting, edited on Setup -> The business -> System defaults and
+| thresholds, and kept here only as the shipped default the seeder wrote and
+| the fallback before it runs. Changing them here changes nothing on a
+| database that already has the rows:
 |
-|   utilities.tariffs               -> Setting `utilities.tariff.{type}`
-|   utilities.zero_usage_run_days   -> Setting `utilities.zero_usage_run_days`
+|   utilities.tariffs.{type}             -> Setting `utilities.tariff.{type}`
+|   utilities.zero_usage_run_days.{key}  -> Setting `utilities.zero_usage_run_days.{key}`
 |
 | Nothing here is a figure the customer reads; each one is passed INTO the
 | procedures, which is where every number on the screen is computed.

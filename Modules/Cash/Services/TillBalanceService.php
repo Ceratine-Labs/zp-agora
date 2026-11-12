@@ -5,6 +5,7 @@ namespace Modules\Cash\Services;
 use App\Support\ProcedureService;
 use Illuminate\Support\Collection;
 use Modules\Cash\Support\TillBalanceScope;
+use Modules\Core\Facades\Settings;
 
 /**
  * Till balance (T038): the seam between the screen and the procedures.
@@ -35,9 +36,10 @@ class TillBalanceService
         return config('cash.tillbalance.write_mode') === 'live' ? 'live' : 'off';
     }
 
-    public function varianceFloor(): float
+    /** cash.tillbalance.variance_floor (T026): the site's own value, else the group's. */
+    public function varianceFloor(?int $branchId = null): float
     {
-        return (float) config('cash.tillbalance.variance_floor', 1.00);
+        return (float) Settings::for($branchId, 'cash.tillbalance.variance_floor');
     }
 
     /**
@@ -53,7 +55,7 @@ class TillBalanceService
             'DateFrom' => $scope->from,
             'DateTo' => $scope->to,
             'EmployeeCode' => $scope->employeeCode,
-            'VarianceFloor' => $this->varianceFloor(),
+            'VarianceFloor' => $this->varianceFloor($scope->branchId),
         ]);
 
         return [

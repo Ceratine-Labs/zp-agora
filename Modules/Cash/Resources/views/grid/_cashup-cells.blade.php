@@ -15,7 +15,7 @@
 --}}
 @switch($column->key)
     @case('Variance')
-        <x-chip :tone="app(\Modules\Cash\Services\CashupService::class)->varianceTone($row->Variance)" :dot="false">{{ \App\Support\Format::r($row->Variance) }}</x-chip>
+        <x-chip :tone="app(\Modules\Cash\Services\CashupService::class)->varianceTone($row->Variance, isset($row->BranchId) ? (int) $row->BranchId : null)" :dot="false">{{ \App\Support\Format::r($row->Variance) }}</x-chip>
         @break
 
     @case('ZreadCheck')

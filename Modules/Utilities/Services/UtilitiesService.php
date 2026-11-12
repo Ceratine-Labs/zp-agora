@@ -5,6 +5,7 @@ namespace Modules\Utilities\Services;
 use App\Support\ProcedureService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Modules\Core\Facades\Settings;
 
 /**
  * Utility meter readings (T056).
@@ -36,7 +37,7 @@ class UtilitiesService
             'DateTo' => $to->toDateString(),
             'UtilityType' => $utilityType,
             'TariffsJson' => $this->tariffsJson(),
-            'ZeroRunDaysJson' => $this->zeroRunDaysJson(),
+            'ZeroRunDaysJson' => $this->zeroRunDaysJson($branchId),
         ]);
 
         return [
@@ -57,7 +58,7 @@ class UtilitiesService
             'BranchId' => $branchId,
             'DateFrom' => $from->toDateString(),
             'DateTo' => $to->toDateString(),
-            'ZeroRunDaysJson' => $this->zeroRunDaysJson(),
+            'ZeroRunDaysJson' => $this->zeroRunDaysJson($branchId),
         ]);
     }
 
@@ -131,13 +132,16 @@ class UtilitiesService
 
     /**
      * The tariffs, as the procedures take them: {"B": 2.95, "L": null, ...}.
-     * An empty config is `{}`, never `[]` — the procedure reads an object.
+     * An empty set is `{}`, never `[]` — the procedure reads an object.
+     *
+     * Settings `utilities.tariff.{type}` (T026), one value for the estate:
+     * the readings grid costs every site in one call.
      */
     public function tariffsJson(): string
     {
         $tariffs = [];
 
-        foreach ((array) config('utilities.tariffs', []) as $type => $rate) {
+        foreach (Settings::prefixed(null, 'utilities.tariff.') as $type => $rate) {
             $tariffs[(string) $type] = is_numeric($rate) ? (float) $rate : null;
         }
 
@@ -153,7 +157,7 @@ class UtilitiesService
     public function typesWithoutTariff(): array
     {
         return array_keys(array_filter(
-            (array) config('utilities.tariffs', []),
+            Settings::prefixed(null, 'utilities.tariff.'),
             fn ($rate) => ! is_numeric($rate),
         ));
     }
@@ -162,9 +166,9 @@ class UtilitiesService
      * The zero-usage run length per meter type, as the procedures take it:
      * {"default": 3, "L": null, "M": null}. A null type is never flagged.
      */
-    public function zeroRunDaysJson(): string
+    public function zeroRunDaysJson(?int $branchId = null): string
     {
-        return json_encode($this->zeroRunDays(), JSON_THROW_ON_ERROR);
+        return json_encode($this->zeroRunDays($branchId), JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -173,9 +177,10 @@ class UtilitiesService
      *
      * @return array<string, int|null>
      */
-    public function zeroRunDays(): array
+    public function zeroRunDays(?int $branchId = null): array
     {
-        $configured = (array) config('utilities.zero_usage_run_days', []);
+        // Settings `utilities.zero_usage_run_days.{default|type}` (T026): the site's own, else the group's.
+        $configured = Settings::prefixed($branchId, 'utilities.zero_usage_run_days.');
         $days = fn ($v) => is_numeric($v) && (int) $v >= 1 ? (int) $v : null;
 
         $map = ['default' => array_key_exists('default', $configured) ? $days($configured['default']) : 3];
@@ -194,9 +199,9 @@ class UtilitiesService
      * does. Built from the same map the procedures are handed, so the sentence
      * and the flags cannot disagree.
      */
-    public function zeroRunRule(): string
+    public function zeroRunRule(?int $branchId = null): string
     {
-        $map = $this->zeroRunDays();
+        $map = $this->zeroRunDays($branchId);
         $default = $map['default'];
         unset($map['default']);
 

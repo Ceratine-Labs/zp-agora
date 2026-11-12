@@ -130,7 +130,7 @@ class ZreadGrid extends GridDefinition
                 'PeriodTo' => $scope->to,
                 'Location' => $scope->location,
                 'Show' => $scope->show,
-                ...$this->service->priors(),
+                ...$this->service->priors($scope->branchId),
             ],
         );
     }

@@ -20,6 +20,7 @@ use Modules\Core\Models\User;
 use Modules\Core\Services\MenuAccessService;
 use Modules\Core\Services\MenuService;
 use Modules\Core\Services\PermissionService;
+use Modules\Core\Services\SettingService;
 use Modules\Core\View\Composers\ShellComposer;
 
 class CoreServiceProvider extends ServiceProvider
@@ -52,6 +53,13 @@ class CoreServiceProvider extends ServiceProvider
          | is the same person's one grant set.
          */
         $this->app->singleton(MenuAccessService::class);
+
+        /*
+         | The settings (T026), read once per request — or per queued job,
+         | which is why this is scoped rather than a singleton: a worker that
+         | lived for a week would otherwise keep the value it read on Monday.
+         */
+        $this->app->scoped(SettingService::class);
     }
 
     public function boot(): void

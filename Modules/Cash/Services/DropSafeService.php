@@ -5,6 +5,7 @@ namespace Modules\Cash\Services;
 use App\Support\ProcedureService;
 use Illuminate\Support\Collection;
 use Modules\Cash\Support\DropSafeScope;
+use Modules\Core\Facades\Settings;
 
 /**
  * The drop safe (T039): the seam between the screens and the procedures.
@@ -44,10 +45,13 @@ class DropSafeService
         return config('cash.dropsafe.write_mode') === 'live' ? 'live' : 'off';
     }
 
-    /** Above this a bag needs a reason — cash.dropsafe.reason_threshold (setting). */
-    public function threshold(): float
+    /**
+     * Above this a bag needs a reason — cash.dropsafe.reason_threshold (T026).
+     * One value for the estate: the bags grid flags every site in one call.
+     */
+    public function threshold(?int $branchId = null): float
     {
-        return (float) config('cash.dropsafe.reason_threshold', 2000.00);
+        return (float) Settings::for($branchId, 'cash.dropsafe.reason_threshold');
     }
 
     /**
@@ -63,7 +67,7 @@ class DropSafeService
             'BranchId' => $scope->branchId,
             'DateFrom' => $scope->from,
             'DateTo' => $scope->to,
-            'Threshold' => $this->threshold(),
+            'Threshold' => $this->threshold($scope->branchId),
         ]);
 
         return [
@@ -197,7 +201,7 @@ class DropSafeService
             'LimitReason' => $bag['limitReason'],
             'CashierCode' => $bag['cashier'],
             'ManagerCode' => $bag['manager'],
-            'Threshold' => $this->threshold(),
+            'Threshold' => $this->threshold($branchId),
             'Note' => $note,
             'WriteMode' => $this->writeMode(),
             'UserId' => $userId,

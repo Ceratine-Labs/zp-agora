@@ -105,12 +105,12 @@ class CashupController extends Controller
             'cards' => $cards,
             'pool' => $pool,
             'poolChannel' => $poolChannel,
-            'summary' => $this->service->summary($day['cashups'], $day['zreads']),
+            'summary' => $this->service->summary($day['cashups'], $day['zreads'], $scope->branchId),
             'channels' => $this->service->channels(),
             'writeMode' => $this->service->writeMode(),
             'savable' => $this->service->savableChannels(),
             'held' => $this->service->heldChannels(),
-            'tolerance' => $this->service->varianceTolerance(),
+            'tolerance' => $this->service->varianceTolerance($scope->branchId),
         ]);
     }
 
@@ -157,7 +157,7 @@ class CashupController extends Controller
             'one' => $one,
             'lines' => $day['lines'],
             'channels' => $this->service->channels(),
-            'tolerance' => $this->service->varianceTolerance(),
+            'tolerance' => $this->service->varianceTolerance($scope->branchId),
         ]);
     }
 
@@ -253,7 +253,7 @@ class CashupController extends Controller
                 $c->Status === 'Open' ? 0 : ($c->Status === 'Confirmed' ? 1 : 2),
                 -abs((float) $c->Variance),
             ])->values(),
-            'tolerance' => $this->service->varianceTolerance(),
+            'tolerance' => $this->service->varianceTolerance($scope->branchId),
         ]);
     }
 

@@ -7,6 +7,7 @@ use App\Support\BusinessDate;
 use App\Support\ProcedureService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Modules\Core\Facades\Settings;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -26,9 +27,13 @@ class DeductionService
 {
     public function __construct(protected ProcedureService $procedures) {}
 
-    public function leniency(): float
+    /**
+     * cash.deductions.cash_leniency (T026). One value for the estate: the
+     * cash-short tab reads every site in one call and must agree with the build.
+     */
+    public function leniency(?int $branchId = null): float
     {
-        return (float) config('cash.deductions.cash_leniency', 3.00);
+        return (float) Settings::for($branchId, 'cash.deductions.cash_leniency');
     }
 
     /**
@@ -80,7 +85,7 @@ class DeductionService
                     'BranchId' => $branchId,
                     'FromDate' => $from->toDateString(),
                     'ToDate' => $to->toDateString(),
-                    'Leniency' => $this->leniency(),
+                    'Leniency' => $this->leniency($branchId),
                     'UserId' => $userId,
                     'Note' => $note,
                 ])[0] ?? collect())->first();

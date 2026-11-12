@@ -13,6 +13,7 @@ use Modules\Cash\Grids\CashupGrid;
 use Modules\Cash\Grids\ZreadNoCashupGrid;
 use Modules\Cash\Services\CashupService;
 use Modules\Cash\Support\CashupScope;
+use Modules\Core\Facades\Settings;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserBranch;
@@ -68,6 +69,9 @@ trait CashupFixture
     protected function setUp(): void
     {
         parent::setUp();
+        // Thresholds are settings since T026; these tests drive them through config([...]),
+        // which is the code default Settings answers with when the table is faked out.
+        Settings::fake();
 
         $this->skipUnlessLocalStub('This fixture writes cashups into the PumpIT stub.');
 

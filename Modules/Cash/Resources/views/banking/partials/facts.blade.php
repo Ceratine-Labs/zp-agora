@@ -9,7 +9,7 @@
 --}}
 @php
     $service = app(\Modules\Cash\Services\CashupService::class);
-    $varianceTone = $service->varianceTone($one->Variance);
+    $varianceTone = $service->varianceTone($one->Variance, isset($one->BranchId) ? (int) $one->BranchId : null);
 @endphp
 
 <x-facts :columns="3">

@@ -4,6 +4,7 @@ namespace Tests\Feature\Utilities;
 
 use App\Grid\GridRegistry;
 use Illuminate\Support\Str;
+use Modules\Core\Facades\Settings;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserPermission;
@@ -33,6 +34,9 @@ class UtilitiesScreenTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Thresholds are settings since T026; these tests drive them through config([...]),
+        // which is the code default Settings answers with when the table is faked out.
+        Settings::fake();
 
         $this->skipUnlessLocalStub('This fixture writes meter readings into the PumpIT stub.');
 
