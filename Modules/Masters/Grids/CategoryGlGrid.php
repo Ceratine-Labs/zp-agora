@@ -55,7 +55,9 @@ class CategoryGlGrid extends ReferenceMasterGrid
     {
         return [
             new GridColumn('BranchName', 'Site', sort: 'BranchName'),
-            new GridColumn('POSSystemId', 'POS system', format: 'number', sort: 'POSSystemId'),
+            new GridColumn('POSSystem', 'POS system', format: 'chip', sort: 'POSSystem',
+                options: ['Aura', 'Arch', 'Gaap', 'Namos', 'Winbranch', 'Manual capture', 'Arch Liquor', 'Pilot', 'None', 'Nights Bridge']),
+            new GridColumn('POSSystemId', 'POS system id', format: 'number', sort: 'POSSystemId', visible: false),
             new GridColumn('Category', 'POS category', sort: 'Category', link: true, wide: true),
             new GridColumn('StandardCategory', 'Standard category', sort: 'StandardCategory'),
             new GridColumn('ProfitCentre', 'Profit centre', sort: 'ProfitCentre'),
@@ -74,6 +76,7 @@ class CategoryGlGrid extends ReferenceMasterGrid
     public function meanings(): array
     {
         return [
+            'POSSystem' => 'The till system the category\'s sales arrive from, named as MIST_Main.dbo.POSSystems names its POSSystemId.',
             'POSSystemId' => 'PumpIT\'s POS system id. A category is unique per site AND POS system — a site running two tills systems carries both.',
             'StandardCategory' => 'The group-standard category it maps into (Setup → Standard categories).',
             'GpBand' => 'Missing when Min and Max GP are both 0: no GP check can return this category\'s lines.',

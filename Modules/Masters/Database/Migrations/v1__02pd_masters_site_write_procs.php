@@ -8,7 +8,8 @@ use App\Support\Database\ProcedureMigration;
  * one save procedure per master over its narrowest columns, priors in
  * agora.MasterWrite, and usp_Masters_ReverseWrite redeployed with a branch
  * for each. No new ledger, so agora.vw_PumpItChange (Reports v1__22o) already
- * reads them.
+ * reads them. Redeploys usp_Masters_GridCategoryGlCodes too, which now names
+ * each category's POS system.
  */
 return new class extends ProcedureMigration
 {
@@ -26,6 +27,8 @@ return new class extends ProcedureMigration
             $this->path().'/usp_Masters_SaveUtilityMeter.sql',
             $this->path().'/usp_Masters_SaveTerminal.sql',
             $this->path().'/usp_Masters_ReverseWrite.sql',
+            // The category listing names its POS system (1 Aura … 10 Nights Bridge).
+            $this->path().'/usp_Masters_GridCategoryGlCodes.sql',
         ];
     }
 };

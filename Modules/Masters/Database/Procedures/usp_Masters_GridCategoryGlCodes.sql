@@ -15,12 +15,19 @@
    different row at every site. Rows are limited to the branches chosen,
    within the caller's grants. RowKey is 'POSSystemId:Category'.
 
+   POSSystem names the POSSystemId — the till system the category's sales
+   arrive from — as MIST_Main.dbo.POSSystems does on the customer's instance
+   (12 Nov 2026; PumpIT's sp_Insert_SDK_CategoryGLCode comments 1–7 the
+   same): 1 Aura, 2 Arch, 3 Gaap, 4 Namos, 5 Winbranch, 6 Manual capture,
+   7 Arch Liquor, 8 Pilot, 9 None, 10 Nights Bridge. Any other id shows as
+   itself.
+
    @Key returns that one category, then the same POS category at the caller's
    other sites, so a band can be compared across the estate.
 
    @Authorized is masters.categorygl.view. The same filtered set drives the
    page, the total and the CSV extract. Read by
-   Modules/Masters/Grids/CategoryGlGrid. Deployed by v1__02pa. Reads
+   Modules/Masters/Grids/CategoryGlGrid. Deployed by v1__02pa, and again by v1__02pd. Reads
    agora.vw_MasterCategoryGl. */
 CREATE OR ALTER PROCEDURE agora.usp_Masters_GridCategoryGlCodes
     @BranchIds NVARCHAR(MAX) = NULL,
@@ -71,6 +78,9 @@ BEGIN
            COALESCE(b.Name, CONCAT(N'Branch ', g.BranchId)) AS BranchName,
            CONVERT(NVARCHAR(200), CONCAT(g.POSSystemId, N':', g.Category)) AS RowKey,
            g.POSSystemId,
+           CONVERT(NVARCHAR(40), CASE g.POSSystemId WHEN 1 THEN N'Aura' WHEN 2 THEN N'Arch' WHEN 3 THEN N'Gaap' WHEN 4 THEN N'Namos'
+                WHEN 5 THEN N'Winbranch' WHEN 6 THEN N'Manual capture' WHEN 7 THEN N'Arch Liquor' WHEN 8 THEN N'Pilot'
+                WHEN 9 THEN N'None' WHEN 10 THEN N'Nights Bridge' ELSE CONCAT(N'POS system ', g.POSSystemId) END) AS POSSystem,
            g.Category,
            g.StandardCategory,
            g.ProfitCentre,
@@ -96,11 +106,11 @@ BEGIN
     WHERE NOT EXISTS (
         SELECT 1 FROM @Filters f
         CROSS APPLY (SELECT
-            CASE f.[Column] WHEN 'BranchName' THEN CONVERT(NVARCHAR(400), r.BranchName) WHEN 'Category' THEN CONVERT(NVARCHAR(400), r.Category) WHEN 'StandardCategory' THEN CONVERT(NVARCHAR(400), r.StandardCategory) WHEN 'ProfitCentre' THEN CONVERT(NVARCHAR(400), r.ProfitCentre) WHEN 'SupplierGLCode' THEN CONVERT(NVARCHAR(400), r.SupplierGLCode) WHEN 'SalesGLCode' THEN CONVERT(NVARCHAR(400), r.SalesGLCode) WHEN 'GpBand' THEN r.GpBand WHEN 'CoverBand' THEN r.CoverBand WHEN 'IsActive' THEN CASE WHEN r.IsActive = 1 THEN N'Yes' ELSE N'No' END END AS T,
+            CASE f.[Column] WHEN 'BranchName' THEN CONVERT(NVARCHAR(400), r.BranchName) WHEN 'POSSystem' THEN CONVERT(NVARCHAR(400), r.POSSystem) WHEN 'Category' THEN CONVERT(NVARCHAR(400), r.Category) WHEN 'StandardCategory' THEN CONVERT(NVARCHAR(400), r.StandardCategory) WHEN 'ProfitCentre' THEN CONVERT(NVARCHAR(400), r.ProfitCentre) WHEN 'SupplierGLCode' THEN CONVERT(NVARCHAR(400), r.SupplierGLCode) WHEN 'SalesGLCode' THEN CONVERT(NVARCHAR(400), r.SalesGLCode) WHEN 'GpBand' THEN r.GpBand WHEN 'CoverBand' THEN r.CoverBand WHEN 'IsActive' THEN CASE WHEN r.IsActive = 1 THEN N'Yes' ELSE N'No' END END AS T,
             CASE f.[Column] WHEN 'POSSystemId' THEN CONVERT(DECIMAL(18, 4), r.POSSystemId) WHEN 'MinGP' THEN CONVERT(DECIMAL(18, 4), r.MinGP) WHEN 'MaxGP' THEN CONVERT(DECIMAL(18, 4), r.MaxGP) WHEN 'MinDaysCover' THEN CONVERT(DECIMAL(18, 4), r.MinDaysCover) WHEN 'MaxDaysCover' THEN CONVERT(DECIMAL(18, 4), r.MaxDaysCover) END AS N,
             CASE WHEN f.[Column] IN ('POSSystemId', 'MinGP', 'MaxGP', 'MinDaysCover', 'MaxDaysCover') THEN 1 ELSE 0 END AS IsNum,
             TRY_CONVERT(DECIMAL(18, 4), f.Value) AS V) v
-        WHERE f.[Column] IN ('BranchName', 'Category', 'StandardCategory', 'ProfitCentre', 'SupplierGLCode', 'SalesGLCode', 'POSSystemId', 'MinGP', 'MaxGP', 'MinDaysCover', 'MaxDaysCover', 'GpBand', 'CoverBand', 'IsActive')
+        WHERE f.[Column] IN ('BranchName', 'POSSystem', 'Category', 'StandardCategory', 'ProfitCentre', 'SupplierGLCode', 'SalesGLCode', 'POSSystemId', 'MinGP', 'MaxGP', 'MinDaysCover', 'MaxDaysCover', 'GpBand', 'CoverBand', 'IsActive')
           AND CASE
                 WHEN f.SetJson IS NOT NULL THEN CASE WHEN EXISTS (SELECT 1 FROM OPENJSON(f.SetJson) s WHERE s.value = v.T) THEN 1 ELSE 0 END
                 WHEN v.IsNum = 1 THEN CASE
@@ -124,8 +134,8 @@ BEGIN
 
     SELECT * FROM #Filtered
     ORDER BY
-        CASE WHEN @SortAsc = 1 THEN CASE @SortColumn WHEN 'BranchName' THEN CONVERT(NVARCHAR(400), BranchName) WHEN 'Category' THEN CONVERT(NVARCHAR(400), Category) WHEN 'StandardCategory' THEN CONVERT(NVARCHAR(400), StandardCategory) WHEN 'ProfitCentre' THEN CONVERT(NVARCHAR(400), ProfitCentre) WHEN 'SupplierGLCode' THEN CONVERT(NVARCHAR(400), SupplierGLCode) WHEN 'SalesGLCode' THEN CONVERT(NVARCHAR(400), SalesGLCode) WHEN 'GpBand' THEN CONVERT(NVARCHAR(400), GpBand) WHEN 'CoverBand' THEN CONVERT(NVARCHAR(400), CoverBand) END END ASC,
-        CASE WHEN @SortAsc = 0 THEN CASE @SortColumn WHEN 'BranchName' THEN CONVERT(NVARCHAR(400), BranchName) WHEN 'Category' THEN CONVERT(NVARCHAR(400), Category) WHEN 'StandardCategory' THEN CONVERT(NVARCHAR(400), StandardCategory) WHEN 'ProfitCentre' THEN CONVERT(NVARCHAR(400), ProfitCentre) WHEN 'SupplierGLCode' THEN CONVERT(NVARCHAR(400), SupplierGLCode) WHEN 'SalesGLCode' THEN CONVERT(NVARCHAR(400), SalesGLCode) WHEN 'GpBand' THEN CONVERT(NVARCHAR(400), GpBand) WHEN 'CoverBand' THEN CONVERT(NVARCHAR(400), CoverBand) END END DESC,
+        CASE WHEN @SortAsc = 1 THEN CASE @SortColumn WHEN 'BranchName' THEN CONVERT(NVARCHAR(400), BranchName) WHEN 'POSSystem' THEN CONVERT(NVARCHAR(400), POSSystem) WHEN 'Category' THEN CONVERT(NVARCHAR(400), Category) WHEN 'StandardCategory' THEN CONVERT(NVARCHAR(400), StandardCategory) WHEN 'ProfitCentre' THEN CONVERT(NVARCHAR(400), ProfitCentre) WHEN 'SupplierGLCode' THEN CONVERT(NVARCHAR(400), SupplierGLCode) WHEN 'SalesGLCode' THEN CONVERT(NVARCHAR(400), SalesGLCode) WHEN 'GpBand' THEN CONVERT(NVARCHAR(400), GpBand) WHEN 'CoverBand' THEN CONVERT(NVARCHAR(400), CoverBand) END END ASC,
+        CASE WHEN @SortAsc = 0 THEN CASE @SortColumn WHEN 'BranchName' THEN CONVERT(NVARCHAR(400), BranchName) WHEN 'POSSystem' THEN CONVERT(NVARCHAR(400), POSSystem) WHEN 'Category' THEN CONVERT(NVARCHAR(400), Category) WHEN 'StandardCategory' THEN CONVERT(NVARCHAR(400), StandardCategory) WHEN 'ProfitCentre' THEN CONVERT(NVARCHAR(400), ProfitCentre) WHEN 'SupplierGLCode' THEN CONVERT(NVARCHAR(400), SupplierGLCode) WHEN 'SalesGLCode' THEN CONVERT(NVARCHAR(400), SalesGLCode) WHEN 'GpBand' THEN CONVERT(NVARCHAR(400), GpBand) WHEN 'CoverBand' THEN CONVERT(NVARCHAR(400), CoverBand) END END DESC,
         CASE WHEN @SortAsc = 1 THEN CASE @SortColumn WHEN 'POSSystemId' THEN CONVERT(DECIMAL(18, 4), POSSystemId) WHEN 'MinGP' THEN CONVERT(DECIMAL(18, 4), MinGP) WHEN 'MaxGP' THEN CONVERT(DECIMAL(18, 4), MaxGP) WHEN 'MinDaysCover' THEN CONVERT(DECIMAL(18, 4), MinDaysCover) WHEN 'MaxDaysCover' THEN CONVERT(DECIMAL(18, 4), MaxDaysCover) END END ASC,
         CASE WHEN @SortAsc = 0 THEN CASE @SortColumn WHEN 'POSSystemId' THEN CONVERT(DECIMAL(18, 4), POSSystemId) WHEN 'MinGP' THEN CONVERT(DECIMAL(18, 4), MinGP) WHEN 'MaxGP' THEN CONVERT(DECIMAL(18, 4), MaxGP) WHEN 'MinDaysCover' THEN CONVERT(DECIMAL(18, 4), MinDaysCover) WHEN 'MaxDaysCover' THEN CONVERT(DECIMAL(18, 4), MaxDaysCover) END END DESC,
         BranchName, POSSystemId, Category
