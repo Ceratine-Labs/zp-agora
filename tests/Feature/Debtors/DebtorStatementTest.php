@@ -152,6 +152,7 @@ class DebtorStatementTest extends TestCase
 
     public function test_km_and_reg_are_blank_without_the_columns_and_fill_once_they_exist(): void
     {
+        config(['debtors.statement.show_vehicle' => true]);
         $service = app(DebtorStatementService::class);
 
         $this->vehicleColumns(false);
@@ -175,6 +176,39 @@ class DebtorStatementTest extends TestCase
         $this->assertNull($with['lines']->firstWhere('DocumentNo', '127')->Km, 'A slip with no vehicle stays blank.');
         $this->assertNull($with['lines']->firstWhere('TranCode', 'R')->Reg, 'A payment has no vehicle.');
         $this->assertEquals((float) $without['account']->Closing, (float) $with['account']->Closing);
+    }
+
+    public function test_km_and_reg_stay_blank_while_show_vehicle_is_off_even_with_the_columns_filled(): void
+    {
+        $this->assertFalse(config('debtors.statement.show_vehicle'), 'Off until MIST fills ODO / REGNO from the right slips (Ryan, 12 Nov 2026).');
+
+        $this->vehicleColumns(true);
+        DB::connection(config('agora.connections.app'))->statement(
+            "UPDATE PumpIT.dbo.MIST_Trans_Customer SET ODO = '66547', REGNO = 'BF23 CH ZN'
+             WHERE MIST_BranchId = ? AND BusinessPartnerCode = ? AND TransactionNumber = '147'",
+            [self::BRANCH, self::ACCOUNT],
+        );
+
+        $service = app(DebtorStatementService::class);
+        $statement = $service->statement(self::BRANCH, self::ACCOUNT, '2026-08-01', '2026-08-31');
+
+        $this->assertFalse((bool) $statement['account']->HasVehicle);
+        $this->assertSame([null], $statement['lines']->pluck('Km')->unique()->values()->all());
+        $this->assertSame([null], $statement['lines']->pluck('Reg')->unique()->values()->all());
+
+        $html = view('debtors::pdf.statement', [
+            'a' => $statement['account'], 'lines' => $statement['lines'], 'issuer' => '', 'note' => '',
+        ])->render();
+        $this->assertStringContainsString('>KM</th>', $html, 'The columns stay, so the layout is ZP\'s.');
+        $this->assertStringContainsString('>REG</th>', $html);
+        $this->assertStringNotContainsString('66547', $html);
+        $this->assertStringNotContainsString('BF23 CH ZN', $html);
+
+        $this->actingAs($this->person(['statements.view']))
+            ->get(route('app.debtors.show', ['branch' => self::BRANCH, 'account' => self::ACCOUNT, 'from' => '2026-08-01', 'to' => '2026-08-31']))
+            ->assertOk()
+            ->assertSee('<th>KM</th>', false)
+            ->assertDontSee('BF23 CH ZN');
     }
 
     public function test_the_pdf_is_zp_detailed_layout(): void

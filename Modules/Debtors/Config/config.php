@@ -59,4 +59,22 @@ return [
     */
     'remittance_note' => 'Please quote your account number with every payment. Queries on this statement to the site that issued it.',
 
+    /*
+    | The statement itself.
+    |
+    | show_vehicle: whether KM and REG are filled from
+    | MIST_Trans_Customer.ODO / .REGNO. OFF (Ryan, 12 Nov 2026): on 12 Nov
+    | those columns showed account 114's vehicles on 8 of 13 NGS00013 slips
+    | at Ngwenya — MIST fills them from the wrong slips. Switch it on once
+    | Shabeer has fixed how MIST fills them. While off, the procedure does not
+    | read them and the PDF, screen and mail leave both cells blank; the
+    | columns stay on the statement so it keeps ZP's layout. When on, the
+    | procedure still only reads them if the columns exist.
+    |
+    | A literal, never an env var: what a debtor is told is a decision.
+    */
+    'statement' => [
+        'show_vehicle' => false,
+    ],
+
 ];

@@ -32,7 +32,9 @@
                (RCN_BankStatementLinesPumpIT) carrying this account's PumpIT customer code; the balance brought
                forward includes the balance PumpIT took the account on with. A balance marked CR is money the
                debtor has paid ahead.</p>
-            <p>KM and REG fill in from MIST_Trans_Customer.ODO and .REGNO once those columns exist.</p>
+            <p>KM and REG are left blank for now: MIST_Trans_Customer.ODO and .REGNO carried other accounts'
+               vehicles on 12 Nov 2026. They fill in once ZP have fixed that and debtors.statement.show_vehicle
+               is switched on.</p>
             <p>Ageing takes payments against the oldest charges first, so what is still owed is the newest charges
                adding up to the balance, each aged from its own date.</p>
         </x-slot:info>

@@ -26,10 +26,14 @@
    keyed on the till account (1002). A till account two customer codes share
    shows both.
 
-   KM AND REG come from MIST_Trans_Customer.ODO and .REGNO, which ZP are
-   adding (12 Nov 2026). The procedure looks for the columns every time it
-   runs: until they exist KM and REG are blank, and the day they appear they
-   fill — no change here. The lookup is per document (one vehicle per slip).
+   KM AND REG come from MIST_Trans_Customer.ODO and .REGNO, and only when
+   @ShowVehicle = 1 (config debtors.statement.show_vehicle). It is OFF (Ryan,
+   12 Nov 2026): on 12 Nov those columns carried account 114's vehicles on 8
+   of 13 NGS00013 slips, so they stay unread until ZP fix how MIST fills
+   them. Off, KM and REG come back NULL and the statement keeps the columns
+   blank. On, the procedure still looks for the columns every time it runs:
+   until they exist KM and REG are blank, the day they appear they fill — no
+   change here. The lookup is per document (one vehicle per slip).
 
    AGEING, as at @DateTo, the way a balance-forward statement ages: payments
    are taken to settle the OLDEST debits first, so what is still owed is the
@@ -62,7 +66,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Debtors_GetStatement]
     @AccountNo        NVARCHAR(10),
     @DateFrom         DATE          = NULL,
     @DateTo           DATE          = NULL,
-    @AllowedBranchIds NVARCHAR(MAX) = NULL
+    @AllowedBranchIds NVARCHAR(MAX) = NULL,
+    @ShowVehicle      BIT           = 0
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -108,7 +113,7 @@ BEGIN
     DECLARE @Closing decimal(18,2) = @Opening + @Debits - @Credits;
 
     /* KM and REG: per document, from MIST_Trans_Customer.ODO / .REGNO — only
-       once those columns exist. Dynamic SQL because a statement that names a
+       when asked for (@ShowVehicle) and once those columns exist. Dynamic SQL because a statement that names a
        missing column does not compile; this one is only built when they are
        there. The window is padded a week each side because a document's date
        is that of its FIRST load and a reload can carry the next day's. */
@@ -120,7 +125,9 @@ BEGIN
     DECLARE @HasOdo bit = CASE WHEN COL_LENGTH('PumpIT.dbo.MIST_Trans_Customer', 'ODO')   IS NULL THEN 0 ELSE 1 END,
             @HasReg bit = CASE WHEN COL_LENGTH('PumpIT.dbo.MIST_Trans_Customer', 'REGNO') IS NULL THEN 0 ELSE 1 END;
 
-    IF @HasOdo = 1 OR @HasReg = 1
+    SET @ShowVehicle = ISNULL(@ShowVehicle, 0);
+
+    IF @ShowVehicle = 1 AND (@HasOdo = 1 OR @HasReg = 1)
     BEGIN
         DECLARE @Sql nvarchar(max) = N'
             SELECT LTRIM(RTRIM(t.TransactionNumber)), NULLIF(LTRIM(RTRIM(t.DocumentNumber)), N''''),
@@ -195,7 +202,7 @@ BEGIN
         (SELECT MAX(TransactionDate) FROM #Ledger WHERE TranCode <> 'O') AS LastTransactionDate,
         @Current AS AgeCurrent, @D30 AS Age30, @D60 AS Age60, @D90 AS Age90, @D120 AS Age120,
         @LedgerFrom AS LedgerFrom,
-        CONVERT(bit, CASE WHEN @HasOdo = 1 AND @HasReg = 1 THEN 1 ELSE 0 END) AS HasVehicle,
+        CONVERT(bit, CASE WHEN @ShowVehicle = 1 AND @HasOdo = 1 AND @HasReg = 1 THEN 1 ELSE 0 END) AS HasVehicle,
         c.Email, c.CcEmail, CONVERT(bit, ISNULL(c.AutoSend, 0)) AS AutoSend, c.Note,
         c.UpdatedAt AS ContactUpdatedAt
     FROM (SELECT 1 AS one) x

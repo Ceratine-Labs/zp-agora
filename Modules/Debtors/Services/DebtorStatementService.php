@@ -60,6 +60,8 @@ class DebtorStatementService
             'DateFrom' => $from,
             'DateTo' => $to,
             'AllowedBranchIds' => $scoped ? $this->allowedBranchIds() : null,
+            // KM / REG off until MIST fills ODO / REGNO from the right slips (config).
+            'ShowVehicle' => (bool) config('debtors.statement.show_vehicle', false) ? 1 : 0,
         ]);
 
         return [
