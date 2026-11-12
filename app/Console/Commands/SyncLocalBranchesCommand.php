@@ -45,7 +45,7 @@ class SyncLocalBranchesCommand extends Command
         $source = DB::connection(config('agora.connections.erp'));
 
         $rows = $source->table('dbo.SS_Branch')
-            ->select('SSBranchId', 'BranchName', 'BrandId', 'RegionId', 'ClassId', 'IsActive')
+            ->select('SSBranchId', 'BranchName', 'BrandId', 'RegionId', 'ClassId', 'IsActive', 'POSType', 'IsPOSImport')
             ->orderBy('SSBranchId')
             ->get();
 
@@ -55,7 +55,7 @@ class SyncLocalBranchesCommand extends Command
 
         foreach ($rows as $row) {
             $stub->insert(
-                "INSERT [{$database}].dbo.SS_Branch (SSBranchId, BranchName, BrandId, RegionId, ClassId, IsActive) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT [{$database}].dbo.SS_Branch (SSBranchId, BranchName, BrandId, RegionId, ClassId, IsActive, POSType, IsPOSImport) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (int) $row->SSBranchId,
                     trim((string) $row->BranchName),
@@ -63,11 +63,43 @@ class SyncLocalBranchesCommand extends Command
                     $row->RegionId,
                     $row->ClassId,
                     (int) $row->IsActive,
+                    $row->POSType,
+                    $row->IsPOSImport,
                 ]
             );
         }
 
         $this->components->info("Copied {$rows->count()} branches into the local [{$database}] stub.");
+
+        // The branch master's other sources (T021): the three groupings, the
+        // profit centres and the category → profit centre map. Copied whole;
+        // database/stubs/pumpit-branch.sql gives them their shape.
+        foreach ([
+            'SS_Region' => ['Regionid', 'Region', 'IsActive', 'CreateDateTime'],
+            'SS_Brand' => ['Brandid', 'BrandName', 'IsActive', 'CreateDateTime'],
+            'SS_Class' => ['Classid', 'ClassName', 'IsActive', 'CreateDateTime'],
+            'SS_ProfitCentre' => ['ProfitCentreId', 'ProfitCentre', 'IsActive'],
+            'SDK_CategoryGLCode' => ['SSBranchId', 'POSSystemId', 'Category', 'StandardCategory', 'SupplierGLCode',
+                'SalesGLCode', 'ProfitCentre', 'IsActive', 'MINGP', 'MAXGP', 'MINDaysCover', 'MAXDaysCover'],
+        ] as $table => $columns) {
+            if ($stub->selectOne("SELECT OBJECT_ID('[{$database}].dbo.{$table}') AS Id")->Id === null) {
+                $this->components->warn("[{$database}].dbo.{$table} is missing locally — run scripts/local-sql.sh up first.");
+
+                continue;
+            }
+
+            $copied = $source->table("dbo.{$table}")->select($columns)->get();
+            $stub->statement("DELETE FROM [{$database}].dbo.{$table};");
+            $list = implode(', ', $columns);
+            $marks = implode(', ', array_fill(0, count($columns), '?'));
+
+            foreach ($copied as $row) {
+                $stub->insert("INSERT [{$database}].dbo.{$table} ({$list}) VALUES ({$marks})",
+                    array_map(fn (string $column) => $row->{$column}, $columns));
+            }
+
+            $this->components->info("Copied {$copied->count()} rows of {$table}.");
+        }
 
         return self::SUCCESS;
     }

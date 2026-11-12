@@ -1,0 +1,11 @@
+{
+    "name": "Masters",
+    "alias": "masters",
+    "version": "1.0.0",
+    "enabled": true,
+    "order": 2,
+    "requires": ["Core"],
+    "providers": [
+        "Modules\\Masters\\Providers\\MastersServiceProvider"
+    ]
+}

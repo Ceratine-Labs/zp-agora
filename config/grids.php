@@ -20,6 +20,7 @@ use Modules\Cash\Grids\ZreadNoCashupGrid;
 use Modules\Core\Grids\RoleGrid;
 use Modules\Core\Grids\UserGrid;
 use Modules\Debtors\Grids\DebtorAccountGrid;
+use Modules\Masters\Grids\BranchMasterGrid;
 use Modules\Product\Grids\CriticalLineGrid;
 use Modules\Product\Grids\StockItemGrid;
 use Modules\Recon\Grids\ReconBankSideGrid;
@@ -102,6 +103,7 @@ return [
     'grids' => [
         'app.setup.users' => UserGrid::class,
         'app.setup.roles' => RoleGrid::class,
+        'app.setup.branches' => BranchMasterGrid::class,
 
         // The per-branch stock master: the customer's row unless Agora holds
         // a live override for it, with cost, GP, stock on hand and last

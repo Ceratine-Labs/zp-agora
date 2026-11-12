@@ -3,8 +3,7 @@
 namespace Modules\Core\Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Models\Branch;
+use Modules\Core\Services\BranchMigrationService;
 
 /**
  * Copies dbo.SS_Branch into agora.Branch.
@@ -14,52 +13,22 @@ use Modules\Core\Models\Branch;
  * It stays reconcilable: BranchId here IS SSBranchId, so a join back to legacy
  * data needs no translation.
  *
- * The six administrative entities are marked IsTrading = false. They are
- * branches for accounting and always have been, but they never keep a trading
- * day, and leaving them in a day-close queue is how the queue stops meaning
- * anything. The list is by name because the legacy schema has no column that
- * says so — ClassId is 1 for almost everything, including real sites.
+ * Since T021 (12 Nov 2026) this delegates to agora.usp_Migrate_Branch, which
+ * owns the whole derivation — region, brand, format, status, POS type, the six
+ * administrative entities and each site's profit centres — so a fresh install
+ * and an existing one arrive at the same branch master. Before that this class
+ * copied the bare PumpIT ids and marked the administrative entities by name;
+ * on a database where it already ran, BranchMasterSeeder does the migration.
  */
 class BranchSeeder extends Seeder
 {
     /** Branches first: everything else carries a BranchId. */
     public int $seedOrder = 10;
 
-    private const ADMINISTRATIVE = [
-        'AJLG Properties',
-        'Zululand Petroleum',
-        'Arcum Venandi',
-        'Jakarie Vulstasie',
-        'Thokozile Trust',
-        'Zickyza Properties',
-    ];
-
-    public function run(): void
+    public function run(BranchMigrationService $migration): void
     {
-        $legacy = DB::connection(config('agora.connections.erp'))
-            ->table('dbo.SS_Branch')
-            ->select('SSBranchId', 'BranchName', 'BrandId', 'RegionId', 'ClassId', 'IsActive')
-            ->orderBy('SSBranchId')
-            ->get();
+        $result = $migration->run();
 
-        foreach ($legacy as $row) {
-            $branch = Branch::query()->acrossBranches()
-                ->firstOrNew(['BranchId' => (int) $row->SSBranchId]);
-
-            $branch->fill([
-                'Name' => trim($row->BranchName),
-                'BrandId' => $row->BrandId,
-                'RegionId' => $row->RegionId,
-                'ClassId' => $row->ClassId,
-                'IsTrading' => ! in_array(trim($row->BranchName), self::ADMINISTRATIVE, true),
-                'IsActive' => (bool) $row->IsActive,
-                'SortOrder' => (int) $row->SSBranchId,
-            ]);
-            $branch->BranchId = (int) $row->SSBranchId;
-            $branch->save();
-        }
-
-        $this->command?->info('  Branches: '.$legacy->count().' from dbo.SS_Branch ('
-            .count(self::ADMINISTRATIVE).' administrative).');
+        $this->command?->info('  Branches: '.$result['status']->Message);
     }
 }

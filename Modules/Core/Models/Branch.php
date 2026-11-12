@@ -13,10 +13,16 @@ use Illuminate\Support\Carbon;
  * @property int $BranchId
  * @property int $Id
  * @property string $Name
- * @property int|null $BrandId
- * @property int|null $RegionId
- * @property int|null $ClassId
- * @property bool $IsTrading
+ * @property int|null $BrandId agora.Brand.Id
+ * @property int|null $RegionId agora.Region.Id
+ * @property int|null $ClassId PumpIT's SS_Class id, as migrated
+ * @property int|null $FormatId agora.Format.Id
+ * @property string $Status Trading | Mothballed | Non-trading
+ * @property string $POSType BRANCH | NAMOS
+ * @property bool $IsAdminEntity
+ * @property string|null $LegacyName SS_Branch.BranchName as migrated
+ * @property Carbon|null $MigratedAt
+ * @property bool $IsTrading Status = 'Trading', kept by the procedures
  * @property bool $IsActive
  * @property int $SortOrder
  * @property Carbon|null $CreatedAt
@@ -30,6 +36,11 @@ use Illuminate\Support\Carbon;
  * group, the property companies and the trusts are branches for accounting
  * purposes but never keep a trading day, and putting them in a day-close queue
  * is how the queue stops meaning anything.
+ *
+ * Status (T021) is the reason a branch does or does not trade, and IsTrading
+ * follows it: agora.usp_Masters_SaveBranch and agora.usp_Migrate_Branch set
+ * IsTrading = (Status = 'Trading'). Edit a branch through that procedure, not
+ * through this model, or the two drift apart and the change is not audited.
  */
 class Branch extends BaseModel
 {
@@ -39,9 +50,15 @@ class Branch extends BaseModel
 
     public const DELETED_AT = 'DeletedAt';
 
+    public const STATUSES = ['Trading', 'Mothballed', 'Non-trading'];
+
+    public const POS_TYPES = ['BRANCH', 'NAMOS'];
+
     protected $casts = [
         'IsTrading' => 'boolean',
         'IsActive' => 'boolean',
+        'IsAdminEntity' => 'boolean',
+        'MigratedAt' => 'datetime',
     ];
 
     /**

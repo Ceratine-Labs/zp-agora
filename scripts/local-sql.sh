@@ -123,6 +123,7 @@ up)
     for stub in database/stubs/pumpit-recon.sql \
                 database/stubs/pumpit-reports.sql \
                 database/stubs/pumpit-users.sql \
+                database/stubs/pumpit-branch.sql \
                 database/stubs/pumpit-product.sql \
                 database/stubs/pumpit-cash.sql \
                 database/stubs/pumpit-utilities.sql \
