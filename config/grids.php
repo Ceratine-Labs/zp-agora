@@ -133,6 +133,11 @@ return [
         'app.setup.suppliers' => \Modules\Partners\Grids\SupplierGrid::class,
         'app.setup.customers' => \Modules\Partners\Grids\CustomerGrid::class,
 
+        // Setup → Governance (T027): every master change, field by field, and
+        // the sign-ins — over the audit tables, through Reports' procedures.
+        'app.setup.master-changes' => \Modules\Reports\Grids\MasterChangeGrid::class,
+        'app.setup.user-activity' => \Modules\Reports\Grids\UserActivityGrid::class,
+
         // The per-branch stock master: the customer's row unless Agora holds
         // a live override for it, with cost, GP, stock on hand and last
         // counted joined on from places the master itself does not carry.
