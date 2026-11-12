@@ -9,6 +9,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\StockRecon\Models\StockReconAmendment;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
 
@@ -400,6 +401,42 @@ class StockReconService
             'Reason' => $reason,
             'UserId' => auth()->id(),
         ]);
+    }
+
+    /**
+     * Undo one item's chain inside a committed run — its active amendments in
+     * that area, every shift of them, and nothing else on the run (12 Nov
+     * 2026). The run stays committed while anything else on it stands. The
+     * contract is the procedure's header.
+     */
+    public function reverseChain(StockReconRun $run, int $areaNo, string $stockItemNo, string $reason): object
+    {
+        return $this->procedures->write('usp_StockRecon_ReverseChain', [
+            'RunId' => $run->Id,
+            'BranchId' => $run->BranchId,
+            'AreaNo' => $areaNo,
+            'StockItemNo' => $stockItemNo,
+            'Reason' => $reason,
+            'UserId' => auth()->id(),
+        ]);
+    }
+
+    /**
+     * What reversing one item's chain would put back: its amendments still
+     * standing on this run, in shift order. The confirmation names each.
+     *
+     * @return Collection<int, StockReconAmendment>
+     */
+    public function activeChainAmendments(StockReconRun $run, int $areaNo, string $stockItemNo): Collection
+    {
+        return StockReconAmendment::query()
+            ->where('BranchId', $run->BranchId)
+            ->where('RunId', $run->Id)
+            ->where('AreaNo', $areaNo)
+            ->where('StockItemNo', $stockItemNo)
+            ->where('State', 'active')
+            ->orderBy('TransactionDate')->orderBy('ShiftNo')
+            ->get();
     }
 
     /**

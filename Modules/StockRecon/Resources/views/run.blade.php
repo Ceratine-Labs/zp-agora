@@ -37,9 +37,14 @@
              touch is indistinguishable from one it never considered. --}}
         @php($lines = collect(session('committedLines', [])))
         @php($skipped = $lines->where('Result', 'skipped'))
-        <x-notice :tone="session('committedCode') === 'COMMITTED' ? 'info' : 'warn'"
+        {{-- A reversal lands here too (the run's, or one item's since 12 Nov
+             2026). It ticked nothing, so it must not read "every ticked shift
+             went through" in a warning's colours, as it did. --}}
+        <x-notice :tone="in_array(session('committedCode'), ['COMMITTED', 'REVERSED'], true) ? 'info' : 'warn'"
                   :title="session('committed')" style="margin-bottom:16px">
-            @if ($skipped->isEmpty())
+            @if (session('committedCode') === 'REVERSED')
+                <p>PumpIT holds what it held before this run wrote it. Preview the period again to balance it afresh.</p>
+            @elseif ($skipped->isEmpty())
                 <p>Every ticked shift went through.</p>
             @else
                 <p>{{ $skipped->count() }} {{ Str::plural('shift', $skipped->count()) }} skipped rather

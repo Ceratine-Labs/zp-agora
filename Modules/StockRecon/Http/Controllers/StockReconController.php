@@ -370,6 +370,13 @@ class StockReconController extends Controller
             'run' => $run,
             'line' => $line,
             ...$this->service->chain($run, $line),
+            // Reverse this item: what it would put back, on a committed run only.
+            'reversible' => $run->isCommitted()
+                ? $this->service->activeChainAmendments($run, $line->AreaNo, $line->StockItemNo)
+                : collect(),
+            // The fragment lands inside the proposals table, which sits inside
+            // the commit form, so it cannot carry a form of its own.
+            'fragment' => $request->ajax(),
         ];
 
         return $request->ajax()
@@ -489,7 +496,37 @@ class StockReconController extends Controller
             return back()->with('refusal', $e->getMessage());
         }
 
-        return redirect()->route('app.stockrecon.run', $run)->with('committed', $status->Message);
+        return redirect()->route('app.stockrecon.run', $run)
+            ->with('committed', $status->Message)
+            ->with('committedCode', $status->Code);
+    }
+
+    /**
+     * Reverse one item's chain: put back exactly what this run wrote for that
+     * item in that area, every shift of it, and leave the rest of the run
+     * committed (12 Nov 2026). The line names the chain and must be on the run;
+     * the reason and every refusal are the procedure's.
+     */
+    public function reverseChain(Request $request, StockReconRun $run, StockReconRunLine $line): RedirectResponse
+    {
+        $run = StockReconRun::query()->findOrFail($run->getKey());
+        $line = StockReconRunLine::query()->findOrFail($line->getKey());
+        abort_unless($line->RunId === $run->Id && $line->BranchId === $run->BranchId, 404);
+
+        try {
+            $status = $this->service->reverseChain(
+                $run,
+                $line->AreaNo,
+                $line->StockItemNo,
+                trim((string) $request->input('reason')),
+            );
+        } catch (AgoraProcException $e) {
+            return back()->with('refusal', $e->getMessage());
+        }
+
+        return redirect()->route('app.stockrecon.run', $run)
+            ->with('committed', $status->Message)
+            ->with('committedCode', $status->Code);
     }
 
     /**

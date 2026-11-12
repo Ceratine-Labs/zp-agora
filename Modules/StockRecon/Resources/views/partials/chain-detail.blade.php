@@ -235,6 +235,53 @@
         @endforeach
     </x-table>
 
+    {{-- Reverse this item (12 Nov 2026): every amendment this committed run
+         still holds for the item in this area goes back to its recorded prior,
+         and the rest of the run stays posted. One press under the grid; the
+         confirmation names each PumpIT row and column it writes, old → new
+         (confirm-diff.js). The fetched fragment sits inside the commit form,
+         where a form of its own cannot live, so there it opens the chain page,
+         which carries the form. --}}
+    @php($reversible = $reversible ?? collect())
+    @if ($run->isCommitted() && $reversible->isNotEmpty())
+        @can('stockrecon.runs.reverse')
+            @if ($fragment ?? false)
+                <a class="btn-ghost" href="{{ route('app.stockrecon.line', [$run, $line]) }}#reverse-chain">Reverse this item…</a>
+            @else
+                {{-- Old is what the commit left, new the prior that goes back,
+                     per column the reversal writes (the model's
+                     reversalWrites()). One-line php directives only: this
+                     file uses them, and Blade cannot mix them with a block. --}}
+                @php($itemName = $item?->StockItemDescription ?? $line->StockItemNo)
+                @php($live = $reversible->where('StampMode', 'live'))
+                @php($journal = $reversible->count() - $live->count())
+                @php($changes = $live->flatMap(fn ($a) => collect($a->reversalWrites())->map(fn ($p, $column) => [
+                    'field' => $a->TransactionDate->format('d M').' shift '.\Modules\StockRecon\Support\ShiftLabel::show($a->ShiftNo).' · '.$column,
+                    'old' => \App\Support\Format::qty($p[0]), 'new' => \App\Support\Format::qty($p[1])])->values()))
+                @php($table = 'STK_StockReconLine · '.$itemName.', item '.$line->StockItemNo.', area '.$line->AreaNo.', site '.$run->BranchId)
+                @php($note = ($journal > 0 ? $journal.' journal '.Str::plural('amendment', $journal).' reversed in Agora only. ' : '')
+                    .'Every other item on run #'.$run->Id.' stays posted.')
+                @php($confirmText = $live->isEmpty() ? 'Journal mode: nothing in PumpIT changes. '.$note
+                    : $table."\n".$changes->map(fn ($c) => $c['field'].': '.$c['old'].' → '.$c['new'])->whenEmpty(fn ($c) => $c->push('Nothing will change.'))->implode("\n")."\n\n".$note)
+                <form id="reverse-chain" method="POST" action="{{ route('app.stockrecon.lines.reverse', [$run, $line]) }}"
+                      class="reverse-form" style="margin-top:8px"
+                      data-loader="Reversing…"
+                      data-confirm="Reverse {{ $itemName }} on run #{{ $run->Id }}?"
+                      @if ($live->isNotEmpty()) data-diff="{{ $table }}" data-diff-note="{{ $note }}" @endif
+                      data-confirm-text="{{ $confirmText }}"
+                      data-confirm-action="Reverse" data-confirm-danger>
+                    @csrf
+                    @foreach ($changes as $change)
+                        <input type="hidden" data-diff-field="{{ $change['field'] }}" data-diff-old="{{ $change['old'] }}" value="{{ $change['new'] }}">
+                    @endforeach
+                    <input type="text" name="reason" required maxlength="300"
+                           placeholder="Why is this item being reversed?" aria-label="Reason for reversing this item">
+                    <button type="submit" class="btn-ghost">Reverse this item</button>
+                </form>
+            @endif
+        @endcan
+    @endif
+
     {{-- Why the Cumulative column steps on a row whose Variance reads nothing.
          It runs on the balancing basis and ends on the chain total in the card
          above (Ryan, 6 Oct 2026: "balance to 0 but … show a movement of 1 in
