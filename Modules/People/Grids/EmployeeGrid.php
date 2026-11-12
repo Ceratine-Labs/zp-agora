@@ -7,6 +7,8 @@ use App\Grid\GridDefinition;
 use App\Grid\GridFilter;
 use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
+use Illuminate\Support\Facades\Gate;
+use Modules\People\Services\EmployeeWriteService;
 
 /**
  * Setup → People and assets → Employees (T023), over
@@ -107,6 +109,22 @@ class EmployeeGrid extends GridDefinition
     public function detailUrl(object $row): ?string
     {
         return $this->rowUrl($row);
+    }
+
+    /** Open, and Edit where the write is on and the caller may change people or areas. */
+    public function rowActions(object $row): array
+    {
+        $actions = [['label' => 'Open', 'url' => (string) $this->rowUrl($row)]];
+
+        if (EmployeeWriteService::live() && Gate::any(['people.employees.edit', 'people.areas.edit'])) {
+            $actions[] = [
+                'label' => 'Edit',
+                'url' => route('app.setup.employees.edit', ['branch' => $row->BranchId, 'code' => trim((string) $row->EmployeeCode)]),
+                'primary' => true,
+            ];
+        }
+
+        return $actions;
     }
 
     public function rowClass(object $row): ?string

@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Modules\Core\Models\Branch;
 use Modules\People\Grids\EmployeeGrid;
 use Modules\People\Services\EmployeeService;
+use Modules\People\Services\EmployeeWriteService;
 
 /**
  * Setup → People and assets → Employees (T023): the list and one employee.
@@ -37,8 +38,17 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function show(int $branch, string $code, Request $request): View
+    public function show(int $branch, string $code, Request $request, EmployeeWriteService $writes): View
     {
-        return view($request->ajax() ? 'people::employees.detail' : 'people::employees.show', $this->service->get($branch, $code));
+        $data = $this->service->get($branch, $code);
+
+        if ($request->ajax()) {
+            return view('people::employees.detail', $data);
+        }
+
+        return view('people::employees.show', $data + [
+            'changes' => $writes->changes($branch, $code)->groupBy('WriteId'),
+            'writable' => EmployeeWriteService::live(),
+        ]);
     }
 }

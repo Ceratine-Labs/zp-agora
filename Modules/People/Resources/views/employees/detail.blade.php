@@ -7,6 +7,11 @@
 <x-card :title="$employee->EmployeeName" :sub="$employee->EmployeeCode.' · '.($employee->BranchName ?? 'Branch '.$employee->BranchId)">
     <x-slot:actions>
         @unless (request()->routeIs('app.setup.employees.show'))<a class="btn sm" href="{{ $show }}">Open</a>@endunless
+        @if (\Modules\People\Services\EmployeeWriteService::live() && ! $employee->IsSystemAccount)
+            @canany(['people.employees.edit', 'people.areas.edit'])
+                <a class="btn sm" href="{{ route('app.setup.employees.edit', ['branch' => $employee->BranchId, 'code' => $employee->EmployeeCode]) }}">Edit</a>
+            @endcanany
+        @endif
     </x-slot:actions>
     <x-facts>
         <x-fact label="Status" :value="$employee->Status" :tone="$employee->IsActive ? 'good' : 'warn'">
@@ -47,8 +52,8 @@
         <x-empty-state text="No cashup or stock count names this person." />
     @else
         <x-table layout-key="People.employees.shifts" procedure="agora.usp_People_GetEmployee" :count="$shifts->count()" tools>
-            <thead><tr><th>Day</th><th>What</th><th class="num">Shift</th><th class="num">Till</th><th>Area</th></tr></thead>
-            <tbody>@foreach ($shifts as $shift)
+            <x-slot:head><tr><th>Day</th><th>What</th><th class="num">Shift</th><th class="num">Till</th><th>Area</th></tr></x-slot:head>
+            @foreach ($shifts as $shift)
                 <tr>
                     <td data-sort="{{ $shift->TransactionDate }}">{{ $date($shift->TransactionDate) }}</td>
                     <td>{{ $shift->Kind }}</td>
@@ -56,7 +61,7 @@
                     <td class="num">{{ $shift->TillNo ?? '—' }}</td>
                     <td>{{ $shift->AreaDescription ?? ($shift->AreaNo ? 'Area '.$shift->AreaNo : '—') }}</td>
                 </tr>
-            @endforeach</tbody>
+            @endforeach
         </x-table>
         <p class="muted">The {{ $shifts->count() }} most recent. Cashups are BRN_DailyBanking rows with this person as the cashier; stock counts are STK_StockReconEmployees sign-ons.</p>
     @endif

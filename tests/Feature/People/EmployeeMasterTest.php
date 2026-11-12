@@ -204,19 +204,30 @@ class EmployeeMasterTest extends TestCase
         $this->assertSame('Not on the employee list', $rows->firstWhere('EmployeeCode', 'TPX99')->Status);
     }
 
-    public function test_nothing_in_the_module_writes(): void
+    public function test_the_readers_read_and_only_the_named_writers_touch_pumpit(): void
     {
         $procedures = collect($this->db()->select(
             "SELECT o.name, m.definition FROM sys.sql_modules m JOIN sys.objects o ON o.object_id = m.object_id
-             WHERE o.schema_id = SCHEMA_ID('agora') AND o.name LIKE 'usp[_]People[_]%'"));
-        $this->assertSame(
-            ['usp_People_GetEmployee', 'usp_People_GridEmployeeAreas', 'usp_People_GridEmployees', 'usp_People_GridPosts', 'usp_People_NextPost'],
-            $procedures->pluck('name')->sort()->values()->all()
-        );
-        foreach ($procedures as $procedure) {
-            $body = preg_replace('~/\*.*?\*/~s', '', $procedure->definition);
+             WHERE o.schema_id = SCHEMA_ID('agora') AND o.name LIKE 'usp[_]People[_]%'"))->keyBy('name');
+        $writers = ['usp_People_AddPost', 'usp_People_ReverseWrite', 'usp_People_SaveEmployee', 'usp_People_SaveEmployeeAreas'];
+        $readers = ['usp_People_GetEmployee', 'usp_People_GetEmployeeChanges', 'usp_People_GetEmployeeForm', 'usp_People_GridEmployeeAreas',
+            'usp_People_GridEmployees', 'usp_People_GridPosts', 'usp_People_NextPost'];
+        $this->assertSame(collect([...$readers, ...$writers])->sort()->values()->all(), $procedures->keys()->sort()->values()->all());
+
+        $strip = fn (string $name) => (string) preg_replace('~/\*.*?\*/~s', '', (string) $procedures[$name]->definition);
+        foreach ($readers as $name) {
             $this->assertDoesNotMatchRegularExpression('~\b(INSERT\s+(INTO\s+)?(?!#)\S*(PumpIT|agora)|UPDATE\s+\S*(PumpIT|agora)|DELETE\s+(FROM\s+)?\S*(PumpIT|agora)|MERGE)\b~i',
-                (string) $body, "{$procedure->name} reads only.");
+                $strip($name), "{$name} reads only.");
+        }
+
+        // The writers name no PumpIT table but the three of the named write
+        // (CLAUDE.md rule 1, PM decision 01a1ceba-4d74) and STK_Area, which
+        // they read to check an area exists.
+        foreach ($writers as $name) {
+            preg_match_all('~\[PumpIT\]\.dbo\.(\w+)~i', $strip($name), $m);
+            $this->assertEmpty(array_diff(array_unique($m[1]), ['BRN_Employee', 'BRN_EmployeeArea', 'BRN_EmployeePost', 'STK_Area']),
+                "{$name} reaches only the named tables.");
+            $this->assertStringContainsString('agora.PeopleWrite', $strip($name), "{$name} keeps its ledger.");
         }
     }
 
