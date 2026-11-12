@@ -106,6 +106,12 @@ class MasterWriteTest extends TestCase
 
         $this->get($this->showUrl())->assertOk()->assertSee('MINGP')->assertSee('10.8')->assertSee('TEST-Master write')->assertSee('TEST-raise the bread band');
 
+        // The audit trail (vw_PumpItChange, Reports v1__22o) carries it with before/after and who.
+        $audit = $this->db()->selectOne("SELECT * FROM agora.vw_PumpItChange WHERE Ledger = 'MasterWrite' AND LedgerId = ?", [$ledger['MINGP']->Id]);
+        $this->assertSame(['Masters', 'Category band changed', 'SDK_CategoryGLCode', 'MINGP 10.8 → 25'],
+            [$audit->Module, $audit->Action, $audit->PumpItTable, $audit->Change]);
+        $this->assertSame((int) $editor->Id, (int) $audit->ChangedBy);
+
         // The listing reads PumpIT, so it shows the new band at once.
         $listed = app(ProcedureService::class)->callSets('agora.usp_Masters_GridCategoryGlCodes', [
             'BranchIds' => (string) self::BRANCH, 'Key' => self::KEY, 'Authorized' => 1])[0]->first();
