@@ -453,6 +453,13 @@ div.emptystate { padding: 44px 20px; text-align: center; }
 .table-scroll .table-block {
   display: grid; grid-template-columns: minmax(0, 1fr) auto;
 
+  /* Its own stacking context. A nested head cell is sticky at z-index 2,
+     the same as the outer table's headings and ABOVE the outer filter row
+     (z-index 1), so a chain scrolled up under the outer head painted its
+     "Original / Amended" headings over the filter boxes (seen on live run
+     70385, 12 Nov 2026). Isolated, everything in here sits under both rows. */
+  isolation: isolate;
+
   > * { grid-column: 1 / -1; min-width: 0; }
   > .table-scroll { grid-row: 1; max-height: none; }
   > .table-empty { grid-row: 2; }
