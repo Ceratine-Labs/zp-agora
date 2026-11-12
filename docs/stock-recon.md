@@ -43,20 +43,36 @@ What follows from it:
 
 ---
 
-## Shift shortages (2 November 2026)
+## Shift shortages (2 November 2026, corrected 12 November 2026)
 
-The customer does not permit an over on one shift to cancel a short on another.
-This supersedes the historical cross-shift balancing examples below. An existing
-short stays on its shift unless a permitted issue correction on that same shift
-changes it, except when a corrected high opening reveals an over needed by the
-preceding short (5 November 2026; "preceding" is the last shift that traded,
-since 12 November 2026). That pair balances before any missing issue is
-proposed. Eligible issue increases and reductions are assessed independently
-on each interior shift, including when their chain total is zero. If repairing
-an opening would move or create a short, the entire chain is held for count
-review, except for that opening-break pair. Older saved previews which move a
-shortage outside this case, or issue against that opening before the preceding
-short is resolved, must be previewed again.
+As written on 2 November this section said the customer does not permit an over
+on one shift to cancel a short on another, and that an existing short stays on
+its shift. The engine never followed that in full, every piece of customer
+feedback since has asked for more balancing, and on 12 November 2026 Ryan
+settled it (PM question on the failing-tests task: *"Yes, balance both ways
+(what the engine does today)"*). What holds:
+
+* **A short and an over in one continuous chain balance against each other, in
+  either order,** by moving the closings between them. A short, then the over
+  that brings it back, is a closing counted low (chain short carry, `v1__14pzx`;
+  the 12 November section below). An over, then the short that follows it, is a
+  closing counted high, and the next count proves it. The latest closing of the
+  chain is pinned.
+* **No shift ends shorter than it counted, and no balanced or over shift becomes
+  short.** A proposal that would do either holds the whole chain for count
+  review, and a saved run that does it is refused at commit (`SHORT_MOVED`).
+  Two shorts with no over between them stay where they were counted: balancing
+  moves a short onto an over, it never removes one.
+* **A break bigger than the profile's threshold splits the chain** and pins the
+  closing before it, unless the chain's total is nil, or a corrected high
+  opening reveals an over needed by the short before it (5 November 2026;
+  "before it" is the last shift that traded, since 12 November 2026). That pair
+  balances before any missing issue is proposed. If repairing an opening would
+  create or deepen a short, the entire chain is held for count review.
+* Eligible issue increases and reductions are assessed independently on each
+  interior shift, including when their chain total is zero.
+* Older saved previews which deepen a shortage, or issue while an earlier short
+  that needs the over still stands, must be previewed again.
 
 The day, afternoon and night bits on each site's `STK_Area` row define required
 shifts. A missing shift between item observations holds the entire chain, is
@@ -65,9 +81,10 @@ shift is not treated as missing earlier rows without a known predecessor.
 Saved previews are checked again at commit and reset, using the current area
 shift configuration, including the continuation from the count before the window.
 
-A net-zero chain can therefore still contain both an over and a short; it is not
-fully balanced unless each variance is resolved by a valid correction. Where
-counts cannot resolve the chain under this rule, the residuals remain visible.
+A chain that is held, or split at a break, can therefore still show both an
+over and a short on a nil total: it is not balanced until each variance is
+resolved by a valid correction, and until then the residuals stay visible on
+the shifts that carry them.
 
 ### A short before an over balances with it (12 November 2026)
 
@@ -1106,3 +1123,29 @@ Head office can open **Balancing configuration** from a counting area. The gener
 The preview records the selected profile, revision and effective values on each line. Changing a profile or an item mapping invalidates a saved preview for the affected item; preview again before committing. Profile and mapping changes retain an audit event. Reading and changing profiles require separate permissions, and neither permission changes the live-write or original-count safeguards.
 
 A recorded item removal ends its counting obligation after the specified shift. A returned item starts a new continuous period, including when it returns on the same day. Previews calculate and display those periods separately, and commit checks apply to each period: counts, opening corrections, duplicate candidates and missing shifts do not carry across a removal. If the count at a recorded removal disappears, the item is held for correction. A saved preview must be refreshed if removal history or its starting predecessor changes. Reset to original also rechecks completed area shifts and refuses incomplete chains; it does not restore a predecessor from before a removal. Commit and reset hold serializable locks from validation through the write to protect the checked evidence against concurrent changes. Assess lock duration and blocking on representative production workloads before release. The history lookup no longer assumes an item was removed merely because its last count was over 35 days ago. A completed area with no item counts is refused rather than presented as a clean preview. The customer database index proposed for history lookup is not part of an Agora migration and requires customer permission and a build-impact review before execution.
+
+## Reversing one item's chain (12 November 2026)
+
+**Reverse this item** undoes one item's chain inside a committed run and leaves
+every other item on the run posted. Use it when a run is right except for a few
+chains — the case that prompted it: the engine fault fixed the same day (*A
+short before an over balances with it*) left wrongly inserted issues in two live
+runs of 220 and 63 amendments, of which 3 and 2 item chains were wrong. Reverse
+the whole run only when the whole run is wrong.
+
+It is `agora.usp_StockRecon_ReverseChain` (`v1__14q`): the run-level reversal's
+contract, restricted to the run's active amendments for one area and one item.
+Always the whole chain, every shift, never one shift: a closing and the next
+opening move together. A reason is required and is kept on each amendment it
+reversed (`StockReconAmendment.ReversalReason`). Every row is checked first
+(ISSUE_MOVED, COUNT_MOVED, POS_MOVED) and a row changed in PumpIT since the
+commit refuses the whole chain, with nothing written. The prior counts, and the
+issue or POS where the commit wrote them, go back; a journal amendment is
+reversed in Agora only. The chain's proposals go back to pending; the run stays
+posted until its last chain is reversed, and is then reversed. Preview the
+window again to balance the item afresh.
+
+The press is under the chain's grid on a posted run, for holders of
+`stockrecon.runs.reverse`; its confirmation lists every PumpIT row and column it
+writes, old → new. From the proposals table it opens the chain page, which
+carries the form. (`tests/Feature/StockRecon/ChainReversalTest`.)
