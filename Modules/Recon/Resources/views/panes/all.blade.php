@@ -56,7 +56,7 @@
 </x-card>
 
 <x-card title="Recent group runs" sub="The last five, every site in this area" collapsible flush>
-    <x-table :count="$groups->count()" empty="No group has been run in this area yet.">
+    <x-table layout-key="Recon.panes.all.1" :count="$groups->count()" empty="No group has been run in this area yet.">
         <x-slot:head>
             <tr>
                 <th>Group</th><th>Period</th><th class="num">Sites</th>

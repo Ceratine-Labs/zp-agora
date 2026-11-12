@@ -83,6 +83,7 @@
             "scripts/check-recon-types.sh",
             "scripts/check-roles.sh",
             "scripts/check-business-date.sh",
+            "python3 scripts/check-customer-connection-details.py",
             "@php artisan test"
         ],
         "check-fast": [
@@ -93,7 +94,8 @@
             "scripts/check-blades.sh",
             "scripts/check-recon-types.sh",
             "scripts/check-roles.sh",
-            "scripts/check-business-date.sh"
+            "scripts/check-business-date.sh",
+            "python3 scripts/check-customer-connection-details.py"
         ]
     },
     "extra": {

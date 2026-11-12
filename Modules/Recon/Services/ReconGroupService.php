@@ -219,6 +219,12 @@ class ReconGroupService
             }
         }
 
+        // A refusal or empty retry must leave both the preview state and any
+        // earlier successful post's totals and audit metadata untouched.
+        if ($branches === 0) {
+            return $results;
+        }
+
         $group->forceFill([
             'Status' => 'committed',
             'CommittedAt' => now(),

@@ -202,7 +202,7 @@
     "Restore script is idempotent and documented; `agora:db-check` matches the counts recorded in the plan within the backup's date",
     "The `agora` schema does not exist yet after restore (proves T003 creates it)"
    ],
-   "notes": "PumpIT is 170 GB; the restore must be selective if disk is short — SDK_ActionLog_DEFUNCT (100M rows, 17 GB) and the DBF_INVHISTF_CUSTOMER family (68M rows, 33 GB) can be truncated in the local copy by the script with a --slim flag. Never point local at 105.247.172.179 for writes.",
+   "notes": "PumpIT is 170 GB; the restore must be selective if disk is short — SDK_ActionLog_DEFUNCT (100M rows, 17 GB) and the DBF_INVHISTF_CUSTOMER family (68M rows, 33 GB) can be truncated in the local copy by the script with a --slim flag. Never point local at customer-db-host for writes.",
    "llm_model": "opus",
    "type": "feature",
    "subtasks": [],

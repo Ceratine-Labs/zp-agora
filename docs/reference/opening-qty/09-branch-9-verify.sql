@@ -32,7 +32,7 @@ SELECT  (SELECT COUNT(*) FROM sys.databases WHERE name = 'Agora')               
 /* ---------------------------------------------------------------------------
    STEP 2 — what the 21 Sep run did, out of its own audit log.
 
-   22 Sep:  RunId 738E5311-8465-4993-8FC2-73665DFAF380, by Revteck,
+   22 Sep:  RunId 738E5311-8465-4993-8FC2-73665DFAF380, by customer-db-login,
             2026-09-21 19:36:38.730, branch 9
             2,153 rows | 2,075 as-captured | 141 working | 553 never entered
             12 areas | 307 items | 2024-08-29 .. 2026-09-20

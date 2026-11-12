@@ -34,6 +34,7 @@
         @can('setup.users.edit')
             <x-slot:bulk>
                 <button type="button" class="btn-primary sm" data-modal-open="users-bulk-roles">Add roles…</button>
+                <button type="button" class="btn sm" data-modal-open="users-bulk-replace-roles">Replace roles…</button>
                 <button type="button" class="btn sm" data-modal-open="users-bulk-status">Change account status…</button>
             </x-slot:bulk>
         @endcan
@@ -62,6 +63,28 @@
                     <p class="field-help">Adds these roles to every selected user. Existing roles, direct grants and sites are kept.</p>
                 </div>
                 <div class="form-actions"><button type="submit" class="btn-primary" disabled>Add roles</button></div>
+            </form>
+            @endif
+        </x-modal>
+        <x-modal id="users-bulk-replace-roles" title="Replace roles for selected users">
+            @if ($allRoles->isEmpty())
+                <x-empty-state text="No roles have been created yet. Create a role before assigning it to users." />
+            @else
+            <form method="POST" action="{{ route('app.setup.users.bulk.update') }}" data-bulk-form="app.setup.users"
+                  data-confirm="Replace all roles for the selected users?" data-confirm-action="Replace roles"
+                  data-confirm-text="Their existing roles will be removed. Direct permissions and site access are kept.">
+                @csrf
+                <input type="hidden" name="action" value="replace_roles">
+                <div data-bulk-items></div>
+                <p><strong><span data-bulk-count>0</span> users selected</strong> on this page.</p>
+                <div class="field field-wide">
+                    <label for="bulk-user-replacement-roles">Replacement roles</label>
+                    <select id="bulk-user-replacement-roles" name="roles[]" multiple data-select required data-placeholder="Choose roles">
+                        @foreach ($allRoles as $role)<option value="{{ $role->Id }}">{{ $role->Name }}</option>@endforeach
+                    </select>
+                    <p class="field-help">Replaces existing roles for every selected user. Direct permissions and sites are kept.</p>
+                </div>
+                <div class="form-actions"><button type="submit" class="btn-primary" disabled>Replace roles</button></div>
             </form>
             @endif
         </x-modal>

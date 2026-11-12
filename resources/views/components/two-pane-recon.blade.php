@@ -97,7 +97,7 @@
                     <span class="muted" data-alloc-head></span>
                 </div>
 
-                <x-table dense id="match-alloc">
+                <x-table layout-key="shared.two-pane-recon.1" dense id="match-alloc">
                     <x-slot:head>
                         <tr>
                             <th>Cashier</th>
@@ -135,7 +135,7 @@
              not cost a round trip. A filtered row's tick box is disabled, so
              the running totals above and the match itself only ever count
              what is on screen. --}}
-        <x-table dense :count="$bank->count()" id="match-bank" tools
+        <x-table layout-key="shared.two-pane-recon.2" dense :count="$bank->count()" id="match-bank" tools
                  empty="No bank lines match this site, period and state.">
             <x-slot:head>
                 <tr>
@@ -191,7 +191,7 @@
              Amount column scrolled out of sight. fit pins the numeric columns
              to their content, so the surplus goes to the cashier's name. The
              other areas render as they always have. --}}
-        <x-table dense :fit="$cashier" :count="$mops->count()" id="match-mops" tools
+        <x-table layout-key="shared.two-pane-recon.3" dense :fit="$cashier" :count="$mops->count()" id="match-mops" tools
                  empty="No deposits match this site, period and state.">
             <x-slot:head>
                 <tr>

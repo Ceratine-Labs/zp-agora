@@ -335,7 +335,7 @@ CREATE TABLE dbo.STK_StockReconLine (
     TransactionDate                  DATETIME         NOT NULL,
     ShiftNo                          INT              NOT NULL,
     AreaNo                           INT              NOT NULL,
-    StockItemNo                      NVARCHAR(5)      NOT NULL,
+    StockItemNo                      NVARCHAR(10)     NOT NULL,
     SellPrice                        MONEY            NULL,
     QtyOpen_Original                 FLOAT            NOT NULL,
     QtyIssued_Original               FLOAT            NOT NULL,
@@ -350,7 +350,7 @@ CREATE TABLE dbo.STK_StockReconLine (
 IF OBJECT_ID('dbo.STK_StockMaster') IS NULL
 CREATE TABLE dbo.STK_StockMaster (
     SSBranchId                       INT              NOT NULL,
-    StockItemNo                      NVARCHAR(5)      NOT NULL,
+    StockItemNo                      NVARCHAR(10)     NOT NULL,
     StockItemDescription             NVARCHAR(50)     NULL,
     [Location]                       NVARCHAR(10)     NULL,
     UOMCode                          NVARCHAR(10)     NOT NULL,
@@ -380,11 +380,27 @@ CREATE TABLE dbo.STK_StockWasteLine (
     TransactionDate                  DATETIME         NOT NULL,
     ShiftNo                          INT              NOT NULL,
     AreaNo                           INT              NOT NULL,
-    StockItemNo                      NVARCHAR(5)      NOT NULL,
+    StockItemNo                      NVARCHAR(10)     NOT NULL,
     QtyGoodWaste                     FLOAT            NULL,
     QtyBadWaste                      FLOAT            NULL,
-    CreateDateTime                   DATETIME         NULL
+    CreateDateTime                   DATETIME         NULL,
+    WasteReason                      NVARCHAR(255)    NULL,
+    isWasteQtyAuthorised             BIT              NOT NULL DEFAULT 0,
+    WasteQtyAuthorisedDate           DATETIME         NULL,
+    WasteQtyAuthorisedUser           NVARCHAR(50)     NULL
 );
+
+-- Bring existing local volumes into line too; NVARCHAR lengths are bytes here.
+-- Only the old five-character definitions are changed, never a wider column.
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.STK_StockReconLine')
+           AND name = 'StockItemNo' AND system_type_id = 231 AND max_length = 10)
+    ALTER TABLE dbo.STK_StockReconLine ALTER COLUMN StockItemNo NVARCHAR(10) NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.STK_StockMaster')
+           AND name = 'StockItemNo' AND system_type_id = 231 AND max_length = 10)
+    ALTER TABLE dbo.STK_StockMaster ALTER COLUMN StockItemNo NVARCHAR(10) NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.STK_StockWasteLine')
+           AND name = 'StockItemNo' AND system_type_id = 231 AND max_length = 10)
+    ALTER TABLE dbo.STK_StockWasteLine ALTER COLUMN StockItemNo NVARCHAR(10) NOT NULL;
 
 IF OBJECT_ID('dbo.BRN_UtilityTransaction') IS NULL
 CREATE TABLE dbo.BRN_UtilityTransaction (

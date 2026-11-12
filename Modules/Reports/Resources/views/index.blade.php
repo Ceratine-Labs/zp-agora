@@ -9,9 +9,11 @@
     </x-page-head>
 
     @foreach ($catalogue as $group => $reports)
+        @php($visible = collect($reports)->filter(fn ($report) => auth()->user()->can('reports.'.$report['key'].'.view')))
+        @continue($visible->isEmpty())
         <x-card :title="$group" class="report-catalogue-group" flush>
             <div class="report-menu-grid">
-                @foreach ($reports as $report)
+                @foreach ($visible as $report)
                     <x-report-menu-card :report="$report" />
                 @endforeach
             </div>

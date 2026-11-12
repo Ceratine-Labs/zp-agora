@@ -188,17 +188,101 @@ test.describe('component behaviour', () => {
         await expect(row.locator('.d')).toBeVisible();
     });
 
-    test('the run bar disables itself once and says it is running', async ({ page }) => {
+    test('the run bar disables itself once and says it is running', async ({ page, isMobile }) => {
         await page.goto('/dev/components');
 
-        const bar = page.locator('form [data-runbar]');
+        const bar = page.locator('#c-x-runbar form [data-runbar]');
         const go = bar.locator('[data-runbar-go]');
+        const status = bar.locator('[data-runbar-status]');
+        const idle = await status.textContent();
+        await go.evaluate((button) => button.scrollIntoView({ block: 'center', behavior: 'instant' }));
+        await expect(go).toBeInViewport({ ratio: 1 });
 
-        await go.click();
+        // Chromium stalls new evaluations during a pending form navigation.
+        // Observe the real DOM from a listener installed before the native
+        // click; its next tick follows runbar's own delayed button disable.
+        const observations = [];
+        await page.exposeFunction('observeRunbar', (state) => observations.push(state));
+        await page.evaluate(() => {
+            const bar = document.querySelector('#c-x-runbar form [data-runbar]');
+            const report = (phase) => window.observeRunbar({
+                phase,
+                busy: bar.getAttribute('aria-busy'),
+                status: bar.querySelector('[data-runbar-status]').textContent,
+                disabled: bar.querySelector('[data-runbar-go]').disabled,
+            });
+            bar.closest('form').addEventListener('submit', () => {
+                window.setTimeout(() => {
+                    report('executing');
+                    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }));
+                    report('ordinary pageshow');
+                    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+                    report('restored from bfcache');
+                }, 0);
+            }, { once: true });
+        });
 
-        await expect(bar).toHaveAttribute('aria-busy', 'true');
-        await expect(bar.locator('[data-runbar-status]')).toHaveText(/Executing/);
-        await expect(go).toBeDisabled();
+        // Let the browser submit its real GET, but hold the response so these
+        // observations precede document replacement. Never prevent submit.
+        let resumeNavigation;
+        const held = new Promise((resolve) => { resumeNavigation = resolve; });
+        let receiveRequest;
+        let rejectRequest;
+        const pending = new Promise((resolve, reject) => { receiveRequest = resolve; rejectRequest = reject; });
+        await page.route('**/dev/components*', async (route) => {
+            receiveRequest(route.request());
+            await held;
+            await route.continue();
+        });
+
+        try {
+            // The mobile visual viewport can pan within the layout viewport.
+            // DOM hit tests use layout coordinates; native touch uses visual
+            // coordinates. Verify the actual target before translating it.
+            let touch;
+            if (isMobile) {
+                await expect(go).toBeEnabled();
+                await expect.poll(async () => {
+                    touch = await go.evaluate((button) => {
+                        const rect = button.getBoundingClientRect();
+                        const x = rect.left + rect.width / 2;
+                        const y = rect.top + rect.height / 2;
+                        const viewport = window.visualViewport;
+                        return {
+                            x: x - viewport.offsetLeft,
+                            y: y - viewport.offsetTop,
+                            width: viewport.width,
+                            height: viewport.height,
+                            hit: button.contains(document.elementFromPoint(x, y)),
+                        };
+                    });
+                    return touch.hit && touch.x > 0 && touch.x < touch.width && touch.y > 0 && touch.y < touch.height;
+                }).toBe(true);
+            }
+            const clicked = isMobile
+                ? page.touchscreen.tap(touch.x, touch.y)
+                : go.click({ noWaitAfter: true });
+            clicked.catch(rejectRequest);
+            const request = await pending;
+            expect(request.isNavigationRequest()).toBe(true);
+            expect(request.method()).toBe('GET');
+            const executing = { busy: 'true', status: expect.stringMatching(/Executing/), disabled: true };
+            await expect.poll(() => observations).toEqual([
+                { phase: 'executing', ...executing },
+                { phase: 'ordinary pageshow', ...executing },
+                { phase: 'restored from bfcache', busy: null, status: idle, disabled: false },
+            ]);
+
+            const loaded = page.waitForEvent('domcontentloaded');
+            resumeNavigation();
+            await Promise.all([clicked, loaded]);
+            await expect(bar).not.toHaveAttribute('aria-busy');
+            await expect(status).toHaveText(idle);
+            await expect(go).toBeEnabled();
+        } finally {
+            resumeNavigation();
+            await page.unrouteAll({ behavior: 'wait' });
+        }
     });
 
     test('the tooltip opens on focus, not only on hover', async ({ page }) => {

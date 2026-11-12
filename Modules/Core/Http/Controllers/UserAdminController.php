@@ -12,14 +12,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\Branch;
-use Modules\Core\Models\MenuItem;
-use Modules\Core\Models\MenuSection;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserBranch;
 use Modules\Core\Models\UserPermission;
 use Modules\Core\Services\MenuAccessService;
-use Modules\Core\Services\MenuService;
 use Modules\Core\Services\PasswordResetService;
 use Modules\Core\Services\PermissionService;
 use Modules\Core\Services\RoleAccessService;
@@ -36,13 +33,9 @@ use RuntimeException;
  * place anything changes. A view screen that also saved would need every
  * reader to hold `setup.users.edit`.
  *
- * THE EDIT SCREEN HAS A SAVE BUTTON PER CARD, and that is deliberate. Each
- * card owns a complete set — the sites, the permissions, the menu, the person
- * themselves — and each Save REPLACES its set rather than diffing it, because
- * a grant removed is the change that matters. A single Save across all of them
- * would mean one refusal (a home branch that is not granted, say) discarding
- * the other cards' work, and it would make "absent means empty" ambiguous the
- * moment one card fails validation.
+ * The editor submits all access sets together. The completion sentinel guards
+ * against a truncated request turning missing fields into unrestricted access.
+ * A failure rolls back every change and preserves the submitted form values.
  *
  * WHAT THIS DELIBERATELY DOES NOT DO. It does not create a user: the 88 people
  * come from PumpIT through usp_Core_MigrateUsers, and a hand-made 89th before
@@ -59,8 +52,70 @@ class UserAdminController extends Controller
         private PermissionService $permissions,
         private UserAccessService $access,
         private MenuAccessService $menuAccess,
-        private MenuService $menus,
     ) {}
+
+    public function update(Request $request, int $user, RoleAccessService $roles): RedirectResponse
+    {
+        $person = $this->person($user);
+        $data = $request->validate([
+            'user_editor' => ['required', 'in:1'],
+            'editor_complete' => ['required', 'in:1'],
+            'UserName' => ['required', 'string', 'max:120'],
+            'EmailAddress' => ['required', 'email', 'max:160'],
+            'UserCode' => ['nullable', 'string', 'max:40'],
+            'HomeBranchId' => ['nullable', 'integer'],
+            'IsActive' => ['boolean'], 'IsLocked' => ['boolean'],
+            'roles' => ['array'], 'roles.*' => ['required', 'integer', 'distinct'],
+            'branches' => ['array'], 'branches.*' => ['integer', 'distinct'],
+            'permissions' => ['array'], 'permissions.*' => ['integer', 'distinct'],
+        ]);
+
+        if (User::query()->acrossBranches()->where('EmailAddress', $data['EmailAddress'])
+            ->where('Id', '!=', $person->Id)->exists()) {
+            return back()->withInput()->withErrors(['EmailAddress' => 'Another user already signs in with that address.']);
+        }
+
+        foreach ([
+            'branches' => [Branch::query()->acrossBranches()->withoutTrashed(), 'BranchId'],
+            'permissions' => [Permission::query()->acrossBranches(), 'Id'],
+        ] as $field => [$query, $key]) {
+            $ids = $data[$field] ?? [];
+            if ($query->whereIn($key, $ids)->count() !== count($ids)) {
+                throw ValidationException::withMessages([$field => 'An entry is no longer available. Reload and try again.']);
+            }
+        }
+
+        return $this->save($person, 'details', function () use ($person, $request, $data, $roles): string {
+            $actor = $request->user();
+            try {
+                DB::connection(config('agora.connections.app'))->transaction(function () use ($person, $data, $roles, $actor) {
+                    $roles->assign($person, array_map('intval', $data['roles'] ?? []), $actor);
+                    $branches = $this->access->setBranches($person, $data['branches'] ?? []);
+                    $home = match (count($branches)) {
+                        0 => null,
+                        1 => $branches[0],
+                        default => $data['HomeBranchId'] ?? null,
+                    };
+                    $this->access->updateDetails($person->fresh(), [
+                        'UserName' => $data['UserName'], 'EmailAddress' => $data['EmailAddress'],
+                        'UserCode' => $data['UserCode'] ?? null, 'HomeBranchId' => $home === null ? null : (int) $home,
+                        'IsActive' => (bool) ($data['IsActive'] ?? false), 'IsLocked' => (bool) ($data['IsLocked'] ?? false),
+                    ], $actor);
+                    $this->access->setPermissions($person, $data['permissions'] ?? [], $actor);
+                    $this->refuseMenuLockout($actor);
+                });
+            } finally {
+                $this->menuAccess->forget($person);
+                $this->permissions->forget($person);
+                if ($actor !== null) {
+                    $this->menuAccess->forget($actor);
+                    $this->permissions->forget($actor);
+                }
+            }
+
+            return $data['UserName'].' is saved.';
+        });
+    }
 
     public function updateRoles(Request $request, int $user, RoleAccessService $roles): RedirectResponse
     {
@@ -95,13 +150,13 @@ class UserAdminController extends Controller
             $data = $request->validate([
                 'items' => ['required', 'array', 'min:1', 'max:200'],
                 'items.*' => ['required', 'integer', 'min:1', 'max:2147483647', 'distinct'],
-                'action' => ['required', 'string', 'in:add_roles,activate,deactivate,unlock'],
-                'roles' => ['required_if:action,add_roles', 'array', 'min:1', 'max:200'],
+                'action' => ['required', 'string', 'in:add_roles,replace_roles,activate,deactivate,unlock'],
+                'roles' => ['required_if:action,add_roles,replace_roles', 'array', 'min:1', 'max:200'],
                 'roles.*' => ['required', 'integer', 'min:1', 'max:2147483647', 'distinct'],
             ], [
                 'items.required' => 'Select at least one user.',
                 'items.max' => 'Select no more than 200 users at a time.',
-                'roles.required_if' => 'Choose at least one role to add.',
+                'roles.required_if' => 'Choose at least one role.',
             ]);
             $count = $bulk->apply(array_map('intval', $data['items']), $data['action'],
                 array_map('intval', $data['roles'] ?? []), $request->user());
@@ -113,6 +168,7 @@ class UserAdminController extends Controller
 
         $verb = match ($data['action']) {
             'add_roles' => 'Roles added for',
+            'replace_roles' => 'Roles replaced for',
             'activate' => 'Activated',
             'deactivate' => 'Deactivated',
             default => 'Unlocked',
@@ -201,55 +257,6 @@ class UserAdminController extends Controller
             return $granted === []
                 ? $person->UserName.' holds no permissions and can sign in but do nothing.'
                 : $person->UserName.' holds '.count($granted).' permission'.(count($granted) === 1 ? '' : 's').'.';
-        });
-    }
-
-    /**
-     * Change which menu entries this person may see — and therefore reach.
-     *
-     * The customer's own words: a tick for the view, or no access (22 Sep
-     * 2026). An EMPTY set is a real answer and means the whole menu, exactly
-     * as an empty set of sites means every site — v1__01f says why, and the
-     * card says it in words above the list.
-     *
-     * The self-lockout guard asks EnforceMenuAccess's own question rather than
-     * a permission question: an administrator who unticks "Users and access"
-     * for themselves still holds `setup.users.edit`, so the permission check
-     * would wave it through and the very next request would 403 them off the
-     * screen they made the change on.
-     */
-    public function updateMenu(Request $request, int $user): RedirectResponse
-    {
-        $person = $this->person($user);
-
-        $data = $request->validate([
-            'menu' => ['array'],
-            'menu.*' => ['integer'],
-        ]);
-
-        return $this->save($person, 'menu', function () use ($person, $request, $data): string {
-            $actor = $request->user();
-            $granted = [];
-
-            try {
-                DB::connection(config('agora.connections.app'))->transaction(function () use (&$granted, $person, $data, $actor) {
-                    $granted = $this->menuAccess->setForUser($person, $data['menu'] ?? []);
-                    $this->refuseMenuLockout($actor);
-                });
-            } finally {
-                // In the finally, not after the commit: the guard above reads
-                // the written-but-uncommitted rows and caches them, and a
-                // rollback must not leave that reading behind.
-                $this->menuAccess->forget($person);
-
-                if ($actor !== null) {
-                    $this->menuAccess->forget($actor);
-                }
-            }
-
-            return $granted === []
-                ? $person->UserName.' is ticked for nothing individually, which means the whole menu.'
-                : $person->UserName.' is ticked for '.count($granted).' menu entr'.(count($granted) === 1 ? 'y' : 'ies').'.';
         });
     }
 
@@ -406,29 +413,9 @@ class UserAdminController extends Controller
         }
 
         throw new RuntimeException(
-            'That would take Users and access off your own menu, and this is the only screen that can put it back. '
+            'That would remove your access to Users and access. '
             .'Leave it ticked for yourself, or have another administrator make the change.'
         );
-    }
-
-    /**
-     * The whole menu of every workspace, flattened, for the two screens that
-     * set the ticks.
-     *
-     * @return array<string, array{label: string, rows: array<int, array{section: MenuSection, item: MenuItem, depth: int}>}>
-     */
-    private function menuWorkspaces(): array
-    {
-        $workspaces = [];
-
-        foreach ((array) config('core.workspaces', []) as $code => $label) {
-            $workspaces[(string) $code] = [
-                'label' => (string) $label,
-                'rows' => $this->menus->flatten((string) $code),
-            ];
-        }
-
-        return $workspaces;
     }
 
     private function person(int $id): User
@@ -448,10 +435,14 @@ class UserAdminController extends Controller
      */
     private function accessState(User $person): array
     {
-        $menuDirectIds = $this->menuAccess->userItemIdsFor($person);
         $roles = app(RoleAccessService::class);
-        $rolePatterns = $roles->patternsFor($person);
-        $effectiveMenuIds = $this->menuAccess->grantedItemIds($person);
+        $roleIds = $roles->roleIdsFor($person);
+        $schema = config('agora.schema');
+        $roleGrants = DB::connection(config('agora.connections.app'))->table($schema.'.RolePermission as rp')
+            ->join($schema.'.Role as r', 'r.Id', '=', 'rp.RoleId')
+            ->join($schema.'.Permission as p', 'p.Id', '=', 'rp.PermissionId')
+            ->whereIn('rp.RoleId', $roleIds)->select('r.Name as RoleName', 'p.Code as PermissionCode')
+            ->get()->groupBy('RoleName')->map(fn (Collection $rows) => $rows->pluck('PermissionCode')->all());
 
         $grantedBranchIds = UserBranch::query()->acrossBranches()
             ->where('UserId', $person->Id)
@@ -479,27 +470,18 @@ class UserAdminController extends Controller
             'branchCount' => count($grantedBranchIds),
 
             'allRoles' => $roles->roles()->orderBy('Name')->get(),
-            'grantedRoleIds' => $roles->roleIdsFor($person),
-            'effectiveMenuIds' => $effectiveMenuIds,
-            'roleMenuIds' => $roles->menuIdsFor($person),
+            'grantedRoleIds' => $roleIds,
             'permissionRows' => $permissions
                 ->map(fn (Permission $p) => [
                     'permission' => $p,
                     'direct' => in_array((int) $p->Id, $directIds, true),
-                    'inherited' => $this->permissions->anyMatches($rolePatterns, $p->Code),
+                    'inherited' => $roleGrants->contains(fn (array $patterns) => $this->permissions->anyMatches($patterns, $p->Code)),
+                    'roleNames' => $roleGrants->filter(fn (array $patterns) => $this->permissions->anyMatches($patterns, $p->Code))->keys()->all(),
                     'effective' => $this->permissions->userHas($person, $p->Code),
                 ])
                 ->groupBy(fn (array $row) => $row['permission']->Module),
             'directCount' => count($directIds),
 
-            /*
-             * The menu, unfiltered, flattened per workspace so the card can
-             * indent it. One list of ticks, against this person's name.
-             */
-            'menuWorkspaces' => $this->menuWorkspaces(),
-            'menuDirectIds' => $menuDirectIds,
-            'menuRestricted' => $effectiveMenuIds !== [],
-            'menuDirectCount' => count($menuDirectIds),
             'effective' => $permissions
                 ->filter(fn (Permission $p) => $this->permissions->userHas($person, $p->Code))
                 ->groupBy('Module')

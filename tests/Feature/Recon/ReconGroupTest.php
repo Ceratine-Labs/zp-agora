@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Recon;
 
+use App\Exceptions\AgoraProcException;
 use App\Support\ProcedureService;
 use Closure;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,7 @@ use Modules\Recon\Models\ReconRunGroup;
 use Modules\Recon\Services\ReconGroupService;
 use Modules\Recon\Services\ReconService;
 use PDOException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -373,7 +375,149 @@ class ReconGroupTest extends TestCase
         $this->assertFalse($results[0]['ok']);
         $this->assertSame('TEST_COMMIT_REFUSED', $results[0]['code'],
             'The post must report the code the procedure THREW, not the fallback.');
+        $this->assertSame('The test procedure refused this site.', $results[0]['message']);
         $this->assertSame('previewed', $run->fresh()?->Status, 'A refused post leaves the run as it was.');
+        $group->refresh();
+        $this->assertSame('running', $group->Status);
+        $this->assertNull($group->CommittedAt);
+        $this->assertSame(0, $group->CommittedBranches);
+
+        $this->app->instance(ReconGroupService::class, new ReconGroupService(new ReconService($procedures)));
+        $response = $this->actingAs($this->admin())->post(route('app.recon.group.execute', $group->GroupRef), ['runs' => [$run->Id]]);
+        $response->assertRedirect(route('app.recon.group', $group->GroupRef));
+        $response->assertSessionHas('posted', fn ($posted) => count($posted) === 1
+            && ! $posted[0]['Ok'] && $posted[0]['Code'] === 'TEST_COMMIT_REFUSED'
+            && $posted[0]['Message'] === 'The test procedure refused this site.');
+        $this->get(route('app.recon.group', $group->GroupRef))->assertOk()
+            ->assertSee('TEST_COMMIT_REFUSED')->assertSee('The test procedure refused this site.');
+    }
+
+    #[DataProvider('mixedPostStartingStates')]
+    public function test_mixed_post_preserves_previous_totals_and_reports_refusal(
+        string $status,
+        int $previousBranches,
+        int $previousRows,
+        int $previousTotal,
+    ): void {
+        $group = $this->startGroup();
+        $group->forceFill([
+            'Status' => $status, 'CommittedBranches' => $previousBranches,
+            'CommittedRows' => $previousRows, 'CommittedTotal' => $previousTotal,
+            'CommittedAt' => $previousBranches > 0 ? '2026-08-31 12:00:00' : null,
+            'CommittedBy' => $previousBranches > 0 ? $this->admin()->getKey() : null,
+        ])->save();
+        $runs = [];
+        foreach ([1, 2] as $site) {
+            $runs[] = $this->previewedRun($group, $site);
+        }
+        $service = \Mockery::mock(ReconService::class);
+        $this->assertInstanceOf(ReconService::class, $service);
+        $service->shouldReceive('selectAll')->times(3)->andReturn(0);
+        $service->shouldReceive('commit')->times(3)->andReturnUsing(function (ReconRun $run) use ($runs) {
+            if ($run->Id === $runs[1]->Id) {
+                throw new AgoraProcException('TEST_REFUSED', 'Site refused.', 'usp_Recon_Commit');
+            }
+            $run->forceFill(['Status' => 'committed', 'CommittedRows' => 3, 'CommittedTotal' => 25])->save();
+
+            return ['status' => (object) ['Code' => 'COMMITTED', 'Message' => 'Posted.']];
+        });
+
+        $results = collect((new ReconGroupService($service))->commit($group, array_map(fn ($run) => $run->Id, $runs)))
+            ->keyBy(fn (array $result) => $result['run']->Id);
+        $this->assertCount(2, $results);
+        $this->assertTrue($results[$runs[0]->Id]['ok']);
+        $this->assertFalse($results[$runs[1]->Id]['ok']);
+        $this->assertSame('TEST_REFUSED', $results[$runs[1]->Id]['code']);
+        $this->assertSame('Site refused.', $results[$runs[1]->Id]['message']);
+        $this->assertSame('committed', $runs[0]->fresh()?->Status);
+        $this->assertSame('previewed', $runs[1]->fresh()?->Status);
+        $group->refresh();
+        $this->assertSame('committed', $group->Status);
+        $this->assertSame($previousBranches + 1, $group->CommittedBranches);
+        $this->assertSame($previousRows + 3, $group->CommittedRows);
+        $this->assertEquals($previousTotal + 25, $group->CommittedTotal);
+
+        $beforeRetry = $group->getAttributes();
+        $this->assertNotNull($group->CommittedAt);
+        $this->assertEquals($this->admin()->getKey(), $group->CommittedBy);
+
+        // Retrying the same selection skips the posted site and retries the
+        // refused one. Neither can replace the earlier post's audit metadata.
+        $this->travel(1)->minutes();
+        auth()->logout();
+        $retry = collect((new ReconGroupService($service))->commit($group->fresh(), array_map(fn ($run) => $run->Id, $runs)))
+            ->keyBy(fn (array $result) => $result['run']->Id);
+        $this->assertCount(2, $retry);
+        $this->assertFalse($retry[$runs[0]->Id]['ok']);
+        $this->assertSame('NOT_PREVIEWED', $retry[$runs[0]->Id]['code']);
+        $this->assertFalse($retry[$runs[1]->Id]['ok']);
+        $this->assertSame('TEST_REFUSED', $retry[$runs[1]->Id]['code']);
+        $this->assertSame($beforeRetry, $group->fresh()->getAttributes());
+        $this->travelBack();
+    }
+
+    /** @return array<string, array{string, int, int, int}> */
+    public static function mixedPostStartingStates(): array
+    {
+        return [
+            'first post' => ['complete', 0, 0, 0],
+            'previously posted sites' => ['committed', 2, 5, 100],
+        ];
+    }
+
+    public function test_all_refused_sites_leave_the_completed_preview_uncommitted(): void
+    {
+        $group = $this->startGroup();
+        $group->forceFill(['Status' => 'complete', 'BranchCount' => 2, 'CompletedCount' => 2, 'CompletedAt' => now()])->save();
+        $runs = [$this->previewedRun($group, 1), $this->previewedRun($group, 2)];
+        $before = $group->fresh()->getAttributes();
+        $procedures = $this->refusingProcedures('TEST_ALL_REFUSED');
+
+        $results = (new ReconGroupService(new ReconService($procedures)))->commit($group, array_map(fn ($run) => $run->Id, $runs));
+
+        $this->assertSame(['usp_Recon_Commit', 'usp_Recon_Commit'], $this->asked);
+        $this->assertCount(2, $results);
+        foreach ($results as $result) {
+            $this->assertFalse($result['ok']);
+            $this->assertSame('TEST_ALL_REFUSED', $result['code']);
+            $this->assertSame('The test procedure refused this site.', $result['message']);
+            $this->assertSame('previewed', $result['run']->fresh()?->Status);
+        }
+        $this->assertSame($before, $group->fresh()->getAttributes());
+        $this->assertFalse($group->fresh()->isCommitted());
+        $this->assertNull($group->fresh()?->CommittedBy);
+    }
+
+    public function test_empty_or_unrelated_selection_does_not_commit_the_group(): void
+    {
+        $group = $this->startGroup();
+        $otherGroup = app(ReconGroupService::class)->start(
+            $group->ReconArea, $group->FromDate, $group->ToDate, [1], note: self::NAME,
+        );
+        $unrelatedRun = $this->previewedRun($otherGroup, 1);
+        $before = $group->fresh()->getAttributes();
+        $service = \Mockery::mock(ReconService::class);
+        $this->assertInstanceOf(ReconService::class, $service);
+        $service->shouldNotReceive('selectAll');
+        $service->shouldNotReceive('commit');
+        $groups = new ReconGroupService($service);
+
+        $this->assertSame([], $groups->commit($group, []));
+        $this->assertSame([], $groups->commit($group, [$unrelatedRun->Id]));
+        $this->assertSame($before, $group->fresh()->getAttributes());
+        $this->assertSame('previewed', $unrelatedRun->fresh()?->Status);
+    }
+
+    private function previewedRun(ReconRunGroup $group, int $site): ReconRun
+    {
+        return ReconRun::create([
+            'BranchId' => $site, 'GroupRef' => $group->GroupRef, 'ReconArea' => $group->ReconArea,
+            'FromDate' => $group->FromDate->toDateString(), 'ToDate' => $group->ToDate->toDateString(),
+            'Status' => 'previewed', 'StampMode' => config('recon.stamp_mode'),
+            'ProcedureName' => config('agora.schema').'.'.config('recon.areas.ABSA.procedure'),
+            'ParamsJson' => $group->ParamsJson, 'Note' => self::NAME,
+            'CreatedBy' => $this->admin()->getKey(), 'CreatedAt' => now(),
+        ]);
     }
 
     /**

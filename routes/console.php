@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -13,16 +14,29 @@ Artisan::command('inspire', function () {
 | Scheduled work
 |--------------------------------------------------------------------------
 |
-| ⚠ NOTHING RUNS THIS YET. There is no `schedule:run` cron on
-| agora.ceratine.com — docs/deployment.md does not mention one because until
-| now Agora had nothing to schedule. A line here is a declaration of intent
-| until that cron exists, and the screens say how old their data is precisely
-| so that a schedule which is not running is visible rather than silent.
+| These declarations require one Agora-specific `schedule:run` cron. The
+| production check on 8 November 2026 found none; installation requires
+| Ryan's operational approval. See docs/deployment.md for the runtime user,
+| proposed cron, log rotation, verification and rollback. ZP-NQL has its own
+| scheduler on the same server and must remain unchanged.
 |
-| To turn it on, on the server:
-|     * * * * * cd /path/to/agora && php artisan schedule:run >> /dev/null 2>&1
+| Command output is retained separately from the scheduler runner. Success
+| and failure callbacks record the completed command in its dedicated log;
+| launching a background command alone is not proof that it succeeded.
 |
 */
+
+$recordScheduledOutcome = static function (string $command, string $logFile, bool $succeeded): void {
+    Log::build([
+        'driver' => 'single',
+        'path' => storage_path('logs/'.$logFile),
+        'level' => 'info',
+    ])->log(
+        $succeeded ? 'info' : 'error',
+        $succeeded ? 'Scheduler command succeeded.' : 'Scheduler command failed.',
+        ['command' => $command],
+    );
+};
 
 /*
  * The stock master's "last counted" column (T025).
@@ -43,7 +57,10 @@ Artisan::command('inspire', function () {
 Schedule::command('agora:refresh-count-stats --if-stale')
     ->hourly()
     ->withoutOverlapping()
-    ->runInBackground();
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler-count-stats.log'))
+    ->onSuccess(fn () => $recordScheduledOutcome('agora:refresh-count-stats --if-stale', 'scheduler-count-stats.log', true))
+    ->onFailure(fn () => $recordScheduledOutcome('agora:refresh-count-stats --if-stale', 'scheduler-count-stats.log', false));
 
 /*
  * Debtors statements: last month's statement to every account on the monthly
@@ -55,4 +72,7 @@ Schedule::command('agora:refresh-count-stats --if-stale')
 Schedule::command('debtors:send-statements')
     ->monthlyOn((int) config('debtors.run_day', 1), '06:00')
     ->timezone('Africa/Johannesburg')
-    ->withoutOverlapping();
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/scheduler-debtors.log'))
+    ->onSuccess(fn () => $recordScheduledOutcome('debtors:send-statements', 'scheduler-debtors.log', true))
+    ->onFailure(fn () => $recordScheduledOutcome('debtors:send-statements', 'scheduler-debtors.log', false));

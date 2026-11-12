@@ -44,14 +44,16 @@ class AmendmentRecommitTest extends TestCase
     public function test_a_live_run_can_be_committed_and_reversed_twice_without_changing_its_first_history(): void
     {
         $run = $this->newRun();
-        $this->proposal($run, 1, [10, 0, 8, 1], [10, 9]);
-        $this->proposal($run, 2, [8, 0, 6, 3], [9, 6]);
+        // Remove an over-count and carry the changed close through the next
+        // zero-variance shift; no counted shortage is erased by this fixture.
+        $this->proposal($run, 1, [10, 0, 10, 1], [10, 9]);
+        $this->proposal($run, 2, [10, 0, 7, 3], [9, 6]);
 
         // Existing reversed rows must survive the upgrade unchanged.
         $this->assertSame('COMMITTED', $this->commit($run)->Code);
         $this->assertSource([[10, 0, 9, 1], [9, 0, 6, 3]]);
         $this->reverse($run);
-        $this->assertSource([[10, 0, 8, 1], [8, 0, 6, 3]]);
+        $this->assertSource([[10, 0, 10, 1], [10, 0, 7, 3]]);
         $firstHistory = $this->amendments($run)->orderBy('Id')->get()->all();
         $this->assertCount(2, $firstHistory);
 
@@ -63,7 +65,7 @@ class AmendmentRecommitTest extends TestCase
         $this->assertEquals($firstHistory, $this->amendments($run)->where('State', 'reversed')->orderBy('Id')->get()->all());
 
         $this->reverse($run);
-        $this->assertSource([[10, 0, 8, 1], [8, 0, 6, 3]]);
+        $this->assertSource([[10, 0, 10, 1], [10, 0, 7, 3]]);
         $this->assertSame(0, $this->amendments($run)->where('State', 'active')->count());
         $this->assertSame(4, $this->amendments($run)->where('State', 'reversed')->count());
         $this->assertEquals($firstHistory, $this->amendments($run)->orderBy('Id')->limit(2)->get()->all());
@@ -121,9 +123,9 @@ class AmendmentRecommitTest extends TestCase
     {
         $this->migrateActiveKey();
         $first = $this->newRun();
-        $this->proposal($first, 1, [10, 0, 8, 1], [10, 9]);
+        $this->proposal($first, 1, [10, 0, 10, 1], [10, 9]);
         $second = $this->newRun();
-        $this->proposal($second, 1, [10, 0, 8, 1], [10, 9], source: false);
+        $this->proposal($second, 1, [10, 0, 10, 1], [10, 9], source: false);
         $this->commit($first, 'journal');
 
         try {
@@ -135,12 +137,12 @@ class AmendmentRecommitTest extends TestCase
         }
         $this->assertSame(0, $this->amendments($second)->count());
         $this->assertSame(1, $this->amendments($first)->where('State', 'active')->count());
-        $this->assertSource([[10, 0, 8, 1]]);
+        $this->assertSource([[10, 0, 10, 1]]);
         $this->reverse($first);
         $this->assertSame('COMMITTED', $this->commit($second, 'journal')->Code);
         $this->assertSame(1, $this->amendments($first)->where('State', 'reversed')->count());
         $this->assertSame(1, $this->amendments($second)->where('State', 'active')->count());
-        $this->assertSource([[10, 0, 8, 1]]);
+        $this->assertSource([[10, 0, 10, 1]]);
     }
 
     public function test_a_reset_can_repeat_with_issue_pos_and_the_negative_anchor_line_retained_in_history(): void
@@ -175,15 +177,31 @@ class AmendmentRecommitTest extends TestCase
     {
         $this->migrateActiveKey();
         $run = $this->newRun();
-        $this->proposal($run, 1, $counts, [$counts[0], $counts[2]], $newIssue);
+        // Current issue proposals require an interior shift and a real pack
+        // multiple. The neighboring proposals stay unselected and unchanged.
+        $multiple = 2;
+        $this->assertFalse($this->db()->table('agora.vw_StockItem')->where('BranchId', self::BRANCH)->where('StockItemNo', self::ITEM)->exists());
+        $this->db()->table('agora.StockIssueMultiple')->insert([
+            'BranchId' => self::BRANCH, 'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM,
+            'IssueMultiple' => $multiple, 'Workbook' => 'TEST-recommit issue pack', 'CreatedAt' => now(),
+        ]);
+        $prior = [10, 0, 10, 0];
+        $next = [$counts[2], 0, $counts[2], 0];
+        $before = $this->proposal($run, 1, $prior, [$prior[0], $prior[2]]);
+        $changed = $this->proposal($run, 2, $counts, [$counts[0], $counts[2]], $newIssue);
+        $after = $this->proposal($run, 3, $next, [$next[0], $next[2]]);
+        $this->db()->table('agora.StockReconRunLine')->where('BranchId', self::BRANCH)->where('RunId', $run->Id)
+            ->whereIn('Id', [$before, $after])->update(['Selected' => 0, 'WouldAmend' => 0]);
+        $this->db()->table('agora.StockReconRunLine')->where('BranchId', self::BRANCH)->where('Id', $changed)
+            ->update(['IssueMultiple' => $multiple]);
         for ($cycle = 1; $cycle <= 2; $cycle++) {
             $this->assertSame('COMMITTED', $this->commit($run)->Code);
-            $this->assertSource([[$counts[0], $newIssue, $counts[2], $counts[3]]]);
+            $this->assertSource([$prior, [$counts[0], $newIssue, $counts[2], $counts[3]], $next]);
             $active = $this->amendments($run)->where('State', 'active')->sole();
             $this->assertEquals($counts[1], $active->PriorQtyIssued);
             $this->assertEquals($newIssue, $active->NewQtyIssued);
             $this->reverse($run);
-            $this->assertSource([$counts]);
+            $this->assertSource([$prior, $counts, $next]);
             $this->assertSame($cycle, $this->amendments($run)->where('State', 'reversed')->count());
             $this->assertSame(0, $this->amendments($run)->where('State', 'active')->count());
         }
@@ -213,11 +231,25 @@ class AmendmentRecommitTest extends TestCase
             $this->sourceRow('2031-01-01', $shift, $counts, $counts);
         }
 
+        // Hand-built proposals still need the evidence a current preview
+        // captures. Assert this TEST item has no removal, mapping or waste;
+        // snapshot the effective generic profile before the tested writes.
+        $key = ['BranchId' => self::BRANCH, 'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM];
+        $this->assertFalse($this->db()->table('agora.StockReconItemRemoval')->where($key)->whereNull('WithdrawnAt')->exists());
+        $this->assertFalse($this->db()->table('agora.StockReconItemProfile')->where($key)->exists());
+        $this->assertFalse($this->db()->table('agora.vw_StockWasteLine')->where($key)->exists());
+        $profile = $this->db()->table('agora.StockReconBalancingProfile')
+            ->where('BranchId', (int) config('agora.group_branch_id', 2))->where('IsActive', 1)->where('IsDefault', 1)->sole();
+
         return $this->db()->table('agora.StockReconRunLine')->insertGetId([
             'BranchId' => self::BRANCH, 'RunId' => $run->Id, 'LineNo' => $shift,
             'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM, 'TransactionDate' => '2031-01-01', 'ShiftNo' => $shift,
             'QtyOpen' => $counts[0], 'QtyIssued' => $counts[1], 'QtyClose' => $counts[2], 'QtyPOS' => $counts[3],
             'QtyOpenNow' => $counts[0], 'QtyCloseNow' => $counts[2],
+            'QtyVar' => $counts[2] - ($counts[0] + $counts[1] - $counts[3]),
+            'QtyVarNew' => $newCounts[1] - ($newCounts[0] + ($newIssue ?? $counts[1]) - $counts[3]),
+            'ContinuitySegment' => 0, 'BalancingProfileId' => $profile->Id, 'BalancingProfileRevision' => $profile->Revision,
+            'WasteSourceAuthorised' => 0, 'AuthorizedGoodWaste' => 0,
             'QtyOpenNew' => $newCounts[0], 'QtyCloseNew' => $newCounts[1], 'QtyIssuedNew' => $newIssue,
             'AmendClose' => $newCounts[1] - $counts[2], 'WouldAmend' => true, 'Selected' => true,
             'CountsMove' => $newCounts !== [$counts[0], $counts[2]], 'Outcome' => 'TEST-recommit',
@@ -259,7 +291,10 @@ class AmendmentRecommitTest extends TestCase
 
     private function commit(StockReconRun $run, string $mode = 'live'): object
     {
-        return $this->write('usp_StockRecon_Commit', $run, ['StampMode' => $mode, 'IssueMode' => 'live', 'UseOriginalCounts' => 1]);
+        return $this->write('usp_StockRecon_Commit', $run, [
+            'StampMode' => $mode, 'IssueMode' => 'live', 'UseOriginalCounts' => 1,
+            'ProfileBranchId' => (int) config('agora.group_branch_id', 2),
+        ]);
     }
 
     private function reverse(StockReconRun $run): void

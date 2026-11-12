@@ -1,6 +1,27 @@
-# Weekly stock acceptance evidence — 26 October 2026
+# Weekly stock acceptance evidence — 26 October and 8 November 2026
 
-The workflow has been extended and tested locally. **This is a documented current-source reconciliation, not certification that the saved master book can be reproduced exactly.** The PM parent remains in review. No commit, push, deployment, customer data repair or live investigation assignment was performed.
+day_list_id: `01a1ba62-f2e9-7149-aeed-f326e5d4ed98` · task: `01a0f16f-20c3-7352-82d8-b7bbb48319a5`
+
+The workflow has been extended and tested locally. **This is a documented current-source reconciliation, not certification that the saved master book can be reproduced exactly.** No commit, push, deployment, customer data repair or live investigation assignment was performed.
+
+## 8 November acceptance review
+
+The approved task requires the whole master-book investigation workflow and a **representative** baseline against the pack. The retained 2,360 field comparisons meet that baseline requirement while explicitly identifying 436 differences. Exact historical equivalence and a replay of all nine original site exports are not claimed: the missing historical exports cannot be recreated from later source state. Historical aggregate action wording does not have to become a duplicate all-site record when each site's accountable action, evidence, target and signed outcome are retained.
+
+The saved workbook's **Cross-Site Patterns** sheet does contain a separate signed register (columns K:R: owner, due date, status, finding, recovery, correction, closed date and head-office sign-off). The previous implementation only linked to site cases; that was a real gap. It is now implemented:
+
+- **Open cross-site investigation** captures the server-calculated pattern, all contributing area-case and snapshot references, and their source evidence as an immutable group-owned case. Repeating the same capture returns the existing case; later source revisions create a separate case and leave earlier captures visible.
+- Viewing, assignment, saving, approval, reopening and CSV export require head-office access to every contributing site. A group-entity grant is not required. An owner must retain access to all contributing sites; no permission grants are created.
+- The existing investigation form supplies owner, status, due date, written finding, evidence, supported recovery, correction, dated action and head-office sign-off. Approval requires the linked supporting cases to be signed. Reopening a supporting case invalidates the signed pattern approval in the same transaction and preserves both histories.
+- `usp_StockRecon_WeeklyPatterns` is the single calculation used by the overview and capture. `v1__14pzh_stockrecon_weekly_patterns.php` deploys seven procedure definitions and makes no table changes. Only Agora investigation records can be written; source quantities remain untouched.
+
+Verification: **6 targeted methods / 135 assertions passed** on guarded local SQL Server, including the three new pattern tests and existing cross-site, management-dependency and signed-history regressions. Scoped Pint, PHPStan (zero errors), seven procedure guards and the migration deployment-list check pass. The test fixture cleanup tracks only branch IDs it successfully inserted. Parent review and independent targeted reruns remain the PM closure gate. No full suite, browser interaction test, production test or deployment was run for this addition.
+
+Command: `php /tmp/agora-day-list-01a1b6c4/recon-local-phpunit.php tests/Feature/StockRecon/WeeklyPatternTest.php tests/Feature/StockRecon/WeeklyStockTest.php --filter='WeeklyPatternTest|test_cross_site_patterns_use_whole_product_original_quantities_and_current_branch_grants|test_management_approval_requires_corrected_children_and_reopening_invalidates_both_approvals|test_closure_requires_evidence_head_office_permission_and_reopening_preserves_signed_history' --colors=never`, under `/tmp/agora-day-list-01a1b6c4/local-sql.lock`.
+
+Actual output: `OK (6 tests, 135 assertions)`; all four SQL hosts were `127.0.0.1:1433`.
+
+The following sections retain the 26 October evidence and its historical limitations.
 
 ## Evidence and scope
 
@@ -36,7 +57,7 @@ Weekly selling-price exposure, period stock variance at cost and signed charges/
 
 Opening/closing breaks, balancing breaches, issue failures, count compliance/recency, period items, daily recipe comparisons and receipt controls have actionable cases. Receipt period totals are independent of same-day/next-day delivery matching; issues without a receipt today or yesterday remain visible. Missing daily recipe data remains unavailable instead of being silently filled with zero.
 
-Management actions reference their supporting cases. The book's preventive controls—zero-count exports, NAMOS count links where relevant, virtual lines, issue packs, opening handover, staff identity and count reason codes—also get assignable records. They retain the book's target wording and responsible role; actual owner and due date are explicit investigation inputs. These tasks record follow-up; they do not implement changes in the customer's ERP. All-site policies are instantiated per site rather than merged into one all-site action. Cross-site patterns use complete permitted snapshots, original whole-product quantities, the three-site/75%/3% rule and median; links lead to the relevant site cases for action. The pattern display itself is not a separate signed register row.
+Management actions reference their supporting cases. The book's preventive controls—zero-count exports, NAMOS count links where relevant, virtual lines, issue packs, opening handover, staff identity and count reason codes—also get assignable records. They retain the book's target wording and responsible role; actual owner and due date are explicit investigation inputs. These tasks record follow-up; they do not implement changes in the customer's ERP. All-site policies are instantiated per site rather than merged into one all-site action. Cross-site patterns use complete permitted snapshots, original whole-product quantities, the three-site/75%/3% rule and median; links lead to the relevant site cases for action. At the 26 October checkpoint the pattern display was not a separate signed register row; the 8 November addition above supplies that workflow.
 
 Closing requires an owner, due date, finding, evidence reference, outcome, explicit recovery amount, recovery evidence when positive, correction evidence/reason, completed action/date and head-office sign-off. Opening/closing and balancing controls require a recorded correction. A management action cannot close while a supporting case is unsigned. Separate approve/reopen permissions apply; ordinary save cannot close. Approval captures actor/time/closed date. Reopening preserves the prior signed record, removes the current sign-off and reopens any signed management action that depended on that case. Optimistic version checks reject stale writes.
 
@@ -46,7 +67,7 @@ Closing requires an owner, due date, finding, evidence reference, outcome, expli
 
 Pint and PHPStan were scoped to the changed weekly PHP/tests. Migration, procedure, component/view and business-date rules were checked against the touched files. Component-catalogue regeneration was excluded because no component was changed. No full suite, whole-tree static analysis, production smoke test, browser interaction test or deployment was run. Approval/reopen permissions are seeded without automatically granting them to production users.
 
-Remaining acceptance work is explicit: the captured sources do not prove exact September whole-workbook equivalence; changed recon quantities/costs and unavailable historical nil counts remain differences; the all-nine-site saved cross-pattern baseline has not been replayed. Generated management actions preserve the control workflow but not every historical narrative/deadline as a one-for-one row. A separate signed cross-site register would be additional work if required beyond the linked site cases. None of these is converted into an assertion that the parent is complete.
+Historical evidence limits remain explicit: the captured sources do not prove exact September whole-workbook equivalence; changed recon quantities/costs and unavailable historical nil counts remain differences; the all-nine-site saved cross-pattern baseline has not been replayed. Generated management actions preserve the control workflow but not every historical narrative/deadline as a one-for-one row. The missing signed cross-site register was subsequently confirmed from the saved workbook and implemented on 8 November. Historical source differences remain documented differences, rather than fabricated equivalence.
 
 ## Reproduce locally
 

@@ -94,6 +94,9 @@ test.describe('data grid — desktop', () => {
         const before = await grid.locator('tbody tr').count();
 
         await grid.locator('input[name="branches_f[Name][q]"]').fill('Ulundi');
+        if (!(await grid.locator('.dg-scope-fold').evaluate((element) => element.open))) {
+            await grid.locator('.dg-scope-fold > summary').click();
+        }
         await grid.locator('form.dg-scope button[type="submit"]').click();
 
         await signedIn.waitForURL(/branches_f%5BName%5D%5Bq%5D=Ulundi/);

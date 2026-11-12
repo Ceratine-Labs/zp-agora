@@ -59,14 +59,40 @@ class WeeklyStockController extends Controller
         return redirect()->route('app.stockrecon.weekly', ['snapshot' => $snapshot->SnapshotRef])->with('status', $snapshot->Message);
     }
 
+    public function storePattern(Request $request, BranchContext $context): RedirectResponse
+    {
+        abort_unless($context->workspace() === 'ho', 403);
+        $input = $request->validate(['branches' => ['required', 'array', 'min:3'], 'branches.*' => ['required', 'integer', 'min:1', 'distinct'],
+            'period_from' => ['required', 'date_format:Y-m-d'], 'period_to' => ['required', 'date_format:Y-m-d', 'after_or_equal:period_from'],
+            'pos_code' => ['required', 'string', 'max:80']]);
+        try {
+            $result = $this->service->createPattern(array_map('intval', $input['branches']), $input['period_from'], $input['period_to'], $input['pos_code']);
+        } catch (AgoraProcException $e) {
+            return back()->withErrors(['refusal' => $e->getMessage()]);
+        }
+
+        return redirect()->route('app.stockrecon.weekly.show', ['branch' => $result->BranchId, 'case' => $result->Id])->with('status', $result->Message);
+    }
+
     public function show(int $branch, int $case, Request $request): View
     {
-        return view($request->ajax() ? 'stockrecon::weekly.detail' : 'stockrecon::weekly.show', $this->service->get($branch, $case));
+        return view($request->ajax() ? 'stockrecon::weekly.detail' : 'stockrecon::weekly.show', $this->caseData($branch, $case));
     }
 
     public function edit(int $branch, int $case): View
     {
-        return view('stockrecon::weekly.edit', $this->service->get($branch, $case));
+        return view('stockrecon::weekly.edit', $this->caseData($branch, $case));
+    }
+
+    /** @return array<string, mixed> */
+    private function caseData(int $branch, int $case): array
+    {
+        try {
+            return $this->service->get($branch, $case);
+        } catch (AgoraProcException $e) {
+            abort_if($e->code() === 'WEEKLY_FORBIDDEN', 403);
+            throw $e;
+        }
     }
 
     public function reopen(int $branch, int $case, Request $request): RedirectResponse

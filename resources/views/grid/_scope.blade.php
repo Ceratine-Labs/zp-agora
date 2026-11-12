@@ -20,6 +20,8 @@
     $mine = array_map($p, ['q', 'branches', 'from', 'to', 'sort', 'dir', 'page', 'size', 'f']);
 @endphp
 
+<details class="dg-scope-fold" data-remember="grid-scope:{{ auth()->id() }}:{{ $grid->key() }}">
+<summary>Filters</summary>
 <form class="dg-scope" id="{{ $formId }}" method="GET" action="{{ $grid->baseUrl }}">
     @foreach ($grid->query as $name => $value)
         @continue(in_array($name, $mine, true) || is_array($value))
@@ -92,3 +94,4 @@
         <a class="btn-ghost" href="{{ $grid->baseUrl }}">Reset</a>
     </div>
 </form>
+</details>

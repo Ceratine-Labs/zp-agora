@@ -119,6 +119,8 @@ npm run build >/dev/null
 #       there. Hide stops it being sent AND lets --delete remove the copy that
 #       is already on the server, so the first deploy after this change
 #       deletes tests/ from the box. That is intended.
+#   H /probe.mjs   keeps the root browser diagnostic off the server and lets
+#       the next authorized deploy remove any previously shipped copy.
 echo "==> shipping to ${HOST}:${REMOTE}"
 rsync -az --no-owner --no-group --delete $DRY \
     --exclude '.git' \
@@ -141,6 +143,7 @@ rsync -az --no-owner --no-group --delete $DRY \
     --filter 'P /public/build/assets/*' \
     --filter 'H /tests/' \
     --filter 'H /playwright-report/' \
+    --filter 'H /probe.mjs' \
     ./ "${HOST}:${REMOTE}/"
 
 if [ -n "$DRY" ]; then

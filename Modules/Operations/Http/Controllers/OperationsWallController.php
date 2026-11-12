@@ -11,6 +11,7 @@ use Modules\Core\Models\User;
 use Modules\Operations\Services\OperationsWallService;
 use Modules\Operations\Services\WallAccess;
 use Modules\Operations\Services\WallScope;
+use Modules\Reports\Services\MyQueueAccess;
 
 class OperationsWallController extends Controller
 {
@@ -36,7 +37,9 @@ class OperationsWallController extends Controller
         $sites = $this->scope->sites();
         $selected = $this->scope->selected($request, $sites);
 
-        return response()->json($this->wall->snapshot($selected, $this->access->sources($user)))
+        $queues = $user->can('reports.my-queue.view') ? app(MyQueueAccess::class)->allowed($user) : [];
+
+        return response()->json($this->wall->snapshot($selected, $this->access->sources($user), $queues))
             ->header('Cache-Control', 'private, no-store');
     }
 

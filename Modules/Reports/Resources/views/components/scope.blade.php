@@ -31,7 +31,7 @@
         'Last 30 days' => [\App\Support\BusinessDate::today()->subDays(29)->toDateString(), $today],
     ];
 @endphp
-<details {{ $attributes->class(['card', 'report-scope']) }} @if ($open) open @endif>
+<details {{ $attributes->class(['card', 'report-scope']) }} data-remember="report-scope:{{ auth()->id() }}:{{ $report['key'] }}" @if ($open) open @endif>
     <summary class="report-scope-summary">
         <strong>Scope</strong>
         <span class="report-scope-tags">

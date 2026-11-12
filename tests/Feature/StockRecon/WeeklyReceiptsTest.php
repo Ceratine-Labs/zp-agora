@@ -144,7 +144,14 @@ class WeeklyReceiptsTest extends TestCase
 
     public function test_invalid_week_and_missing_sources_are_explicit(): void
     {
-        foreach ([['BranchId' => 0], ['FromDate' => '2031-01-13'], ['ToDate' => '2031-01-13']] as $params) {
+        // January 6 through April 8 is 93 inclusive days; April 9 is day 94.
+        $this->supplier('LAST-VALID-DAY', ['EODDate' => '2031-04-08']);
+        $rows = $this->evidence(['ToDate' => '2031-04-08']);
+        $this->assertCount(1, $rows);
+        $this->assertSame('LAST-VALID-DAY', $rows[0]->Reference);
+        $this->assertSame('2031-04-08', $rows[0]->EvidenceDate);
+        $this->assertSame('Selected week', $this->detail($rows[0])['PeriodPosition']);
+        foreach ([['BranchId' => 0], ['FromDate' => '2031-01-13'], ['ToDate' => '2031-04-09']] as $params) {
             try {
                 $this->evidence($params);
                 $this->fail('Invalid scope must be refused.');

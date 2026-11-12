@@ -21,14 +21,14 @@ class StockReconHelper
 
     /**
      * Routing choices from the saved preview, using existing model classifications.
-     * One link per item/area; the evidence itself comes from DrillChain.
+     * One link per continuous item period; the evidence comes from DrillChain.
      *
      * @param  Collection<int, StockReconRunLine>  $lines
      * @return Collection<int, StockReconRunLine>
      */
     public function choices(Collection $lines, string $topic): Collection
     {
-        return $lines->groupBy(fn (StockReconRunLine $line) => $line->AreaNo.'|'.$line->StockItemNo)
+        return $lines->groupBy(fn (StockReconRunLine $line) => $line->continuityKey())
             ->filter(fn (Collection $chain) => $chain->contains(fn (StockReconRunLine $line) => match ($topic) {
                 'held' => (bool) $line->ChainBlocked,
                 'issues' => $line->DupTier !== null || $line->QtyIssuedNew !== null
@@ -75,6 +75,12 @@ class StockReconHelper
             $cases[] = $this->case('A missing issue was proposed', 'warn', 'missing-issues', [
                 'What it means' => 'This run proposes increasing the issue quantity to account for a remaining over. That changes the issue total; it is separate from redistributing a count difference.',
                 'Review next' => 'Compare the proposed issue with the issue sheet, receipts and POS evidence. Check the saved outcome and commit state before treating “Missing issue captured” as a completed write.',
+            ]);
+        }
+        if ($lines->contains(fn (StockReconRunLine $line) => $line->reducesIssue())) {
+            $cases[] = $this->case('An issue reduction was proposed', 'warn', 'missing-issues', [
+                'What it means' => 'Agora proposes reducing an issue by a whole configured multiple because the shift is short. The issue cannot be reduced below zero.',
+                'Review next' => 'Compare the proposed reduction with the issue sheet and check the commit state before treating it as a completed write.',
             ]);
         }
         if ($lines->contains(fn (StockReconRunLine $line) => (bool) $line->FlagChainBroken

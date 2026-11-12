@@ -4,33 +4,23 @@ namespace Modules\Cash\Mail;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Modules\Email\Support\RenderedTemplate;
+use Modules\Email\Support\UsesEmailTemplate;
 
-/**
- * "A staff short is waiting for you" — to each approver, when a short is raised
- * (T040's acceptance: raising sends the approver an email).
- *
- * The body is a Blade view for now. T019 — the customer-editable template
- * registry, agora.EmailTemplate — is NOT BUILT; when it is, it seeds a template
- * under TEMPLATE_CODE and this class renders that instead, with the variables
- * content() passes. The code is a constant here, not a view name, so the swap
- * changes nothing a caller sees. PasswordResetMail is the same arrangement.
- *
- * Plain values, not models: a queued mail must not re-read a row that has
- * moved since, and the figures in it are the ones the approver is being told.
- */
+/** Module-owned editable content; recipients and delivery remain with the caller. */
 class StaffShortRaisedMail extends Mailable
 {
     use Queueable;
     use SerializesModels;
+    use UsesEmailTemplate;
 
-    /** The agora.EmailTemplate code T019 will seed. Do not rename it. */
+    /** Stable module-owned template code. */
     public const TEMPLATE_CODE = 'cash.staff_short_raised';
 
     /**
-     * @param  array{no: int, site: string, employee: string, code: string, amount: string, reason: string,
+     * @param  array{branchId?: int, no: int, site: string, employee: string, code: string, amount: string, reason: string,
      *               day: string, note: ?string, raisedBy: string, source: ?string}  $short
      */
     public function __construct(
@@ -41,16 +31,13 @@ class StaffShortRaisedMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: 'Staff short '.$this->short['no'].' to approve — '.$this->short['amount'].', '.$this->short['employee'],
-        );
+        return new Envelope(subject: $this->template()->subject);
     }
 
-    public function content(): Content
+    protected function template(): RenderedTemplate
     {
-        return new Content(
-            view: 'cash::mail.staff_short_raised',
-            with: ['short' => $this->short, 'approver' => $this->approver, 'url' => $this->url],
-        );
+        return $this->templateFor(self::TEMPLATE_CODE, (int) ($this->short['branchId'] ?? config('agora.group_branch_id')), [
+            'short' => $this->short, 'approver' => $this->approver, 'url' => $this->url,
+        ]);
     }
 }

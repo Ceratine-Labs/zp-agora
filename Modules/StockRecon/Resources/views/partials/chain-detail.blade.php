@@ -55,11 +55,14 @@
         <a class="btn-ghost" href="{{ route('app.stockrecon.helper', [$run, 'line' => $line->Id]) }}">Explain this chain</a>
         <div class="card-t">
             <h4>{{ $item->StockItemDescription ?? $line->StockItemNo }}</h4>
+            @if ($line->BalancingProfileName)
+                <p>Balancing profile: {{ $line->BalancingProfileName }} · correction limit {{ \App\Support\Format::qty($line->ProfileMaxAmendment) }} · share {{ $line->ProfileMaxAmendmentPct }} · minimum shifts {{ $line->ProfileMinShifts }} · keep breaks up to {{ \App\Support\Format::qty($line->ProfileKeepBreaksUpTo) }}</p>
+            @endif
             {{-- The reading notes, behind a button (ZRP, 4 Oct 2026). --}}
             <x-info label="How to read this chain" class="info-wide">
                 <p>Balancing amends the closing count; the opening follows, because it <em>is</em> the previous
                    closing. Where the counted opening missed the previous closing, the opening is repaired: a
-                   break of 3 or fewer is balanced straight through, a bigger one splits the chain and the
+                   break within the item’s configured limit is balanced straight through; a bigger one splits the chain and the
                    closing before it stands.</p>
                 <p>Where two people were on a shift both are named: the counts cannot say which of them a
                    variance belongs to. A red chip beside the outcome is hand balancing already in PumpIT that
@@ -194,7 +197,7 @@
          is read straight across; Amend, which only the amended side has, sits
          after them. --}}
     @php($dash = fn ($v) => abs((float) $v) < 0.0005 ? '—' : \App\Support\Format::qty($v))
-    <x-table :count="$shifts->count()" dense fit
+    <x-table layout-key="StockRecon.partials.chain-detail.1" :count="$shifts->count()" dense fit
              empty="This item has no other shift in the window.">
         <x-slot:head>
             <tr class="grp-head">
@@ -277,6 +280,16 @@
                 <td class="num">{{ $dash($shift->AmendClose) }}</td>
                 <td class="l muted" style="font-size:12px">
                     {{ $shift->Outcome }}
+                    @if ((float) $shift->CurrentGoodWaste > 0 || (float) $shift->CurrentBadWaste > 0 || (float) $shift->PreviewAppliedGoodWaste > 0)
+                        <div>Current captured waste: good {{ \App\Support\Format::qty($shift->CurrentGoodWaste) }}, bad {{ \App\Support\Format::qty($shift->CurrentBadWaste) }} · {{ $shift->CurrentWasteStatus }}.</div>
+                        @if ($shift->CurrentWasteStatus === 'Authorized')
+                            <div>Authorized in PumpIT{{ $shift->CurrentWasteAuthorisedBy ? ' by '.$shift->CurrentWasteAuthorisedBy : '' }}{{ $shift->CurrentWasteAuthorisedAt ? ' · '.\Illuminate\Support\Carbon::parse($shift->CurrentWasteAuthorisedAt)->format('Y-m-d H:i') : '' }}.</div>
+                        @endif
+                        <div>This preview: authorized {{ \App\Support\Format::qty($shift->PreviewAuthorizedGoodWaste) }}, applied {{ \App\Support\Format::qty($shift->PreviewAppliedGoodWaste) }}. Refresh the preview after an authorization changes.</div>
+                        @can('reports.waste.view')
+                            <a href="{{ route('app.reports.show', ['report' => 'waste', 'from' => $run->FromDate->format('Y-m-d'), 'to' => $run->ToDate->format('Y-m-d'), 'branches' => [$run->BranchId]]) }}">Review waste authorization</a>
+                        @endcan
+                    @endif
                     @if ($shift->IsDormant)<x-chip tone="neutral" :dot="false">dormant</x-chip>@endif
                     @if ($shift->AmendmentState === 'active')<x-chip tone="good" :dot="false">amended</x-chip>@endif
                     @if ($shift->AuditCode)
@@ -297,8 +310,13 @@
                     {{-- An over balanced by capturing its missing issue (13 Oct 2026). --}}
                     @if ($shift->QtyIssuedNew !== null && $shift->DupTier !== 'D1')
                         <x-chip tone="good" :dot="false"
-                                title="The over this shift sold or held without an issue, recorded as the issue it never got. Reversible from the run.">
-                            missing issue {{ \App\Support\Format::qty($shift->QtyIssued) }} → {{ \App\Support\Format::qty($shift->QtyIssuedNew) }}
+                                title="Agora proposes this issue adjustment; check the commit state to see whether it has been written. It is reversible from the run.">
+                            @if ((float) $shift->QtyIssuedNew < (float) $shift->QtyIssued)
+                                {{ $shift->AmendmentState === 'active' ? ($run->StampMode === 'live' ? 'Agora reduced issue' : 'Agora recorded issue reduction') : 'Agora proposes reducing issue' }}
+                            @else
+                                {{ $shift->AmendmentState === 'active' ? ($run->StampMode === 'live' ? 'Agora added missing issue' : 'Agora recorded missing issue') : 'Agora proposes missing issue' }}
+                            @endif
+                            {{ \App\Support\Format::qty($shift->QtyIssued) }} → {{ \App\Support\Format::qty($shift->QtyIssuedNew) }}
                         </x-chip>
                     @endif
                     {{-- A possible duplicate: its twin, why it is not clear, and

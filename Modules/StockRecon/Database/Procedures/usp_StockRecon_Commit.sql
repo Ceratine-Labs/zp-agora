@@ -79,7 +79,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_StockRecon_Commit]
     @IssueMode         NVARCHAR(20)  = 'off',
     /* Defaults ON, so a call that forgets it errs towards writing nothing. */
     @BlockPossibleDuplicates BIT     = 1,
-    @UserId            INT           = NULL
+    @UserId            INT           = NULL,
+    @ProfileBranchId   INT           = 2
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -93,6 +94,14 @@ BEGIN
     IF @IssueMode NOT IN ('off', 'live')
         THROW 51000, 'AGORA:BAD_ISSUE_MODE:The issue mode must be off or live.', 1;
 
+    /* Keep the source and continuity ranges stable from the first recheck
+       through the write. SQL Server holds serializable read/range locks until
+       the transaction ends; concurrent changes wait or one transaction is
+       safely chosen as a deadlock victim. */
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    BEGIN TRY
+    BEGIN TRANSACTION;
+
     DECLARE @Status NVARCHAR(20) = (
         SELECT [Status] FROM agora.StockReconRun WHERE BranchId = @BranchId AND Id = @RunId);
 
@@ -105,22 +114,291 @@ BEGIN
     IF @Status NOT IN ('previewed', 'reversed')
         THROW 51000, 'AGORA:RUN_NOT_READY:Only a previewed run can be committed.', 1;
 
+    /* Profile selection and revision are part of the preview basis. */
+    IF EXISTS (
+        SELECT 1 FROM agora.StockReconRunLine rl
+        OUTER APPLY (SELECT TOP 1 profile.Id, profile.Revision FROM agora.StockReconBalancingProfile profile
+            WHERE profile.BranchId = @ProfileBranchId AND profile.IsActive = 1 AND profile.Id = COALESCE(
+                (SELECT map.ProfileId FROM agora.StockReconItemProfile map WHERE map.BranchId = rl.BranchId
+                    AND map.AreaNo = rl.AreaNo AND map.StockItemNo = rl.StockItemNo),
+                (SELECT generic.Id FROM agora.StockReconBalancingProfile generic WHERE generic.BranchId = @ProfileBranchId
+                    AND generic.IsDefault = 1 AND generic.IsActive = 1))) currentProfile
+        WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+          AND (currentProfile.Id IS NULL OR rl.BalancingProfileId IS NULL
+               OR currentProfile.Id <> rl.BalancingProfileId OR currentProfile.Revision <> rl.BalancingProfileRevision)
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = rl.BranchId AND selected.RunId = rl.RunId AND selected.AreaNo = rl.AreaNo
+                AND selected.StockItemNo = rl.StockItemNo AND selected.ContinuitySegment = rl.ContinuitySegment AND selected.Selected = 1 AND selected.WouldAmend = 1
+                AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:PROFILE_CHANGED:The item profile changed since this preview. Preview again.', 1;
+
+    /* Removal can also change the predecessor just outside the window. Compare
+       the preview's predecessor with today's removal-aware source before writing. */
+    IF EXISTS (SELECT 1 FROM (
+        SELECT rl.*, run.FromDate, ROW_NUMBER() OVER (PARTITION BY rl.AreaNo, rl.StockItemNo, rl.ContinuitySegment
+            ORDER BY rl.TransactionDate, rl.ShiftNo) AS rn
+        FROM agora.StockReconRunLine rl JOIN agora.StockReconRun run ON run.BranchId = rl.BranchId AND run.Id = rl.RunId
+        WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+    ) firstLine
+    OUTER APPLY (SELECT TOP 1 CONVERT(decimal(18,4), ISNULL(CASE WHEN @UseOriginalCounts = 1
+            THEN l.QtyClose_Original ELSE l.QtyClose END, 0)) AS PredClose
+        FROM agora.vw_StockReconLine l
+        WHERE l.BranchId = @BranchId AND l.AreaNo = firstLine.AreaNo AND l.StockItemNo = firstLine.StockItemNo
+          AND l.TransactionDate < firstLine.FromDate
+          AND firstLine.ContinuitySegment = (SELECT MIN(z.ContinuitySegment) FROM agora.StockReconRunLine z WHERE z.BranchId = @BranchId AND z.RunId = @RunId AND z.AreaNo = firstLine.AreaNo AND z.StockItemNo = firstLine.StockItemNo)
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconItemRemoval removal WHERE removal.BranchId = l.BranchId
+            AND removal.AreaNo = l.AreaNo AND removal.StockItemNo = l.StockItemNo AND removal.WithdrawnAt IS NULL
+            AND (removal.LastDate > CONVERT(date, l.TransactionDate)
+              OR (removal.LastDate = CONVERT(date, l.TransactionDate) AND removal.LastShift >= l.ShiftNo))
+            AND removal.LastDate < firstLine.FromDate)
+        ORDER BY l.TransactionDate DESC, l.ShiftNo DESC) prior
+    WHERE firstLine.rn = 1
+      AND ((firstLine.PrevClose IS NULL AND prior.PredClose IS NOT NULL)
+        OR (firstLine.PrevClose IS NOT NULL AND prior.PredClose IS NULL)
+        OR ABS(firstLine.PrevClose - prior.PredClose) > 0.001)
+      AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+        AND selected.AreaNo = firstLine.AreaNo AND selected.StockItemNo = firstLine.StockItemNo AND selected.ContinuitySegment = firstLine.ContinuitySegment
+        AND selected.Selected = 1 AND selected.WouldAmend = 1 AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:PREDECESSOR_CHANGED:The previous count or removal changed since this preview. Preview again.', 1;
+
+    /* The segment identity captures every effective removal before a row.
+       Any later addition or withdrawal changes it and requires a new preview. */
+    IF EXISTS (SELECT 1 FROM agora.StockReconRunLine rl
+        CROSS APPLY (SELECT COUNT(*) AS Segment FROM agora.StockReconItemRemoval boundary
+          WHERE boundary.BranchId = rl.BranchId AND boundary.AreaNo = rl.AreaNo AND boundary.StockItemNo = rl.StockItemNo
+            AND boundary.WithdrawnAt IS NULL AND (boundary.LastDate < rl.TransactionDate
+              OR (boundary.LastDate = rl.TransactionDate AND boundary.LastShift < rl.ShiftNo))) currentBoundary
+        WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+          AND (rl.ContinuitySegment IS NULL OR rl.ContinuitySegment <> currentBoundary.Segment)
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected WHERE selected.BranchId = rl.BranchId AND selected.RunId = rl.RunId
+            AND selected.AreaNo = rl.AreaNo AND selected.StockItemNo = rl.StockItemNo
+            AND selected.Selected = 1 AND selected.WouldAmend = 1 AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:REMOVAL_CHANGED:The item removal history changed since this preview. Preview again.', 1;
+
+    IF EXISTS (SELECT 1 FROM agora.StockReconItemRemoval removal
+        JOIN agora.StockReconRun run ON run.BranchId = removal.BranchId AND run.Id = @RunId
+        WHERE removal.BranchId = @BranchId AND removal.WithdrawnAt IS NULL AND removal.LastDate <= run.ToDate
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+            AND selected.AreaNo = removal.AreaNo AND selected.StockItemNo = removal.StockItemNo
+            AND selected.Selected = 1 AND selected.WouldAmend = 1 AND selected.CommitState IN ('pending', 'skipped'))
+          AND NOT EXISTS (SELECT 1 FROM agora.vw_StockReconLine source WHERE source.BranchId = removal.BranchId
+            AND source.AreaNo = removal.AreaNo AND source.StockItemNo = removal.StockItemNo
+            AND source.TransactionDate >= removal.LastDate AND source.TransactionDate < DATEADD(day, 1, removal.LastDate)
+            AND source.ShiftNo = removal.LastShift))
+        THROW 51000, 'AGORA:MISSING_SHIFT:The recorded removal count is missing. Correct it and preview again.', 1;
+
+    /* Reject old previews as well: a saved run may predate the shift guard or
+       the area's configured shifts may have changed since it was created. */
+    IF EXISTS (
+        SELECT 1 FROM (
+            SELECT rl.AreaNo, rl.StockItemNo, rl.ContinuitySegment, rl.TransactionDate, rl.ShiftNo,
+                   LAG(rl.TransactionDate, 1, prior.TransactionDate) OVER (PARTITION BY rl.AreaNo, rl.StockItemNo, rl.ContinuitySegment ORDER BY rl.TransactionDate, rl.ShiftNo) AS PriorDate,
+                   LAG(rl.ShiftNo, 1, prior.ShiftNo) OVER (PARTITION BY rl.AreaNo, rl.StockItemNo, rl.ContinuitySegment ORDER BY rl.TransactionDate, rl.ShiftNo) AS PriorShift
+            FROM agora.StockReconRunLine rl
+            JOIN agora.StockReconRun run ON run.BranchId = rl.BranchId AND run.Id = rl.RunId
+            OUTER APPLY (SELECT TOP 1 CONVERT(date, l.TransactionDate) AS TransactionDate, l.ShiftNo
+                FROM agora.vw_StockReconLine l
+                WHERE l.BranchId = rl.BranchId AND l.AreaNo = rl.AreaNo AND l.StockItemNo = rl.StockItemNo
+                  AND l.TransactionDate < run.FromDate
+                  AND rl.ContinuitySegment = (SELECT MIN(z.ContinuitySegment) FROM agora.StockReconRunLine z WHERE z.BranchId = @BranchId AND z.RunId = @RunId AND z.AreaNo = rl.AreaNo AND z.StockItemNo = rl.StockItemNo)
+                  AND NOT EXISTS (SELECT 1 FROM agora.StockReconItemRemoval removal WHERE removal.BranchId = l.BranchId
+                      AND removal.AreaNo = l.AreaNo AND removal.StockItemNo = l.StockItemNo AND removal.WithdrawnAt IS NULL
+                      AND (removal.LastDate > CONVERT(date, l.TransactionDate)
+                        OR (removal.LastDate = CONVERT(date, l.TransactionDate) AND removal.LastShift >= l.ShiftNo))
+                      AND removal.LastDate < run.FromDate)
+                ORDER BY l.TransactionDate DESC, l.ShiftNo DESC) prior
+            WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+        ) r
+        JOIN agora.vw_StockArea a ON a.BranchId = @BranchId AND a.AreaNo = r.AreaNo
+        CROSS APPLY (
+            SELECT TOP 1 s.ShiftNo + CASE WHEN s.ShiftNo <= r.PriorShift THEN 3 ELSE 0 END AS NextOffset
+            FROM (VALUES (1, a.DayShift), (2, a.AfternoonShift), (3, a.NightShift)) s(ShiftNo, Enabled)
+            WHERE s.Enabled = 1
+            ORDER BY s.ShiftNo + CASE WHEN s.ShiftNo <= r.PriorShift THEN 3 ELSE 0 END
+        ) expected
+        WHERE r.PriorDate IS NOT NULL
+          AND expected.NextOffset < DATEDIFF(day, r.PriorDate, r.TransactionDate) * 3 + r.ShiftNo
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+                AND selected.AreaNo = r.AreaNo AND selected.StockItemNo = r.StockItemNo AND selected.ContinuitySegment = r.ContinuitySegment
+                AND selected.Selected = 1 AND selected.WouldAmend = 1
+                AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:MISSING_SHIFT:A required shift is missing from this item chain. Correct it and preview again.', 1;
+
+    /* Recheck tail gaps against live area activity and removal records. */
+    IF EXISTS (
+        SELECT 1 FROM (
+            SELECT rl.*, ROW_NUMBER() OVER (PARTITION BY rl.AreaNo, rl.StockItemNo, rl.ContinuitySegment
+                ORDER BY rl.TransactionDate DESC, rl.ShiftNo DESC) AS rn
+            FROM agora.StockReconRunLine rl WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+        ) r
+        JOIN agora.StockReconRun run ON run.BranchId = r.BranchId AND run.Id = r.RunId
+        JOIN agora.vw_StockArea a ON a.BranchId = @BranchId AND a.AreaNo = r.AreaNo
+        CROSS APPLY (
+            SELECT TOP 1 s.ShiftNo + CASE WHEN s.ShiftNo <= r.ShiftNo THEN 3 ELSE 0 END AS NextOffset
+            FROM (VALUES (1, a.DayShift), (2, a.AfternoonShift), (3, a.NightShift)) s(ShiftNo, Enabled)
+            WHERE s.Enabled = 1
+            ORDER BY s.ShiftNo + CASE WHEN s.ShiftNo <= r.ShiftNo THEN 3 ELSE 0 END
+        ) expected
+        WHERE r.rn = 1
+          AND (EXISTS (SELECT 1 FROM agora.vw_StockReconLine later WHERE later.BranchId = @BranchId
+              AND later.AreaNo = r.AreaNo AND later.TransactionDate < DATEADD(day, 1, run.ToDate)
+              AND NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter WHERE meter.BranchId = later.BranchId
+                  AND meter.AreaNo = later.AreaNo AND meter.StockItemNo = later.StockItemNo AND meter.IsActive = 1)
+              AND DATEDIFF(day, r.TransactionDate, later.TransactionDate) * 3 + later.ShiftNo >= expected.NextOffset)
+            OR EXISTS (SELECT 1 FROM agora.StockReconAreaShiftCompletion done WHERE done.BranchId = @BranchId
+              AND done.AreaNo = r.AreaNo AND done.WithdrawnAt IS NULL AND done.TransactionDate <= run.ToDate
+              AND DATEDIFF(day, r.TransactionDate, done.TransactionDate) * 3 + done.ShiftNo >= expected.NextOffset))
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconItemRemoval removal
+              WHERE removal.BranchId = @BranchId AND removal.AreaNo = r.AreaNo AND removal.StockItemNo = r.StockItemNo
+                AND removal.WithdrawnAt IS NULL AND removal.LastDate = r.TransactionDate AND removal.LastShift = r.ShiftNo)
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+                AND selected.AreaNo = r.AreaNo AND selected.StockItemNo = r.StockItemNo AND selected.ContinuitySegment = r.ContinuitySegment
+                AND selected.Selected = 1 AND selected.WouldAmend = 1 AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:MISSING_SHIFT:A required continuation is missing. Correct it or record removal and preview again.', 1;
+
+    /* Completed shifts also require items absent for the whole window. */
+    IF EXISTS (
+        SELECT 1 FROM (
+            SELECT l.BranchId, l.AreaNo, l.StockItemNo, CONVERT(date, l.TransactionDate) AS LastDate, l.ShiftNo AS LastShift,
+                   ROW_NUMBER() OVER (PARTITION BY l.AreaNo, l.StockItemNo ORDER BY l.TransactionDate DESC, l.ShiftNo DESC) AS rn
+            FROM agora.vw_StockReconLine l
+            JOIN agora.StockReconRun run ON run.BranchId = l.BranchId AND run.Id = @RunId
+            WHERE l.BranchId = @BranchId AND l.TransactionDate < run.FromDate
+              AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+                  AND selected.AreaNo = l.AreaNo AND selected.Selected = 1 AND selected.WouldAmend = 1 AND selected.CommitState IN ('pending', 'skipped'))
+              AND NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter WHERE meter.BranchId = l.BranchId
+                  AND meter.AreaNo = l.AreaNo AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1)
+        ) p
+        JOIN agora.StockReconRun run ON run.BranchId = p.BranchId AND run.Id = @RunId
+        JOIN agora.vw_StockArea a ON a.BranchId = p.BranchId AND a.AreaNo = p.AreaNo
+        CROSS APPLY (SELECT TOP 1 s.ShiftNo + CASE WHEN s.ShiftNo <= p.LastShift THEN 3 ELSE 0 END AS NextOffset
+            FROM (VALUES (1, a.DayShift), (2, a.AfternoonShift), (3, a.NightShift)) s(ShiftNo, Enabled)
+            WHERE s.Enabled = 1 ORDER BY s.ShiftNo + CASE WHEN s.ShiftNo <= p.LastShift THEN 3 ELSE 0 END) expected
+        WHERE p.rn = 1
+          AND NOT EXISTS (SELECT 1 FROM agora.vw_StockReconLine present WHERE present.BranchId = p.BranchId
+              AND present.AreaNo = p.AreaNo AND present.StockItemNo = p.StockItemNo
+              AND present.TransactionDate >= run.FromDate AND present.TransactionDate < DATEADD(day, 1, run.ToDate))
+          AND EXISTS (SELECT 1 FROM agora.StockReconAreaShiftCompletion done WHERE done.BranchId = p.BranchId
+              AND done.AreaNo = p.AreaNo AND done.WithdrawnAt IS NULL AND done.TransactionDate BETWEEN run.FromDate AND run.ToDate
+              AND DATEDIFF(day, p.LastDate, done.TransactionDate) * 3 + done.ShiftNo >= expected.NextOffset)
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconItemRemoval removal WHERE removal.BranchId = p.BranchId
+              AND removal.AreaNo = p.AreaNo AND removal.StockItemNo = p.StockItemNo AND removal.WithdrawnAt IS NULL
+              AND removal.LastDate = p.LastDate AND removal.LastShift = p.LastShift)
+    ) THROW 51000, 'AGORA:MISSING_SHIFT:An item is absent from a completed area shift. Correct it or record removal and preview again.', 1;
+
+    /* A non-amended intermediate row can disappear after preview too. The
+       candidate-only source check below would not see that broken chain. */
+    IF EXISTS (
+        SELECT 1 FROM agora.StockReconRunLine r
+        WHERE r.BranchId = @BranchId AND r.RunId = @RunId
+          AND NOT EXISTS (SELECT 1 FROM agora.vw_StockReconLine l
+              WHERE l.BranchId = r.BranchId AND l.AreaNo = r.AreaNo AND l.StockItemNo = r.StockItemNo
+                AND CONVERT(date, l.TransactionDate) = r.TransactionDate AND l.ShiftNo = r.ShiftNo)
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = r.BranchId AND selected.RunId = r.RunId
+                AND selected.AreaNo = r.AreaNo AND selected.StockItemNo = r.StockItemNo AND selected.ContinuitySegment = r.ContinuitySegment
+                AND selected.Selected = 1 AND selected.WouldAmend = 1
+                AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:MISSING_SHIFT:A shift in this item chain no longer exists. Correct it and preview again.', 1;
+
+    /* Authorizations can be withdrawn or a source capture can be changed
+       after preview. Never commit counts or issues against an old decision. */
+    IF EXISTS (
+        SELECT 1 FROM agora.StockReconRunLine rl
+        LEFT JOIN agora.vw_StockWasteLine w ON w.BranchId = rl.BranchId AND CONVERT(date, w.TransactionDate) = rl.TransactionDate
+          AND w.ShiftNo = rl.ShiftNo AND w.AreaNo = rl.AreaNo AND w.StockItemNo = rl.StockItemNo
+        WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+          AND (rl.WasteSourceAuthorised IS NULL OR EXISTS (
+              SELECT rl.WasteSourceAuthorised, rl.AuthorizedGoodWaste, rl.WasteSourceAuthorisedAt, rl.WasteSourceAuthorisedBy
+              EXCEPT SELECT CONVERT(bit, ISNULL(w.isWasteQtyAuthorised, 0)),
+                  CONVERT(decimal(18,4), CASE WHEN w.isWasteQtyAuthorised = 1 AND w.QtyGoodWaste > 0 THEN w.QtyGoodWaste ELSE 0 END),
+                  CASE WHEN w.isWasteQtyAuthorised = 1 THEN w.WasteQtyAuthorisedDate END,
+                  CASE WHEN w.isWasteQtyAuthorised = 1 THEN w.WasteQtyAuthorisedUser END))
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = rl.BranchId AND selected.RunId = rl.RunId
+                AND selected.AreaNo = rl.AreaNo AND selected.StockItemNo = rl.StockItemNo AND selected.ContinuitySegment = rl.ContinuitySegment
+                AND selected.Selected = 1 AND selected.WouldAmend = 1
+                AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:WASTE_CHANGED:Waste authorization changed since this preview. Preview again.', 1;
+
+    /* An older preview can have captured an issue from an opening correction
+       while the preceding shift remained short. Re-preview instead of writing
+       that stale proposal. */
+    IF EXISTS (
+        SELECT 1 FROM (
+            SELECT rl.*,
+                   LAG(rl.QtyVar + rl.ChainBreak) OVER (PARTITION BY rl.AreaNo, rl.StockItemNo, rl.ContinuitySegment ORDER BY rl.TransactionDate, rl.ShiftNo) AS PriorVariance
+            FROM agora.StockReconRunLine rl WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+        ) r
+        WHERE r.ChainBreak > @eps AND r.PriorVariance < -@eps AND r.QtyIssuedNew > r.QtyIssued + @eps
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+                AND selected.AreaNo = r.AreaNo AND selected.StockItemNo = r.StockItemNo AND selected.ContinuitySegment = r.ContinuitySegment
+                AND selected.Selected = 1 AND selected.WouldAmend = 1
+                AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:STALE_OPENING_ISSUE:This saved run may issue stock before offsetting a previous short. Preview again.', 1;
+
+    /* A balanced chain may offset a counted short against a later over, but
+       must never increase that short or turn an over into a new short.
+       Check all rows of a selected chain, not just the ticked rows. */
+    IF EXISTS (
+        SELECT 1 FROM agora.StockReconRunLine changed
+        WHERE changed.BranchId = @BranchId AND changed.RunId = @RunId
+          AND ((changed.QtyVar < -0.0005 AND changed.QtyVarNew <
+                (changed.QtyVar - (COALESCE(changed.QtyIssuedNew, changed.QtyIssued) - changed.QtyIssued)
+                  + ISNULL(changed.AppliedGoodWaste, 0)) - 0.0005)
+               OR (changed.QtyVar >= -0.0005 AND changed.QtyVarNew < -0.0005))
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = changed.BranchId AND selected.RunId = changed.RunId
+                AND selected.AreaNo = changed.AreaNo AND selected.StockItemNo = changed.StockItemNo AND selected.ContinuitySegment = changed.ContinuitySegment
+                AND selected.Selected = 1 AND selected.WouldAmend = 1
+                AND selected.CommitState IN ('pending', 'skipped'))
+          AND NOT EXISTS (
+              SELECT 1 FROM (
+                  SELECT x.AreaNo, x.StockItemNo, x.ContinuitySegment, x.TransactionDate, x.ShiftNo, x.ChainBreak, x.QtyVar,
+                         LAG(x.QtyVar + x.ChainBreak) OVER (PARTITION BY x.AreaNo, x.StockItemNo, x.ContinuitySegment ORDER BY x.TransactionDate, x.ShiftNo) AS PriorVariance,
+                         LAG(x.TransactionDate) OVER (PARTITION BY x.AreaNo, x.StockItemNo, x.ContinuitySegment ORDER BY x.TransactionDate, x.ShiftNo) AS PriorDate,
+                         LAG(x.ShiftNo) OVER (PARTITION BY x.AreaNo, x.StockItemNo, x.ContinuitySegment ORDER BY x.TransactionDate, x.ShiftNo) AS PriorShift
+                  FROM agora.StockReconRunLine x WHERE x.BranchId = @BranchId AND x.RunId = @RunId
+              ) o WHERE o.AreaNo = changed.AreaNo AND o.StockItemNo = changed.StockItemNo AND o.ContinuitySegment = changed.ContinuitySegment
+                  AND o.ChainBreak > @eps AND o.PriorVariance < -@eps AND o.QtyVar + o.ChainBreak > @eps
+                  AND ((changed.TransactionDate = o.TransactionDate AND changed.ShiftNo = o.ShiftNo)
+                    OR (changed.TransactionDate = o.PriorDate AND changed.ShiftNo = o.PriorShift))
+          )
+    ) THROW 51000, 'AGORA:SHORT_MOVED:This saved run increases a shift shortage or creates a new one. Preview again and review the chain.', 1;
+
     /* Old saved previews may propose a boundary issue. Re-preview the whole
        run so counts are never committed using an issue we no longer capture. */
     IF EXISTS (
         SELECT 1 FROM agora.StockReconRunLine rl
         WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
           AND rl.Selected = 1 AND rl.WouldAmend = 1 AND rl.CommitState IN ('pending', 'skipped')
-          AND rl.QtyIssuedNew > rl.QtyIssued
+          AND (rl.QtyIssuedNew > rl.QtyIssued OR (rl.QtyIssuedNew < rl.QtyIssued AND ISNULL(rl.DupTier, '') <> 'D1'))
           AND (NOT EXISTS (SELECT 1 FROM agora.StockReconRunLine p
                WHERE p.BranchId = rl.BranchId AND p.RunId = rl.RunId
-                 AND p.AreaNo = rl.AreaNo AND p.StockItemNo = rl.StockItemNo
+                 AND p.AreaNo = rl.AreaNo AND p.StockItemNo = rl.StockItemNo AND p.ContinuitySegment = rl.ContinuitySegment
                  AND (p.TransactionDate < rl.TransactionDate OR (p.TransactionDate = rl.TransactionDate AND p.ShiftNo < rl.ShiftNo)))
             OR NOT EXISTS (SELECT 1 FROM agora.StockReconRunLine n
                WHERE n.BranchId = rl.BranchId AND n.RunId = rl.RunId
-                 AND n.AreaNo = rl.AreaNo AND n.StockItemNo = rl.StockItemNo
+                 AND n.AreaNo = rl.AreaNo AND n.StockItemNo = rl.StockItemNo AND n.ContinuitySegment = rl.ContinuitySegment
                  AND (n.TransactionDate > rl.TransactionDate OR (n.TransactionDate = rl.TransactionDate AND n.ShiftNo > rl.ShiftNo))))
-    ) THROW 51000, 'AGORA:BOUNDARY_ISSUE:This saved run proposes an issue on the first or last line. Preview again.', 1;
+    ) THROW 51000, 'AGORA:BOUNDARY_ISSUE:This saved run proposes an issue on the first or last shift. Preview again.', 1;
+
+    IF EXISTS (SELECT 1 FROM agora.StockReconRunLine rl
+        OUTER APPLY (SELECT TOP 1 x.IssueMultiple FROM agora.vw_StockItem x
+            WHERE x.BranchId = rl.BranchId AND x.StockItemNo = rl.StockItemNo
+            ORDER BY CASE WHEN x.AreaNo = rl.AreaNo THEN 0 ELSE 1 END) si
+        OUTER APPLY (SELECT TOP 1 x.IssueMultiple FROM agora.StockIssueMultiple x
+            WHERE x.BranchId = rl.BranchId AND x.AreaNo = rl.AreaNo AND x.StockItemNo = rl.StockItemNo) im
+        WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
+          AND rl.Selected = 1 AND rl.WouldAmend = 1 AND rl.CommitState IN ('pending', 'skipped')
+          AND (rl.QtyIssuedNew > rl.QtyIssued OR (rl.QtyIssuedNew < rl.QtyIssued AND ISNULL(rl.DupTier, '') <> 'D1'))
+          AND (rl.QtyIssuedNew < 0 OR ISNULL(rl.IssueMultiple, 0) <= 1 OR
+               ABS(ISNULL(rl.IssueMultiple, 0) - COALESCE(si.IssueMultiple, im.IssueMultiple, 0)) > 0.0005 OR
+               ABS((rl.QtyIssuedNew - rl.QtyIssued) - ROUND((rl.QtyIssuedNew - rl.QtyIssued) / NULLIF(rl.IssueMultiple, 0), 0) * rl.IssueMultiple) > 0.0005))
+        THROW 51000, 'AGORA:ISSUE_MULTIPLE:This saved run proposes an issue outside its issue multiple. Preview again.', 1;
 
     /* A saved preview predating the explicit measurement mapping may still
        contain meter proposals. Refuse BEFORE any run/source mutation. A new
@@ -150,7 +428,7 @@ BEGIN
     IF OBJECT_ID('tempdb..#cand') IS NOT NULL DROP TABLE #cand;
 
     SELECT
-        rl.Id, rl.[LineNo], rl.AreaNo, rl.StockItemNo, rl.TransactionDate, rl.ShiftNo,
+        rl.Id, rl.[LineNo], rl.AreaNo, rl.StockItemNo, rl.ContinuitySegment, rl.TransactionDate, rl.ShiftNo,
         rl.QtyOpen, rl.QtyClose, rl.QtyOpenNew, rl.QtyCloseNew,
         rl.QtyOpenNow, rl.QtyCloseNow,
         /* The issue as the preview read it, and what it becomes: 0 on a clear
@@ -302,7 +580,7 @@ BEGIN
       AND EXISTS (
         SELECT 1 FROM agora.StockReconRunLine d
         WHERE d.BranchId = @BranchId AND d.RunId = @RunId
-          AND d.AreaNo = c.AreaNo AND d.StockItemNo = c.StockItemNo
+          AND d.AreaNo = c.AreaNo AND d.StockItemNo = c.StockItemNo AND d.ContinuitySegment = c.ContinuitySegment
           AND d.Id <> c.Id
           AND d.QtyIssuedNew IS NOT NULL
           /* A DUPLICATE only: the chain's counts were balanced with it gone. A
@@ -313,8 +591,21 @@ BEGIN
           AND d.CommitState <> 'committed'
           AND NOT EXISTS (SELECT 1 FROM #cand x WHERE x.Id = d.Id AND x.SkipReason IS NULL));
 
+    /* Counts may be balanced around a proposed missing issue. Never write
+       only part of such a chain, including when a source re-check failed. */
+    UPDATE c SET SkipReason = 'This chain includes a missing issue. Select every amendable shift and preview again if any shift has changed.'
+    FROM #cand c
+    WHERE c.SkipReason IS NULL
+      AND EXISTS (SELECT 1 FROM agora.StockReconRunLine i
+          WHERE i.BranchId = @BranchId AND i.RunId = @RunId AND i.AreaNo = c.AreaNo AND i.StockItemNo = c.StockItemNo AND i.ContinuitySegment = c.ContinuitySegment
+            AND i.QtyIssuedNew IS NOT NULL AND ISNULL(i.DupTier, '') <> 'D1')
+      AND EXISTS (SELECT 1 FROM agora.StockReconRunLine d
+          WHERE d.BranchId = @BranchId AND d.RunId = @RunId AND d.AreaNo = c.AreaNo AND d.StockItemNo = c.StockItemNo AND d.ContinuitySegment = c.ContinuitySegment
+            AND d.WouldAmend = 1 AND d.CommitState <> 'committed'
+            AND NOT EXISTS (SELECT 1 FROM #cand x WHERE x.Id = d.Id AND x.SkipReason IS NULL));
+
     /* ------------------------------------------------------- ONE TRANSACTION
-       Everything below writes, and from here on it is all-or-nothing.
+       Validation and writes above and below are all-or-nothing.
 
        This matters more since live writes were enabled (8 Sep 2026), because
        the work now spans TWO DATABASES: the amendment record lands in Agora
@@ -327,9 +618,6 @@ BEGIN
 
        XACT_ABORT is on, so any error dooms the transaction and the CATCH
        rolls the whole thing back and re-raises with the code intact. */
-    BEGIN TRY
-    BEGIN TRANSACTION;
-
     /* --------------------------------------------------------- the amendment
        Written in BOTH modes. In journal mode this IS the output: the list an
        admin works, with the prior pair beside the new one. */
@@ -406,8 +694,10 @@ BEGIN
 
     DECLARE @Written INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NULL),
             @Skipped INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NOT NULL),
-            @Issues  INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NULL AND QtyIssuedNew IS NOT NULL
-                                                         AND QtyIssuedNew < QtyIssued),
+            @Issues  INT = (SELECT COUNT(*) FROM #cand c JOIN agora.StockReconRunLine rl ON rl.Id = c.Id AND rl.BranchId = @BranchId
+                            WHERE c.SkipReason IS NULL AND c.QtyIssuedNew < c.QtyIssued AND rl.DupTier = 'D1'),
+            @Reduced INT = (SELECT COUNT(*) FROM #cand c JOIN agora.StockReconRunLine rl ON rl.Id = c.Id AND rl.BranchId = @BranchId
+                            WHERE c.SkipReason IS NULL AND c.QtyIssuedNew < c.QtyIssued AND ISNULL(rl.DupTier, '') <> 'D1'),
             @Captured INT = (SELECT COUNT(*) FROM #cand WHERE SkipReason IS NULL AND QtyIssuedNew IS NOT NULL
                                                           AND QtyIssuedNew > QtyIssued);
 
@@ -479,6 +769,9 @@ BEGIN
                             ELSE '' END
                      + CASE WHEN @Captured > 0
                             THEN ' (' + CONVERT(nvarchar(20), @Captured) + ' missing issue(s) captured)'
+                            ELSE '' END
+                     + CASE WHEN @Reduced > 0
+                            THEN ' (' + CONVERT(nvarchar(20), @Reduced) + ' issue(s) reduced)'
                             ELSE '' END
                      + CASE WHEN @Skipped > 0
                             /* Not "because they had moved": a skip is also a

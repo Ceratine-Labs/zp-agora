@@ -11,6 +11,8 @@
    WHO READS IT
    Head office first thing; a branch manager sees only their own site because
    the branch workspace passes a single @BranchIds.
+   @QueueKeys is the server-derived set of event permissions; NULL or empty
+   returns no event types. Filtering precedes pagination and summary totals.
 
    WHERE THE NUMBERS COME FROM
    Six queues, each the same rule its own report uses:
@@ -22,9 +24,7 @@
      staff-shorts         Approved = 0, IsDeclined = 0
      drop-safe            a bag with CollectionId = 0 — dropped, never collected
 
-   Waste is deliberately absent. PumpIT holds no approval state for waste (see
-   usp_Reports_GridWaste), so "waste to approve" is not a number this database
-   can produce and a zero here would read as "none outstanding".
+   Good waste awaits authorization when the PumpIT authorization flag is off.
 
    THE SHAPE EVERY GRID PROCEDURE IN THIS MODULE SHARES
    Two result sets: the page of rows, then one row (TotalRows BIGINT) so the
@@ -52,7 +52,8 @@ CREATE OR ALTER PROCEDURE [agora].[usp_Reports_GridMyQueue]
     @SortColumn  NVARCHAR(80)  = NULL,
     @SortAsc     BIT           = 1,
     @Page        INT           = 1,
-    @PageSize    INT           = 50
+    @PageSize    INT           = 50,
+    @QueueKeys   NVARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -184,9 +185,20 @@ BEGIN
         WHERE g.DropDate >= @DateFrom AND g.DropDate < DATEADD(day, 1, @DateTo)
           AND ISNULL(g.CollectionId, 0) = 0
         GROUP BY g.BranchId
+
+        UNION ALL
+
+        SELECT w.BranchId, 'waste-approvals', 'Good waste awaiting authorization',
+               'app.reports.show/waste', 70, COUNT(*), MIN(w.TransactionDate), CONVERT(money, NULL)
+        FROM agora.vw_StockWasteLine w
+        WHERE w.TransactionDate >= @DateFrom AND w.TransactionDate < DATEADD(day, 1, @DateTo)
+          AND ISNULL(w.QtyGoodWaste, 0) > 0
+          AND w.isWasteQtyAuthorised = 0
+        GROUP BY w.BranchId
     ) q
     JOIN agora.vw_Branch b ON b.BranchId = q.BranchId
     WHERE (@AllBranches = 1 OR q.BranchId IN (SELECT BranchId FROM @Branch))
+      AND q.QueueKey IN (SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(ISNULL(@QueueKeys, ''), ','))
       AND (@Search IS NULL OR b.Name LIKE '%' + @Search + '%' OR q.Queue LIKE '%' + @Search + '%');
 
     DECLARE @Total bigint = (SELECT COUNT_BIG(*) FROM #Rows);

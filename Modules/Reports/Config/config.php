@@ -297,8 +297,8 @@ return [
 
         'waste' => [
             'label' => 'Waste to approve',
-            'menu_label' => 'Captured waste',
-            'summary' => 'Captured waste quantities and selling value by site and item.',
+            'menu_label' => 'Waste authorization',
+            'summary' => 'Captured waste and operations authorizations by site and item.',
             'group' => 'Waiting on a decision',
             'menu' => 'decisions/waste',
             'procedure' => 'usp_Reports_GridWaste',
@@ -307,21 +307,22 @@ return [
                 'help' => 'Defaults to today with a 30-day lookback, by captured waste date.',
                 'search_placeholder' => 'Site, area or item…',
             ],
-            'blurb' => 'Waste captured at a branch, by area, shift and item, with what it would have '
-                .'sold for. PumpIT records no approval state for waste, so this is captured waste, not '
-                .'a queue.',
+            'blurb' => 'Review captured waste and the authorization recorded in PumpIT. '
+                .'Authorized good waste may offset a shortage.',
             'was' => [],
-            'caveat' => 'PumpIT has no approval columns on STK_StockWasteLine, so there is no approval '
-                .'queue to report. An approval trail for waste would be Agora\'s own.',
+            'caveat' => 'Only good waste authorized in PumpIT is applied to a shortage. Bad waste and unapproved quantities are not deducted.',
             'columns' => [
                 ['key' => 'BranchName', 'label' => 'Site', 'type' => 'text', 'sort' => 'BranchName'],
                 ['key' => 'TransactionDate', 'label' => 'Date', 'type' => 'date', 'sort' => 'TransactionDate'],
+                ['key' => 'ShiftDescription', 'label' => 'Shift', 'type' => 'text'],
                 ['key' => 'AreaDescription', 'label' => 'Area', 'type' => 'text', 'sort' => 'AreaDescription'],
                 ['key' => 'StockItemDescription', 'label' => 'Item', 'type' => 'text', 'sort' => 'StockItemDescription'],
                 ['key' => 'QtyGoodWaste', 'label' => 'Good', 'type' => 'number'],
+                ['key' => 'AuthorizedGood', 'label' => 'Authorized good', 'type' => 'number'],
                 ['key' => 'QtyBadWaste', 'label' => 'Bad', 'type' => 'number', 'sort' => 'QtyBadWaste'],
                 ['key' => 'QtyTotalWaste', 'label' => 'Total qty', 'type' => 'number', 'sort' => 'QtyTotalWaste'],
                 ['key' => 'TotalAtSellingPrice', 'label' => 'At selling price', 'type' => 'money', 'sort' => 'TotalAtSellingPrice'],
+                ['key' => 'Status', 'label' => 'Authorization', 'type' => 'text'],
             ],
         ],
 
@@ -414,7 +415,7 @@ return [
                 ['key' => 'CashBags', 'label' => 'Cash bags', 'type' => 'money', 'sort' => 'CashBags'],
                 ['key' => 'Cards', 'label' => 'Cards', 'type' => 'money', 'sort' => 'Cards'],
                 ['key' => 'PumpShortages', 'label' => 'Pump shortages', 'type' => 'money', 'sort' => 'PumpShortages'],
-                ['key' => 'ZreadCheck', 'label' => 'Z-read', 'type' => 'chip', 'sort' => 'ZreadCheck'],
+                ['key' => 'ZreadCheck', 'label' => 'Z-read', 'type' => 'chip', 'sort' => 'ZreadCheck', 'permission' => 'cash.discrepancy.view'],
                 ['key' => 'Status', 'label' => 'Cashup', 'type' => 'chip', 'sort' => 'Status'],
             ],
         ],

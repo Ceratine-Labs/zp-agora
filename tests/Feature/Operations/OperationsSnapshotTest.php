@@ -169,11 +169,17 @@ class OperationsSnapshotTest extends TestCase
         $this->assertCount(10, $top);
         $this->assertSame('K0012', $top[0]->ItemCode);
         $this->assertSame('TEST', $top[0]->StockLocation);
-        $this->assertEqualsWithDelta(-180, (float) $top[0]->Value, 0.001);
+        $this->assertEqualsWithDelta(-240, (float) $top[0]->Value, 0.001, 'Unverified waste is not deducted.');
         $this->assertSame(2, (int) $top[0]->SourceCount, 'Both shortage shifts belong to one item; the over is separate.');
         $this->assertFalse($top->contains('ItemCode', 'K0001'));
         $this->assertFalse($top->contains('ItemCode', 'K0002'));
         $this->assertFalse($top->contains('ItemCode', 'TMTR'));
+
+        DB::table('PumpIT.dbo.STK_StockWasteLine')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', 'K0012')->update(['isWasteQtyAuthorised' => 1]);
+        $rows = $this->snapshot();
+        $this->assertEqualsWithDelta(-180, (float) $rows->where('MetricKey', 'stock-loss-item')
+            ->firstWhere('ItemCode', 'K0012')->Value, 0.001, 'The wall applies authorized good waste.');
 
         $sets = app(ProcedureService::class)->callSets('usp_StockRecon_GridVariance', [
             'BranchIds' => (string) self::BRANCH, 'DateFrom' => self::DAY,

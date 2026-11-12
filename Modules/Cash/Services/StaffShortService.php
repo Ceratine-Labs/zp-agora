@@ -403,11 +403,12 @@ class StaffShortService
     }
 
     /**
-     * @return array{no: int, site: string, employee: string, code: string, amount: string, reason: string, day: string, note: ?string}
+     * @return array{branchId: int, no: int, site: string, employee: string, code: string, amount: string, reason: string, day: string, note: ?string}
      */
     private function details(object $short): array
     {
         return [
+            'branchId' => (int) $short->BranchId,
             'no' => (int) $short->StaffShortsNo,
             'site' => (string) (Branch::query()->acrossBranches()->where('BranchId', $short->BranchId)->value('Name') ?? 'site '.$short->BranchId),
             'employee' => (string) ($short->EmployeeName ?: $short->EmployeeCode),

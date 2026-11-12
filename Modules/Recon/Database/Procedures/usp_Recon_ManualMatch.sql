@@ -671,9 +671,11 @@ BEGIN
            CASE @ReconArea WHEN 'CashMachine' THEN 'BRN_DailyBankingDeposita'
                            ELSE 'BRN_DailyBanking' + @ReconArea END,
            m.SourceId,
-           /* FNB carries the rest of its primary key, raw, so a reversal can
-              name the exact row it puts the prior values back on. */
-           (SELECT m.SourceKey AS [key], m.SourceKey AS ref, m.SourceDate AS dt, m.Amount AS amt,
+           /* Each selected card deposit carries its actual merchant, not a
+              representative batch key. RunFreshness reads ref/ref2 for every
+              manual source pair, including ABSA (whose MerchantNo is NULL).
+              The existing FNB raw primary key remains unchanged for reversal. */
+           (SELECT m.SourceKey AS [key], m.SourceKey AS ref, m.Ref2 AS ref2, m.SourceDate AS dt, m.Amount AS amt,
                    m.TillNo AS till, m.ShiftNo AS shift, m.MerchantNo AS merchant,
                    m.BatchNoRaw AS batch, CONVERT(nvarchar(23), m.TxnAt, 126) AS txn
             FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),

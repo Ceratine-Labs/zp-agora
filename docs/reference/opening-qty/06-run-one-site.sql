@@ -4,7 +4,7 @@
    READ THIS FIRST. Branch 9 HAS ALREADY BEEN CORRECTED.
 
      RunId    738E5311-8465-4993-8FC2-73665DFAF380
-     Applied  21 Sep 2026 19:36:38 by Revteck
+     Applied  21 Sep 2026 19:36:38 by customer-db-login
      Changed  2,153 openings (2,075 as-captured, 141 working, 553 never entered)
      Value    R 1,252,099.58 gross · net +R 46,398.15
      Reversible  2,152 of 2,153 (one row has been edited since and will skip)

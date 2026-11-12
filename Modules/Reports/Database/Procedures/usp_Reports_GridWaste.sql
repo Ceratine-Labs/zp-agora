@@ -4,25 +4,7 @@
    WHAT IT IS FOR
    Waste captured at a branch, by area, shift and stock item, with what it cost.
 
-   ⚠ WHAT IT CANNOT DO, AND WHY THE MENU ENTRY SAYS "WASTE TO APPROVE"
-   PumpIT HOLDS NO APPROVAL STATE FOR WASTE. STK_StockWasteLine has eight
-   columns — branch, date, shift, area, item, good qty, bad qty, created-at —
-   and not one of them records approval, decline, an approver or an approval
-   date. Staff shorts have Approved / ApprovedByUserId / ApprovedDate /
-   IsDeclined; purchase requests have the same four; waste has none of it.
-
-   So this report is CAPTURED waste, not waste awaiting approval, and it says
-   so in the Status column rather than returning an empty grid that would read
-   as "nothing outstanding". An approval trail for waste is a thing Agora would
-   have to own in its own database — it does not exist to be reported on.
-
-   Raised for Ryan as a decision rather than invented here.
-
-   ALSO WORTH KNOWING BEFORE READING THE NUMBERS
-   STK_StockWasteLine holds 91 rows in total and the most recent is 1 Mar 2026,
-   measured 4 Sep 2026. Waste capture is either barely used or has stopped. The
-   report is correct; the estate is nearly empty, and a blank screen here is
-   probably the data rather than a bug.
+   Authorization is read from the PumpIT waste line and remains read-only here.
 
    HOW THE VALUE IS PUT ON IT
    Waste lines carry a quantity and no price, so the value comes from the stock
@@ -90,8 +72,12 @@ BEGIN
                        * ISNULL(m.SellingPrice, 0))                           AS TotalAtSellingPrice,
         w.CreateDateTime                                AS CapturedAt,
 
-        /* Not an approval state. PumpIT has none for waste — see the header. */
-        'Captured (PumpIT records no approval for waste)' AS Status
+        CASE WHEN ISNULL(w.QtyGoodWaste, 0) <= 0 THEN 'No good waste'
+             WHEN w.isWasteQtyAuthorised = 1 THEN 'Authorized'
+             ELSE 'Awaiting authorization' END AS Status,
+        CONVERT(decimal(18,4), CASE WHEN w.isWasteQtyAuthorised = 1 AND w.QtyGoodWaste > 0 THEN w.QtyGoodWaste ELSE 0 END) AS AuthorizedGood,
+        w.WasteQtyAuthorisedDate AS DecisionAt, CONVERT(int, NULL) AS DecisionBy,
+        w.WasteQtyAuthorisedUser AS DecisionByName
     INTO #Rows
     FROM agora.vw_StockWasteLine w
     JOIN agora.vw_Branch b ON b.BranchId = w.BranchId
@@ -123,7 +109,7 @@ BEGIN
            r.AreaNo, r.AreaDescription, r.AreaGroup, r.StockItemNo, r.StockItemDescription,
            r.UOMCode, r.QtyGoodWaste, r.QtyBadWaste, r.QtyTotalWaste, r.SellingPrice,
            r.GoodWasteAtSellingPrice, r.BadWasteAtSellingPrice, r.TotalAtSellingPrice,
-           r.CapturedAt, r.Status
+           r.CapturedAt, r.Status, r.AuthorizedGood, r.DecisionAt, r.DecisionBy, r.DecisionByName
     FROM #Rows r
     ORDER BY
         CASE WHEN @SortAsc = 1 THEN

@@ -10,160 +10,180 @@ class TutorialContentTest extends TestCase
     public function test_navigation_references_resolve_and_every_example_is_reachable(): void
     {
         $content = (new StockReconTutorialContent)->all();
-        $this->assertSame(['lessons', 'scenarios', 'events'], array_keys($content));
-        $this->assertCount(12, $content['lessons']);
-        $this->assertCount(7, $content['scenarios']);
-        $this->assertCount(14, $content['events']);
-
         $ids = [];
         foreach ($content as $collection => $records) {
-            $this->assertTrue(array_is_list($records), $collection);
+            $this->assertTrue(array_is_list($records));
             $ids[$collection] = array_column($records, 'id');
-            $this->assertSame($ids[$collection], array_values(array_unique($ids[$collection])), $collection);
+            $this->assertSame($ids[$collection], array_values(array_unique($ids[$collection])));
             foreach ($records as $record) {
                 $this->assertMatchesRegularExpression('/^[a-z][a-z0-9-]+$/', $record['id']);
                 $this->assertNotSame('', trim($record['title']));
             }
         }
-
         $reachable = [];
         foreach ($content['lessons'] as $lesson) {
-            $this->assertSame(['id', 'title', 'icon', 'kicker', 'summary', 'body', 'steps', 'scenario_id', 'event_ids'], array_keys($lesson));
-            $this->assertContains($lesson['icon'], ['book', 'box', 'link', 'scale', 'alert', 'receipt', 'shield', 'check', 'search', 'history']);
             $this->assertNotEmpty($lesson['body']);
-            $this->assertNotEmpty($lesson['steps']);
-            foreach ($lesson['steps'] as $step) {
-                $this->assertSame(['title', 'text', 'screen'], array_keys($step));
-                $this->assertNotSame('', trim($step['screen']));
+            $this->assertTrue($lesson['flow'] !== [] || $lesson['id'] === 'visual-summary');
+            foreach ($lesson['scenario_ids'] as $id) {
+                $this->assertContains($id, $ids['scenarios']);
+                $reachable[] = $id;
             }
-            if ($lesson['scenario_id'] !== null) {
-                $this->assertContains($lesson['scenario_id'], $ids['scenarios']);
-                $reachable[] = $lesson['scenario_id'];
-            }
-            foreach ($lesson['event_ids'] as $eventId) {
-                $this->assertContains($eventId, $ids['events']);
+            foreach ($lesson['event_ids'] as $id) {
+                $this->assertContains($id, $ids['events']);
             }
         }
-        $this->assertEqualsCanonicalizing($ids['scenarios'], array_values(array_unique($reachable)));
-
-        foreach ($content['scenarios'] as $scenario) {
-            $this->assertSame(['id', 'title', 'kind', 'summary', 'explanation', 'checks', 'before', 'after', 'steps', 'event_ids'], array_keys($scenario));
-            $this->assertStringContainsString('Training dataset:', $scenario['explanation']);
-            foreach ($scenario['event_ids'] as $eventId) {
-                $this->assertContains($eventId, $ids['events']);
-            }
-        }
+        $this->assertEqualsCanonicalizing($ids['scenarios'], array_unique($reachable));
         foreach ($content['events'] as $event) {
-            $this->assertSame(['id', 'title', 'code', 'tone', 'meaning', 'example', 'checks', 'next', 'location', 'lesson_id', 'write_effect'], array_keys($event));
             $this->assertContains($event['lesson_id'], $ids['lessons']);
-            $this->assertContains($event['tone'], ['good', 'warn', 'serious', 'crit', 'neutral']);
             $this->assertNotEmpty($event['checks']);
             $this->assertNotEmpty($event['next']);
-            $this->assertNotSame('', trim($event['write_effect']));
         }
     }
 
-    public function test_worked_quantities_produce_the_advertised_signed_variances(): void
+    public function test_worked_quantities_produce_the_advertised_variances_at_every_stage(): void
     {
         $expected = [
-            'zero-balance' => ['before' => [-10, 10], 'after' => [0, 0]],
-            'residual-short' => ['before' => [-5, 3], 'after' => [-2, 0]],
-            'no-offset' => ['before' => [-5, -3], 'after' => [-5, -3]],
-            'missing-issue' => ['before' => [5], 'after' => [0]],
-            'clear-duplicate' => ['before' => [0, -12], 'after' => [0, 0]],
-            'possible-duplicate' => ['before' => [-12, -12], 'after' => null],
-            'negative-count' => ['before' => [-9], 'after' => null],
+            'basic-variance' => [[-5], null, null],
+            'zero-balance' => [[-5, 0], [-5, 5], [0, 0]],
+            'residual-short' => [[-61, 5], [-61, 60], [-1, 0]],
+            'ordinary-offset' => [[-5, 5], null, [-5, 5]],
+            'no-offset' => [[-5, -3], null, [-5, -3]],
+            'missing-issue' => [[0, 12, 0], null, [0, 2, 0]],
+            'issue-reduction' => [[0, -15, 0], null, [0, -5, 0]],
+            'clear-duplicate' => [[0, -12], null, [0, 0]],
+            'possible-duplicate' => [[-12, -12], null, null],
+            'negative-count' => [[-9], null, null],
+            'removal-return' => [[-40, 40], null, [-40, 40]],
+            'waste-cap' => [[-8], null, [0]],
+            'waste-and-issue' => [[0, -15, 0], [0, -11, 0], [0, -1, 0]],
         ];
-
-        foreach ((new StockReconTutorialContent)->all()['scenarios'] as $scenario) {
-            foreach (['before', 'after'] as $stage) {
-                if ($expected[$scenario['id']][$stage] === null) {
-                    $this->assertNull($scenario[$stage], $scenario['id']);
-
-                    continue;
-                }
-                $actual = [];
-                foreach ($scenario[$stage] as $index => $row) {
-                    $this->assertSame(['shift', 'open', 'issued', 'pos', 'close'], array_keys($row));
-                    foreach (['open', 'issued', 'pos', 'close'] as $quantity) {
-                        $this->assertTrue(is_int($row[$quantity]) || is_float($row[$quantity]), $quantity);
-                    }
-                    $actual[] = self::variance($row);
-                    if ($index > 0) {
-                        $this->assertSame($scenario[$stage][$index - 1]['close'], $row['open'], $scenario['id'].' continuity');
-                    }
-                }
-                $this->assertSame($expected[$scenario['id']][$stage], $actual, $scenario['id'].' '.$stage);
+        foreach ($this->scenarios() as $id => $scenario) {
+            foreach (['before', 'prepared', 'after'] as $index => $state) {
+                $actual = $scenario[$state] === null ? null : array_map(self::variance(...), $scenario[$state]);
+                $this->assertSame($expected[$id][$index], $actual, $id.' '.$state);
             }
         }
     }
 
-    public function test_count_balancing_preserves_anchors_issues_sales_and_total(): void
+    public function test_only_the_opening_exception_examples_move_counted_shorts(): void
     {
-        foreach ((new StockReconTutorialContent)->all()['scenarios'] as $scenario) {
-            if ($scenario['kind'] !== 'count-balancing') {
+        foreach ($this->scenarios() as $scenario) {
+            if ($scenario['kind'] !== 'opening-exception') {
                 continue;
             }
-            $before = $scenario['before'];
+            $original = $scenario['before'];
+            $repaired = $scenario['prepared'];
             $after = $scenario['after'];
-            $last = count($before) - 1;
-            $this->assertSame($before[0]['open'], $after[0]['open']);
-            $this->assertSame($before[$last]['close'], $after[$last]['close']);
-            $this->assertSame(array_column($before, 'issued'), array_column($after, 'issued'));
-            $this->assertSame(array_column($before, 'pos'), array_column($after, 'pos'));
-            $this->assertSame(array_sum(array_map(self::variance(...), $before)), array_sum(array_map(self::variance(...), $after)));
-
-            foreach ($before as $index => $row) {
-                $was = self::variance($row);
-                $becomes = self::variance($after[$index]);
-                if ($was < 0) {
-                    $this->assertGreaterThanOrEqual($was, $becomes, 'A count proposal must not increase a short.');
-                } elseif ($was > 0) {
-                    $this->assertSame(0, $becomes, 'An over must reach zero without becoming a short.');
-                }
-            }
+            $this->assertGreaterThan($original[0]['close'], $original[1]['open']);
+            $this->assertLessThan(0, self::variance($repaired[0]));
+            $this->assertGreaterThan(0, self::variance($repaired[1]));
+            $this->assertSame($original[0]['close'], $repaired[1]['open']);
+            $this->assertSame($original[0]['open'], $after[0]['open']);
+            $this->assertSame($original[1]['close'], $after[1]['close']);
+            $this->assertSame(array_column($original, 'issued'), array_column($after, 'issued'));
+            $this->assertSame(array_column($original, 'pos'), array_column($after, 'pos'));
+            $this->assertSame(array_sum(array_map(self::variance(...), $repaired)), array_sum(array_map(self::variance(...), $after)));
+            $this->assertNotSame(array_sum(array_map(self::variance(...), $original)), array_sum(array_map(self::variance(...), $repaired)), 'The raw and repaired bases must not be presented as identical.');
+        }
+        foreach (['ordinary-offset', 'no-offset', 'removal-return'] as $id) {
+            $this->assertSame($this->scenarios()[$id]['before'], $this->scenarios()[$id]['after']);
         }
     }
 
-    public function test_issue_examples_change_only_the_explicit_issue_and_explain_that_change(): void
+    public function test_issue_examples_preserve_boundaries_counts_and_whole_multiple_remainders(): void
     {
-        $scenarios = array_column((new StockReconTutorialContent)->all()['scenarios'], null, 'id');
-        foreach (['missing-issue', 'clear-duplicate'] as $id) {
-            $scenario = $scenarios[$id];
-            $this->assertSame('issue-correction', $scenario['kind']);
-            foreach ($scenario['before'] as $index => $row) {
-                foreach (['shift', 'open', 'pos', 'close'] as $unchanged) {
-                    $this->assertSame($row[$unchanged], $scenario['after'][$index][$unchanged], $id.' '.$unchanged);
+        foreach (['missing-issue', 'issue-reduction', 'waste-and-issue'] as $id) {
+            $scenario = $this->scenarios()[$id];
+            $last = count($scenario['before']) - 1;
+            foreach ($scenario['before'] as $i => $row) {
+                $after = $scenario['after'][$i];
+                foreach (['open', 'close', 'pos'] as $key) {
+                    $this->assertSame($row[$key], $after[$key], $id.' '.$key);
+                }
+                $delta = $after['issued'] - $row['issued'];
+                $this->assertSame(0, $delta % $scenario['multiple']);
+                $this->assertGreaterThanOrEqual(0, $after['issued']);
+                if ($i === 0 || $i === $last) {
+                    $this->assertSame(0, $delta, 'Boundary issues must stay unchanged.');
                 }
             }
+            $this->assertLessThan($scenario['multiple'], abs(self::variance($scenario['after'][1])));
         }
-
-        $missing = $scenarios['missing-issue'];
-        $over = self::variance($missing['before'][0]);
-        $this->assertGreaterThan(0, $over);
-        $this->assertSame($over, $missing['after'][0]['issued'] - $missing['before'][0]['issued']);
-        $this->assertStringContainsString('additional issue of 5', $missing['explanation']);
-
-        $duplicate = $scenarios['clear-duplicate'];
-        $this->assertSame(12, $duplicate['after'][0]['issued'], 'The real neighbouring issue must stay.');
-        $this->assertSame(0, $duplicate['after'][1]['issued']);
-        $this->assertStringContainsString('full D1 evidence is confirmed', $duplicate['explanation']);
-        $this->assertStringContainsString('not the complete duplicate test', $duplicate['explanation']);
+        $d1 = $this->scenarios()['clear-duplicate'];
+        $this->assertSame(12, $d1['after'][0]['issued']);
+        $this->assertSame(0, $d1['after'][1]['issued']);
     }
 
-    public function test_unresolved_cases_do_not_offer_a_fabricated_correction(): void
+    public function test_waste_is_separate_capped_and_not_counted_twice(): void
     {
-        $scenarios = array_column((new StockReconTutorialContent)->all()['scenarios'], null, 'id');
-        $this->assertSame($scenarios['no-offset']['before'], $scenarios['no-offset']['after']);
+        $cap = $this->scenarios()['waste-cap'];
+        $this->assertSame(-self::variance($cap['before'][0]), $cap['after'][0]['waste']);
+        foreach (['open', 'issued', 'pos', 'close'] as $key) {
+            $this->assertSame($cap['before'][0][$key], $cap['after'][0][$key]);
+        }
+        $combined = $this->scenarios()['waste-and-issue'];
+        $this->assertSame(20, $combined['prepared'][1]['issued']);
+        $this->assertSame(4, $combined['prepared'][1]['waste']);
+        $this->assertSame(4, $combined['after'][1]['waste']);
+        $this->assertSame(-1, self::variance($combined['after'][1]));
         foreach (['possible-duplicate', 'negative-count'] as $id) {
-            $this->assertSame('held', $scenarios[$id]['kind']);
-            $this->assertNull($scenarios[$id]['after']);
+            $this->assertNull($this->scenarios()[$id]['after']);
         }
     }
 
-    /** @param array{shift: string, open: int|float, issued: int|float, pos: int|float, close: int|float} $row */
+    public function test_changing_master_multiple_explains_the_same_quantity_without_conversion(): void
+    {
+        $lessons = array_column((new StockReconTutorialContent)->all()['lessons'], null, 'id');
+        foreach ($lessons['item-settings']['comparison'] as $example) {
+            $this->assertSame(12, $example['issued'] - 20 + $example['remainder']);
+        }
+        $examples = $lessons['item-settings']['comparison'];
+        $this->assertSame([20, 30, 32, 30], array_column($examples, 'issued'));
+        $this->assertSame([12, 2, 0, 2], array_column($examples, 'remainder'));
+    }
+
+    public function test_visual_summary_is_last_and_paths_reuse_the_verified_worked_cases(): void
+    {
+        $content = (new StockReconTutorialContent)->all();
+        $this->assertSame('visual-summary', $content['lessons'][array_key_last($content['lessons'])]['id']);
+        $this->assertCount(8, $content['flows']);
+        $lessons = array_column($content['lessons'], 'id');
+        foreach ($content['flows'] as $case) {
+            $this->assertContains($case['lesson_id'], $lessons);
+            $this->assertArrayHasKey($case['scenario_id'], $this->scenarios());
+            $scenario = $this->scenarios()[$case['scenario_id']];
+            $this->assertNotEmpty($case['next']);
+            $this->assertNotEmpty($case['assumptions']);
+            $this->assertGreaterThanOrEqual(4, count($case['steps']));
+            if ($case['outcome'] === 'held') {
+                $this->assertNull($scenario['after'], 'Held paths must not invent a proposal.');
+                $this->assertContains('hold', array_column($case['steps'], 'stage'));
+            } elseif (in_array($case['outcome'], ['unchanged', 'separate'], true)) {
+                $this->assertSame($scenario['before'], $scenario['after']);
+            } else {
+                $this->assertNotNull($scenario['after']);
+                $this->assertNotSame($scenario['before'], $scenario['after']);
+            }
+            foreach ($case['steps'] as $step) {
+                $this->assertNotEmpty($step['value']);
+                $this->assertSame(isset($step['answer']), isset($step['alternative']), 'A decision explains its other path.');
+            }
+        }
+        $paths = array_column($content['flows'], null, 'id');
+        $stages = array_column($paths['waste-then-issue']['steps'], 'stage');
+        $this->assertLessThan(array_search('final', $stages, true), array_search('waste', $stages, true));
+        $this->assertTrue($this->scenarios()[$paths['removal-return']['scenario_id']]['separate_periods']);
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private function scenarios(): array
+    {
+        return array_column((new StockReconTutorialContent)->all()['scenarios'], null, 'id');
+    }
+
+    /** @param array<string, mixed> $row */
     private static function variance(array $row): int|float
     {
-        return $row['pos'] - ($row['open'] + $row['issued'] - $row['close']);
+        return $row['pos'] - ($row['open'] + $row['issued'] - $row['close']) + ($row['waste'] ?? 0);
     }
 }

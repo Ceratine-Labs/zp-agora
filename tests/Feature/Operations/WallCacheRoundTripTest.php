@@ -23,7 +23,8 @@ class WallCacheRoundTripTest extends TestCase
 
         Carbon::setTestNow(Carbon::parse('2033-02-01T09:00:00Z'));
         $branch = random_int(900000, 999999);
-        $key = 'operations.wall.v2.2033-01-31.'.hash('sha256', (string) $branch);
+        $revision = Cache::store('file')->get('operations.wall.waste-revision', '0');
+        $key = 'operations.wall.v2.2033-01-31.'.hash('sha256', $branch.'|'.$revision);
         try {
             $firstStore = Cache::store('file');
             $this->assertInstanceOf(FileStore::class, $firstStore->getStore());

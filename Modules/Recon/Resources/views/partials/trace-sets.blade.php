@@ -10,7 +10,7 @@
 --}}
 
 <x-card title="Runs" collapsible flush>
-    <x-table tools :count="$sets['runs']->count()" empty="No run has ever proposed anything carrying this value.">
+    <x-table layout-key="Recon.partials.trace-sets.1" tools :count="$sets['runs']->count()" empty="No run has ever proposed anything carrying this value.">
         <x-slot:head>
             <tr><th>Run</th><th>Area</th><th>Site</th><th>Period</th><th>Status</th>
                 <th class="num">Proposals</th><th class="num">Stamped</th><th>Run by</th><th>When</th></tr>
@@ -37,7 +37,7 @@
 </x-card>
 
 <x-card title="Proposals" collapsible flush>
-    <x-table tools :count="$sets['proposals']->count()" empty="No proposal carries this value.">
+    <x-table layout-key="Recon.partials.trace-sets.2" tools :count="$sets['proposals']->count()" empty="No proposal carries this value.">
         <x-slot:head>
             <tr><th>Run</th><th>Reference</th><th>Outcome</th><th class="num">Bank</th>
                 <th class="num">Deposit</th><th class="num" title="The bank side less the deposits: negative is money the bank did not receive">Bank less deposits</th><th>State</th><th>Rule</th></tr>
@@ -66,7 +66,7 @@
 </x-card>
 
 <x-card title="Batches" collapsible flush>
-    <x-table tools :count="$sets['batches']->count()" empty="No batch was ever allocated for this value.">
+    <x-table layout-key="Recon.partials.trace-sets.3" tools :count="$sets['batches']->count()" empty="No batch was ever allocated for this value.">
         <x-slot:head>
             <tr><th>Batch</th><th>Run</th><th>Site</th><th>Reference</th>
                 <th class="num">Bank lines</th><th class="num">Bank</th>
@@ -90,7 +90,7 @@
 </x-card>
 
 <x-card title="Rows touched" collapsible flush>
-    <x-table tools :count="$sets['matches']->count()" empty="Agora has never written to a row carrying this value.">
+    <x-table layout-key="Recon.partials.trace-sets.4" tools :count="$sets['matches']->count()" empty="Agora has never written to a row carrying this value.">
         <x-slot:head>
             <tr><th>Batch</th><th>Side</th><th>Source</th><th>Key</th><th>Date</th>
                 <th class="num">Amount</th><th>Was</th></tr>
@@ -114,7 +114,7 @@
 {{-- Cash bags only. Share is bank less bags, so a negative share is money
      missing — the only kind that is due as a staff short. --}}
 <x-card title="Split by cashier" collapsible flush>
-    <x-table tools :count="$sets['allocations']->count()" empty="No cash-bag match carrying this value was split by cashier.">
+    <x-table layout-key="Recon.partials.trace-sets.5" tools :count="$sets['allocations']->count()" empty="No cash-bag match carrying this value was split by cashier.">
         <x-slot:head>
             <tr><th>Batch</th><th>Cashier</th><th class="num">Bags</th><th class="num">Banked</th>
                 <th class="num">Drop safe</th><th class="num">Share</th><th class="num">Accountable</th>
@@ -145,7 +145,7 @@
 </x-card>
 
 <x-card title="Stamps" collapsible flush>
-    <x-table tools :count="$sets['stamps']->count()" empty="Nothing was ever stamped for this value.">
+    <x-table layout-key="Recon.partials.trace-sets.6" tools :count="$sets['stamps']->count()" empty="Nothing was ever stamped for this value.">
         <x-slot:head>
             <tr><th>Batch</th><th>Target</th><th>Key</th><th>Columns</th><th>State</th>
                 <th class="num">Rows</th><th>When</th></tr>
@@ -166,7 +166,7 @@
 </x-card>
 
 <x-card title="Bank statement" sub="As it stands now" collapsible flush>
-    <x-table tools :count="$sets['bank']->count()" empty="Nothing on the statement carries this value inside the window.">
+    <x-table layout-key="Recon.partials.trace-sets.7" tools :count="$sets['bank']->count()" empty="Nothing on the statement carries this value inside the window.">
         <x-slot:head>
             <tr><th>Line</th><th>Site</th><th>Date</th><th>Narrative</th>
                 <th class="num">Amount</th><th>Channel</th><th>Recon state</th></tr>
@@ -195,7 +195,7 @@
 </x-card>
 
 <x-card title="Deposits" sub="All five deposit tables, as they stand now" collapsible flush>
-    <x-table tools :count="$sets['deposits']->count()" empty="No deposit carries this value inside the window.">
+    <x-table layout-key="Recon.partials.trace-sets.8" tools :count="$sets['deposits']->count()" empty="No deposit carries this value inside the window.">
         <x-slot:head>
             <tr><th>Area</th><th>Site</th><th>Date</th><th>Reference</th>
                 <th>Second reference</th><th class="num">Amount</th><th>Reconciled in PumpIT</th></tr>

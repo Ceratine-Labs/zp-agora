@@ -13,34 +13,36 @@ use Illuminate\Support\Facades\DB;
  * BEFORE it runs the first migration. So the schema cannot be created by a
  * migration — it has to exist first. Run once per database, then never again.
  *
- * It is also the first statement Agora ever writes to the customer's
- * production database, which is why it prints what it is about to do and
- * confirms outside --force.
+ * It writes to the configured application database, so it prints the resolved
+ * target and confirms outside --force before creating anything.
  */
 class InitSchemaCommand extends Command
 {
     protected $signature = 'agora:init-schema {--force : Skip the confirmation}';
 
-    protected $description = 'Create the agora schema in the PumpIT database (idempotent)';
+    protected $description = 'Create the configured Agora schema in the application database (idempotent)';
 
     public function handle(): int
     {
         $schema = config('agora.schema');
         $connection = config('agora.connections.app');
-        $database = config("database.connections.{$connection}.database");
-        $host = config("database.connections.{$connection}.host");
+        $db = DB::connection($connection);
+        $database = $db->getDatabaseName();
+        $host = $db->getConfig('host');
+        $local = in_array(strtolower((string) $host), ['127.0.0.1', 'localhost', '::1'], true);
 
-        $exists = DB::connection($connection)
-            ->selectOne('SELECT SCHEMA_ID(?) AS id', [$schema])->id !== null;
+        $exists = $db->selectOne('SELECT SCHEMA_ID(?) AS id', [$schema])->id !== null;
 
         if ($exists) {
-            $this->info("Schema [{$schema}] already exists in {$database}. Nothing to do.");
+            $this->info("Schema [{$schema}] already exists in {$database} on {$host}. Nothing to do.");
 
             return self::SUCCESS;
         }
 
         $this->warn("About to CREATE SCHEMA [{$schema}] in {$database} on {$host}.");
-        $this->line('This is a write to the customer production database. Nothing in dbo is touched.');
+        $this->line($local
+            ? 'This is a write through a local (loopback) connection. Nothing in dbo is touched.'
+            : 'This is a write through a remote connection; the target may be customer production. Nothing in dbo is touched.');
 
         if (! $this->option('force') && ! $this->confirm('Proceed?', false)) {
             $this->line('Aborted. No statement was sent.');
@@ -48,9 +50,9 @@ class InitSchemaCommand extends Command
             return self::FAILURE;
         }
 
-        DB::connection($connection)->statement("CREATE SCHEMA [{$schema}]");
+        $db->statement("CREATE SCHEMA [{$schema}]");
 
-        $this->info("Created schema [{$schema}] in {$database}.");
+        $this->info("Created schema [{$schema}] in {$database} on {$host}.");
 
         return self::SUCCESS;
     }

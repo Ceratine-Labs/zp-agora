@@ -89,7 +89,9 @@ class UserAdminScreenTest extends TestCase
         $this->actingAs($this->person('admin'))
             ->get(route('app.setup.users.index'))
             ->assertOk()
-            ->assertSee('Users and access');
+            ->assertSee('Users and access')
+            ->assertSee('Add roles…')
+            ->assertSee('Replace roles…');
     }
 
     public function test_a_branch_manager_is_refused_the_user_list(): void
@@ -116,13 +118,19 @@ class UserAdminScreenTest extends TestCase
 
     public function test_the_edit_screen_is_behind_the_edit_permission(): void
     {
+        $this->skipUnlessLocalStub();
         $subject = $this->person('operations');
 
-        $this->actingAs($this->person('admin'))
+        $html = $this->actingAs($this->person('admin'))
             ->get(route('app.setup.users.edit', ['user' => $subject->Id]))
             ->assertOk()
-            ->assertSee('Save permissions')
-            ->assertSee('Save sites');
+            ->assertSee('Save user')->getContent();
+        $document = new \DOMDocument;
+        @$document->loadHTML($html);
+        $xpath = new \DOMXPath($document);
+        $this->assertSame(1, $xpath->query('//form[@data-loader and .//input[@name="editor_complete"]]')->length);
+        $this->assertSame(1, $xpath->query('//form[@data-loader]//button[@type="submit" and normalize-space()="Save user"]')->length);
+        $this->assertSame(1, $xpath->query('//form[.//button[@name="action" and @value="temporary"]]')->length);
 
         // *.*.view reaches the VIEW screen and stops there. A read-only person
         // must not reach a page made of Save buttons.
@@ -136,7 +144,7 @@ class UserAdminScreenTest extends TestCase
         $this->skipUnlessLocalStub();
         $admin = $this->person('admin');
         $subject = $this->person('operations');
-        $sections = ['id="details"', 'id="roles"', 'id="branches"', 'id="permissions"', 'id="menu"', 'id="password"'];
+        $sections = ['id="details"', 'id="roles"', 'id="branches"', 'id="permissions"', 'id="password"'];
 
         foreach (['show', 'edit'] as $mode) {
             $this->actingAs($admin)->get(route('app.setup.users.'.$mode, ['user' => $subject->Id]))
@@ -144,13 +152,56 @@ class UserAdminScreenTest extends TestCase
                 ->assertSee('Back to the list');
         }
 
-        $html = $this->actingAs($admin)->withSession(['_old_input' => ['_section' => 'permissions']])
+        $html = $this->actingAs($admin)->withSession(['_old_input' => ['user_editor' => '1']])
             ->get(route('app.setup.users.edit', ['user' => $subject->Id]))->assertOk()->getContent();
         $document = new \DOMDocument;
         @$document->loadHTML($html);
         $xpath = new \DOMXPath($document);
         $this->assertSame(0, $xpath->query('//input[@name="permissions[]" and @checked]')->length);
         $this->assertGreaterThan(0, $xpath->query('//input[@name="permissions[]"]')->length);
+    }
+
+    public function test_user_editor_saves_all_sections_and_rejects_incomplete_submission(): void
+    {
+        $this->skipUnlessLocalStub();
+        $admin = $this->person('admin');
+        $subject = $this->person('operations');
+        $site = Branch::query()->acrossBranches()->trading()->firstOrFail();
+        $permission = Permission::query()->acrossBranches()->firstOrFail();
+        $url = route('app.setup.users.update', ['user' => $subject->Id]);
+        $input = ['user_editor' => '1', 'editor_complete' => '1', 'roles_form' => '1',
+            'UserName' => 'TEST-combined', 'EmailAddress' => $subject->EmailAddress,
+            'IsActive' => '1', 'IsLocked' => '0', 'branches' => [$site->BranchId],
+            'permissions' => [$permission->Id], 'menu' => [], 'roles' => []];
+
+        $this->actingAs($admin)->put($url, $input)->assertSessionHasNoErrors();
+        $this->assertSame('TEST-combined', $subject->fresh()->UserName);
+        $this->assertSame([(int) $site->BranchId], $subject->fresh()->allowedBranchIds());
+        $this->assertSame([(int) $permission->Id], UserPermission::query()->acrossBranches()
+            ->where('UserId', $subject->Id)->pluck('PermissionId')->map(fn ($id) => (int) $id)->all());
+
+        unset($input['editor_complete']);
+        $input['UserName'] = 'TEST-incomplete';
+        $this->actingAs($admin)->put($url, $input)->assertSessionHasErrors('editor_complete');
+        $this->assertSame('TEST-combined', $subject->fresh()->UserName);
+    }
+
+    public function test_user_editor_rolls_back_all_changes_when_home_site_is_forbidden(): void
+    {
+        $this->skipUnlessLocalStub();
+        $admin = $this->person('admin');
+        $subject = $this->person('operations');
+        $sites = Branch::query()->acrossBranches()->trading()->take(3)->pluck('BranchId')->all();
+        $this->assertCount(3, $sites);
+        $before = $subject->UserName;
+
+        $this->actingAs($admin)->put(route('app.setup.users.update', ['user' => $subject->Id]), [
+            'user_editor' => '1', 'editor_complete' => '1', 'UserName' => 'TEST-rollback',
+            'EmailAddress' => $subject->EmailAddress, 'IsActive' => '1', 'IsLocked' => '0',
+            'branches' => [$sites[0], $sites[1]], 'HomeBranchId' => $sites[2],
+        ])->assertSessionHasErrors();
+        $this->assertSame($before, $subject->fresh()->UserName);
+        $this->assertSame([], $subject->fresh()->allowedBranchIds());
     }
 
     public function test_granting_sites_replaces_the_set_and_settles_what_the_person_is(): void

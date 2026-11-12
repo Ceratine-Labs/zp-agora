@@ -37,7 +37,7 @@
     @endif
 
     <form method="GET" action="{{ route('app.cash.banking.phone') }}">
-        <x-params collapsible :open="! $scope->isChosen()" remember="cash-banking-phone" summary="Site and day">
+        <x-params collapsible :open="false" :remember="'cash-banking-phone:'.auth()->id()" summary="Site and day">
             @unless ($pinned)
                 <x-param name="branch_id" label="Site"
                          :choices="['' => 'Choose a site'] + $branches->pluck('Name', 'BranchId')->all()"
@@ -69,7 +69,9 @@
                 </x-facts>
                 <p>
                     <x-chip :tone="\Modules\Cash\Services\CashupService::statusTone($c->Status)">{{ $c->Status }}</x-chip>
-                    <x-chip :tone="\Modules\Cash\Services\CashupService::zreadTone($c->ZreadCheck)">Z-read: {{ mb_strtolower($c->ZreadCheck) }}</x-chip>
+                    @can('cash.discrepancy.view')
+                        <x-chip :tone="\Modules\Cash\Services\CashupService::zreadTone($c->ZreadCheck)">Z-read: {{ mb_strtolower($c->ZreadCheck) }}</x-chip>
+                    @endcan
                 </p>
                 @if ($canConfirm && ($c->Status === 'Open' || $c->Status === 'Day balanced' || ($c->Status === 'Confirmed' && $c->FiguresMoved)))
                     <form method="POST" action="{{ route('app.cash.banking.confirm') }}" class="inline-reason"

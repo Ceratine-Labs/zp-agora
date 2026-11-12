@@ -107,16 +107,16 @@
                the deposit was captured but the bank has not settled it, or it settled under a
                reference the configured extraction does not produce.</p>
         @elseif ($bankOpen->isNotEmpty())
-            <table class="dt dense">
-                <thead>
+            <x-table layout-key="Recon.partials.line-detail.1" dense>
+                <x-slot:head>
                     <tr>
                         <th>Date</th>
                         <th>Narrative</th>
                         @if ($run->ReconArea === 'ABSA')<th>Leg</th>@endif
                         <th class="num">Amount</th>
                     </tr>
-                </thead>
-                <tbody>
+                </x-slot:head>
+
                     @foreach ($bankOpen as $row)
                         <tr>
                             <td class="mono">{{ \Illuminate\Support\Carbon::parse($row->LineDate)->format('d M Y') }}</td>
@@ -141,16 +141,16 @@
                             <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>
                         </tr>
                     @endforeach
-                </tbody>
-            </table>
+
+            </x-table>
         @endif
 
         @if ($bankGone->isNotEmpty())
-            <table class="dt dense drill-gone">
-                <thead>
+            <x-table layout-key="Recon.partials.line-detail.2" dense class="drill-gone">
+                <x-slot:head>
                     <tr><th>Date</th><th>Narrative</th><th>Claimed by</th><th class="num">Amount</th></tr>
-                </thead>
-                <tbody>
+                </x-slot:head>
+
                     @foreach ($bankGone as $row)
                         <tr>
                             <td class="mono">{{ \Illuminate\Support\Carbon::parse($row->LineDate)->format('d M Y') }}</td>
@@ -160,8 +160,8 @@
                             <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>
                         </tr>
                     @endforeach
-                </tbody>
-            </table>
+
+            </x-table>
         @endif
     </div>
 
@@ -195,11 +195,11 @@
                 reconciled against nothing.
             </p>
         @elseif ($mopsOpen->isNotEmpty())
-            <table class="dt dense">
-                <thead>
+            <x-table layout-key="Recon.partials.line-detail.3" dense>
+                <x-slot:head>
                     <tr><th>Date</th><th>Reference</th><th class="num">Amount</th></tr>
-                </thead>
-                <tbody>
+                </x-slot:head>
+
                     @foreach ($mopsOpen as $row)
                         <tr>
                             {{-- Date AND TIME where the source carries one. A Smart ATM deposit has a
@@ -217,16 +217,16 @@
                             <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>
                         </tr>
                     @endforeach
-                </tbody>
-            </table>
+
+            </x-table>
         @endif
 
         @if ($mopsGone->isNotEmpty())
-            <table class="dt dense drill-gone">
-                <thead>
+            <x-table layout-key="Recon.partials.line-detail.4" dense class="drill-gone">
+                <x-slot:head>
                     <tr><th>Date</th><th>Reference</th><th>Claimed by</th><th class="num">Amount</th></tr>
-                </thead>
-                <tbody>
+                </x-slot:head>
+
                     @foreach ($mopsGone as $row)
                         <tr>
                             {{-- Date AND TIME where the source carries one. A Smart ATM deposit has a
@@ -245,8 +245,8 @@
                             <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>
                         </tr>
                     @endforeach
-                </tbody>
-            </table>
+
+            </x-table>
         @endif
     </div>
 

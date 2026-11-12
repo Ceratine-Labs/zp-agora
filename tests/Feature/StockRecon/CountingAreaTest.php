@@ -9,7 +9,6 @@ use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Models\User;
-use Modules\Core\Services\MenuAccessService;
 use Modules\Core\Services\PermissionService;
 use Tests\TestCase;
 
@@ -56,6 +55,8 @@ class CountingAreaTest extends TestCase
         if ($this->safe) {
             $this->cleanUp();
             foreach ($this->users as $user) {
+                $this->db()->table('agora.StockReconProfileEvent')->where('CreatedBy', $user->Id)->delete();
+                $this->db()->table('agora.StockReconBalancingProfile')->where('CreatedBy', $user->Id)->where('Name', 'TEST area profile')->delete();
                 foreach (['UserPermission', 'UserBranch', 'UserGridColumn', 'UserMenuItem'] as $table) {
                     $this->db()->table('agora.'.$table)->where('UserId', $user->Id)->delete();
                 }
@@ -63,6 +64,43 @@ class CountingAreaTest extends TestCase
             }
         }
         parent::tearDown();
+    }
+
+    public function test_balancing_configuration_is_readable_and_requires_save_permission(): void
+    {
+        $user = $this->person(['view']);
+        $profileView = $this->db()->table('agora.Permission')->where('Code', 'stockrecon.profiles.view')->value('Id');
+        $profileSave = $this->db()->table('agora.Permission')->where('Code', 'stockrecon.profiles.save')->value('Id');
+        $this->db()->table('agora.UserPermission')->insert(['BranchId' => 2, 'UserId' => $user->Id, 'PermissionId' => $profileView]);
+        app(PermissionService::class)->forget($user);
+        $this->actingAs($user)->get($this->url('balancing-config'))->assertOk()->assertSee('Generic')->assertSee('Item mappings')->assertDontSee('Create profile');
+        $this->post($this->url('profiles.store'), [])->assertForbidden();
+        $this->db()->table('agora.UserPermission')->insert(['BranchId' => 2, 'UserId' => $user->Id, 'PermissionId' => $profileSave]);
+        app(PermissionService::class)->forget($user);
+        $this->get($this->url('balancing-config'))->assertOk()->assertSee('Create profile');
+    }
+
+    public function test_authorized_profile_edit_is_audited_and_rejects_a_stale_revision(): void
+    {
+        $user = $this->person(['view']);
+        foreach (['view', 'save'] as $action) {
+            $permission = $this->db()->table('agora.Permission')->where('Code', 'stockrecon.profiles.'.$action)->value('Id');
+            $this->db()->table('agora.UserPermission')->insert(['BranchId' => 2, 'UserId' => $user->Id, 'PermissionId' => $permission]);
+        }
+        app(PermissionService::class)->forget($user);
+        $this->actingAs($user);
+        $payload = ['name' => 'TEST area profile', 'MaxAmendment' => 50, 'MaxAmendmentPct' => 0.5,
+            'MinShiftsInChain' => 2, 'KeepBreaksUpTo' => 3];
+        $this->post($this->url('profiles.store'), $payload)->assertRedirect();
+        $profile = $this->db()->table('agora.StockReconBalancingProfile')->where('CreatedBy', $user->Id)->where('Name', $payload['name'])->first();
+        $this->assertNotNull($profile);
+        $url = route('app.stockrecon.countingareas.profiles.update', ['branch' => self::BRANCH, 'area' => 801, 'profile' => $profile->Id]);
+        $this->put($url, array_replace($payload, ['revision' => 1, 'MaxAmendment' => 40]))->assertRedirect();
+        $this->put($url, array_replace($payload, ['revision' => 1, 'MaxAmendment' => 30]))->assertSessionHasErrors('revision');
+        $fresh = $this->db()->table('agora.StockReconBalancingProfile')->where('Id', $profile->Id)->first();
+        $this->assertEquals(40, $fresh->MaxAmendment);
+        $this->assertEquals(2, $fresh->Revision);
+        $this->assertSame(2, $this->db()->table('agora.StockReconProfileEvent')->where('CreatedBy', $user->Id)->count());
     }
 
     public function test_listing_detail_edit_and_csv_leave_safe_proposals_unchanged(): void
@@ -86,9 +124,9 @@ class CountingAreaTest extends TestCase
 
     public function test_view_edit_save_and_direct_grid_endpoints_have_separate_access(): void
     {
-        $this->actingAs($this->person([]))->get(route('app.stockrecon.countingareas'))->assertForbidden();
-        $this->get(route('app.grids.extract', ['grid' => 'app.stockrecon.countingareas']))->assertForbidden();
-        $this->post(route('app.grids.columns.store', ['grid' => 'app.stockrecon.countingareas']), [])->assertForbidden();
+        $this->actingAs($this->person([]))->get(route('app.stockrecon.countingareas'))->assertRedirect(route('app.access-required'));
+        $this->getJson(route('app.grids.extract', ['grid' => 'app.stockrecon.countingareas']))->assertForbidden();
+        $this->postJson(route('app.grids.columns.store', ['grid' => 'app.stockrecon.countingareas']), [])->assertForbidden();
         $this->actingAs($this->person(['view']))->get($this->url('show'))->assertOk()->assertDontSee('Edit classification');
         $this->get($this->url('edit'))->assertForbidden();
         $this->put($this->url('update'), $this->input() + ['Authorized' => 1, 'Workspace' => 'ho'])->assertForbidden();
@@ -169,12 +207,17 @@ class CountingAreaTest extends TestCase
         $this->assertNull($this->setting()->ConfirmedAt);
     }
 
-    public function test_a_menu_restriction_applies_to_the_screen_and_direct_export(): void
+    public function test_missing_counting_area_permission_denies_the_screen_detail_and_direct_export(): void
     {
-        $user = $this->person(['view', 'edit', 'save']);
-        $otherMenu = $this->db()->table('agora.MenuItem')->where('RouteName', 'app.stockrecon.index')->value('Id');
-        $this->db()->table('agora.UserMenuItem')->insert(['BranchId' => 2, 'UserId' => $user->Id, 'MenuItemId' => $otherMenu]);
-        app(MenuAccessService::class)->forget($user->Id);
+        $user = $this->person([]);
+        // Menus follow permissions. Keep unrelated access so these requests
+        // reach the counting-area guard instead of the no-access redirect.
+        $unrelated = $this->db()->table('agora.Permission')->where('Code', 'recon.runs.view')->value('Id');
+        $this->assertNotNull($unrelated);
+        $this->db()->table('agora.UserPermission')->insert(['BranchId' => 2, 'UserId' => $user->Id, 'PermissionId' => $unrelated]);
+        app(PermissionService::class)->forget($user);
+        $this->assertTrue($user->can('recon.runs.view'));
+        $this->assertFalse($user->can('stockrecon.countingareas.view'));
         $this->actingAs($user)->get(route('app.stockrecon.countingareas'))->assertForbidden();
         $this->get($this->url('show'))->assertForbidden();
         $this->get(route('app.grids.extract', ['grid' => 'app.stockrecon.countingareas']))->assertForbidden();

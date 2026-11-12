@@ -4,6 +4,7 @@ namespace Modules\Cash\Services;
 
 use App\Support\ProcedureService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Modules\Cash\Support\CashupScope;
 use Modules\Core\Facades\Settings;
 
@@ -248,7 +249,8 @@ class CashupService
             'beyond' => $cashups->filter(fn (object $c) => abs((float) $c->Variance) > $tolerance)->count(),
             'toConfirm' => $cashups->where('Status', 'Open')->count(),
             'toClose' => $cashups->where('Status', 'Confirmed')->count(),
-            'disagree' => $cashups->where('ZreadCheck', '!=', 'Agrees')->count(),
+            ...(Gate::allows('cash.discrepancy.view')
+                ? ['disagree' => $cashups->where('ZreadCheck', '!=', 'Agrees')->count()] : []),
             'notCaptured' => $zreads->filter(fn (object $z) => (bool) $z->IsAllocated && ! (bool) $z->HasCashup
                 && (float) $z->Sales !== 0.0)->count(),
             'shorts' => (float) $cashups->sum(fn (object $c) => (float) $c->StaffShorts),

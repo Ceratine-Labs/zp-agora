@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Models\User;
+use Modules\Reports\Database\Seeders\ReportViewPermissionsSeeder;
+use Modules\Reports\Database\Seeders\WasteAuthorizationPermissionSeeder;
 use Modules\StockRecon\Grids\StockReconVarianceGrid;
 use Tests\TestCase;
 
@@ -26,8 +28,8 @@ use Tests\TestCase;
  *   item   shift  original o/i/c/pos  amended o/i/c/pos  waste  original var  amended var
  *   TVAR1  1 Jan 1  10/0/8/0            10/0/10/0          —      -2 (short)    0
  *   TVAR1  1 Jan 3   8/0/10/0           10/0/10/0          —      +2 (over)     0
- *   TVAR2  2 Jan 1   5/0/3/0             5/0/3/0           1      -2            -1 (waste explains 1)
- *   TVAR2  2 Jan 3   3/0/4/0             3/0/4/0           2      +1 (in allow) 0  (waste never makes an over)
+ *   TVAR2  2 Jan 1   5/0/3/0             5/0/3/0           1      -2            -2 (waste is not verified)
+ *   TVAR2  2 Jan 3   3/0/4/0             3/0/4/0           2      +1 (in allow) +1 (waste never offsets an over)
  *
  * TVAR1 sells at R10 with no allowance; TVAR2 at R4 with an allowance of 5.
  * Checked against the live screen on 19 Oct 2026 as well: Ngwenya, Bakery,
@@ -87,10 +89,10 @@ class VarianceTest extends TestCase
 
         $this->assertEqualsWithDelta(-1, $t['QtyVar'], 0.0005);
         $this->assertEqualsWithDelta(-4, $t['ValueVar'], 0.005);
-        $this->assertEqualsWithDelta(-4, $t['ValueShort'], 0.005, 'All that is left short: TVAR2 after its waste.');
-        $this->assertEqualsWithDelta(0, $t['ValueOver'], 0.005);
+        $this->assertEqualsWithDelta(-8, $t['ValueShort'], 0.005, 'Unverified waste is not deducted from the shortage.');
+        $this->assertEqualsWithDelta(4, $t['ValueOver'], 0.005);
         $this->assertEqualsWithDelta(0, $t['ValueVarMoved'], 0.005,
-            'Balancing moved a short onto an over and made nothing smaller; waste took R8 off the shorts and R4 off the overs.');
+            'Unverified waste leaves both shortages and overs unchanged.');
     }
 
     public function test_each_line_carries_both_sides_and_pumpits_colours(): void
@@ -112,13 +114,61 @@ class VarianceTest extends TestCase
         $waste = $rows['TVAR2/2030-01-02/1'];
         $this->assertEqualsWithDelta(-2, (float) $waste->QtyVarB4Waste, 0.0005);
         $this->assertEqualsWithDelta(1, (float) $waste->QtyGoodWaste, 0.0005);
-        $this->assertEqualsWithDelta(-1, (float) $waste->QtyVar, 0.0005, 'Good waste explains part of a short.');
+        $this->assertEqualsWithDelta(-2, (float) $waste->QtyVar, 0.0005, 'Unverified good waste cannot reduce a short.');
         $this->assertSame('crit', $waste->AmendedTone);
         $this->assertSame('As counted', $waste->Balancing, 'Waste moves the variance, not a count.');
 
         $within = $rows['TVAR2/2030-01-02/3'];
         $this->assertSame('good', $within->OriginalTone, 'Over by no more than the allowance.');
-        $this->assertEqualsWithDelta(0, (float) $within->QtyVar, 0.0005, 'Waste never makes an over: the line goes to nil.');
+        $this->assertEqualsWithDelta(1, (float) $within->QtyVar, 0.0005, 'Waste is not applied to an existing over.');
+    }
+
+    public function test_good_waste_uses_pumpit_authorization_caps_at_zero_and_never_reduces_an_over(): void
+    {
+        $row = fn (int $shift) => $this->grid()->rows->first(fn ($r) => trim((string) $r->StockItemNo) === 'TVAR2' && (int) $r->ShiftNo === $shift);
+        $waste = $this->db()->table('PumpIT.dbo.STK_StockWasteLine')->where('SSBranchId', self::BRANCH)->where('StockItemNo', 'TVAR2');
+        $this->assertEqualsWithDelta(-2, (float) $row(1)->QtyVar, 0.001);
+        (clone $waste)->where('ShiftNo', 1)->update(['isWasteQtyAuthorised' => 1]);
+        $this->assertEqualsWithDelta(-1, (float) $row(1)->QtyVar, 0.001);
+        $this->assertEqualsWithDelta(1, (float) $row(1)->QtyAuthorizedGoodWaste, 0.001);
+        (clone $waste)->where('ShiftNo', 3)->update(['isWasteQtyAuthorised' => 1]);
+        $this->assertEqualsWithDelta(1, (float) $row(3)->QtyVar, 0.001, 'Waste does not erase an over.');
+        (clone $waste)->where('ShiftNo', 1)->update(['QtyGoodWaste' => 3, 'QtyBadWaste' => 100]);
+        $this->assertEqualsWithDelta(0, (float) $row(1)->QtyVar, 0.001, 'Waste exceeding a short stops at zero.');
+        (clone $waste)->where('ShiftNo', 1)->update(['isWasteQtyAuthorised' => 0]);
+        $this->assertEqualsWithDelta(-2, (float) $row(1)->QtyVar, 0.001, 'Source withdrawal restores the full shortage.');
+    }
+
+    public function test_agora_cannot_override_pumpit_waste_authorization(): void
+    {
+        app(WasteAuthorizationPermissionSeeder::class)->run();
+        $data = ['branch_id' => self::BRANCH, 'date' => '2030-01-02', 'shift' => 1,
+            'area' => self::AREA, 'item' => 'TVAR2', 'captured_good' => 1, 'captured_at' => null,
+            'decision' => 'authorize', 'authorized_good' => 1];
+        $approver = $this->person(['stockrecon.variance.view', 'reports.waste.approve']);
+        $this->actingAs($approver)->from('/')->post(route('app.reports.waste.authorization'), $data)
+            ->assertRedirect()->assertSessionHasErrors('waste');
+        $this->assertSame(0, $this->db()->table('agora.StockWasteAuthorization')->where('BranchId', self::BRANCH)->count());
+    }
+
+    public function test_waste_report_retains_source_authorization_details(): void
+    {
+        app(ReportViewPermissionsSeeder::class)->run();
+        $this->db()->table('PumpIT.dbo.SS_Branch')->insert(['SSBranchId' => self::BRANCH, 'BranchName' => 'TEST variance', 'IsActive' => 1]);
+        $this->db()->table('agora.Branch')->insert(['BranchId' => self::BRANCH, 'Name' => 'TEST variance', 'IsTrading' => 1, 'IsActive' => 1]);
+        try {
+            $url = route('app.reports.show', ['report' => 'waste', 'from' => '2030-01-01', 'to' => '2030-01-02']);
+            $this->actingAs($this->person(['reports.waste.view']))->get($url)->assertOk()
+                ->assertSee('Awaiting authorization')->assertSee('Authorize in PumpIT');
+            $this->db()->table('PumpIT.dbo.STK_StockWasteLine')->where('SSBranchId', self::BRANCH)
+                ->where('StockItemNo', 'TVAR2')->where('ShiftNo', 1)->update([
+                    'isWasteQtyAuthorised' => 1, 'WasteQtyAuthorisedUser' => 'TEST approver', 'WasteQtyAuthorisedDate' => '2030-01-02 12:00:00',
+                ]);
+            $this->get($url)->assertOk()->assertSee('Authorized')->assertSee('TEST approver')->assertSee('2030-01-02 12:00');
+        } finally {
+            $this->db()->table('agora.Branch')->where('BranchId', self::BRANCH)->delete();
+            $this->db()->table('PumpIT.dbo.SS_Branch')->where('SSBranchId', self::BRANCH)->delete();
+        }
     }
 
     public function test_a_filter_narrows_the_lines_and_the_totals_together(): void
@@ -195,7 +245,7 @@ class VarianceTest extends TestCase
 
         $page->assertSeeInOrder(['Value variance', 'Value short', 'Value over', 'Quantity variance', 'POS quantity', 'Lines']);
         $page->assertSee('As counted -R28.00', false);
-        $page->assertSeeInOrder(['>Balancing<', '>Moved by balancing<', '>Original variance<',
+        $page->assertSeeInOrder(['>Balancing<', '>Change in variance<', '>Original variance<',
             '>Original value<', '>Amended variance<', '>Amended value<'], false);
         $page->assertSee('data-chooser-item="QtyOpenOriginal"', false);
         $page->assertDontSee('data-column="QtyOpenOriginal"', false);
@@ -298,6 +348,7 @@ class VarianceTest extends TestCase
 
     private function cleanUp(): void
     {
+        $this->db()->table('agora.StockWasteAuthorization')->where('BranchId', self::BRANCH)->delete();
         foreach (['STK_StockReconLine', 'STK_StockWasteLine', 'STK_StockMaster', 'STK_Area'] as $table) {
             $this->db()->table("PumpIT.dbo.{$table}")->where('SSBranchId', self::BRANCH)->delete();
         }

@@ -10,7 +10,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
-    EXEC agora.usp_StockRecon_AuthorizeWeekly @BranchId,@UserId,@Authorized,@Workspace,@BranchPin;
+    EXEC agora.usp_StockRecon_AuthorizeWeeklyCase @BranchId,@CaseId,@UserId,@Authorized,@Workspace,@BranchPin;
     IF @Status NOT IN ('Open','Investigating','Waiting','Escalated','Closed') OR @Status IS NULL OR LEN(LTRIM(RTRIM(ISNULL(@Reason,''))))<10
         THROW 51000, 'AGORA:WEEKLY_ACTION:Choose a valid status and give a change reason of at least ten characters.', 1;
     IF @Operation IS NULL OR @Operation NOT IN ('save','approve','reopen')
@@ -34,9 +34,14 @@ BEGIN
         THROW 51000, 'AGORA:WEEKLY_CLOSURE:Record the outcome, supported recovery (zero if none), correction or reason not needed, dated action and head-office sign-off.', 1;
     IF @RecoveryAmount<0
         THROW 51000, 'AGORA:WEEKLY_CLOSURE:Recovery cannot be negative.', 1;
+    DECLARE @IsPattern bit=CASE WHEN EXISTS(SELECT 1 FROM agora.StockWeeklyCase WHERE BranchId=@BranchId AND Id=@CaseId AND RegisterName='Cross-Site Patterns') THEN 1 ELSE 0 END;
     IF @OwnerId IS NOT NULL AND NOT EXISTS(SELECT 1 FROM agora.[User] u WHERE u.Id=@OwnerId AND IsActive=1 AND IsLocked=0 AND DeletedAt IS NULL
-        AND (HomeBranchId IS NULL OR HomeBranchId=@BranchId)
-        AND (NOT EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id) OR EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id AND BranchId=@BranchId)))
+        AND ((@IsPattern=0 AND (HomeBranchId IS NULL OR HomeBranchId=@BranchId)
+            AND (NOT EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id) OR EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id AND BranchId=@BranchId)))
+          OR (@IsPattern=1 AND HomeBranchId IS NULL AND Workspace='ho'
+            AND NOT EXISTS(SELECT 1 FROM agora.StockWeeklyCase c CROSS APPLY OPENJSON(c.EvidenceJson,'$.RelatedCases') WITH(BranchId int) r
+              WHERE c.BranchId=@BranchId AND c.Id=@CaseId AND EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id)
+                AND NOT EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id AND BranchId=r.BranchId)))))
         THROW 51000, 'AGORA:WEEKLY_OWNER:Choose an active owner who can access this site.', 1;
     BEGIN TRANSACTION;
     DECLARE @Prior nvarchar(max),@Version varchar(18),@Now datetime2=SYSUTCDATETIME();
@@ -50,9 +55,9 @@ BEGIN
         AND c.RegisterName IN ('Opening vs Closing','Balancing Breaches') AND @CorrectionStatus<>'Y')
         THROW 51000, 'AGORA:WEEKLY_CORRECTION:Closing this control requires the recorded PumpIT correction and its evidence.', 1;
     IF @Operation='approve' AND EXISTS(SELECT 1 FROM agora.StockWeeklyCase c
-        CROSS APPLY OPENJSON(c.EvidenceJson,'$.RelatedCases') WITH(CaseId bigint) related
-        JOIN agora.StockWeeklyCase child ON child.BranchId=c.BranchId AND child.SnapshotRef=c.SnapshotRef AND child.Id=related.CaseId
-        WHERE c.BranchId=@BranchId AND c.Id=@CaseId AND c.RegisterName='Control Actions' AND (child.Status<>'Closed' OR child.SignedOffBy IS NULL))
+        CROSS APPLY OPENJSON(c.EvidenceJson,'$.RelatedCases') WITH(CaseId bigint,BranchId int,SnapshotRef uniqueidentifier) related
+        LEFT JOIN agora.StockWeeklyCase child ON child.BranchId=ISNULL(related.BranchId,c.BranchId) AND child.SnapshotRef=ISNULL(related.SnapshotRef,c.SnapshotRef) AND child.Id=related.CaseId
+        WHERE c.BranchId=@BranchId AND c.Id=@CaseId AND c.RegisterName IN ('Control Actions','Cross-Site Patterns') AND (child.Id IS NULL OR child.Status<>'Closed' OR child.SignedOffBy IS NULL))
         THROW 51000, 'AGORA:WEEKLY_RELATED:Complete and approve the related register cases before signing off this management action.', 1;
     IF JSON_VALUE(@Prior,'$.Status')='Closed' AND @Operation<>'reopen'
         THROW 51000, 'AGORA:WEEKLY_CLOSED:Reopen the signed case before changing its findings or actions.', 1;
@@ -64,23 +69,24 @@ BEGIN
             UpdatedAt=@Now,UpdatedBy=@UserId WHERE BranchId=@BranchId AND Id=@CaseId;
         /* A changed supporting finding invalidates the management approval too.
            Preserve both approvals in their audit trails, in this transaction. */
-        DECLARE @Parents TABLE(Id bigint,PriorJson nvarchar(max));
-        INSERT @Parents SELECT c.Id,
+        DECLARE @Parents TABLE(BranchId int,Id bigint,PriorJson nvarchar(max));
+        INSERT @Parents SELECT c.BranchId,c.Id,
             (SELECT c.Status,c.OwnerId,c.DueDate,c.Finding,c.EvidenceReference,c.ClosureOutcome,c.RecoveryAmount,c.RecoveryReference,
                 c.CorrectionStatus,c.CorrectionReference,c.ActionTaken,c.ActionDate,c.SignoffNote,c.SignedOffBy,c.SignedOffAt,c.ClosedDate
                 FOR JSON PATH,INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER)
         FROM agora.StockWeeklyCase c WITH(UPDLOCK,HOLDLOCK)
-        WHERE c.BranchId=@BranchId AND c.RegisterName='Control Actions' AND c.Status='Closed'
-            AND EXISTS(SELECT 1 FROM OPENJSON(c.EvidenceJson,'$.RelatedCases') WITH(CaseId bigint) r WHERE r.CaseId=@CaseId);
+        WHERE c.RegisterName IN ('Control Actions','Cross-Site Patterns') AND c.Status='Closed'
+            AND EXISTS(SELECT 1 FROM OPENJSON(c.EvidenceJson,'$.RelatedCases') WITH(CaseId bigint,BranchId int) r
+                WHERE r.CaseId=@CaseId AND ISNULL(r.BranchId,c.BranchId)=@BranchId);
         UPDATE c SET Status='Investigating',SignedOffBy=NULL,SignedOffAt=NULL,ClosedDate=NULL,SignoffNote=NULL,UpdatedAt=@Now,UpdatedBy=@UserId
-        FROM agora.StockWeeklyCase c JOIN @Parents p ON p.Id=c.Id WHERE c.BranchId=@BranchId;
+        FROM agora.StockWeeklyCase c JOIN @Parents p ON p.Id=c.Id AND p.BranchId=c.BranchId;
         INSERT agora.StockWeeklyCaseChange(BranchId,CaseId,PriorJson,NewJson,Reason,CreatedAt,CreatedBy)
-        SELECT @BranchId,c.Id,p.PriorJson,
+        SELECT c.BranchId,c.Id,p.PriorJson,
             (SELECT c.Status,c.OwnerId,c.DueDate,c.Finding,c.EvidenceReference,c.ClosureOutcome,c.RecoveryAmount,c.RecoveryReference,
                 c.CorrectionStatus,c.CorrectionReference,c.ActionTaken,c.ActionDate,c.SignoffNote,c.SignedOffBy,c.SignedOffAt,c.ClosedDate
                 FOR JSON PATH,INCLUDE_NULL_VALUES,WITHOUT_ARRAY_WRAPPER),
             LEFT(CONCAT('Supporting case ',@CaseId,' reopened: ',@Reason),400),@Now,@UserId
-        FROM agora.StockWeeklyCase c JOIN @Parents p ON p.Id=c.Id;
+        FROM agora.StockWeeklyCase c JOIN @Parents p ON p.Id=c.Id AND p.BranchId=c.BranchId;
 
     END
     ELSE

@@ -2,9 +2,13 @@
 
 namespace Tests\Feature\Seeding;
 
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Core\Database\Seeders\E2eFixtureSeeder;
 use Modules\Core\Models\Branch;
 use Modules\Core\Models\User;
+use PHPUnit\Framework\SkippedWithMessageException;
 use Tests\TestCase;
 
 /**
@@ -24,64 +28,70 @@ class E2eFixtureGuardTest extends TestCase
     public function test_it_skips_when_the_app_connection_is_not_local(): void
     {
         $connection = config('agora.connections.app');
+        config(["database.connections.{$connection}.host" => '192.0.2.1']);
 
-        $branchId = (int) config('agora.e2e.branch_id');
-        $email = config('agora.e2e.email');
+        // No database setup, cleanup or connection is permitted for this case.
+        // A connection expectation catches even an attempted query, unlike a
+        // later row count on an already-open connection to the local database.
+        DB::shouldReceive('connection')->never();
+        $command = $this->createMock(Command::class);
+        $command->expects($this->once())->method('warn')->with($this->callback(
+            fn (string $message): bool => str_contains($message, 'not a local database — skipped')
+        ));
+        $seeder = new E2eFixtureSeeder;
+        $seeder->setCommand($command);
+        $seeder->run();
+    }
 
-        // A known starting point: "it did nothing" can only be shown against
-        // an empty one. forceDelete on both — Branch soft-deletes, and a
-        // soft-deleted row still occupies its natural key, so a plain delete
-        // here would leave the row in the unique index and break the seeder
-        // the next time it ran.
-        Branch::query()->acrossBranches()->withTrashed()->where('BranchId', $branchId)->forceDelete();
-        User::query()->acrossBranches()->withTrashed()->where('EmailAddress', $email)->forceDelete();
+    public function test_the_writing_case_skips_before_connecting_to_a_nonlocal_database(): void
+    {
+        $connection = config('agora.connections.app');
+        config(["database.connections.{$connection}.host" => '192.0.2.1']);
+        DB::shouldReceive('connection')->never();
 
-        config(["database.connections.{$connection}.host" => '105.247.172.179']);
-
-        (new E2eFixtureSeeder)->run();
-
-        // The guard reads config before any query, so nothing was sent
-        // anywhere — including to the local database this test can see.
-        config(["database.connections.{$connection}.host" => '127.0.0.1']);
-
-        $this->assertSame(
-            0,
-            Branch::query()->acrossBranches()->where('BranchId', $branchId)->count(),
-            'A remote target must not get the fixture branch.'
-        );
-        $this->assertSame(
-            0,
-            User::query()->acrossBranches()->where('EmailAddress', $email)->withTrashed()->count(),
-            'A remote target must not get a working sign-in credential.'
-        );
+        // Exercise the actual writing test's entry point. Moving its guard
+        // below setup would attempt a connection and fail this expectation.
+        $this->expectException(SkippedWithMessageException::class);
+        $this->expectExceptionMessage('local container only');
+        $this->test_it_still_seeds_against_a_local_database();
     }
 
     public function test_it_still_seeds_against_a_local_database(): void
     {
-        if (! config('agora.e2e.password')) {
-            $this->markTestSkipped('AGORA_E2E_PASSWORD is not set, so there is no fixture to seed.');
-        }
+        $this->skipUnlessLocalStub('This test runs the E2E fixture seeder.');
 
-        (new E2eFixtureSeeder)->run();
+        // Keep the browser fixture intact, including its existing password and
+        // grants. The real seeder runs with a separate TEST account inside a
+        // rollback transaction; no reseeding is needed in tearDown, even after
+        // an assertion fails or the local-only guard skips this case.
+        $email = 'TEST-fixture-guard-'.Str::uuid().'@agora.invalid';
+        $branchId = 999;
+        config([
+            'agora.e2e.branch_id' => $branchId,
+            'agora.e2e.email' => $email,
+            'agora.e2e.password' => 'TEST-fixture-guard-password',
+        ]);
+        $branchBefore = Branch::query()->acrossBranches()->withTrashed()
+            ->where('BranchId', $branchId)->first()?->getAttributes();
+        $db = DB::connection(config('agora.connections.app'));
+        $db->beginTransaction();
 
-        $this->assertSame(
-            1,
-            User::query()->acrossBranches()->where('EmailAddress', config('agora.e2e.email'))->count()
-        );
-    }
-
-    /**
-     * Put the fixture back however this file left it.
-     *
-     * The browser suite signs in as this account, so a run of these two tests
-     * must not be what takes it away.
-     */
-    protected function tearDown(): void
-    {
-        if ($this->app !== null && config('agora.e2e.password')) {
+        try {
             (new E2eFixtureSeeder)->run();
+
+            $user = User::query()->acrossBranches()->where('EmailAddress', $email)->sole();
+            $this->assertSame('TEST Playwright', $user->UserName);
+            $this->assertTrue((bool) $user->IsActive);
+            $branch = Branch::query()->acrossBranches()->where('BranchId', $branchId)->sole();
+            $this->assertSame(E2eFixtureSeeder::BRANCH_NAME, $branch->Name);
+            $this->assertFalse((bool) $branch->IsActive);
+            $this->assertFalse((bool) $branch->IsTrading);
+        } finally {
+            $db->rollBack();
         }
 
-        parent::tearDown();
+        $this->assertFalse(User::query()->acrossBranches()->where('EmailAddress', $email)->withTrashed()->exists());
+        $this->assertSame($branchBefore, Branch::query()->acrossBranches()->withTrashed()
+            ->where('BranchId', $branchId)->first()?->getAttributes());
     }
 }

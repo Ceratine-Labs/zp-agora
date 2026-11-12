@@ -212,15 +212,25 @@ class MigrationHelper
      * say what it is running without anyone reading the migrations folder.
      * Idempotent: re-running a migration does not double-stamp.
      */
-    public static function recordVersion(string $version, string $note = ''): void
+    public static function recordVersion(string $version, string $note = '', ?string $module = null): void
     {
-        $schema = config('agora.schema');
-        $branchId = (int) config('agora.group_branch_id');
+        // Existing migrations are immutable. Their actual source path provides
+        // attribution without rewriting callers or guessing from old notes.
+        if ($module === null) {
+            $root = preg_quote(base_path('Modules').DIRECTORY_SEPARATOR, '~');
+            foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) as $frame) {
+                if (preg_match('~^'.$root.'([A-Za-z][A-Za-z0-9]*)/Database/Migrations/[^/]+\\.php$~', $frame['file'] ?? '', $matches)) {
+                    $module = $matches[1];
+                    break;
+                }
+            }
+        }
 
-        DB::table("{$schema}.SchemaVersion")->updateOrInsert(
-            ['BranchId' => $branchId, 'Version' => $version],
-            ['Note' => $note !== '' ? $note : null, 'AppliedAt' => now(), 'UpdatedAt' => now()],
-        );
+        if ($module === null) {
+            throw new RuntimeException('SchemaVersion requires a module migration source or an explicit module.');
+        }
+
+        SchemaVersionLedger::record($module, $version, $note);
     }
 
     /**

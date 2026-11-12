@@ -125,6 +125,7 @@ up)
                 database/stubs/pumpit-users.sql \
                 database/stubs/pumpit-branch.sql \
                 database/stubs/pumpit-product.sql \
+                database/stubs/pumpit-fuel.sql \
                 database/stubs/pumpit-cash.sql \
                 database/stubs/pumpit-utilities.sql \
                 database/stubs/pumpit-assets.sql \

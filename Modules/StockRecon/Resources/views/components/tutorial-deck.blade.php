@@ -13,9 +13,9 @@
     <div class="sr-tutorial-intro">
         <span class="sr-tutorial-emblem"><x-stockrecon::tutorial-icon name="box" /></span>
         <div>
-            <span class="sr-overline">Your practical field guide</span>
-            <h2>Every count tells a story.</h2>
-            <p>See where the figures come from, try worked examples and learn the next step when a run needs attention.</p>
+            <span class="sr-overline">For administrators, finance and management</span>
+            <h2>Every correction needs an explanation.</h2>
+            <p>Trace inputs → rules → proposal → actual write. Compare worked examples, including the shortages that must remain visible.</p>
         </div>
         <div class="sr-tutorial-facts">
             <span><strong>{{ count($lessons) }}</strong> chapters</span>
@@ -24,6 +24,18 @@
         </div>
     </div>
 
+    <search class="sr-guide-search" data-guide-search hidden aria-label="Search the stock reconciliation guide">
+        <label for="stock-recon-guide-search">Search this guide</label>
+        <div class="sr-search-input-row">
+            <x-stockrecon::tutorial-icon name="search" />
+            <input id="stock-recon-guide-search" type="search" data-guide-query autocomplete="off" maxlength="200"
+                   placeholder="Try issue multiple, opening, waste or D2…" aria-describedby="stock-recon-search-status" aria-controls="stock-recon-search-results">
+            <button type="button" class="btn" data-guide-clear hidden>Clear</button>
+        </div>
+        <p id="stock-recon-search-status" data-guide-search-status role="status" aria-live="polite">Search every chapter, worked example, diagram and event code.</p>
+        <ul id="stock-recon-search-results" class="sr-search-results" data-guide-search-results hidden></ul>
+    </search>
+
     <div class="sr-tutorial-layout">
         <aside class="sr-tutorial-sidebar" aria-label="Tutorial contents">
             <div class="sr-tutorial-progress">
@@ -31,6 +43,7 @@
                 <progress data-tutorial-progress value="{{ $activeIndex + 1 }}" max="{{ count($lessons) }}" aria-label="Current chapter"></progress>
                 <p>Move at your own pace. Choose any chapter.</p>
             </div>
+            <a class="sr-search-shortcut" href="#stock-recon-guide-search" data-guide-search-link hidden><x-stockrecon::tutorial-icon name="search" /> Search this guide</a>
             <nav class="sr-chapter-nav" aria-label="Stock recon chapters">
                 @foreach ($lessons as $chapter)
                     <a href="{{ route('app.stockrecon.tutorial', ['lesson' => $chapter['id']]) }}" data-lesson-link="{{ $chapter['id'] }}"
@@ -79,26 +92,44 @@
                             </div>
                         @endif
 
-                        <div class="sr-chapter-copy">
-                            @foreach ($chapter['body'] as $paragraph)<p>{{ $paragraph }}</p>@endforeach
-                        </div>
-
-                        @if ($chapter['steps'])
-                            <ol class="sr-practical-steps">
-                                @foreach ($chapter['steps'] as $step)
+                        @if ($chapter['flow'])
+                            <ol class="sr-logic-flow" aria-label="{{ $chapter['title'] }} — sequence">
+                                @foreach ($chapter['flow'] as $step)
                                     <li>
                                         <span class="sr-step-number" aria-hidden="true">{{ $loop->iteration }}</span>
-                                        <div><h3>{{ $step['title'] }}</h3><p>{{ $step['text'] }}</p>
-                                            @if ($step['screen'])<span class="sr-screen-path"><x-stockrecon::tutorial-icon name="search" /> {{ $step['screen'] }}</span>@endif
-                                        </div>
+                                        <div><h3>{{ $step['title'] }}</h3><p>{{ $step['text'] }}</p></div>
                                     </li>
                                 @endforeach
                             </ol>
                         @endif
 
-                        @if ($chapter['scenario_id'] && $scenarios->has($chapter['scenario_id']))
-                            <x-stockrecon::tutorial-scenario :scenario="$scenarios[$chapter['scenario_id']]" />
+                        <div class="sr-chapter-copy">
+                            @foreach ($chapter['body'] as $paragraph)<p>{{ $paragraph }}</p>@endforeach
+                        </div>
+
+                        @if ($chapter['id'] === 'visual-summary')
+                            <x-stockrecon::tutorial-flow :cases="$content['flows']" :scenarios="$scenarios" />
                         @endif
+
+                        @if (isset($chapter['comparison']))
+                            <section class="sr-setting-comparison" aria-label="Changing the issue multiple">
+                                <h3>Same item quantities. Different issue multiple.</h3>
+                                <p>Interior shift: opening 90, issued 20, POS 32, closing 90 → over 12. Assume a complete eligible chain, enabled issue modes, no opening break, duplicate or waste.</p>
+                                <x-table layout-key="StockRecon.tutorial.issue-multiple" :count="count($chapter['comparison'])" aria-label="Effect of issue multiple on the same over of 12">
+                                    <x-slot:head><tr><th>Issue multiple</th><th class="num">Issue before</th><th class="num">Issue after</th><th class="num">Over left</th><th>Why</th></tr></x-slot:head>
+                                    @foreach ($chapter['comparison'] as $example)
+                                        <tr><th scope="row">{{ $example['multiple'] }}</th><td class="num">{{ \App\Support\Format::qty(20) }}</td><td class="num">{{ \App\Support\Format::qty($example['issued']) }}</td><td class="num">{{ $example['remainder'] > 0 ? '+' : '' }}{{ \App\Support\Format::qty($example['remainder']) }}</td><td>{{ $example['why'] }}</td></tr>
+                                    @endforeach
+                                </x-table>
+                                <p>On the first or last observed shift, all these ordinary issue corrections are disabled: issued stays 20 and the over stays 12. D1 has its own evidence test.</p>
+                            </section>
+                        @endif
+
+                        @foreach ($chapter['scenario_ids'] as $scenarioId)
+                            @if ($scenarios->has($scenarioId))
+                                <x-stockrecon::tutorial-scenario :scenario="$scenarios[$scenarioId]" />
+                            @endif
+                        @endforeach
 
                         @if ($chapter['event_ids'])
                             <section class="sr-related-events" aria-label="Events in this chapter">
@@ -121,8 +152,9 @@
                         @if ($chapter['id'] === 'review')
                             <div class="sr-review-prompts">
                                 <h3>Check your understanding</h3>
-                                <details class="sr-checkpoint"><summary>One shift is +5 and the next is −5. Is that enough to commit?</summary><p>No. Net zero is a useful starting point, but the chain, supporting evidence, proposed counts and any holds still need review. A green total alone does not approve a change.</p></details>
-                                <details class="sr-checkpoint"><summary>Can moving a count remove a real short?</summary><p>No. Within the same continuous chain, a count adjustment transfers variance between shifts. The net short remains unless another supported correction explains it.</p></details>
+                                <details class="sr-checkpoint"><summary>One shift is −5 and the next is +5. Can the shared count erase both?</summary><p>An ordinary continuous pair must keep both differences. Only the qualifying high opening-break pair gets the narrow count-offset exception. Net zero alone is insufficient.</p></details>
+                                <details class="sr-checkpoint"><summary>Does an issue multiple of 5 convert five units into one pack?</summary><p>No. It restricts an eligible issue correction to steps of five in the item’s existing quantity unit. An over of 12 adds 10 and leaves 2. No unit or recipe-ratio conversion is performed.</p></details>
+                                <details class="sr-checkpoint"><summary>Short 15, authorised waste 4, issue multiple 10: what remains?</summary><p>Apply waste first: short 11. If the interior shift is eligible and has enough issued stock, reduce the issue by 10. Short 1 remains; the waste is not counted twice.</p></details>
                                 <details class="sr-checkpoint"><summary>Does opening a preview change the customer's stock?</summary><p>No. Preview saves the proposed result in Agora. A permitted commit is a separate action with its own checks and confirmation.</p></details>
                             </div>
                         @endif
@@ -131,7 +163,7 @@
                             @if ($chapterIndex > 0)
                                 <a class="btn" href="{{ route('app.stockrecon.tutorial', ['lesson' => $lessons[$chapterIndex - 1]['id']]) }}" data-lesson-link="{{ $lessons[$chapterIndex - 1]['id'] }}">← Previous</a>
                             @else
-                                <span class="sr-chapter-first">Start here. No stock knowledge needed.</span>
+                                <span class="sr-chapter-first">Start with the sequence, then inspect each rule.</span>
                             @endif
                             @if ($chapterIndex < count($lessons) - 1)
                                 <a class="btn primary" href="{{ route('app.stockrecon.tutorial', ['lesson' => $lessons[$chapterIndex + 1]['id']]) }}" data-lesson-link="{{ $lessons[$chapterIndex + 1]['id'] }}">Next: {{ $lessons[$chapterIndex + 1]['title'] }} →</a>

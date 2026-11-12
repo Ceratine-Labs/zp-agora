@@ -123,6 +123,20 @@
   &.tone-crit .val,    &.tone-crit .kpi-value    { color: var(--crit-ink); }
 }
 a.kpi:hover { border-color: var(--brand); }
+.kpi:has(.kpi-art) {
+  padding-right: 88px; min-height: 112px;
+  background: linear-gradient(125deg, var(--surface) 45%, var(--brand-soft));
+  .kpi-art { position: absolute; right: 12px; top: 12px; --feature-art-size: 62px; }
+}
+button.kpi {
+  width: 100%; text-align: left; font: inherit; cursor: pointer;
+  &:hover { border-color: var(--brand); }
+  &:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+}
+.kpi-detail-hint { color: var(--brand-ink); font-size: 11px; font-weight: 600; margin-top: auto; padding-top: 6px; }
+@media (max-width: 480px) {
+  .kpi:has(.kpi-art) { padding-right: 58px; .kpi-art { right: 5px; --feature-art-size: 45px; } }
+}
 
 /* FACTS ---------------------------------------------------------------------
    The body of a detail screen: labelled properties of one record, each with
@@ -323,7 +337,7 @@ div.emptystate { padding: 44px 20px; text-align: center; }
 }
 .sg-chip {
   display: block; width: 92px; height: 46px; border-radius: var(--r);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
 }
 .sg-type {
   display: flex; flex-direction: column; gap: 4px;
@@ -389,6 +403,26 @@ div.emptystate { padding: 44px 20px; text-align: center; }
    page never scrolls sideways (feature-rules §3).
    --------------------------------------------------------------------------- */
 .table-block { display: block; }
+.tl-chooser { position: relative; display: inline-block; margin: 0 0 6px; }
+.tl-panel {
+  position: absolute; z-index: 30; left: 0; min-width: 245px; max-height: 65vh;
+  overflow: auto; padding: 12px; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 22px #0003;
+}
+.tl-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.tl-list li { display: flex; align-items: center; gap: 5px; }
+.tl-list label { flex: 1; }
+.tl-setting { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0; }
+.tl-resize { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; }
+.tl-text-compact > .table-scroll > table.dt { font-size: 12px; }
+.tl-text-large > .table-scroll > table.dt { font-size: 15px; }
+.tl-text-compact > .table-scroll > table.dt thead th { font-size: 9px; }
+.tl-text-large > .table-scroll > table.dt thead th { font-size: 12px; }
+.tl-height-compact > .table-scroll { max-height: 280px; }
+.tl-height-large > .table-scroll { max-height: 80vh; }
+@media (max-width: 720px) {
+  .tl-panel { position: fixed; left: 8px; right: 8px; bottom: 8px; max-height: 70vh; }
+}
 /* Each table measures its own first head row (stickyHead() in table-tools.js)
    and writes it on itself. A custom property inherits, so a table NESTED in
    another one — the stock recon chain panel inside a proposals row — took its
@@ -519,25 +553,57 @@ table.dt {
 }
 .table-proc { font-family: var(--font-mono); font-size: 11px; color: var(--brand-ink); }
 
-/* ---------------------------------------------------------------------------
-   The confirmation dialog's body.
+/* SweetAlert loads its stylesheet on first use. Scope the theme to notify's
+   popups so it wins that later stylesheet, including toasts in a native dialog. */
+.swal2-popup.ag-dialog, .swal2-popup.ag-toast {
+  --swal2-background: var(--surface);
+  --swal2-color: var(--ink);
+  --swal2-input-background: var(--surface-2);
+  --swal2-input-border: 1px solid var(--line);
+  --swal2-input-border-radius: var(--r);
+  --swal2-input-box-shadow: none;
+  --swal2-input-hover-box-shadow: none;
+  --swal2-input-focus-border: 1px solid var(--brand-ink);
+  --swal2-input-focus-box-shadow: none;
+  --swal2-validation-message-background: var(--crit-bg);
+  --swal2-validation-message-color: var(--crit-ink);
+  --swal2-timer-progress-bar-background: var(--brand);
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--shadow-pop); font-family: var(--font-text);
 
-   The ONLY rule this class carries, and it exists for one reason: SweetAlert's
-   `text` option sets textContent, so a paragraph break written as \n\n
-   collapses to a single space and the sentence meant to stand out runs
-   straight into the standing explanation below it. That is exactly what
-   happened to the column-filter warning — it rendered as the first clause of
-   a wall of text instead of as its own line.
+  .swal2-title {
+    color: var(--ink); font-family: var(--font-display); font-weight: 600;
+  }
+  .swal2-html-container {
+    color: var(--ink-2); font-size: 14px; line-height: 1.5;
+    // Preserve paragraph breaks in the wrapper's textContent messages.
+    white-space: pre-line;
+  }
+  .swal2-actions { gap: 8px; }
+  .swal2-confirm {
+    background: var(--brand-ink); color: var(--surface);
+    &:hover { background: var(--brand); }
+  }
+  .swal2-cancel { background: var(--surface-2); }
+  .swal2-actions button:focus-visible, .swal2-input:focus-visible {
+    outline: 2px solid var(--brand-ink); outline-offset: 3px; box-shadow: none;
+  }
+  .swal2-input::placeholder { color: var(--muted); opacity: .7; }
+  .swal2-validation-message::before { background: var(--crit-ink); color: var(--surface); }
 
-   `pre-line` keeps the newlines and still collapses runs of spaces, so every
-   existing single-line confirm text renders exactly as it did.
-
-   NOTE for whoever comes next: `ag-dialog`, `ag-dialog-title` and `ag-toast`
-   are passed to SweetAlert by notify.js and have no styles at all, so the
-   dialogs render in the library's own light skin even on a dark page. That is
-   a real gap and it is not this rule's job to close.
-   --------------------------------------------------------------------------- */
-.ag-dialog-body { white-space: pre-line; }
+  .swal2-icon {
+    &.swal2-info, &.swal2-question { color: var(--brand-ink); border-color: var(--brand-ink); }
+    &.swal2-warning { color: var(--warn-ink); border-color: var(--warn-ink); }
+    &.swal2-error { color: var(--crit-ink); border-color: var(--crit-ink); }
+    &.swal2-success { color: var(--good-ink); border-color: var(--good-ink); }
+    [class^="swal2-x-mark-line"], [class^="swal2-success-line"] { background: currentColor; }
+    .swal2-success-ring { border-color: currentColor; }
+    // SweetAlert writes these animation masks inline. Keep them on the same
+    // surface when the theme changes while a success toast is still visible.
+    [class^="swal2-success-circular-line"], .swal2-success-fix { background: var(--surface) !important; }
+  }
+}
 
 /* ---------------------------------------------------------------------------
    Table tools — the sort control, the filter row and the value panel that
@@ -1261,6 +1327,15 @@ tr.is-expandable > td.pick::before {
 tr.is-expandable.is-open > td.pick::before { content: '\25BE'; }
 tr.is-expandable > td.pick { position: relative; }
 
+/* Group-detail rows already have a caret beside the item. Reserve the first
+   cell for selection, with a generous label target that cannot open the row. */
+table.dt[data-tt-group-detail] tr.is-expandable > td.pick { padding: 0; }
+table.dt[data-tt-group-detail] tr.is-expandable > td.pick::before { content: none; }
+table.dt[data-tt-group-detail] .pick-target {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; min-height: 44px; cursor: pointer;
+}
+
 .reverse-form {
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
   input[type="text"] {
@@ -1431,6 +1506,7 @@ table.dt.fit {
   cursor: pointer;
 }
 .role-row:hover { background: var(--surface-2); }
+.role-row.is-inherited { border-left: 3px solid var(--brand); background: var(--surface-2); }
 .role-row.on { border-color: var(--brand); background: var(--brand-soft); }
 .role-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .role-primary {
@@ -1641,7 +1717,13 @@ dialog.modal {
     border-bottom: 1px solid var(--line-soft);
 }
 
-.modal-x { display: flex; }
+.modal-x {
+    display: flex;
+    .iconbtn {
+        color: var(--ink-2);
+        &:hover { background: var(--surface-3); color: var(--ink); }
+    }
+}
 
 .modal-title {
     margin: 0;
@@ -1692,7 +1774,7 @@ dialog.modal {
 }
 
 /* The half that is in force reads louder than the half that is not. */
-.compare-side.is-live { border-color: var(--line-strong); }
+.compare-side.is-live { border-color: var(--brand); }
 
 /* ---------------------------------------------------------------------------
    Menu access (customer request, 22 Sep 2026)

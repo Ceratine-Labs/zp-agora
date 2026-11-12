@@ -14,7 +14,7 @@
 
 <x-facts :columns="3">
     <x-fact label="Z read" :value="\App\Support\Format::r($one->ZRead)">
-        @if ((int) $one->Zreads === 1 && abs((float) $one->ZreadSales - (float) $one->ZRead) > 0.01)
+        @if (auth()->user()?->can('cash.discrepancy.view') && (int) $one->Zreads === 1 && abs((float) $one->ZreadSales - (float) $one->ZRead) > 0.01)
             The Z-read allocated to this till and shift says {{ \App\Support\Format::r($one->ZreadSales) }}.
         @else
             EOD {{ $one->DayEndNo ?? \App\Support\Format::NOTHING }}.
@@ -33,6 +33,7 @@
             PumpIT last stored {{ \App\Support\Format::r($one->StoredVariance) }}; a leg has moved since it was saved.
         @endif
     </x-fact>
+    @can('cash.discrepancy.view')
     <x-fact label="Z-read" :value="$one->ZreadCheck" :tone="\Modules\Cash\Services\CashupService::zreadTone($one->ZreadCheck)">
         @switch($one->ZreadCheck)
             @case('Agrees') The Z-read allocated to this till and shift is this cashup's, at this figure. @break
@@ -41,6 +42,7 @@
             @case('Other cashier') The allocated Z-read belongs to {{ $one->ZreadEmployeeCode ?? 'someone else' }} (EOD {{ $one->ZreadEodCounter ?? '—' }}), not this cashier — PumpIT's own Daily Banking grid does not list this cashup. @break
         @endswitch
     </x-fact>
+    @endcan
     <x-fact label="Cashup" :value="$one->Status" :tone="\Modules\Cash\Services\CashupService::statusTone($one->Status)">
         @switch($one->Status)
             @case('Open') Nobody has confirmed these figures. @break

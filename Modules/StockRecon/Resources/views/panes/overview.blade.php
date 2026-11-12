@@ -8,11 +8,11 @@
      */
     $toBalance = $run->lines
         ->filter(fn ($l) => $l->WouldAmend && ! $l->ChainBlocked)
-        ->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)
+        ->unique(fn ($l) => $l->continuityKey())
         ->count();
 
     $alreadyBalanced = $run->lines
-        ->groupBy(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)
+        ->groupBy(fn ($l) => $l->continuityKey())
         ->filter(fn ($chain) => ! $chain->first()->ChainBlocked
             && ! $chain->contains(fn ($l) => $l->WouldAmend)
             && $chain->contains(fn ($l) => abs((float) $l->QtyCloseNew - (float) $l->QtyClose) > 0.0005
@@ -109,7 +109,7 @@
 </x-card>
 
     <x-card title="What this run was given" collapsible flush>
-        <x-table dense :count="count($run->params()) + 4">
+        <x-table layout-key="StockRecon.panes.overview.1" dense :count="count($run->params()) + 4">
             <x-slot:head>
                 <tr><th class="l">Argument</th><th class="l">Value</th></tr>
             </x-slot:head>

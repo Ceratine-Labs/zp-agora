@@ -37,7 +37,7 @@
 /* ---------------------------------------------------------------------------
    dbo.STK_StockMaster — the other fourteen columns.
 
-   NVARCHAR lengths are the real ones: StockItemNo is NVARCHAR(5), which is why
+   NVARCHAR lengths are the real ones: StockItemNo is NVARCHAR(10), which is why
    an item number is per branch and small, and why renumbering is not available
    with 6.2 million count lines referencing it.
    --------------------------------------------------------------------------- */

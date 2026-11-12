@@ -95,6 +95,15 @@ class WeeklyStockService
         return ['sites' => $sets[0] ?? collect(), 'products' => $sets[1] ?? collect(), 'registers' => $sets[2] ?? collect(), 'patterns' => $sets[3] ?? collect()];
     }
 
+    /** @param array<int, int> $branches */
+    public function createPattern(array $branches, string $from, string $to, string $code): object
+    {
+        return $this->procedures->write('agora.usp_StockRecon_CreateWeeklyPattern', [
+            'GroupBranchId' => config('agora.group_branch_id'), 'BranchIds' => implode(',', $branches),
+            'PeriodFrom' => $from, 'PeriodTo' => $to, 'POSCode' => $code,
+        ] + self::access('create'));
+    }
+
     /** @param array<string, mixed> $input */
     public function save(int $branch, int $case, array $input, string $operation = 'save'): object
     {

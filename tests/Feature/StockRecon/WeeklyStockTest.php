@@ -202,7 +202,16 @@ class WeeklyStockTest extends TestCase
     {
         $snapshot = $this->snapshot($this->source([['A1', -10, -10]]));
         $case = $this->db()->table('agora.StockWeeklyCase')->where('SnapshotRef', $snapshot->SnapshotRef)->first();
-        $this->actingAs($this->person([]))->get(route('app.stockrecon.weekly'))->assertForbidden();
+        $user = $this->person([]);
+        // Keep unrelated access so these requests reach the weekly permission
+        // guard instead of the no-access redirect for an empty grant set.
+        $unrelated = $this->db()->table('agora.Permission')->where('Code', 'recon.runs.view')->value('Id');
+        $this->assertNotNull($unrelated);
+        $this->db()->table('agora.UserPermission')->insert(['BranchId' => 2, 'UserId' => $user->Id, 'PermissionId' => $unrelated]);
+        app(PermissionService::class)->forget($user);
+        $this->assertTrue($user->can('recon.runs.view'));
+        $this->assertFalse($user->can('stockrecon.weekly.view'));
+        $this->actingAs($user)->get(route('app.stockrecon.weekly'))->assertForbidden();
         $this->get(route('app.grids.extract', ['grid' => 'app.stockrecon.weekly']))->assertForbidden();
         $this->actingAs($this->person(['view']))->get($this->url('show', $case->Id))->assertOk()->assertDontSee('Record action');
         $this->get($this->url('edit', $case->Id))->assertForbidden();

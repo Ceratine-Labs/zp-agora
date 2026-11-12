@@ -26,13 +26,12 @@
         ['label' => 'Roles', 'value' => count($grantedRoleIds)],
         ['label' => 'Last sign-in', 'value' => $person->LastSignInAt ? \App\Support\BusinessDate::show($person->LastSignInAt) : 'Never'],
     ]" />
-    @if ($editing)<p class="field-help">Editing user · Save each section separately. Roles and direct grants combine.</p>@else<p class="field-help">Viewing user · Access below combines roles and direct grants.</p>@endif
+    @if ($editing)<p class="field-help">Editing user · Save all changes together. Roles and direct grants combine.</p>@else<p class="field-help">Viewing user · Access below combines roles and direct grants.</p>@endif
     <x-tabs chips active="none" label="User sections" :items="[
         ['key' => 'details', 'label' => 'Account details', 'href' => '#details'],
         ['key' => 'roles', 'label' => 'Roles', 'href' => '#roles'],
         ['key' => 'branches', 'label' => 'Sites', 'href' => '#branches'],
         ['key' => 'permissions', 'label' => 'Permissions', 'href' => '#permissions'],
-        ['key' => 'menu', 'label' => 'Menu access', 'href' => '#menu'],
         ['key' => 'password', 'label' => 'Password', 'href' => '#password'],
     ]" />
     @include('core::setup.users._sections')
@@ -52,7 +51,7 @@
         });
         function openUserSection() {
             const id = location.hash.slice(1);
-            if (!['details', 'roles', 'branches', 'permissions', 'menu', 'password'].includes(id)) return;
+            if (!['details', 'roles', 'branches', 'permissions', 'password'].includes(id)) return;
             const section = document.getElementById(id);
             if (section?.matches('details')) section.open = true;
             if (section) requestAnimationFrame(function () { section.scrollIntoView({ block: 'start' }); });

@@ -98,6 +98,8 @@ test.describe('ZREAD Allocation', () => {
         await page.goto(url('/app/cash/zread'));
 
         const search = page.locator('[data-grid] form.dg-scope input[name="q"]');
+        const fold = page.locator('[data-grid] .dg-scope-fold');
+        if (!(await fold.evaluate((element) => element.open))) await fold.locator('> summary').click();
         await search.fill('ARCH');
         await search.press('Enter');
         await page.waitForURL(/q=ARCH/);

@@ -7,6 +7,7 @@ use App\Grid\GridDefinition;
 use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
 use App\Support\BranchContext;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Cash → Cashups: the manager's view (T037).
@@ -60,7 +61,7 @@ class CashupGrid extends GridDefinition
 
     public function columns(): array
     {
-        return [
+        $columns = [
             new GridColumn(key: 'BranchName', label: 'Site', sort: 'BranchName', filter: 'text'),
             new GridColumn(key: 'TransactionDate', label: 'Date', format: 'date', sort: 'TransactionDate'),
             new GridColumn(key: 'ShiftDescription', label: 'Shift', sort: 'ShiftDescription'),
@@ -97,12 +98,22 @@ class CashupGrid extends GridDefinition
             new GridColumn(key: 'ClosedByName', label: 'Closed by', visible: false, filter: 'none'),
             new GridColumn(key: 'AgeDays', label: 'Age (days)', format: 'number', sort: 'AgeDays', visible: false),
         ];
+
+        // Removing the column from the catalogue also removes forged/saved
+        // filters, sorts and CSV/XLSX column requests at the shared grid boundary.
+        return Gate::allows('cash.discrepancy.view') ? $columns : array_values(array_filter(
+            $columns, fn (GridColumn $column): bool => $column->key !== 'ZreadCheck',
+        ));
     }
 
     public function source(): GridSource
     {
         $request = request();
         $show = (string) $request->query('show', 'all');
+        // Both the page and the direct export endpoint pass through this source.
+        if ($show === 'disagree') {
+            Gate::authorize('cash.discrepancy.view');
+        }
         $over = $request->query('variance_over');
         $allowed = $this->context->allowed();
 

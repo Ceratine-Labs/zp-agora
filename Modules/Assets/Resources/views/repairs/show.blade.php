@@ -102,7 +102,7 @@
             <x-empty-state title="No purchase request yet"
                            text="The cost of a repair is its approved purchase request. Attach the request number when it is raised, and the cost appears here." />
         @else
-            <x-table procedure="agora.usp_Assets_GetRepair" :count="$lines->count()" dense
+            <x-table layout-key="Assets.repairs.show.1" procedure="agora.usp_Assets_GetRepair" :count="$lines->count()" dense
                      empty="The request has no lines.">
                 <x-slot:head>
                     <tr><th class="num">Line</th><th>Description</th><th>Justification</th><th class="num">Amount</th><th>Invoice</th></tr>

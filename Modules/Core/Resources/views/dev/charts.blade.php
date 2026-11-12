@@ -244,7 +244,7 @@
             @endphp
             {{-- No `procedure`: these rows are fixtures in a controller, and
                  naming a procedure that does not exist is worse than naming none. --}}
-            <x-table :count="$variances->count() + 3">
+            <x-table layout-key="Core.dev.charts.1" :count="$variances->count() + 3">
                 <x-slot:head>
                     <tr>
                         <th>Profit centre</th>

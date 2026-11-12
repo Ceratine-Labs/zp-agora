@@ -1,6 +1,6 @@
-<x-app-shell title="Stock recon tutorial">
-    <x-page-head eyebrow="Control · stock · learning" title="Stock recon, explained"
-                 blurb="Follow the stock, understand the exceptions, then work through a run with confidence.">
+<x-app-shell title="Stock reconciliation logic">
+    <x-page-head eyebrow="Control · stock · management guide" title="Stock reconciliation logic"
+                 blurb="Follow the calculation, understand each correction, and verify the financial result.">
         <x-slot:actions>
             <a class="btn" href="{{ route('app.stockrecon.index') }}">Back to stock recon</a>
         </x-slot:actions>

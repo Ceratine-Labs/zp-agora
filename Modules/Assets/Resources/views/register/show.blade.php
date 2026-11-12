@@ -134,7 +134,7 @@
         <x-slot:info>
             <p>Newest first. A reversed movement stays, marked, with who took it back and why.</p>
         </x-slot:info>
-        <x-table procedure="agora.usp_Assets_GetAsset" :count="$movements->count()" dense
+        <x-table layout-key="Assets.register.show.1" procedure="agora.usp_Assets_GetAsset" :count="$movements->count()" dense
                  empty="Nothing has happened to this asset since it was registered.">
             <x-slot:head>
                 <tr>
@@ -171,7 +171,7 @@
         <x-slot:info>
             <p>A comeback is a second call on this asset within 30 days of the one before.</p>
         </x-slot:info>
-        <x-table procedure="agora.usp_Assets_GetAsset" :count="$repairs->count()" dense
+        <x-table layout-key="Assets.register.show.2" procedure="agora.usp_Assets_GetAsset" :count="$repairs->count()" dense
                  empty="No repair has been called in on this asset.">
             <x-slot:head>
                 <tr>
@@ -209,7 +209,7 @@
             <x-empty-state title="Not depreciated"
                            text="There is no depreciation period for group {{ $asset->AssetGroupCode }}, so there is no schedule. The periods are on Groups and types." />
         @else
-            <x-table procedure="agora.usp_Assets_Depreciate" :count="$schedule->count()" dense>
+            <x-table layout-key="Assets.register.show.3" procedure="agora.usp_Assets_Depreciate" :count="$schedule->count()" dense>
                 <x-slot:head>
                     <tr><th class="num">Month</th><th>Month end</th><th class="num">Charge</th><th class="num">Accumulated</th><th class="num">NBV</th></tr>
                 </x-slot:head>

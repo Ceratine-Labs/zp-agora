@@ -28,6 +28,7 @@
 <html lang="en" @if($theme) data-theme="{{ $theme }}" @endif>
 <head>
     <meta charset="utf-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Components · Agora</title>
     @vite(['resources/scss/app.scss', 'resources/js/app.js'])
@@ -234,7 +235,7 @@
                             'Result' => 'The issue is set to 0 when the run is committed — R700.00 not charged.',
                         ]">
                     <x-slot:actions><a class="btn-ghost btn-row" href="#c-x-case">Open the chain</a></x-slot:actions>
-                    <x-table dense :count="2">
+                    <x-table layout-key="Core.dev.styleguide.1" dense :count="2">
                         <x-slot:head>
                             <tr><th class="l">Shift</th><th class="num">Open</th><th class="num">+ Issued</th>
                                 <th class="num">− Sold</th><th class="num">= Expected</th><th class="num">Counted</th>
@@ -380,7 +381,7 @@
         <x-core::gallery-entry name="x-table">
             <div class="gal-variant">
                 <p class="eyebrow">A result set with its procedure named and its count stated</p>
-                <x-table :procedure="'agora.usp_Cash_GridDailyBanking'" :count="3" :total="41">
+                <x-table layout-key="Core.dev.styleguide.2" :procedure="'agora.usp_Cash_GridDailyBanking'" :count="3" :total="41">
                     <x-slot:head>
                         <tr><th>Site</th><th>Reference</th><th class="num">Declared</th><th class="num">Banked</th></tr>
                     </x-slot:head>
@@ -399,7 +400,7 @@
                     <code>tools</code> — click a heading to sort, and filter each column in the browser.
                     The ▾ opens the value list; a filtered column is marked on the head, not only in the box
                 </p>
-                <x-table tools id="gal-table-tools"
+                <x-table layout-key="Core.dev.styleguide.3" tools id="gal-table-tools"
                          :procedure="'agora.usp_Cash_GridDailyBanking'" :count="3">
                     <x-slot:head>
                         <tr>
@@ -427,7 +428,8 @@
                     on a heading moves that column's value list out to a strip above the table, opening
                     scoped to the value it names
                 </p>
-                <x-table tools id="gal-table-paged" data-tt-page="25"
+                <button type="button" data-tt-restore-defaults="gal-table-paged">Default filters</button>
+                <x-table layout-key="Core.dev.styleguide.4" tools id="gal-table-paged" data-tt-page="25"
                          :procedure="'agora.usp_Cash_GridDailyBanking'" :count="count($fixtures['pagedRows'])">
                     <x-slot:head>
                         <tr>
@@ -455,7 +457,7 @@
                     as their own set, ruled off from the first; each set wraps as a unit. The two filters AND
                     together. The stock recon proposals use it for the chain's total beside Outcome
                 </p>
-                <x-table tools id="gal-table-joined"
+                <x-table layout-key="Core.dev.styleguide.5" tools id="gal-table-joined"
                          :procedure="'agora.usp_Cash_GridDailyBanking'" :count="count($fixtures['pagedRows'])">
                     <x-slot:head>
                         <tr>
@@ -486,7 +488,7 @@
                     head's own box (<code>data-tt-group-check</code>) ticks its members. The stock recon proposals
                     use it for one row per chain
                 </p>
-                <x-table tools id="gal-table-grouped" data-tt-groups data-tt-group-noun="site"
+                <x-table layout-key="Core.dev.styleguide.6" tools id="gal-table-grouped" data-tt-groups data-tt-group-noun="site"
                          :procedure="'agora.usp_Cash_GridDailyBanking'" :count="count($fixtures['pagedRows'])">
                     <x-slot:head>
                         <tr>
@@ -527,7 +529,9 @@
                     show. They stay in the document as the data the filters, pills and ticks act on. The stock
                     recon proposals: a chain opens straight to its chain panel (12 Oct 2026)
                 </p>
-                <x-table tools id="gal-table-group-detail" data-tt-groups data-tt-group-detail data-row-detail
+                <button type="button" data-tt-restore-defaults="gal-table-group-detail">Default filters</button>
+                <a href="/dev/components?test-default-reload=1#gal-table-group-detail" data-tt-defaults-reload="gal-table-group-detail">Default filters with reload</a>
+                <x-table layout-key="Core.dev.styleguide.7" tools id="gal-table-group-detail" data-tt-groups data-tt-group-detail data-row-detail
                          data-tt-group-noun="site" :procedure="'agora.usp_Cash_GridDailyBanking'"
                          :count="count($fixtures['pagedRows'])">
                     <x-slot:head>
@@ -539,7 +543,7 @@
                     </x-slot:head>
                     @foreach (collect($fixtures['pagedRows'])->groupBy('site') as $site => $group)
                         <tr class="tt-group" data-tt-group-head="{{ $site }}" data-detail-template="gal-gd-{{ $loop->index }}">
-                            <td class="pick"><input type="checkbox" data-tt-group-check aria-label="Every row of {{ $site }}"></td>
+                            <td class="pick"><label class="pick-target"><input type="checkbox" data-tt-group-check aria-label="Every row of {{ $site }}"></label></td>
                             <td data-sort="{{ $group->count() }}">
                                 <span class="chain-bar" aria-hidden="true">@foreach ($group as $row)<i class="tone-{{ ['Balanced' => 'good', 'Short' => 'warn', 'Blocked' => 'serious', 'Unrecorded issue' => 'crit'][$row['state']] }}"></i>@endforeach</span>
                             </td>
@@ -566,7 +570,7 @@
             </div>
             <div class="gal-variant">
                 <p class="eyebrow">Empty — a designed answer, not a gap</p>
-                <x-table :count="0" empty="The procedure ran and found nothing in this period. That is an answer, not a failure." />
+                <x-table layout-key="Core.dev.styleguide.8" :count="0" empty="The procedure ran and found nothing in this period. That is an answer, not a failure." />
             </div>
         </x-core::gallery-entry>
 

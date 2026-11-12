@@ -208,7 +208,7 @@ return [
             // A number input's step defaults to 1, which makes 1.0 the only
             // legal value between 0.01 and 1.0 and 0.5 a refusal the browser
             // reports as "an invalid form control is not focusable".
-            'step' => 0.01,
+            'step' => 0.0001,
         ],
 
         'MaxAmendment' => [
@@ -216,9 +216,10 @@ return [
             'help' => 'The same cap in absolute terms, for items where a share of a small holding is still '
                 .'an implausible number of units.',
             'default' => 9999,
-            'type' => 'int',
+            'type' => 'decimal',
             'min' => 1,
             'max' => 999999,
+            'step' => 0.0001,
         ],
 
         'MinShiftsInChain' => [
@@ -243,23 +244,23 @@ return [
             'help' => 'Units. An opening that misses the previous closing by this much or less is repaired '
                 .'and reported, but does not split the chain. 0 splits at every break.',
             'default' => 3,
-            'type' => 'int',
+            'type' => 'decimal',
             'min' => 0,
             'max' => 99,
+            'step' => 0.0001,
         ],
 
         /*
-        | Rule 10 of the client's pack: a site is analysed only up to its last
-        | complete recon day — every shift in on 95% of its lines, closings in,
-        | POS posted. Later days are held back and counted on the run, because
-        | balancing them would pin "the latest count" on one nobody has taken.
+        | An optional completeness check can hold back days with missing
+        | shifts, closings or POS. Leave it off by default so the preview
+        | includes the site's available records across the requested period.
         */
         'HoldBackIncomplete' => [
             'label' => 'Hold back days the recon has not finished',
-            'help' => 'On, a day with a shift missing, closings not captured or POS not posted — and every '
-                .'day after it — is left out of the run and counted on it, as the client\'s weekly pack does. '
-                .'Turn it off only to look at an unfinished week on purpose.',
-            'default' => 1,
+            'help' => 'When enabled, a day with a shift missing, closings not captured or POS not posted — and every '
+                .'day after it — is left out of the run and counted on it. With this off, review unfinished '
+                .'counts and POS data before amending.',
+            'default' => 0,
             'type' => 'bool',
         ],
 

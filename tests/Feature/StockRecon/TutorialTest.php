@@ -61,7 +61,18 @@ class TutorialTest extends TestCase
         $this->app->instance(ShellComposer::class, $shell);
 
         $html = $this->tutorial(['lesson' => 'balancing'])->render();
-        $this->assertStringContainsString('Stock recon, explained', $html);
+        $this->assertStringContainsString('Stock reconciliation logic', $html);
+        $this->assertStringContainsString('Repaired opening basis', $html);
+        $this->assertStringContainsString('After authorised waste', $html);
+        $this->assertStringContainsString('Net zero · differences remain', $html);
+        $this->assertStringContainsString('Two continuous periods · no combined result', $html);
+        $this->assertStringContainsString('Same item quantities. Different issue multiple.', $html);
+        $this->assertStringContainsString('Search this guide', $html);
+        $this->assertStringContainsString('Follow an item through the chain', $html);
+        $this->assertStringContainsString('Writes are skipped or refused', $html);
+        $this->assertSame(18, substr_count($html, 'data-tutorial-lesson='));
+        $this->assertSame(8, substr_count($html, 'data-flow-case='));
+        $this->assertSame(2, substr_count($html, 'data-flow-outcome="held"'));
         foreach ((new StockReconTutorialContent)->all()['lessons'] as $lesson) {
             $this->assertStringContainsString(e($lesson['title']), $html);
         }

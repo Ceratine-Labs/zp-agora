@@ -28,6 +28,7 @@
     <div class="operations-wall__progress" aria-hidden="true"><span data-wall-progress></span></div>
 
     <div class="operations-wall__stage" data-wall-stage aria-busy="true">
+        <div class="operations-wall__stage-head">
         <div class="operations-wall__heading">
             <div>
                 <span class="operations-wall__eyebrow" data-wall-date>Today's operations</span>
@@ -40,6 +41,7 @@
             </div>
         </div>
         <div class="operations-wall__metrics" data-wall-metrics></div>
+        </div>
         <div class="operations-wall__list-head">
             <div><h3 data-wall-list-title>Attention first</h3><span data-wall-count>Loading…</span></div>
             <div>

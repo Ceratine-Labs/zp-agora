@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property int $LineNo
  * @property int $AreaNo
  * @property string $StockItemNo
+ * @property int|null $ContinuitySegment
  * @property Carbon $TransactionDate
  * @property int $ShiftNo
  * @property string|null $SellPrice
@@ -81,10 +82,28 @@ use Illuminate\Support\Carbon;
  * @property bool $CountsMove
  * @property bool $DupHold
  * @property int|null $DupReleaseId
+ * @property int|null $WasteAuthorizationId
+ * @property string|null $AuthorizedGoodWaste
+ * @property bool|null $WasteSourceAuthorised
+ * @property string|null $WasteSourceAuthorisedAt
+ * @property string|null $WasteSourceAuthorisedBy
+ * @property string|null $AppliedGoodWaste
+ * @property int|null $BalancingProfileId
+ * @property string|null $BalancingProfileName
+ * @property int|null $BalancingProfileRevision
+ * @property string|null $ProfileMaxAmendment
+ * @property string|null $ProfileMaxAmendmentPct
+ * @property int|null $ProfileMinShifts
+ * @property string|null $ProfileKeepBreaksUpTo
  * @property-read StockReconRun $run
  */
 class StockReconRunLine extends BaseModel
 {
+    public function continuityKey(): string
+    {
+        return $this->AreaNo.'|'.$this->StockItemNo.'|'.($this->ContinuitySegment ?? 'legacy');
+    }
+
     /**
      * READS COME FROM THE VIEW, and that is the fix for what Ryan saw on
      * 9 September 2026: a proposals row reading `10` over `area 1` while the
@@ -104,7 +123,7 @@ class StockReconRunLine extends BaseModel
      * agora.StockReconRunLine directly and says so. Everything else that
      * writes a line is a procedure.
      */
-    protected $table = 'vw_StockReconRunLine';
+    protected $table = 'vw_StockReconRunLineWithWaste';
 
     /**
      * Integers come back from sqlsrv as strings; quantities deliberately do not.
@@ -117,6 +136,7 @@ class StockReconRunLine extends BaseModel
         'RunId' => 'integer',
         'LineNo' => 'integer',
         'AreaNo' => 'integer',
+        'ContinuitySegment' => 'integer',
         'ShiftNo' => 'integer',
         'ActiveSeq' => 'integer',
         'ActiveLen' => 'integer',
@@ -164,6 +184,7 @@ class StockReconRunLine extends BaseModel
     public function outcomeKey(): string
     {
         return match (true) {
+            str_starts_with((string) $this->Outcome, 'Missing shift:') => 'blocked',
             /*
              * A duplicate issue has its own state, ahead of everything else.
              * A clear one (D1) the commit takes out is 'duplicate': with the
@@ -175,6 +196,7 @@ class StockReconRunLine extends BaseModel
              * 'possible' whatever it holds back, released or not.
              */
             $this->removesDuplicate() => 'duplicate',
+            $this->reducesIssue() => 'reduced',
             // An over balanced by capturing its missing issue (13 Oct 2026):
             // the issue goes up by the over and the shift reads nil.
             $this->capturesIssue() => 'captured',
@@ -193,6 +215,8 @@ class StockReconRunLine extends BaseModel
             // is reversed, the chain is still not balanced.
             $this->RestoresHand && $this->WouldAmend => 'restored',
             $this->ChainBlocked => 'blocked',
+            (float) $this->AppliedGoodWaste > 0.0005 && (float) $this->QtyVarNew < -0.005 => 'short',
+            (float) $this->AppliedGoodWaste > 0.0005 => 'balanced',
             $this->WouldAmend && (float) $this->QtyVarNew < -0.005 => 'short',
             $this->WouldAmend => 'balanced',
             (float) $this->QtyVarNew < -0.005 => 'short',
@@ -249,11 +273,16 @@ class StockReconRunLine extends BaseModel
     /** The chip tone for that outcome. */
     public function tone(): string
     {
+        if (str_starts_with((string) $this->Outcome, 'Missing shift:')) {
+            return 'crit';
+        }
+
         return match ($this->outcomeKey()) {
             'balanced' => 'good',
             // The tones config('stockrecon.exceptions') gives D1 and D2.
             'duplicate' => 'good',
             'captured' => 'good',
+            'reduced' => 'good',
             'possible' => 'serious',
             'short' => 'warn',
             'unrecorded' => 'crit',
@@ -321,7 +350,14 @@ class StockReconRunLine extends BaseModel
      */
     public function capturesIssue(): bool
     {
-        return $this->QtyIssuedNew !== null && ! $this->removesDuplicate();
+        return $this->QtyIssuedNew !== null && ! $this->removesDuplicate()
+            && (float) $this->QtyIssuedNew > (float) $this->QtyIssued;
+    }
+
+    public function reducesIssue(): bool
+    {
+        return $this->QtyIssuedNew !== null && ! $this->removesDuplicate()
+            && (float) $this->QtyIssuedNew < (float) $this->QtyIssued;
     }
 
     public function isCommitted(): bool
@@ -402,7 +438,9 @@ class StockReconRunLine extends BaseModel
     {
         // Not a row the commit would write: a nil chain balances since
         // 7 Oct 2026, and an opening it repairs is not "no movement".
-        return (bool) $this->FlagShortChain
+        return ! str_starts_with((string) $this->Outcome, 'Missing shift:')
+            && (float) $this->AppliedGoodWaste <= 0.0005
+            && (bool) $this->FlagShortChain
             && abs((float) $this->ChainNetVar) < 0.0005
             && ! $this->WouldAmend;
     }

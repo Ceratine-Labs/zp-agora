@@ -84,7 +84,7 @@
 
         <x-card title="Original, live at preview and proposed counts" flush>
             <p>Original is the saved original count pair, where this run captured it. Live at preview is what PumpIT held when the preview was made. Proposed is the calculated balancing answer{{ $run->CommitKind === 'reset' ? ', not the reset writes' : ', whether committed or not' }}. A dash means a value was not recorded.</p>
-            <x-table :count="$shifts->count()" fit>
+            <x-table layout-key="StockRecon.helper.1" :count="$shifts->count()" fit>
                 <x-slot:head><tr><th>Date / shift</th><th class="num">Original open</th><th class="num">Original close</th><th class="num">Live open at preview</th><th class="num">Live close at preview</th><th class="num">Proposed open</th><th class="num">Proposed close</th></tr></x-slot:head>
                 @foreach ($shifts as $shift)
                     @php($saved = $savedLines->get($shift->Id))
@@ -98,7 +98,7 @@
 
         <x-card title="Recorded result and the next evidence to check" flush>
             <p>The issue and POS basis are the quantities this run used, including its explicit issue-correction rules. Variances below come from the saved calculation. Quantities alone do not authorise a charge.</p>
-            <x-table :count="$shifts->count()" fit>
+            <x-table layout-key="StockRecon.helper.2" :count="$shifts->count()" fit>
                 <x-slot:head><tr><th>Date / shift</th><th class="num">Basis issue</th><th class="num">Proposed issue</th><th class="num">POS</th><th class="num">Variance before</th><th class="num">Variance proposed</th><th>Saved finding / result</th></tr></x-slot:head>
                 @foreach ($shifts as $shift)
                     @php($saved = $savedLines->get($shift->Id))

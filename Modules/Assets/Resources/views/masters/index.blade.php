@@ -63,7 +63,7 @@
 
     @if ($tab === 'groups')
         <x-card flush>
-            <x-table procedure="agora.usp_Assets_Masters" :count="$counts['groups']" tools dense>
+            <x-table layout-key="Assets.masters.index.1" procedure="agora.usp_Assets_Masters" :count="$counts['groups']" tools dense>
                 <x-slot:head>
                     <tr>
                         <th>Group</th>
@@ -94,7 +94,7 @@
         </x-card>
     @elseif ($tab === 'types')
         <x-card flush>
-            <x-table procedure="agora.usp_Assets_Masters" :count="$counts['types']" tools dense data-tt-page="50">
+            <x-table layout-key="Assets.masters.index.2" procedure="agora.usp_Assets_Masters" :count="$counts['types']" tools dense data-tt-page="50">
                 <x-slot:head>
                     <tr><th>Group</th><th>Type</th><th>Description</th><th class="num">Assets</th></tr>
                 </x-slot:head>
@@ -110,7 +110,7 @@
         </x-card>
     @elseif ($tab === 'owners')
         <x-card flush>
-            <x-table procedure="agora.usp_Assets_Masters" :count="$counts['owners']" tools dense>
+            <x-table layout-key="Assets.masters.index.3" procedure="agora.usp_Assets_Masters" :count="$counts['owners']" tools dense>
                 <x-slot:head>
                     <tr><th>Owner</th><th class="num">Assets</th></tr>
                 </x-slot:head>
@@ -124,7 +124,7 @@
         </x-card>
     @else
         <x-card flush>
-            <x-table procedure="agora.usp_Assets_Masters" :count="$counts['movements']" dense>
+            <x-table layout-key="Assets.masters.index.4" procedure="agora.usp_Assets_Masters" :count="$counts['movements']" dense>
                 <x-slot:head>
                     <tr><th>Code</th><th>Movement</th><th>What it does</th><th>From</th></tr>
                 </x-slot:head>

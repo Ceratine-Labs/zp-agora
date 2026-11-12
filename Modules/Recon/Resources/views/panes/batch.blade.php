@@ -30,7 +30,7 @@
     <h2>Batch {{ $batch->BatchNo }} · {{ $branches->firstWhere('BranchId', $branchId)?->Name ?? 'Site '.$branchId }}</h2>
     <p>Run <a href="{{ route('app.recon.run', $batch->RunId) }}">#{{ $batch->RunId }}</a> · {{ $batch->State }} · {{ $batch->StampMode }}.
        {{ $batch->BankLineCount }} bank lines ({{ Format::r($batch->BankTotal) }}), {{ $batch->MopsRowCount }} deposit rows ({{ Format::r($batch->MopsTotal) }}).</p>
-    <x-table procedure="agora.usp_Recon_GetBatch" :count="$lines->count()">
+    <x-table layout-key="Recon.panes.batch.1" procedure="agora.usp_Recon_GetBatch" :count="$lines->count()">
         <x-slot:head><tr><th>Side</th><th>Reference / ID</th><th>Date</th><th>Recorded amount</th><th>Amount change to undo</th></tr></x-slot:head>
         @foreach ($lines as $line)
             <tr><td>{{ $line->Side }}</td><td>{{ $line->SourceKey ?? $line->SourceId }}@if ($line->SourceKey && $line->SourceId) · #{{ $line->SourceId }}@endif</td><td>{{ $line->SourceDate }}</td>

@@ -48,7 +48,7 @@
     @endif
 
     <form method="GET" action="{{ route('app.cash.zread.confirm') }}">
-        <x-params collapsible :open="! $scope->isChosen()" remember="cash-zread-confirm" summary="Site and days">
+        <x-params collapsible :open="false" :remember="'cash-zread-confirm:'.auth()->id()" summary="Site and days">
             @unless ($pinned)
                 <x-param name="branch_id" label="Site"
                          :choices="['' => 'Choose a site'] + $branches->pluck('Name', 'BranchId')->all()"

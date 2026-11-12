@@ -26,6 +26,150 @@ which site you are editing before you reload nginx.
 
 ---
 
+## Laravel scheduler — enabled 8 November 2026
+
+Read-only verification on **8 November 2026** found `cron.service` active,
+but no Agora entry in system or user crontabs and no matching systemd unit.
+The existing `www-data` minute scheduler runs `/var/www/zp-nql`; it belongs
+to that application and must remain unchanged. Agora's nginx vhost uses the
+PHP 8.3 FPM pool running as `www-data`, and its storage is owned by that user.
+Ryan subsequently authorized installation and one immediate count-event
+verification in decision `01a1bb92-c942-708e-9c88-d518150900f7`.
+
+The dedicated `/etc/cron.d/agora` (root-owned, mode `0644`) was installed
+on 8 November 2026; installation began at **14:33:28 UTC / 16:33:28 SAST**:
+
+```cron
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+* * * * * www-data cd /var/www/agora && /usr/bin/php8.3 artisan schedule:run --no-interaction >> /var/www/agora/storage/logs/scheduler.log 2>&1
+```
+
+The reviewed console route, cron and logrotate configuration were the only
+three installed files. Their hashes, ownership and modes were verified;
+all 13 pre-existing cron-file hashes, including ZP-NQL's, were unchanged.
+Do not add a second entry to a user crontab or alter ZP-NQL's entry. The
+runner wakes every minute; the declared work is:
+
+- **Hourly:** `agora:refresh-count-stats --if-stale` compares the newest source
+  count-line creation time with the rollup watermark. If stale, it reads the
+  source count lines and replaces Agora's own `agora.StockItemCountStat`
+  rollup. It does not write the customer's source tables.
+- **Monthly, day 1 at 06:00 Africa/Johannesburg:**
+  `debtors:send-statements` reads the due-account list. Live configuration
+  was verified as `debtors.send_mode=off`, so it sends no mail. Enabling
+  customer sending remains a separate customer go-live decision.
+
+Both commands use `withoutOverlapping()` with a 1,440-minute expiry and the
+live file cache in `storage/framework/cache/data`. The count job runs in the
+background. A scheduler runner's successful exit therefore does not prove
+that the count job completed. `routes/console.php` appends command output to
+`storage/logs/scheduler-count-stats.log` and `scheduler-debtors.log`; its
+completion callbacks use a dedicated single-file logger at explicit `info`
+level to append timestamped success or failure records to those same event
+logs. Global application logging remains `stack` → `single` at level
+`warning`; its threshold was not changed.
+
+The initial installation sent completion callbacks to the global logger,
+which filtered its INFO success record. The real count event still succeeded,
+as verified below. The narrowly scoped console-route repair was installed at
+**14:46:01 UTC / 16:46:01 SAST** on 8 November; its exact hash and
+`www-data:www-data`, `0644` ownership/mode were verified. No event was forced
+for the repair and no success record was added retrospectively.
+
+Create only missing scheduler logs as `www-data:www-data`, mode `0640`;
+never truncate an existing log. Rotate the three scheduler logs with a
+dedicated `/etc/logrotate.d/agora-scheduler`:
+
+```text
+/var/www/agora/storage/logs/scheduler.log /var/www/agora/storage/logs/scheduler-count-stats.log /var/www/agora/storage/logs/scheduler-debtors.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    su www-data www-data
+    create 0640 www-data www-data
+}
+```
+
+Before installation, save the existing console route with its owner, mode
+and hash, record that the two new configuration paths are absent, and retain
+hashes of all existing cron files. Validate log rotation with `logrotate -d`
+(no rotation), PHP syntax, and read-only schedule inspection. Afterward,
+verify the existing cron hashes are unchanged and observe a real minute tick
+in the cron journal and runner log.
+
+The authorized immediate verification used one invocation of the **count
+event only** (a repeat is real scheduled work and needs authorization):
+
+```bash
+cd /var/www/agora
+sudo -u www-data /usr/bin/php8.3 artisan schedule:test \
+  --name='agora:refresh-count-stats --if-stale' --no-interaction
+```
+
+This is real work, despite the command's name: Laravel runs the selected
+scheduled event in the foreground, retaining its overlap lock and callbacks.
+It can read the full count source and rebuild the Agora rollup once. It does
+not run the debtor event. Verify retained command output and a fresh rollup
+watermark; do not treat `schedule:test`'s exit alone as proof. That initial
+invocation preceded the logging repair, so its filtered INFO callback is
+not claimed as an emitted completion record.
+Record this as an operator-invoked scheduled event, separately from evidence
+of a natural hourly cron run. No current execution-time estimate is assumed.
+
+At the read-only check, all **7,094** rollup rows had `RefreshedAt` of
+**2026-09-21 04:56:09**, while the newest source creation time was
+**2026-11-08 13:01:32.913** (both SQL server local timestamps). The rollup
+was stale. There was no last successful scheduled run to report: the scanned
+cron journal window, 4 November 12:59 through 8 November 13:17 SAST, had no
+Agora entries and no scheduler logs existed. Do not describe the rollup
+timestamp as evidence of a scheduled execution.
+
+After installation, the operator-invoked count event returned successfully.
+Its retained output reported **7,095 rows**, `RefreshedAt` **2026-11-08
+16:40:48** (SQL server local time), and **4,659 ms**. Read-only verification
+found all 7,095 rollup rows at that watermark, ahead of the newest source
+creation time, **15:31:55.777** on the same date; the command's stale check
+returned false. These SQL timestamps use the database clock, which is ahead
+of the application clock; the separate clock discrepancy was reported without
+changing either clock.
+
+The first observed natural minute tick was **16:34:01 SAST / 14:34:01 UTC**
+as `www-data`; `scheduler.log` recorded that no scheduled commands were due.
+This proves the cron launcher runs. The successful count refresh above was
+the explicitly invoked scheduled event, not a natural hourly execution.
+On the natural **17:00:01 SAST / 15:00:01 UTC** tick, cron launched the hourly
+count event. It completed successfully at **17:00:03 SAST / 15:00:03 UTC**,
+recording `Scheduler command succeeded.` at INFO in `scheduler-count-stats.log`.
+The event correctly skipped a rebuild because no count lines had arrived
+since the earlier 7,095-row refresh. This verifies both the natural hourly
+execution and the repaired completion logger; it is separate from the
+operator-invoked refresh above. The read-only post-run check found all three
+installed file hashes and all 13 existing cron files unchanged, with no new
+application or event errors. The debtor log remained empty and sending
+remained off. Exact logrotate debug validation parsed the staged regular
+configuration file before install;
+passing it through `/dev/stdin` is unsupported and is not a valid substitute.
+
+The logging repair has a separate backup at
+`/var/backups/agora-scheduler-logging-repair-20261108`. To undo the entire
+scheduler installation, first restore that repair's saved console route;
+then use the original backup at `/var/backups/agora-scheduler-20261108`.
+The original rollback validates its recorded ownership, hashes and state,
+disables only `/etc/cron.d/agora`, restores the pre-install console route,
+and removes only the newly installed scheduler rotation configuration.
+It records progress before removing cron, so an interrupted rollback can
+resume without treating an unexplained missing configuration as its own work.
+Retain all logs. Removing cron prevents future starts; let an already-running
+count refresh finish rather than interrupt its transaction. A completed
+derived-data refresh is retained; rollback does not rewrite source data or
+restore the stale rollup. Verify ZP-NQL's crontab is still byte-identical.
+
+---
+
 ## ⚠️ The one thing that will break Agora if you copy the neighbour
 
 `zp-db.ceratine.com`'s vhost contains:
@@ -70,8 +214,9 @@ rm -rf public/build public/hot
 npm run build
 
 # 2. Ship it. Every exclusion below is load-bearing, and so is --no-owner
-#    --no-group — see "the ownership window" below — and so are the three
-#    --filter rules — see "old asset chunks" and "tests/ is hidden" below.
+#    --no-group — see "the ownership window" below — and so are the four
+#    --filter rules — see "old asset chunks", "tests/ is hidden" and
+#    "root browser diagnostic" below.
 rsync -az --no-owner --no-group --delete \
   --exclude '.git' --exclude 'node_modules' --exclude 'vendor' \
   --exclude '.env' --exclude '.env.*' --exclude 'public/hot' \
@@ -85,6 +230,7 @@ rsync -az --no-owner --no-group --delete \
   --exclude 'bootstrap/cache/*' \
   --filter 'P /public/build/assets/*' \
   --filter 'H /tests/' --filter 'H /playwright-report/' \
+  --filter 'H /probe.mjs' \
   ./ root@agora.ceratine.com:/var/www/agora/
 
 # 3. On the server.
@@ -219,6 +365,13 @@ shields the SERVER's copy from `--delete` — the `user.json` earlier deploys le
 there would stay forever. Hide stops the files being sent and lets `--delete`
 remove the copy already on the box, so **the first deploy after this change
 deletes `/var/www/agora/tests` from the server.** That is intended.
+
+## Root browser diagnostic — `H /probe.mjs`
+
+The root `probe.mjs` is a local browser diagnostic, so the deploy hides it.
+The leading slash limits this rule to the repository root. Like the test
+directory rules, `H` prevents uploading the file and lets `--delete` remove
+any previously shipped copy during the next authorized deployment.
 
 ---
 

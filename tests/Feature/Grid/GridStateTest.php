@@ -126,6 +126,7 @@ class GridStateTest extends TestCase
                 'hidden' => ['SortOrder'],
                 'widths' => ['Name' => 5000, 'BranchId' => 120],
                 'text_size' => 'large',
+                'table_height' => 'compact',
                 'evil' => 'payload',
             ],
         );
@@ -137,6 +138,7 @@ class GridStateTest extends TestCase
         $this->assertArrayNotHasKey('evil', $state);
         $this->assertSame(['BranchId' => 120], $state['widths'], '5000px is out of bounds and does not survive');
         $this->assertSame('large', $state['text_size']);
+        $this->assertSame('compact', $state['table_height']);
     }
 
     public function test_the_endpoint_refuses_a_grid_key_nothing_claims(): void

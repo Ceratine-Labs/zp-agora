@@ -120,6 +120,33 @@ class UserBulkAccessTest extends TestCase
         }
     }
 
+    public function test_replacing_roles_updates_each_selected_user_and_keeps_direct_grants(): void
+    {
+        $first = $this->person();
+        $second = $this->person();
+        $existing = $this->role('setup.users.view');
+        $replacement = $this->role('setup.roles.view');
+        $other = $this->role('setup.roles.edit');
+        $roles = app(RoleAccessService::class);
+        $roles->assign($first, [$existing->Id]);
+        $roles->assign($second, [$existing->Id]);
+        $direct = $this->permission('setup.users.edit');
+        UserPermission::query()->acrossBranches()->create([
+            'BranchId' => config('agora.group_branch_id'), 'UserId' => $first->Id, 'PermissionId' => $direct,
+        ]);
+        $this->actingAs($this->person('admin'));
+        $this->get(route('app.setup.users.index'))->assertOk()->assertSee('replace_roles')->assertSee('Replacement roles');
+        $this->post(route('app.setup.users.bulk.update'), [
+            'items' => [$first->Id, $second->Id], 'action' => 'replace_roles', 'roles' => [$replacement->Id, $other->Id],
+        ])->assertSessionHasNoErrors();
+        foreach ([$first, $second] as $person) {
+            $this->assertEqualsCanonicalizing([$replacement->Id, $other->Id], $roles->roleIdsFor($person));
+            $this->assertFalse(app(PermissionService::class)->userHas($person, 'setup.users.view'));
+            $this->assertTrue(app(PermissionService::class)->userHas($person, 'setup.roles.view'));
+        }
+        $this->assertTrue(app(PermissionService::class)->userHas($first, 'setup.users.edit'));
+    }
+
     public function test_activation_and_unlock_change_only_the_requested_account_flag(): void
     {
         $first = $this->person();
@@ -161,6 +188,7 @@ class UserBulkAccessTest extends TestCase
             ['items' => range(1, 201)],
             ['items' => [$subject->Id], 'action' => 'remove_roles'],
             ['items' => [$subject->Id], 'action' => 'add_roles'],
+            ['items' => [$subject->Id], 'action' => 'replace_roles'],
         ];
         foreach ($invalid as $payload) {
             $this->post(route('app.setup.users.bulk.update'), $payload + ['action' => 'deactivate'])

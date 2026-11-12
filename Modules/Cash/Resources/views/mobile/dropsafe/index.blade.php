@@ -39,7 +39,7 @@
     @include('cash::dropsafe.partials.outcome')
 
     <form method="GET" action="{{ route('app.cash.dropsafe.phone') }}">
-        <x-params collapsible :open="! $scope->isChosen()" remember="cash-dropsafe-phone" summary="Site">
+        <x-params collapsible :open="false" :remember="'cash-dropsafe-phone:'.auth()->id()" summary="Site">
             @unless ($pinned)
                 <x-param name="branch_id" label="Site"
                          :choices="['' => 'Choose a site'] + $branches->pluck('Name', 'BranchId')->all()"

@@ -3,7 +3,7 @@ CREATE OR ALTER PROCEDURE agora.usp_StockRecon_GetWeeklyCase
 AS
 BEGIN
     SET NOCOUNT ON;
-    EXEC agora.usp_StockRecon_AuthorizeWeekly @BranchId,@UserId,@Authorized,@Workspace,@BranchPin;
+    EXEC agora.usp_StockRecon_AuthorizeWeeklyCase @BranchId,@CaseId,@UserId,@Authorized,@Workspace,@BranchPin;
     DECLARE @SourceJson nvarchar(max),@POSCode nvarchar(80),@SourceSystem nvarchar(20),@AreaNo int,@StockItemNo nvarchar(10);
     SELECT @SourceJson=s.SourceJson,@POSCode=c.POSCode,@SourceSystem=c.SourceSystem,@AreaNo=c.AreaNo,@StockItemNo=c.StockItemNo
     FROM agora.StockWeeklyCase c JOIN agora.StockWeeklySnapshot s ON s.BranchId=c.BranchId AND s.SnapshotRef=c.SnapshotRef
@@ -29,7 +29,13 @@ BEGIN
     SELECT h.*,u.UserName AS ActorName FROM agora.StockWeeklyCaseChange h LEFT JOIN agora.[User] u ON u.Id=h.CreatedBy
     WHERE h.BranchId=@BranchId AND h.CaseId=@CaseId ORDER BY h.Id DESC;
     SELECT u.Id,u.UserName FROM agora.[User] u WHERE u.IsActive=1 AND u.IsLocked=0 AND u.DeletedAt IS NULL
-      AND (u.HomeBranchId IS NULL OR u.HomeBranchId=@BranchId)
-      AND (NOT EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id) OR EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id AND BranchId=@BranchId))
+      AND ((NOT EXISTS(SELECT 1 FROM agora.StockWeeklyCase WHERE BranchId=@BranchId AND Id=@CaseId AND RegisterName='Cross-Site Patterns')
+        AND (u.HomeBranchId IS NULL OR u.HomeBranchId=@BranchId)
+        AND (NOT EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id) OR EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id AND BranchId=@BranchId)))
+      OR (EXISTS(SELECT 1 FROM agora.StockWeeklyCase WHERE BranchId=@BranchId AND Id=@CaseId AND RegisterName='Cross-Site Patterns')
+        AND u.HomeBranchId IS NULL AND u.Workspace='ho'
+        AND NOT EXISTS(SELECT 1 FROM agora.StockWeeklyCase c CROSS APPLY OPENJSON(c.EvidenceJson,'$.RelatedCases') WITH(BranchId int) r
+          WHERE c.BranchId=@BranchId AND c.Id=@CaseId AND EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id)
+          AND NOT EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=u.Id AND BranchId=r.BranchId))))
     ORDER BY u.UserName;
 END

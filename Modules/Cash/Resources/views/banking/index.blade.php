@@ -79,7 +79,7 @@
         </x-notice>
     @endif
 
-    <x-card title="Which day">
+    <x-card title="Which day" collapsible :remember="'cash.banking.scope:'.auth()->id()">
         <form method="GET" action="{{ route('app.cash.banking') }}">
             <x-params legend="Scope">
                 @if ($pinned)
@@ -120,12 +120,14 @@
                  'tone' => $summary['beyond'] > 0 ? 'crit' : 'good'],
                 ['label' => 'To confirm', 'value' => \App\Support\Format::n($summary['toConfirm']),
                  'note' => $summary['toClose'].' waiting on a manager', 'tone' => $summary['toConfirm'] > 0 ? 'warn' : 'good'],
-                ['label' => 'Z-read disagrees', 'value' => \App\Support\Format::n($summary['disagree']),
-                 'tone' => $summary['disagree'] > 0 ? 'serious' : 'good'],
+                ...(array_key_exists('disagree', $summary) ? [
+                    ['label' => 'Z-read disagrees', 'value' => \App\Support\Format::n($summary['disagree']),
+                     'tone' => $summary['disagree'] > 0 ? 'serious' : 'good'],
+                ] : []),
                 ['label' => 'Pump shortages', 'value' => \App\Support\Format::r($summary['shorts'])],
             ]" />
 
-            <x-table :count="$cashups->count()" procedure="agora.usp_Cash_GetCashup" dense
+            <x-table layout-key="Cash.banking.index.1" :count="$cashups->count()" procedure="agora.usp_Cash_GetCashup" dense
                      empty="PumpIT holds no cashups for this site on this day.">
                 <x-slot:head>
                     <tr>
@@ -135,7 +137,7 @@
                         <th class="num">Z read</th>
                         <th class="num">Actual total</th>
                         <th class="num">Variance</th>
-                        <th>Z-read</th>
+                        @can('cash.discrepancy.view')<th>Z-read</th>@endcan
                         <th>Cashup</th>
                     </tr>
                 </x-slot:head>
@@ -148,7 +150,9 @@
                         <td class="num">{{ \App\Support\Format::r($c->ZRead) }}</td>
                         <td class="num">{{ \App\Support\Format::r($c->ActualTotal) }}</td>
                         <td class="num"><x-chip :tone="$service->varianceTone($c->Variance, $scope->branchId)" :dot="false">{{ \App\Support\Format::r($c->Variance) }}</x-chip></td>
-                        <td><x-chip :tone="\Modules\Cash\Services\CashupService::zreadTone($c->ZreadCheck)">{{ $c->ZreadCheck }}</x-chip></td>
+                        @can('cash.discrepancy.view')
+                            <td><x-chip :tone="\Modules\Cash\Services\CashupService::zreadTone($c->ZreadCheck)">{{ $c->ZreadCheck }}</x-chip></td>
+                        @endcan
                         <td><x-chip :tone="\Modules\Cash\Services\CashupService::statusTone($c->Status)">{{ $c->Status }}</x-chip></td>
                     </tr>
                 @endforeach
@@ -163,7 +167,7 @@
                            <a href="{{ route('app.cash.zread', ['branch_id' => $scope->branchId, 'date_from' => $scope->date, 'date_to' => $scope->date]) }}">allocate {{ $unallocated->count() === 1 ? 'it' : 'them' }}</a> first.</p>
                     </x-notice>
                 @endif
-                <x-table :count="$notCaptured->count()" procedure="agora.usp_Cash_GetCashup" dense
+                <x-table layout-key="Cash.banking.index.2" :count="$notCaptured->count()" procedure="agora.usp_Cash_GetCashup" dense
                          empty="Every allocated Z-read that day has a cashup.">
                     <x-slot:head>
                         <tr>
@@ -240,7 +244,7 @@
 
             @if ($events->isNotEmpty())
                 <x-card title="What has been done" flush style="margin-top:16px">
-                    <x-table :count="$events->count()" procedure="agora.usp_Cash_GetCashup" dense>
+                    <x-table layout-key="Cash.banking.index.3" :count="$events->count()" procedure="agora.usp_Cash_GetCashup" dense>
                         <x-slot:head>
                             <tr>
                                 <th>When</th>

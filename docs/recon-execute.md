@@ -252,7 +252,7 @@ guards finding 2: if `MatchedRows` is ever 2 there, the NULL comparison is back.
 
 These tests write to the stub through the **app** connection by three-part
 name, never through `pumpit`, which in a working development `.env` points at
-105.247.172.179, the customer's live instance.
+customer-db-host, the customer's live instance.
 
 ## Confirmed cash-bag writeback and single-batch reversal — 25 October 2026
 

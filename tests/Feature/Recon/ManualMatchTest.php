@@ -4,11 +4,14 @@ namespace Tests\Feature\Recon;
 
 use App\Exceptions\AgoraProcException;
 use App\Support\ProcedureService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Core\Models\User;
 use Modules\Recon\Models\ReconRun;
 use Modules\Recon\Models\ReconRunLine;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -598,6 +601,195 @@ class ManualMatchTest extends TestCase
         }
 
         return $out;
+    }
+
+    /** @return array<string, array{string, string, string}> */
+    public static function cardFreshnessAreas(): array
+    {
+        return [
+            'ABSA numeric merchant' => ['ABSA', 'numeric', 'length'],
+            'FNB exact merchant' => ['FNB', 'numeric', 'length'],
+            'FNB position length' => ['FNB', 'position', 'length'],
+            'FNB position endpos' => ['FNB', 'position', 'endpos'],
+        ];
+    }
+
+    #[DataProvider('cardFreshnessAreas')]
+    public function test_later_manual_card_claims_cover_every_source_pair_and_leave_unrelated_rows_selected(string $area, string $batchKey, string $convention): void
+    {
+        $this->skipUnlessLocalStub('This regression creates and reverses manual matches.');
+        $this->actingAs($this->admin());
+        $db = DB::connection(config('agora.connections.app'));
+        $bank = $this->procedures->callSets('usp_Recon_GetSides', [
+            'ReconArea' => $area, 'BranchId' => $this->branchId(),
+            'FromDate' => '2026-07-01', 'ToDate' => '2026-07-31 23:59:59', 'State' => 'outstanding', 'MaxRows' => 200,
+        ])[0]->first();
+        $this->assertNotNull($bank, 'The local stub must supply a bank row for this regression.');
+        $table = $area === 'ABSA' ? 'PumpIT.dbo.BRN_DailyBankingABSA' : 'PumpIT.dbo.BRN_DailyBankingFNB';
+        $db->beginTransaction();
+
+        try {
+            if ($batchKey === 'position') {
+                $db->table('PumpIT.dbo.BRN_AutoReconCriteria')->insert([
+                    'SSBranchId' => $this->branchId(), 'BankReconArea' => 'FNB', 'ProcessOrder' => -99081,
+                    'BANK_StartPosition' => 1, 'BANK_EndPosition' => 7,
+                    'BANK_StartPosition2' => 8, 'BANK_EndPosition2' => 6,
+                    'MOPS_StartPosition' => 7, 'MOPS_EndPosition' => $convention === 'endpos' ? 13 : 7,
+                    'FILTER_Value' => null, 'FILTER_StartPosition' => 0, 'FILTER_EndPosition' => 0,
+                ]);
+            }
+            $deposits = [];
+            // Two selected source keys, plus a different merchant on the first
+            // batch. A TOP 1 batch display key cannot represent this match.
+            foreach ([[9908101, '000123'], [9908102, '000125'], [9908101, '000124']] as $i => [$batch, $merchant]) {
+                $key = $area === 'ABSA' ? (string) $batch : '00'.$batch;
+                if ($batchKey === 'position') {
+                    $key = '  TEST'.$batch.'TAIL';
+                }
+                $base = ['SSBranchId' => $this->branchId(), 'TillNo' => 91 + $i, 'ShiftNo' => 1,
+                    'TransactionDate' => '2026-07-15 00:00:00', 'ReconBatchNo' => 0, 'ReconBatchNoPumpIT' => 0];
+                $db->table($table)->insert($base + ($area === 'ABSA'
+                    ? ['RetrievalRefNumber' => 'TEST-FR'.$i, 'TransactionAuthCode' => 'TST',
+                        'ABSA_TransactionDate' => '2026-07-15 00:00:00', 'ABSA_TransactionTime' => '2026-07-15 10:00:00',
+                        'TransactionAmount' => 123.45, 'BatchNumber' => $batch, 'MerchantNumber' => $merchant]
+                    : ['Amount' => 123.45, 'BatchNo' => $key, 'MerchantNo' => $merchant, 'Adjusted' => 0, 'AdjustedBy' => 0]));
+                $deposits[] = ['id' => null, 'key' => trim($key), 'dt' => '2026-07-15', 'amt' => 123.45, 'ref2' => $merchant];
+            }
+
+            $run = ReconRun::create([
+                'BranchId' => $this->branchId(), 'GroupRef' => (string) Str::uuid(), 'ReconArea' => $area,
+                'FromDate' => '2026-07-01', 'ToDate' => '2026-07-31', 'Status' => 'previewed', 'StampMode' => 'live',
+                'ProcedureName' => 'agora.usp_Recon_Preview'.$area,
+                'ParamsJson' => json_encode(['BatchKey' => $batchKey, 'MopsConvention' => $convention]),
+                'Note' => 'TEST-manual freshness', 'CreatedAt' => now()->subMinutes(5), 'CreatedBy' => 1,
+                'TotalRows' => 5, 'MatchedRows' => 5, 'BankTotal' => 617.25, 'MopsTotal' => 617.25, 'MatchedTotal' => 617.25,
+            ]);
+            $keys = $area === 'ABSA'
+                ? [['09908101', '123'], ['9908102', '125'], ['9908101', '124'], ['9908103', '123'], ['9908101', null]]
+                : [['9908101', '000123'], ['9908102', '000125'], ['9908101', '000124'], ['9908103', '000123'], ['9908101', '123']];
+            $lines = [];
+            foreach ($keys as $i => [$key, $merchant]) {
+                $lines[] = ReconRunLine::create([
+                    'BranchId' => $this->branchId(), 'RunId' => $run->Id, 'LineNo' => $i + 1, 'ReconArea' => $area,
+                    'KeyRef' => $key, 'KeyRef2' => $merchant, 'BankDate' => '2026-07-15', 'BankLines' => 1,
+                    'BankTotal' => 123.45, 'MopsTxns' => 1, 'MopsTotal' => 123.45, 'DiffAmount' => 0,
+                    'Outcome' => 'Matched', 'WouldReconcile' => true, 'Selected' => true, 'CommitState' => 'pending',
+                ]);
+            }
+            if ($batchKey === 'position') {
+                foreach (array_slice($lines, 0, 2) as $i => $line) {
+                    $drill = $this->procedures->call('usp_Recon_DrillMops', [
+                        'ReconArea' => $area, 'BranchId' => $this->branchId(),
+                        'FromDate' => '2026-07-01', 'ToDate' => '2026-07-31 23:59:59',
+                        'KeyRef' => $line->KeyRef, 'KeyRef2' => $line->KeyRef2,
+                        'BatchKey' => $batchKey, 'MopsConvention' => $convention,
+                    ]);
+                    $this->assertSame($deposits[$i]['key'], $drill->sole()->SourceRef, 'The pending key must resolve through the real positional drill.');
+                }
+            }
+            $before = $db->table($table)->where('SSBranchId', $this->branchId())->whereBetween('TillNo', [91, 93])
+                ->orderBy('TillNo')->get();
+            $bankBefore = $this->bankState([$bank->BankStatementLineID]);
+            $status = $this->procedures->write('usp_Recon_ManualMatch', [
+                'BranchId' => $this->branchId(), 'ReconArea' => $area, 'FromDate' => '2026-07-01', 'ToDate' => '2026-07-31 23:59:59',
+                'BankLineIds' => (string) $bank->BankStatementLineID, 'MopsJson' => json_encode(array_slice($deposits, 0, 2)),
+                'Reason' => 'TEST-manual freshness', 'StampMode' => 'live', 'AdjustMode' => 'off', 'UserId' => 1,
+            ]);
+            $freshness = fn (int $offset = 0) => $this->procedures->callSets('usp_Recon_RunFreshness', [
+                'RunId' => $run->Id, 'BranchId' => $this->branchId(), 'AppUtcOffsetMinutes' => $offset,
+            ]);
+            $sets = $freshness();
+            $this->assertSame(5, (int) $sets[0]->sole()->Pending);
+            $this->assertSame(2, (int) $sets[0]->sole()->Claimed, 'Every selected source pair is a claim, including the non-display key.');
+            $this->assertSame(1, (int) $sets[0]->sole()->ClaimingRuns);
+            $this->assertEqualsWithDelta(246.90, (float) $sets[0]->sole()->ClaimedTotal, 0.001);
+            $this->assertSame([$lines[0]->Id, $lines[1]->Id], $sets[1]->pluck('RunLineId')->map(fn ($id) => (int) $id)->all());
+            $this->assertTrue($sets[1]->every(fn ($claim) => (int) $claim->ClaimedByRunId === (int) $status->Id));
+            $batch = $db->table('agora.ReconBatch')->where('RunId', $status->Id)->sole();
+            $this->assertNull($batch->KeyRef2, 'The batch display key is not a multi-row source identity.');
+            $this->assertSame(Carbon::parse($batch->CreatedAt)->format('Y-m-d H:i:s'), (string) $sets[1]->first()->ClaimedAt);
+            $matches = $db->table('agora.ReconMatch')->where('RunId', $status->Id)->where('Side', 'mops')->orderBy('Id')->get();
+            $this->assertEqualsCanonicalizing(['000123', '000125'], $matches->map(fn ($m) => json_decode($m->SourceKeyJson, true)['ref2'] ?? null)->all());
+
+            $html = $this->get(route('app.recon.run', $run))->assertOk()->assertSee('been reconciled by another run since this preview')->getContent();
+            $doc = new \DOMDocument;
+            @$doc->loadHTML($html);
+            $xpath = new \DOMXPath($doc);
+            foreach ($lines as $i => $line) {
+                $checkbox = $xpath->query('//input[@name="lines[]" and @value="'.$line->Id.'"]')->item(0);
+                $this->assertInstanceOf(\DOMElement::class, $checkbox);
+                $this->assertSame($i >= 2, $checkbox->hasAttribute('checked'));
+                $this->assertFalse($checkbox->hasAttribute('disabled'), 'A freshness warning unticks; it never removes the clerk’s choice.');
+            }
+
+            // The preview is stored in application time; claims are stored UTC.
+            $db->update('UPDATE agora.ReconRun SET CreatedAt = DATEADD(minute, 115, ?) WHERE Id = ?', [$batch->CreatedAt, $run->Id]);
+            $offset = $freshness(120);
+            $this->assertSame(2, (int) $offset[0]->sole()->Claimed);
+            $this->assertSame(Carbon::parse($batch->CreatedAt)->addMinutes(120)->format('Y-m-d H:i:s'), (string) $offset[1]->first()->ClaimedAt);
+            $this->assertSame(0, (int) $freshness()[0]->sole()->Claimed, 'A batch older than the preview is not a later claim.');
+            $db->update('UPDATE agora.ReconRun SET CreatedAt = DATEADD(minute, -5, ?) WHERE Id = ?', [$batch->CreatedAt, $run->Id]);
+
+            // Old FNB rows already carried the merchant; old ABSA rows did not.
+            // Missing ABSA evidence must not become a wildcard across merchants.
+            $db->update("UPDATE agora.ReconMatch SET SourceKeyJson = JSON_MODIFY(SourceKeyJson, '$.ref2', NULL) WHERE RunId = ? AND Side = 'mops'", [$status->Id]);
+            $this->assertSame($area === 'FNB' ? 2 : 0, (int) $freshness()[0]->sole()->Claimed);
+            if ($batchKey === 'position') {
+                $db->update("UPDATE agora.ReconMatch SET SourceKeyJson = JSON_MODIFY(SourceKeyJson, '$.batch', NULL) WHERE RunId = ? AND Side = 'mops'", [$status->Id]);
+                $this->assertSame(0, (int) $freshness()[0]->sole()->Claimed, 'Without the raw batch, original character positions cannot be reconstructed safely.');
+            }
+            foreach ($matches as $match) {
+                $db->table('agora.ReconMatch')->where('Id', $match->Id)->update(['SourceKeyJson' => $match->SourceKeyJson]);
+            }
+
+            $this->procedures->write('usp_Recon_Reverse', [
+                'BranchId' => $this->branchId(), 'RunId' => $status->Id, 'Reason' => 'TEST-freshness reversal', 'UserId' => 1,
+            ]);
+            $this->assertSame(0, (int) $freshness()[0]->sole()->Claimed, 'A reversed manual match no longer claims anything.');
+            $this->assertEquals($before, $db->table($table)->where('SSBranchId', $this->branchId())->whereBetween('TillNo', [91, 93])->orderBy('TillNo')->get());
+            $this->assertEquals($bankBefore, $this->bankState([$bank->BankStatementLineID]));
+        } finally {
+            $db->rollBack();
+        }
+    }
+
+    public function test_automatic_smartatm_freshness_still_requires_the_full_terminal_and_date_key(): void
+    {
+        $this->skipUnlessLocalStub('This regression writes automatic-batch ledger fixtures.');
+        $db = DB::connection(config('agora.connections.app'));
+        $db->beginTransaction();
+
+        try {
+            $base = ['BranchId' => $this->branchId(), 'ReconArea' => 'SmartATM', 'FromDate' => '2026-07-01',
+                'ToDate' => '2026-07-31', 'Status' => 'previewed', 'StampMode' => 'journal',
+                'ProcedureName' => 'agora.usp_Recon_PreviewSmartATM', 'ParamsJson' => '{}', 'Note' => 'TEST-smartatm freshness'];
+            $run = ReconRun::create($base + ['GroupRef' => (string) Str::uuid(), 'CreatedAt' => now()->subMinutes(5)]);
+            $claimant = ReconRun::create($base + ['GroupRef' => (string) Str::uuid()]);
+            $lines = [];
+            foreach ([['TESTATM', '0715'], ['TESTATM', '0716'], ['OTHERATM', '0715']] as $i => [$key, $date]) {
+                $lines[] = ReconRunLine::create([
+                    'BranchId' => $this->branchId(), 'RunId' => $run->Id, 'LineNo' => $i + 1, 'ReconArea' => 'SmartATM',
+                    'KeyRef' => $key, 'KeyRef2' => $date, 'BankLines' => 1, 'BankTotal' => 100, 'MopsTxns' => 1,
+                    'MopsTotal' => 100, 'DiffAmount' => 0, 'Outcome' => 'Matched', 'WouldReconcile' => true,
+                    'Selected' => true, 'CommitState' => 'pending',
+                ]);
+            }
+            $db->table('agora.ReconBatch')->insert([
+                'BranchId' => $this->branchId(), 'RunId' => $claimant->Id, 'BatchNo' => -9908101,
+                'ReconArea' => 'SmartATM', 'KeyRef' => 'TESTATM', 'KeyRef2' => '0715',
+                'BankLineCount' => 1, 'MopsRowCount' => 1, 'BankTotal' => 100, 'MopsTotal' => 100,
+                'State' => 'committed', 'CreatedAt' => now(),
+            ]);
+            $sets = $this->procedures->callSets('usp_Recon_RunFreshness', [
+                'RunId' => $run->Id, 'BranchId' => $this->branchId(),
+            ]);
+            $this->assertSame(3, (int) $sets[0]->sole()->Pending);
+            $this->assertSame(1, (int) $sets[0]->sole()->Claimed);
+            $this->assertSame($lines[0]->Id, (int) $sets[1]->sole()->RunLineId);
+            $this->assertSame($claimant->Id, (int) $sets[1]->sole()->ClaimedByRunId);
+        } finally {
+            $db->rollBack();
+        }
     }
 
     /** The screen itself: a site has to be chosen before there are two sides. */

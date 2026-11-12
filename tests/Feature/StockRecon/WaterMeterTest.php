@@ -26,7 +26,7 @@ use Modules\StockRecon\Services\WaterMeterService;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
-/** Local-only source stubs and Agora metadata; every write rolls back. */
+/** Local-only TEST fixtures; rollback by default, exact cleanup for refusal baselines. */
 class WaterMeterTest extends TestCase
 {
     private const BRANCH = 999;
@@ -54,6 +54,11 @@ class WaterMeterTest extends TestCase
         }
         $this->skipUnlessLocalStub();
         $this->db = DB::connection(config('agora.connections.app'));
+        foreach ($this->fixtureKeys() as $table => $keys) {
+            if ($this->db->table($table)->where($keys)->exists()) {
+                throw new \RuntimeException('Water-meter TEST keys already exist; refusing to reuse them.');
+            }
+        }
         $this->db->beginTransaction();
         app(BranchContext::class)->setWorkspace('ho')->set(null)->setAllowed([self::BRANCH]);
         $this->db->table('PumpIT.dbo.STK_Area')->insert([
@@ -335,40 +340,106 @@ class WaterMeterTest extends TestCase
         $this->db->table('agora.StockReconRunLine')->where('BranchId', self::BRANCH)->where('RunId', $run->Id)
             ->update(['Selected' => 1, 'WouldAmend' => 1, 'ChainBlocked' => 0, 'RestoresHand' => 1,
                 'CommitState' => 'pending', 'QtyOpenNew' => 0, 'QtyCloseNew' => 1000, 'CountsMove' => 1]);
-        // THROW + XACT_ABORT rolls back this PDO fixture transaction at the
-        // batch boundary. Capture evidence inside CATCH, then explicitly roll
-        // back; checking after the refusal would only see the vanished fixture.
+        // The procedure's CATCH rolls back every open transaction. Commit
+        // this local TEST baseline so the refusal cannot erase the evidence.
+        $branch = $this->db->table('agora.Branch')->where('BranchId', self::BRANCH)->first();
+        if (! $branch || ! str_starts_with($branch->Name, 'TEST-') || $branch->IsActive || $branch->IsTrading) {
+            throw new \RuntimeException('Expected the existing inactive, non-trading TEST branch 999.');
+        }
+        $this->assertSame(1, $this->db->transactionLevel());
+        $before = $this->sourceRows();
+        $this->assertCount(6, $before);
         $this->assertContains($procedure, ['usp_StockRecon_Commit', 'usp_StockRecon_ResetToOriginal']);
-        $evidence = $this->db->selectOne("DECLARE @Before nvarchar(max) = (
-                SELECT TransactionDate, ShiftNo, QtyOpen, QtyClose, QtyIssued, QtyComputer,
-                    QtyOpen_Original, QtyClose_Original, QtyIssued_Original, QtyComputer_Original
-                FROM PumpIT.dbo.STK_StockReconLine WHERE SSBranchId = ? AND AreaNo = ? AND StockItemNo = ?
-                ORDER BY TransactionDate, ShiftNo FOR JSON PATH);
-            BEGIN TRY
-                EXEC agora.{$procedure} @RunId = ?, @BranchId = ?, @StampMode = 'live';
-            END TRY
-            BEGIN CATCH
-                DECLARE @Message nvarchar(2048) = ERROR_MESSAGE();
-                DECLARE @After nvarchar(max) = (
-                    SELECT TransactionDate, ShiftNo, QtyOpen, QtyClose, QtyIssued, QtyComputer,
-                        QtyOpen_Original, QtyClose_Original, QtyIssued_Original, QtyComputer_Original
-                    FROM PumpIT.dbo.STK_StockReconLine WHERE SSBranchId = ? AND AreaNo = ? AND StockItemNo = ?
-                    ORDER BY TransactionDate, ShiftNo FOR JSON PATH);
-                DECLARE @Amendments int = (SELECT COUNT(*) FROM agora.StockReconAmendment WHERE BranchId = ? AND RunId = ?);
-                DECLARE @RunStatus nvarchar(20) = (SELECT Status FROM agora.StockReconRun WHERE BranchId = ? AND Id = ?);
-                DECLARE @Pending int = (SELECT COUNT(*) FROM agora.StockReconRunLine WHERE BranchId = ? AND RunId = ? AND CommitState = 'pending');
-                IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-                SELECT @Message AS Message, CASE WHEN @Before = @After THEN 1 ELSE 0 END AS SourceUnchanged,
-                    @Amendments AS Amendments, @RunStatus AS RunStatus, @Pending AS Pending;
-            END CATCH", [self::BRANCH, self::AREA, self::ITEM, $run->Id, self::BRANCH,
-            self::BRANCH, self::AREA, self::ITEM, self::BRANCH, $run->Id,
-            self::BRANCH, $run->Id, self::BRANCH, $run->Id]);
-        $this->assertNotNull($evidence);
-        $this->assertStringStartsWith('AGORA:CUMULATIVE_METER:', $evidence->Message);
-        $this->assertEquals(1, $evidence->SourceUnchanged);
-        $this->assertEquals(0, $evidence->Amendments);
-        $this->assertSame('previewed', $evidence->RunStatus);
-        $this->assertEquals(6, $evidence->Pending);
+        $this->db->commit();
+        try {
+            $evidence = $this->db->selectOne("BEGIN TRY
+                    EXEC agora.{$procedure} @RunId = ?, @BranchId = ?, @StampMode = 'live';
+                END TRY
+                BEGIN CATCH
+                    SELECT ERROR_MESSAGE() AS Message, @@TRANCOUNT AS OpenTransactions;
+                END CATCH", [$run->Id, self::BRANCH]);
+            $this->assertNotNull($evidence);
+            $this->assertStringStartsWith('AGORA:CUMULATIVE_METER:', $evidence->Message);
+            $this->assertEquals(0, $evidence->OpenTransactions);
+            $this->assertCount(6, $this->sourceRows(), 'The source baseline must survive the refusal.');
+            $this->assertEquals($before, $this->sourceRows(), 'Every original and working source value is unchanged.');
+            $this->assertEquals(0, $this->db->table('agora.StockReconAmendment')
+                ->where('BranchId', self::BRANCH)->where('RunId', $run->Id)->count());
+            $this->assertSame('previewed', $this->db->table('agora.StockReconRun')
+                ->where('BranchId', self::BRANCH)->where('Id', $run->Id)->value('Status'));
+            $this->assertEquals(6, $this->db->table('agora.StockReconRunLine')
+                ->where('BranchId', self::BRANCH)->where('RunId', $run->Id)->where('CommitState', 'pending')->count());
+        } finally {
+            // Only this run and the keys proved absent before setup are ours.
+            $this->db->transaction(function () use ($run): void {
+                foreach (['StockReconAmendment', 'StockReconRunLine'] as $table) {
+                    $this->db->table('agora.'.$table)->where('BranchId', self::BRANCH)->where('RunId', $run->Id)->delete();
+                }
+                $this->db->table('agora.StockReconRun')->where('BranchId', self::BRANCH)->where('Id', $run->Id)->delete();
+                foreach ($this->fixtureKeys() as $table => $keys) {
+                    $this->db->table($table)->where($keys)->delete();
+                }
+            });
+        }
+        foreach ($this->fixtureKeys() as $table => $keys) {
+            $this->assertFalse($this->db->table($table)->where($keys)->exists(), $table.' fixture was removed.');
+        }
+        $this->assertFalse($this->db->table('agora.StockReconRun')
+            ->where('BranchId', self::BRANCH)->where('Id', $run->Id)->exists());
+    }
+
+    public function test_historical_amendment_can_still_be_reversed_after_meter_mapping(): void
+    {
+        $mapping = $this->db->table('agora.StockReconMeter')->where('BranchId', self::BRANCH)
+            ->where('AreaNo', self::AREA)->where('StockItemNo', self::ITEM);
+        $mapping->update(['IsActive' => 0]);
+        $run = $this->preview();
+        $line = $run->lines->firstOrFail();
+        // Synthetic history left live 5/7; the prior pair was 3/4, distinct
+        // from the original cumulative readings. Do not create a new commit.
+        $this->db->table('agora.StockReconAmendment')->insert([
+            'BranchId' => self::BRANCH, 'RunId' => $run->Id, 'RunLineId' => $line->Id,
+            'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM,
+            'TransactionDate' => $line->TransactionDate, 'ShiftNo' => $line->ShiftNo,
+            'PriorQtyOpen' => 3, 'PriorQtyClose' => 4, 'NewQtyOpen' => 5, 'NewQtyClose' => 7,
+            'StampMode' => 'live', 'State' => 'active', 'CreatedAt' => now(),
+        ]);
+        $this->db->table('agora.StockReconRun')->where('BranchId', self::BRANCH)->where('Id', $run->Id)
+            ->update(['Status' => 'committed']);
+        $this->db->table('agora.StockReconRunLine')->where('BranchId', self::BRANCH)->where('Id', $line->Id)
+            ->update(['CommitState' => 'committed']);
+        $mapping->update(['IsActive' => 1]);
+        $expected = $this->sourceRows();
+        $expectedRow = $expected->firstOrFail(fn ($row) => substr($row->TransactionDate, 0, 10) === $line->TransactionDate->toDateString()
+            && (int) $row->ShiftNo === (int) $line->ShiftNo);
+        $expectedRow->QtyOpen = 3;
+        $expectedRow->QtyClose = 4;
+
+        $result = app(ProcedureService::class)->call('usp_StockRecon_Reverse', [
+            'RunId' => $run->Id, 'BranchId' => self::BRANCH, 'Reason' => 'TEST-Reverse a historical meter amendment',
+        ])->firstOrFail();
+
+        $this->assertSame('REVERSED', $result->Code);
+        $this->assertCount(6, $this->sourceRows());
+        $this->assertEquals($expected, $this->sourceRows(), 'Only the ledger prior pair changes; cumulative originals survive.');
+        $this->assertEquals(1, $mapping->value('IsActive'));
+        $this->assertSame('reversed', $run->fresh()->Status);
+        $this->assertSame('reversed', $this->db->table('agora.StockReconAmendment')
+            ->where('BranchId', self::BRANCH)->where('RunId', $run->Id)->value('State'));
+        $this->assertSame('pending', $line->fresh()->CommitState);
+    }
+
+    /** @return array<string, array<string, int|string>> */
+    private function fixtureKeys(): array
+    {
+        $source = ['SSBranchId' => self::BRANCH, 'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM];
+
+        return [
+            'PumpIT.dbo.STK_StockReconLine' => $source,
+            'PumpIT.dbo.STK_StockMaster' => $source,
+            'agora.StockReconMeter' => ['BranchId' => self::BRANCH, 'AreaNo' => self::AREA, 'StockItemNo' => self::ITEM],
+            'PumpIT.dbo.STK_Area' => ['SSBranchId' => self::BRANCH, 'AreaNo' => self::AREA],
+        ];
     }
 
     public function test_controller_renders_readonly_report_and_grid_with_scope_preserved(): void

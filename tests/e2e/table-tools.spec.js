@@ -171,6 +171,19 @@ test.describe('pills and paging', () => {
             .toHaveText('Showing 1–25 of 39 — filtered from 64');
     });
 
+    test('Default filters restores the opening pills and clears other filters', async ({ page }) => {
+        test.setTimeout(60_000);
+        await page.goto('/dev/components');
+        await strip(page).locator('.tt-pill', { hasText: 'Short' }).click();
+        await page.locator(`${PAGED} input[aria-label="Filter Site"]`).fill('Nyala');
+        await expect(strip(page).locator('.tt-pill.is-on')).toHaveText(['Balanced39', 'Short11']);
+        await page.locator('[data-tt-restore-defaults="gal-table-paged"]').focus();
+        await page.keyboard.press('Enter');
+        await expect(strip(page).locator('.tt-pill.is-on')).toHaveText('Balanced39');
+        await expect(page.locator(`${PAGED} input[aria-label="Filter Site"]`)).toHaveValue('');
+        await expect(strip(page).locator('.table-count')).toHaveText('Showing 1–25 of 39 — filtered from 64');
+    });
+
     test('a pill is a filter: one click rescopes, and the heading says so', async ({ page }) => {
         await page.goto('/dev/components');
 
@@ -420,6 +433,79 @@ test.describe('grouped rows that open a detail', () => {
     const heads = (page) => page.locator(`${TABLE} tbody tr.tt-group:not(.tt-out):not(.tt-page-out)`);
     const members = (page) => page.locator(`${TABLE} tbody tr[data-tt-group]:not(.tt-out):not(.tt-page-out):not(.tt-collapsed)`);
     const panels = (page) => page.locator(`${TABLE} tbody tr.row-detail:not([hidden]):not(.tt-out):not(.tt-page-out)`);
+
+    test('Default filters preserves unchecked chain selections', async ({ page }) => {
+        test.setTimeout(60_000);
+        await page.goto('/dev/components');
+        const first = heads(page).first();
+        const box = first.locator('[data-tt-group-check]');
+        await box.focus();
+        await page.keyboard.press('Space');
+        await page.locator(TABLE).locator('xpath=ancestor::div[contains(@class,"table-block")]')
+            .locator('.tt-pill', { hasText: 'Blocked' }).focus();
+        await page.keyboard.press('Enter');
+        await page.locator('[data-tt-restore-defaults="gal-table-group-detail"]').focus();
+        await page.keyboard.press('Enter');
+        await expect(box).not.toBeChecked();
+        await expect(page.locator(`${TABLE} [data-check]:checked`)).toHaveCount(48);
+    });
+
+    test('Default filters preserves selection when the full view must reload', async ({ page }) => {
+        test.setTimeout(60_000);
+        await page.goto('/dev/components');
+        const first = heads(page).first();
+        await first.locator('[data-tt-group-check]').focus();
+        await page.keyboard.press('Space');
+        await page.locator('[data-tt-defaults-reload="gal-table-group-detail"]').focus();
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(/test-default-reload=1/);
+        await expect(heads(page).first().locator('[data-tt-group-check]')).not.toBeChecked();
+        await expect(page.locator(`${TABLE} [data-check]:checked`)).toHaveCount(48);
+    });
+
+    test('selection has its own target and keyboard does not expand the row', async ({ page }, testInfo) => {
+        test.setTimeout(120_000);
+        await page.goto('/dev/components');
+        const first = heads(page).first();
+        const box = first.locator('[data-tt-group-check]');
+        const target = first.locator('.pick-target');
+        // Centre the gallery's off-screen row before testing the label's edge;
+        // automatic nearest scrolling can put that edge beneath the fixed appbar.
+        await target.evaluate(async (element) => {
+            element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        });
+        await expect(box).toBeChecked();
+        const geometry = await target.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            const edge = { x: rect.x + 3, y: rect.y + 3 };
+            const hit = document.elementFromPoint(edge.x, edge.y);
+            const viewportOffset = { x: visualViewport?.offsetLeft ?? 0, y: visualViewport?.offsetTop ?? 0 };
+            const pointer = { x: edge.x - viewportOffset.x, y: edge.y - viewportOffset.y };
+            const viewport = {
+                meta: document.querySelector('meta[name="viewport"]')?.content,
+                innerWidth, innerHeight,
+                width: visualViewport?.width, height: visualViewport?.height, scale: visualViewport?.scale,
+            };
+            return { width: rect.width, height: rect.height, edge, viewportOffset, viewport, pointer, receivesPointer: element.contains(hit), hit: hit?.outerHTML.slice(0, 200) };
+        });
+        expect(geometry.width).toBeGreaterThanOrEqual(44);
+        expect(geometry.height).toBeGreaterThanOrEqual(44);
+        expect(geometry.receivesPointer, JSON.stringify(geometry)).toBe(true);
+        await testInfo.attach('selection-target-geometry', { body: JSON.stringify(geometry), contentType: 'application/json' });
+        // Native input uses the visual viewport; mobile can pan it within the layout viewport.
+        await page.mouse.click(geometry.pointer.x, geometry.pointer.y);
+        await expect(box).not.toBeChecked();
+        await expect(first).toHaveAttribute('aria-expanded', 'false');
+        await expect(page.locator(`${TABLE} [data-check]:checked`)).toHaveCount(48);
+        await box.focus();
+        await page.keyboard.press('Space');
+        await expect(box).toBeChecked();
+        await expect(first).toHaveAttribute('aria-expanded', 'false');
+        await first.focus();
+        await page.keyboard.press('Enter');
+        await expect(first).toHaveAttribute('aria-expanded', 'true');
+    });
 
     test('a head opens its panel, never its rows, and the rows stay in the submission', async ({ page }) => {
         await page.goto('/dev/components');

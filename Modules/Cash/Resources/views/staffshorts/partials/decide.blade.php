@@ -128,7 +128,7 @@
 
     @if ($trail->isNotEmpty())
         <h3 style="margin:16px 0 4px">What has been done to it</h3>
-        <x-table :count="$trail->count()" procedure="agora.usp_Cash_GetStaffShorts" dense empty="Nothing pressed yet.">
+        <x-table layout-key="Cash.staffshorts.partials.decide.1" :count="$trail->count()" procedure="agora.usp_Cash_GetStaffShorts" dense empty="Nothing pressed yet.">
             <x-slot:head>
                 <tr><th>When</th><th>What</th><th>By</th><th>Detail</th></tr>
             </x-slot:head>

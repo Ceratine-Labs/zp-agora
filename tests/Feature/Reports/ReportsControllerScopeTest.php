@@ -4,11 +4,14 @@ namespace Tests\Feature\Reports;
 
 use App\Support\BranchContext;
 use App\Support\ProcedureService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Connection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Models\User;
+use Modules\Core\Services\PermissionService;
 use Modules\Reports\Http\Controllers\ReportsController;
 use Modules\Reports\Services\ReportScope;
 use Modules\Reports\Services\ReportsService;
@@ -23,6 +26,9 @@ class ReportsControllerScopeTest extends TestCase
     /** @var array<int, array{procedure: string, params: array<string, mixed>}> */
     private array $calls = [];
 
+    /** @var list<string> */
+    private array $grants = ['reports.day-close.view'];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -31,6 +37,26 @@ class ReportsControllerScopeTest extends TestCase
         $refuse = fn () => throw new \LogicException('This test must not open a database connection.');
         $this->connection->setPdo($refuse);
         $this->connection->setReadPdo($refuse);
+
+        // The controller now authorizes each report. Keep the real Gate and
+        // permission matching; replace only database-backed grant retrieval.
+        $user = new User;
+        $user->setRawAttributes(['Id' => 99991]);
+        $this->actingAs($user);
+        $permissions = $this->getMockBuilder(PermissionService::class)->onlyMethods(['patternsFor'])->getMock();
+        $permissions->method('patternsFor')->with($user)->willReturnCallback(fn (): array => $this->grants);
+        $this->app->instance(PermissionService::class, $permissions);
+    }
+
+    public function test_branch_grants_do_not_replace_permission_to_view_the_report(): void
+    {
+        $this->grants = ['reports.catalogue.view'];
+        $procedures = $this->createMock(ProcedureService::class);
+        $procedures->expects($this->never())->method('callSets');
+        $controller = new ReportsController(new ReportsService($procedures));
+
+        $this->expectException(AuthorizationException::class);
+        $controller->show('day-close', Request::create('/app/reports/day-close'), (new BranchContext)->setAllowed([13]));
     }
 
     public function test_an_empty_selection_keeps_the_callers_grants_through_the_procedure_boundary(): void

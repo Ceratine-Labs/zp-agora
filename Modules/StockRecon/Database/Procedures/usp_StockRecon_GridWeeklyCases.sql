@@ -18,11 +18,16 @@ BEGIN
     LEFT JOIN agora.[User] approver ON approver.Id=c.SignedOffBy
     LEFT JOIN agora.Branch b ON b.BranchId=c.BranchId LEFT JOIN agora.[User] u ON u.Id=c.OwnerId
     WHERE (@Workspace='ho' OR c.BranchId=@BranchPin)
-      AND (NOT EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=@UserId) OR EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=@UserId AND BranchId=c.BranchId))
-      AND (NULLIF(@BranchIds,'') IS NULL OR c.BranchId IN(SELECT TRY_CONVERT(int,value) FROM STRING_SPLIT(@BranchIds,',')))
+      AND ((c.RegisterName<>'Cross-Site Patterns'
+        AND (NOT EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=@UserId) OR EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=@UserId AND BranchId=c.BranchId))
+        AND (NULLIF(@BranchIds,'') IS NULL OR c.BranchId IN(SELECT TRY_CONVERT(int,value) FROM STRING_SPLIT(@BranchIds,','))))
+      OR (c.RegisterName='Cross-Site Patterns' AND @Workspace='ho'
+        AND NOT EXISTS(SELECT 1 FROM OPENJSON(c.EvidenceJson,'$.RelatedCases') WITH(BranchId int) r
+          WHERE (EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=@UserId) AND NOT EXISTS(SELECT 1 FROM agora.UserBranch WHERE UserId=@UserId AND BranchId=r.BranchId))
+            OR (NULLIF(@BranchIds,'') IS NOT NULL AND r.BranchId NOT IN(SELECT TRY_CONVERT(int,value) FROM STRING_SPLIT(@BranchIds,','))))))
       AND (@SnapshotRef IS NOT NULL OR ((@DateFrom IS NULL OR s.WeekStart>=@DateFrom) AND (@DateTo IS NULL OR s.WeekStart<=@DateTo)))
-      AND ((@SnapshotRef IS NOT NULL AND c.SnapshotRef=@SnapshotRef) OR (@SnapshotRef IS NULL AND NOT EXISTS(
-          SELECT 1 FROM agora.StockWeeklySnapshot newer WHERE newer.BranchId=s.BranchId AND newer.WeekStart=s.WeekStart AND ISNULL(newer.PeriodFrom,newer.WeekStart)=ISNULL(s.PeriodFrom,s.WeekStart) AND ISNULL(newer.PeriodTo,newer.WeekEnd)=ISNULL(s.PeriodTo,s.WeekEnd) AND newer.Id>s.Id)))
+      AND ((@SnapshotRef IS NOT NULL AND c.SnapshotRef=@SnapshotRef) OR (@SnapshotRef IS NULL AND (c.RegisterName='Cross-Site Patterns' OR NOT EXISTS(
+          SELECT 1 FROM agora.StockWeeklySnapshot newer WHERE newer.BranchId=s.BranchId AND newer.WeekStart=s.WeekStart AND ISNULL(newer.PeriodFrom,newer.WeekStart)=ISNULL(s.PeriodFrom,s.WeekStart) AND ISNULL(newer.PeriodTo,newer.WeekEnd)=ISNULL(s.PeriodTo,s.WeekEnd) AND newer.Id>s.Id))))
       AND (@Search IS NULL OR c.Description LIKE '%'+@Search+'%' OR c.POSCode LIKE '%'+@Search+'%' OR b.Name LIKE '%'+@Search+'%');
     SELECT a.* INTO #Filtered FROM #Cases a WHERE NOT EXISTS(
         SELECT 1 FROM @Filters f CROSS APPLY(SELECT

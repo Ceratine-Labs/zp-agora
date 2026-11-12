@@ -11,6 +11,8 @@
 <x-tabs :active="$active" label="Cashup queues" style="margin-bottom:16px" :items="[
     ['key' => 'all', 'label' => 'All cashups', 'href' => route('app.cash.cashups', $keep)],
     ['key' => 'open', 'label' => 'Open cashups', 'href' => route('app.cash.cashups', $keep + ['show' => 'open'])],
-    ['key' => 'disagree', 'label' => 'Z-read disagrees', 'href' => route('app.cash.cashups', $keep + ['show' => 'disagree'])],
+    ...(auth()->user()?->can('cash.discrepancy.view') ? [
+        ['key' => 'disagree', 'label' => 'Z-read disagrees', 'href' => route('app.cash.cashups', $keep + ['show' => 'disagree'])],
+    ] : []),
     ['key' => 'nocashup', 'label' => 'Z-reads with no cashup', 'href' => route('app.cash.cashups.nocashup', $keep)],
 ]" />

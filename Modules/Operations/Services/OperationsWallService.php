@@ -10,6 +10,7 @@ use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use LogicException;
+use Modules\Reports\Services\MyQueueAccess;
 
 /** Presentation over the procedure's rules. Cached by explicit sites, never by an unscoped URL. */
 class OperationsWallService
@@ -18,20 +19,47 @@ class OperationsWallService
 
     /** @param array<int, int> $sites
      * @param  array<int, string>  $allowedSources
+     * @param  array<int, string>  $queueKeys  event types permitted to the current user
      * @return array<string, mixed>
      */
-    public function snapshot(array $sites, array $allowedSources): array
+    public function snapshot(array $sites, array $allowedSources, array $queueKeys = []): array
     {
         sort($sites);
         $date = BusinessDate::today()->subDay()->toDateString();
         $payload = ['generatedAt' => now()->toIso8601String(), 'businessDate' => $date,
-            'scope' => ['siteCount' => count($sites), 'label' => count($sites).' selected sites'], 'screens' => []];
+            'scope' => ['siteCount' => count($sites), 'label' => count($sites).' selected sites'], 'screens' => [], 'siteWork' => [], 'siteWorkAvailable' => false];
+        $queueKeys = array_values(array_intersect(array_keys(MyQueueAccess::TYPES), $queueKeys));
+        if ($sites !== [] && $queueKeys !== []) {
+            $from = Carbon::parse($date)->subDays(90)->toDateString();
+            $sets = $this->procedures->callSets('agora.usp_Reports_GridMyQueue', [
+                'BranchIds' => implode(',', $sites), 'DateFrom' => $from, 'DateTo' => $date,
+                'Page' => 1, 'PageSize' => 100000, 'QueueKeys' => implode(',', $queueKeys),
+            ]);
+            $payload['siteWorkAvailable'] = true;
+            $payload['siteWork'] = ($sets[0] ?? collect())->map(function (object $row) use ($from, $date): array {
+                $oldest = Carbon::parse((string) $row->OldestDate)->format('d M Y');
+
+                return [
+                    'id' => 'queue-'.$row->BranchId.'-'.$row->QueueKey,
+                    'title' => (string) $row->Queue, 'site' => (string) $row->BranchName,
+                    'severity' => 'warn', 'value' => (string) $row->OpenItems, 'isZero' => false,
+                    'detail' => 'Open: '.$row->OpenItems.' · Oldest: '.$oldest.' · Last 90 days',
+                    'href' => route('app.reports.show', ['report' => 'my-queue', 'branches' => [(int) $row->BranchId], 'from' => $from, 'to' => $date]),
+                    'category' => 'Site work', 'facts' => [
+                        ['label' => 'Open', 'value' => (string) $row->OpenItems],
+                        ['label' => 'Oldest', 'value' => $oldest],
+                        ['label' => 'Scope', 'value' => 'Last 90 days'],
+                    ],
+                ];
+            })->values()->all();
+        }
+
         if ($sites === [] || $allowedSources === []) {
             return $payload;
         }
 
-        $key = 'operations.wall.v2.'.$date.'.'.hash('sha256', implode(',', $sites));
         $store = Cache::store('file');
+        $key = 'operations.wall.v2.'.$date.'.'.hash('sha256', implode(',', $sites).'|'.$store->get('operations.wall.waste-revision', '0'));
         if (! $store instanceof Repository || ! $store->getStore() instanceof LockProvider) {
             throw new LogicException('The Operations Wall file cache must support query locks.');
         }

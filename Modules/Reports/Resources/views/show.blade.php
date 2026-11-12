@@ -42,7 +42,12 @@
         </x-notice>
     @endif
 
-    <x-reports::scope :report="$report" :params="$params" :context="$context" :branches="$branches" :open="$refusal || $rows->isEmpty()" />
+    @if ($report['key'] === 'waste' && ($errors->any() || session('status')))
+        <x-notice :tone="$errors->any() ? 'warn' : 'good'" title="Waste authorization">
+            <p>{{ $errors->first() ?: session('status') }}</p>
+        </x-notice>
+    @endif
+    <x-reports::scope :report="$report" :params="$params" :context="$context" :branches="$branches" />
 
     <x-card :title="$report['label']" flush>
         @if ($total > $ceiling)
@@ -56,7 +61,7 @@
              (feature-rules §3.5, row-detail.js): the route, and which of the
              row's columns fill its parameters. --}}
         @php($detail = $report['detail'] ?? null)
-        <x-table :count="$rows->count()" :total="$total"
+        <x-table layout-key="Reports.show.1" :count="$rows->count()" :total="$total"
                  procedure="agora.{{ $report['procedure'] }}"
                  :empty="__('reports::reports.nothing')"
                  :data-row-detail="$detail ? 'row' : null">
@@ -75,6 +80,7 @@
                             @endif
                         </th>
                     @endforeach
+                    @if ($report['key'] === 'waste')<th>Operations decision</th>@endif
                 </tr>
             </x-slot:head>
 
@@ -86,6 +92,16 @@
                             <x-reports::cell :type="$column['type']" :value="$row->{$column['key']} ?? null" />
                         </td>
                     @endforeach
+                    @if ($report['key'] === 'waste')
+                        <td>
+                            @if ($row->DecisionAt || $row->DecisionByName)
+                                <span>{{ $row->DecisionByName ?: 'Authorizer not recorded' }}</span>
+                                @if ($row->DecisionAt) <small> · {{ \Illuminate\Support\Carbon::parse($row->DecisionAt)->format('Y-m-d H:i') }}</small> @endif
+                            @else
+                                <span class="muted">{{ $row->Status === 'Authorized' ? 'Authorizer not recorded' : 'Authorize in PumpIT' }}</span>
+                            @endif
+                        </td>
+                    @endif
                 </tr>
             @endforeach
         </x-table>

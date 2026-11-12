@@ -112,7 +112,7 @@
             </x-action-bar>
         @endif
 
-        <x-table dense tools :count="$suggestions->count()" procedure="agora.usp_Recon_SuggestMatches"
+        <x-table layout-key="Recon.partials.suggest-results.1" dense tools :count="$suggestions->count()" procedure="agora.usp_Recon_SuggestMatches"
                  id="recon-suggest" data-row-detail data-tt-page="50"
                  empty="Nothing to suggest. Every outstanding line either settles by batch number, or has no set of deposits that adds up to it to the cent or within a few rand.">
             <x-slot:head>
@@ -254,9 +254,9 @@
                             <h3>Bank statement</h3>
                             <span class="muted">{{ $s->BankLines }} · {{ \App\Support\Format::r($s->BankTotal) }}</span>
                         </div>
-                        <table class="dt dense">
-                            <thead><tr><th>Date</th><th>Narrative</th><th class="num">Amount</th></tr></thead>
-                            <tbody>
+                        <x-table layout-key="Recon.partials.suggest-results.2" dense>
+                            <x-slot:head><tr><th>Date</th><th>Narrative</th><th class="num">Amount</th></tr></x-slot:head>
+
                                 @foreach ($s->bank as $line)
                                     <tr>
                                         <td class="mono">{{ substr((string) $line->SourceDate, 0, 10) }}</td>
@@ -264,17 +264,17 @@
                                         <td class="num">{{ \App\Support\Format::r($line->Amount) }}</td>
                                     </tr>
                                 @endforeach
-                            </tbody>
-                        </table>
+
+                        </x-table>
                     </div>
                     <div class="twopane-side">
                         <div class="twopane-head">
                             <h3>Deposits</h3>
                             <span class="muted">{{ $s->MopsRows }} · {{ \App\Support\Format::r($s->MopsTotal) }}</span>
                         </div>
-                        <table class="dt dense">
-                            <thead><tr><th>Date</th><th>{{ $area['key_label'] }}</th><th>{{ $area['key2_label'] ?? 'Second' }}</th><th class="num">Amount</th></tr></thead>
-                            <tbody>
+                        <x-table layout-key="Recon.partials.suggest-results.3" dense>
+                            <x-slot:head><tr><th>Date</th><th>{{ $area['key_label'] }}</th><th>{{ $area['key2_label'] ?? 'Second' }}</th><th class="num">Amount</th></tr></x-slot:head>
+
                                 @foreach ($s->mops as $row)
                                     <tr>
                                         <td class="mono">{{ substr((string) $row->SourceDate, 0, 10) }}</td>
@@ -283,8 +283,8 @@
                                         <td class="num">{{ \App\Support\Format::r($row->Amount) }}</td>
                                     </tr>
                                 @endforeach
-                            </tbody>
-                        </table>
+
+                        </x-table>
                     </div>
                 </div>
             </template>

@@ -14,36 +14,6 @@
 
 @php
     $blank = $value === null || $value === '';
-
-    // A status word to a tone. Keyword rather than an exhaustive list: the
-    // procedures each phrase their own Status, and a new phrase should fall to
-    // neutral rather than to a fatal.
-    $tone = function (string $text): string {
-        $t = mb_strtolower($text);
-
-        return match (true) {
-            str_contains($t, 'never collected'), str_contains($t, 'went backwards'),
-            str_contains($t, 'not started'), str_contains($t, 'no day-close') => 'crit',
-
-            str_contains($t, 'missing'), str_contains($t, 'not confirmed'),
-            str_contains($t, 'not balanced'), str_contains($t, 'do not agree'),
-            str_contains($t, 'does not agree'), str_contains($t, 'over the'),
-            str_contains($t, 'nothing arrived'), str_contains($t, 'nothing configured'),
-            str_contains($t, 'not flagged') => 'serious',
-
-            str_contains($t, 'open'), str_contains($t, 'variance'),
-            str_contains($t, 'gap'), str_contains($t, 'zero usage'),
-            str_contains($t, 'no bags'), str_contains($t, 'switch is off'),
-            str_contains($t, 'several approvers'), str_contains($t, 'over 15') => 'warn',
-
-            str_contains($t, 'closed'), str_contains($t, 'loaded'),
-            str_contains($t, 'agrees'), str_contains($t, 'balanced'),
-            str_contains($t, 'imported'), str_contains($t, 'within'),
-            str_contains($t, 'day on day'), str_contains($t, 'normal') => 'good',
-
-            default => 'neutral',
-        };
-    };
 @endphp
 
 @if ($blank && $type !== 'bool')
@@ -63,7 +33,7 @@
 @elseif ($type === 'bool')
     <x-chip :tone="$value ? 'good' : 'neutral'">{{ $value ? 'Yes' : 'No' }}</x-chip>
 @elseif ($type === 'chip')
-    <x-chip :tone="$tone((string) $value)">{{ $value }}</x-chip>
+    <x-chip :tone="\App\Grid\StatusTone::of((string) $value)">{{ $value }}</x-chip>
 @else
     {{ $value }}
 @endif

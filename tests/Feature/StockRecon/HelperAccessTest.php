@@ -104,6 +104,21 @@ class HelperAccessTest extends TestCase
             ->show($run, Request::create('/'), $this->context()));
     }
 
+    public function test_helper_choices_and_evidence_distinguish_removal_segments(): void
+    {
+        $run = $this->snapshotRun();
+        $first = $run->lines->first()->forceFill(['ContinuitySegment' => 0]);
+        $returned = (new StockReconRunLine)->forceFill($first->getAttributes())->forceFill([
+            'Id' => 11, 'ContinuitySegment' => 1, 'Outcome' => 'Returned item',
+        ]);
+        $run->setRelation('lines', new Collection([$first, $returned]));
+        $recon = Mockery::mock(StockReconService::class);
+        $recon->shouldReceive('chain')->once()->with($run, $returned)->andReturn(['item' => null, 'shifts' => collect()]);
+        $data = $this->controller($run, $recon)->show($run, Request::create('/?line=11'), $this->context())->getData();
+        $this->assertCount(2, $data['choices']);
+        $this->assertSame([11], $data['savedLines']->keys()->all());
+    }
+
     public function test_chain_choices_are_bounded_and_keep_the_total_visible(): void
     {
         $run = $this->snapshotRun();

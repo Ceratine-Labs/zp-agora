@@ -5,7 +5,8 @@
 
    Read by:  the run page (ReconController::show), for a 'previewed' run, to put
              a warning above the Reconcile button and mark the rows it names.
-   Reads:    agora.ReconRun, agora.ReconRunLine, agora.ReconBatch, agora.[User]
+   Reads:    agora.ReconRun, agora.ReconRunLine, agora.ReconBatch,
+             agora.ReconMatch, agora.[User], agora.vw_AutoReconCriteria
    Writes:   nothing.
 
    WHY IT EXISTS. Ryan, 9 Sep 2026: "if the user resumes a run, it needs to
@@ -24,6 +25,16 @@
    23 Sep 2026 before writing it: of the 155 refusals outside Smart ATM that
    said "reconciled by something else", 146 were exactly this — another Agora
    run on the same key, committed after the preview.
+
+   Manual card matches can contain several references and merchants in one
+   batch. Its KeyRef is only a display label: ABSA/FNB claims instead use each
+   ReconMatch source's ref/ref2 pair (v1__13pzf). ABSA compares numeric batch and
+   merchant identities as its drill does; FNB keeps exact merchant text and
+   uses the preview's saved batch mode and MOPS convention. Position mode reads
+   the raw batch through the same effective criterion as DrillMops. Older FNB JSON already
+   carries merchant; older ABSA JSON does not, so that missing evidence cannot
+   safely claim a merchant-specific proposal. Other areas retain their existing
+   batch-key behavior, including SmartATM's rule-derived terminal/date keys.
 
    It does NOT re-drill. usp_Recon_Commit re-finds every proposal's rows
    through usp_Recon_DrillBank and usp_Recon_DrillMops, one cursor step per
@@ -71,14 +82,29 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @Area nvarchar(20), @PreviewedAt datetime2(0);
+    DECLARE @Area nvarchar(20), @PreviewedAt datetime2(0), @BatchKey varchar(10),
+            @MopsConvention varchar(10), @MopsStart int, @MopsLen int;
 
-    SELECT @Area = r.ReconArea, @PreviewedAt = r.CreatedAt
+    SELECT @Area = r.ReconArea, @PreviewedAt = r.CreatedAt,
+           @BatchKey = ISNULL(JSON_VALUE(CASE WHEN ISJSON(r.ParamsJson) = 1 THEN r.ParamsJson ELSE N'{}' END, '$.BatchKey'), 'numeric'),
+           @MopsConvention = ISNULL(JSON_VALUE(CASE WHEN ISJSON(r.ParamsJson) = 1 THEN r.ParamsJson ELSE N'{}' END, '$.MopsConvention'), 'length')
     FROM agora.ReconRun r
     WHERE r.Id = @RunId AND r.BranchId = @BranchId;
 
     IF @Area IS NULL
         THROW 51000, 'AGORA:RUN_NOT_FOUND:That run does not exist on this branch.', 1;
+
+    /* Position-mode FNB uses the first effective deposit rule, exactly as
+       DrillMops does. The run saves the convention, not a criteria snapshot.
+       Take the substring before trimming: leading spaces are positions too. */
+    IF @Area = 'FNB' AND @BatchKey <> 'numeric'
+        SELECT TOP 1 @MopsStart = MOPS_StartPosition,
+                     @MopsLen = CASE WHEN @MopsConvention = 'endpos' AND MOPS_EndPosition >= MOPS_StartPosition
+                                     THEN MOPS_EndPosition - MOPS_StartPosition + 1
+                                     ELSE MOPS_EndPosition END
+        FROM agora.vw_AutoReconCriteria
+        WHERE BranchId = @BranchId AND BankReconArea = @Area
+        ORDER BY ProcessOrder ASC, AutoReconId ASC;
 
     /* The preview time in UTC, which is the clock the batches carry — and,
        going the other way, each claim's time on the application's clock, so
@@ -108,15 +134,47 @@ BEGIN
            to recognise — the one that happened this morning. */
         SELECT TOP 1 b.RunId, b.BatchNo, b.CreatedAt, u.UserName
         FROM agora.ReconBatch b
+        LEFT JOIN agora.ReconRun claimant ON claimant.Id = b.RunId AND claimant.BranchId = b.BranchId
         LEFT JOIN agora.[User] u ON u.Id = b.CreatedBy
         WHERE b.BranchId  = l.BranchId
           AND b.ReconArea = @Area
           AND b.RunId    <> @RunId
           AND b.State     = 'committed'
-          AND b.KeyRef    = l.KeyRef
-          AND ISNULL(b.KeyRef2, N'') = ISNULL(l.KeyRef2, N'')
           AND b.CreatedAt > @PreviewedAtUtc
-        ORDER BY b.CreatedAt DESC
+          AND (
+              /* Automatic batches already represent one preview key. Keep
+                 that comparison, and other areas' existing behavior, intact. */
+              ((ISNULL(claimant.ProcedureName, N'') <> N'agora.usp_Recon_ManualMatch' OR @Area NOT IN ('ABSA', 'FNB'))
+               AND b.KeyRef = l.KeyRef
+               AND ISNULL(b.KeyRef2, N'') = ISNULL(l.KeyRef2, N''))
+              OR
+              (claimant.ProcedureName = N'agora.usp_Recon_ManualMatch' AND @Area IN ('ABSA', 'FNB')
+               AND EXISTS (
+                   SELECT 1
+                   FROM agora.ReconMatch m
+                   CROSS APPLY OPENJSON(CASE WHEN ISJSON(m.SourceKeyJson) = 1 THEN m.SourceKeyJson ELSE N'{}' END)
+                   WITH (SourceRef nvarchar(100) '$.ref', SourceKey nvarchar(100) '$.key',
+                         Ref2 nvarchar(50) '$.ref2', Merchant nvarchar(50) '$.merchant',
+                         RawBatch nvarchar(100) '$.batch') j
+                   CROSS APPLY (SELECT NULLIF(LTRIM(RTRIM(COALESCE(j.SourceRef, j.SourceKey))), N'') AS SourceRef,
+                                       NULLIF(LTRIM(RTRIM(COALESCE(j.Ref2, j.Merchant))), N'') AS Ref2) k
+                   WHERE m.BranchId = b.BranchId AND m.RunId = b.RunId
+                     AND m.BatchNo = b.BatchNo AND m.BatchId = b.Id
+                     AND m.Side = 'mops' AND m.SourceTable = N'BRN_DailyBanking' + @Area
+                     AND (
+                         (@Area = 'ABSA'
+                          AND TRY_CONVERT(bigint, k.SourceRef) = TRY_CONVERT(bigint, ISNULL(l.MopsKeyRef, l.KeyRef))
+                          AND TRY_CONVERT(int, k.Ref2) = TRY_CONVERT(int, NULLIF(LTRIM(RTRIM(l.KeyRef2)), N'')))
+                         OR
+                         (@Area = 'FNB' AND k.Ref2 = l.KeyRef2
+                          AND ((@BatchKey = 'numeric'
+                                AND TRY_CONVERT(bigint, k.SourceRef) = TRY_CONVERT(bigint, ISNULL(l.MopsKeyRef, l.KeyRef)))
+                               OR (@BatchKey <> 'numeric'
+                                   AND LTRIM(RTRIM(SUBSTRING(j.RawBatch, @MopsStart, @MopsLen))) = ISNULL(l.MopsKeyRef, l.KeyRef))))
+                     )
+               ))
+          )
+        ORDER BY b.CreatedAt DESC, b.Id DESC
     ) c
     WHERE l.BranchId = @BranchId
       AND l.RunId = @RunId

@@ -365,12 +365,13 @@ class DebtorStatementService
             ->value('Name') ?? '');
     }
 
-    /** @return array{site: string, accountNo: string, accountName: string, period: string, periodEnd: string, closing: string, owing: bool} */
+    /** @return array{branchId: int, site: string, accountNo: string, accountName: string, period: string, periodEnd: string, closing: string, owing: bool} */
     protected function mailDetails(object $a): array
     {
         $to = Carbon::parse((string) $a->PeriodTo);
 
         return [
+            'branchId' => (int) $a->BranchId,
             'site' => (string) $a->BranchName,
             'accountNo' => (string) ($a->StatementAccountNo ?? $a->AccountNo),
             'accountName' => (string) $a->AccountName,

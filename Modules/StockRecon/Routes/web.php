@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\StockRecon\Http\Controllers\BalancingProfileController;
 use Modules\StockRecon\Http\Controllers\CountingAreaController;
 use Modules\StockRecon\Http\Controllers\StockReconController;
 use Modules\StockRecon\Http\Controllers\StockReconGroupController;
@@ -33,6 +34,7 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
         Route::get('/', [WeeklyStockController::class, 'index'])->name('weekly');
         Route::get('create', [WeeklyStockController::class, 'create'])->middleware('can:stockrecon.weekly.create')->name('weekly.create');
         Route::post('/', [WeeklyStockController::class, 'store'])->middleware('can:stockrecon.weekly.create')->name('weekly.store');
+        Route::post('patterns', [WeeklyStockController::class, 'storePattern'])->middleware('can:stockrecon.weekly.create')->name('weekly.patterns.store');
         Route::get('{branch}/{case}', [WeeklyStockController::class, 'show'])->whereNumber(['branch', 'case'])->name('weekly.show');
         Route::get('{branch}/{case}/edit', [WeeklyStockController::class, 'edit'])->whereNumber(['branch', 'case'])
             ->middleware('can:stockrecon.weekly.edit')->name('weekly.edit');
@@ -51,8 +53,25 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
     Route::prefix('counting-areas')->middleware(CountingAreaAccess::class)->group(function () {
         Route::get('/', [CountingAreaController::class, 'index'])->name('countingareas');
         Route::get('{branch}/{area}', [CountingAreaController::class, 'show'])->whereNumber(['branch', 'area'])->name('countingareas.show');
+        Route::get('{branch}/{area}/balancing-config', [BalancingProfileController::class, 'show'])->whereNumber(['branch', 'area'])->middleware('can:stockrecon.profiles.view')->name('countingareas.balancing-config');
+        Route::post('{branch}/{area}/balancing-config/profiles', [BalancingProfileController::class, 'store'])->whereNumber(['branch', 'area'])
+            ->middleware(['can:stockrecon.profiles.view', 'can:stockrecon.profiles.save'])->name('countingareas.profiles.store');
+        Route::put('{branch}/{area}/balancing-config/profiles/{profile}', [BalancingProfileController::class, 'update'])->whereNumber(['branch', 'area', 'profile'])
+            ->middleware(['can:stockrecon.profiles.view', 'can:stockrecon.profiles.save'])->name('countingareas.profiles.update');
+        Route::post('{branch}/{area}/balancing-config/mappings', [BalancingProfileController::class, 'map'])->whereNumber(['branch', 'area'])
+            ->middleware(['can:stockrecon.profiles.view', 'can:stockrecon.profiles.save'])->name('countingareas.profiles.map');
+        Route::delete('{branch}/{area}/balancing-config/mappings', [BalancingProfileController::class, 'unmap'])->whereNumber(['branch', 'area'])
+            ->middleware(['can:stockrecon.profiles.view', 'can:stockrecon.profiles.save'])->name('countingareas.profiles.unmap');
         Route::get('{branch}/{area}/edit', [CountingAreaController::class, 'edit'])->whereNumber(['branch', 'area'])
             ->middleware('can:stockrecon.countingareas.edit')->name('countingareas.edit');
+        Route::post('{branch}/{area}/removals', [CountingAreaController::class, 'recordRemoval'])->whereNumber(['branch', 'area'])
+            ->middleware(['can:stockrecon.countingareas.edit', 'can:stockrecon.countingareas.save'])->name('countingareas.removals.store');
+        Route::post('{branch}/{area}/removals/{removal}/withdraw', [CountingAreaController::class, 'withdrawRemoval'])->whereNumber(['branch', 'area', 'removal'])
+            ->middleware(['can:stockrecon.countingareas.edit', 'can:stockrecon.countingareas.save'])->name('countingareas.removals.withdraw');
+        Route::post('{branch}/{area}/completions', [CountingAreaController::class, 'recordCompletion'])->whereNumber(['branch', 'area'])
+            ->middleware(['can:stockrecon.countingareas.edit', 'can:stockrecon.countingareas.save'])->name('countingareas.completions.store');
+        Route::post('{branch}/{area}/completions/{completion}/withdraw', [CountingAreaController::class, 'withdrawCompletion'])->whereNumber(['branch', 'area', 'completion'])
+            ->middleware(['can:stockrecon.countingareas.edit', 'can:stockrecon.countingareas.save'])->name('countingareas.completions.withdraw');
         Route::put('{branch}/{area}', [CountingAreaController::class, 'update'])->whereNumber(['branch', 'area'])
             ->middleware(['can:stockrecon.countingareas.edit', 'can:stockrecon.countingareas.save'])->name('countingareas.update');
     });

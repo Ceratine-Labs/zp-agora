@@ -43,6 +43,31 @@ What follows from it:
 
 ---
 
+## Shift shortages (2 November 2026)
+
+The customer does not permit an over on one shift to cancel a short on another.
+This supersedes the historical cross-shift balancing examples below. An existing
+short stays on its shift unless a permitted issue correction on that same shift
+changes it, except when a corrected high opening reveals an over needed by the
+immediately preceding short (5 November 2026). That pair balances before any
+missing issue is proposed. Eligible issue increases and reductions are assessed independently
+on each interior shift, including when their chain total is zero. If repairing
+an opening would move or create a short, the entire chain is held for count
+review, except for that opening-break pair. Older saved previews which move a
+shortage outside this case, or issue against that opening before the preceding
+short is resolved, must be previewed again.
+
+The day, afternoon and night bits on each site's `STK_Area` row define required
+shifts. A missing shift between item observations holds the entire chain, is
+shown in red with its date and shift, and prevents balancing. The first observed
+shift is not treated as missing earlier rows without a known predecessor.
+Saved previews are checked again at commit and reset, using the current area
+shift configuration, including the continuation from the count before the window.
+
+A net-zero chain can therefore still contain both an over and a short; it is not
+fully balanced unless each variance is resolved by a valid correction. Where
+counts cannot resolve the chain under this rule, the residuals remain visible.
+
 ## The one fact everything follows from
 
 A shift's variance is
@@ -298,7 +323,7 @@ Where each rule lands:
 | 1. Variance = POS − (opening + issued − closing) | Unchanged. |
 | 3. Opening must equal the previous closing; amend the **opening**, never the closing | A break is **repaired**, not blocked: `QtyOpenNew` = the previous closing (the shift before the window for the first row). The closing before a repaired opening is **pinned** — the chain is balanced in segments split at each repair — because the pack flags any moved previous closing at a break as S12. Reported as **S10a** (opening below: stock vanished) or **S10b** (above). **A break of 3 or fewer does not split** (ZRP, 4 Oct 2026 — see above). |
 | 4. Over → nil, never a short; a short never grows; the latest closing stands | Unchanged — it is what the reverse running maximum already did. The last active shift of each segment is pinned. |
-| 5. An over within 10% of a whole issue multiple is an issue not written up | **S1**, reported on the shift. It blocked the chain until 7 Oct 2026, when ZRP asked that such a chain be balanced; it now balances around it. Multiples come from `agora.StockIssueMultiple` (head office's workbook, seeded by `IssueMultipleSeeder`), falling back to `vw_StockItem.IssueMultiple` — PumpIT's column is ≥ 2 on 1 of 2,433 items at the pack's sites. |
+| 5. An over within 10% of a whole issue multiple is an issue not written up | **S1**, reported on the shift. The current `vw_StockItem.IssueMultiple` takes precedence; `agora.StockIssueMultiple` supplies the workbook value when the master has none. |
 | 10. Analyse a site only up to its last complete recon day | Stage 0 of the preview. A day is complete when every shift the site normally runs carries ≥ 95% of its normal lines with ≥ half its normal share of closings, and POS is posted on ≥ half the normal share. The first incomplete day and everything after it is **held back** (`CompleteTo`, `HeldBackRows`). Option `HoldBackIncomplete`, default on. |
 | E1. Stock falling with no till sales linked is a system fault | **E1**, blocks the chain: T < −max(3, pack) over 2+ days with Σ POS ≤ 10% of \|T\|. Nobody is charged. |
 | S7, S8, S11, S12, S13, S4/S4a/S4b — the audit of hand balancing | `AuditCode` on every line: what the balancing **already in PumpIT** did against the rules, measured the pack's way (original counts, opening repaired to the original previous closing, fat-finger issues neutralised). |
@@ -858,11 +883,12 @@ It is **not a run**. It reads PumpIT's count lines directly, so it shows any
 period — balanced by Agora, by hand in PumpIT, or not at all — and the
 arithmetic is that screen's own (`dbo.sp_SelectStockReconBalancing`): the
 original variance on the `_Original` columns, the amended one on the current
-columns with good waste set against a short (never making an over), and PumpIT's
+columns. Captured good waste is deducted from shortages only after operations
+authorizes it in PumpIT; an existing over remains unchanged. The preview snapshots the source flag, authorizer, time and authorized quantity, and refuses a commit if they change. Older previews require refreshing. PumpIT's
 colours per side. The strip above the grid is its corner: value variance, short,
 over, quantity and POS quantity after balancing, each with the figure as counted
 under it, from the procedure's third result set over every matched line.
-*Moved by balancing* is the amended value less the original.
+*Change in variance* is the amended value less the original, including authorized waste.
 
 **Proved against the customer's own screenshot**: Ngwenya, Bakery, 5–7 Oct 2026
 reads -13 / -R211.98 / -R940.73 / R728.75 as counted and -5 / -R76.60 / -R76.60 /
@@ -977,17 +1003,35 @@ usable if the global comparison refuses its size.
 
 ### Issue multiples: existing behaviour and pending reference data
 
-The audit verified that `StockIssueMultiple` (the imported head-office
-workbook) takes precedence over the product master's `IssueMultiple`. A master
-edit therefore does not replace an existing workbook override. The next
-spreadsheet import must reconcile that override deliberately and preserve its
-source; no new values have been guessed or imported in this audit.
+The current stock recon master's `IssueMultiple` takes precedence, including
+zero and one; the workbook supplies a value only if the master has none.
+The master is read through `vw_StockItem`, which uses an active Agora override
+when present and otherwise reads PumpIT directly.
 
-Pack-sized overs are reported as S1 and can balance. An unblocked remaining
-over generates a missing-issue proposal under the already-authorized live
-missing-issue mode, even when it is not a whole pack. Clear duplicates require
+Pack-sized overs are reported as S1 and can balance. On interior shifts an
+unblocked remaining over or short can generate an issue adjustment for whole
+multiples only; any remainder stays visible, and a reduction cannot exceed the
+issued quantity. Multiples of zero or one never cause an
+automatic issue change. No issues are added or reduced on the first or last shift of the item
+chain. Older saved proposals that break these rules require a fresh preview.
+An exact whole-multiple over or short on an unbroken chain with no duplicate
+candidate is identified on its own shift before balancing, independently of
+the net chain variance. An issue can be reduced only by a
+whole multiple that is already present. The proposal identifies additions and
+reductions by Agora; the audit trail distinguishes reductions from confirmed
+duplicates. A chain containing a proposed issue change must be committed as a
+whole, so its count changes cannot be written without the issue they assume.
+Clear duplicates require
 an identical nearby issue plus independent count evidence and the existing
 ambiguity/food checks; possible duplicates remain held. A pack-sized short
 alone is not proof of a duplicate. Writes still require the existing commit
 confirmation and retain exact priors for reversal. The global comparison does
 not expand that write contract.
+
+## Balancing profiles and item mappings
+
+Head office can open **Balancing configuration** from a counting area. The generic profile supplies the normal preview defaults; a custom profile can be mapped to an item in a particular site and area. The mapping overrides that item's correction limits, minimum active shifts and kept-break threshold. Items without a mapping use the generic run settings. The unfinished-day setting applies to the whole preview period, not to an individual item.
+
+The preview records the selected profile, revision and effective values on each line. Changing a profile or an item mapping invalidates a saved preview for the affected item; preview again before committing. Profile and mapping changes retain an audit event. Reading and changing profiles require separate permissions, and neither permission changes the live-write or original-count safeguards.
+
+A recorded item removal ends its counting obligation after the specified shift. A returned item starts a new continuous period, including when it returns on the same day. Previews calculate and display those periods separately, and commit checks apply to each period: counts, opening corrections, duplicate candidates and missing shifts do not carry across a removal. If the count at a recorded removal disappears, the item is held for correction. A saved preview must be refreshed if removal history or its starting predecessor changes. Reset to original also rechecks completed area shifts and refuses incomplete chains; it does not restore a predecessor from before a removal. Commit and reset hold serializable locks from validation through the write to protect the checked evidence against concurrent changes. Assess lock duration and blocking on representative production workloads before release. The history lookup no longer assumes an item was removed merely because its last count was over 35 days ago. A completed area with no item counts is refused rather than presented as a clean preview. The customer database index proposed for history lookup is not part of an Agora migration and requires customer permission and a build-impact review before execution.

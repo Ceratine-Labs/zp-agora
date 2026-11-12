@@ -9,13 +9,8 @@ namespace App\Grid;
  * phrase their own Status and a new phrase must fall to neutral rather than to
  * a fatal. "Bank does not agree" is serious whichever report says it.
  *
- * This is lifted verbatim from `<x-reports::cell>`, which grew it first. It is
- * here now because the shared grid needs the same answer and a second copy of
- * a match table is a table that drifts — the first time somebody adds a phrase
- * to one of them, two screens start disagreeing about the same word. When this
- * merges, `Modules/Reports/Resources/views/components/cell.blade.php` should
- * call `StatusTone::of()` and delete its inline copy; that file belongs to
- * another lane, so it is named here rather than edited.
+ * Shared by grid cells and `<x-reports::cell>` so adding a phrase gives it
+ * the same tone wherever it appears.
  */
 final class StatusTone
 {

@@ -6,6 +6,7 @@ use App\Support\BusinessDate;
 use App\Support\ProcedureService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * All of this module's logic that is not in T-SQL — which is not much, and that
@@ -122,6 +123,13 @@ class ReportsService
         /** @var array<string, array<string, mixed>> $reports */
         $reports = config('reports.reports', []);
 
+        // Apply column permissions before rendering and before validating sorts.
+        // Reports use the same definition for direct requests and their table export.
+        foreach ($reports as &$report) {
+            $report['columns'] = array_values(array_filter($report['columns'] ?? [],
+                fn (array $column): bool => ! isset($column['permission']) || Gate::allows($column['permission'])));
+        }
+
         return $reports;
     }
 
@@ -178,6 +186,11 @@ class ReportsService
         }
 
         $params = $this->parametersFor($key, $input);
+
+        if ($key === 'my-queue') {
+            $requested = is_array($input['queue_keys'] ?? null) ? $input['queue_keys'] : [];
+            $params['QueueKeys'] = implode(',', array_intersect(array_keys(MyQueueAccess::TYPES), $requested));
+        }
 
         $sets = $this->procedures->callSets($report['procedure'], $params);
 

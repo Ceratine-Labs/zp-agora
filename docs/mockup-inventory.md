@@ -1,7 +1,7 @@
 # Agora mockup inventory (from agoraretailconsole.html)
 
 Brand: AGORA — "All Group Operations, Reconciliation & Analysis" — owner Zululand Retail & Petroleum — was PumpIT.
-Meta: 31 branches (25 sites + 6 admin entities), FY2027 (Jul–Jun), ABSA bank, DB server 105.247.172.179, v2026.8.6.1.
+Meta: 31 branches (25 sites + 6 admin entities), FY2027 (Jul–Jun), ABSA bank, DB server customer-db-host, v2026.8.6.1.
 IA: four sections — Today / Trade / Control / Setup; two workspaces — Head Office / Branch; 5 roles — Executive, Finance, Operations, Branch manager, Auditor (read-only).
 Global context bar: Region / Brand / Format / Branch (branch WS only) / Period + "as at".
 Chrome: appbar (wordmark, workspace switch, primary nav w/ mega menus, Ctrl-K palette, exceptions bell w/ badge, theme toggle, avatar), crumb + context filters, main, footer, tooltip, extract drawer (CSV/copy), command palette.

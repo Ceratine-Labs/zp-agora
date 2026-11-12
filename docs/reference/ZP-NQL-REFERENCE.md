@@ -15,9 +15,9 @@ map is worse than none because it looks authoritative.
 
 | | |
 |---|---|
-| Host | `105.247.172.179` · TCP `1433` · reachable from Ryan's machine |
+| Host | `customer-db-host` · TCP `1433` · reachable from Ryan's machine |
 | Engine | Microsoft SQL Server **2017** (RTM-GDR, KB5021127, 14.0.2047) |
-| Login | `Revteck` — **`sysadmin` + `dbcreator` at server level, `db_owner` in PumpIT** |
+| Login | `customer-db-login` — **`sysadmin` + `dbcreator` at server level, `db_owner` in PumpIT** |
 | Server collation | `Latin1_General_CI_AS` on all three databases |
 | Driver locally | `pdo_sqlsrv` + `sqlsrv` present in PHP; `isql` available |
 
@@ -96,34 +96,34 @@ are not FKs) but the table names mostly do not.
 
 Three customer connections ship on day one. `fuelsheet`, named in T001 of the
 build plan, is dropped until someone can say what it points at. All three use
-the existing **`Revteck`** login — Ryan's call, made knowing it is sysadmin on
+the existing **`customer-db-login`** login — Ryan's call, made knowing it is sysadmin on
 the instance; tightening to a scoped login is a cutover-time task, not a v1
 blocker.
 
 ```env
 # Primary — the ERP database. Agora migrations create schema `agora` in here.
-PUMPIT_DB_HOST=105.247.172.179
+PUMPIT_DB_HOST=customer-db-host
 PUMPIT_DB_PORT=1433
 PUMPIT_DB_DATABASE=PumpIT
-PUMPIT_DB_USERNAME=Revteck
+PUMPIT_DB_USERNAME=customer-db-login
 PUMPIT_DB_PASSWORD=            # recover once from ZP: DatabaseConnection 'PumpIT'
 PUMPIT_DB_ENCRYPT=yes
 PUMPIT_DB_TRUST_SERVER_CERTIFICATE=true
 
 # Secondary — POS landing zone. Read-only for Agora in v1 (load monitoring).
-MIST_DB_HOST=105.247.172.179
+MIST_DB_HOST=customer-db-host
 MIST_DB_PORT=1433
 MIST_DB_DATABASE=MIST_Import
-MIST_DB_USERNAME=Revteck
+MIST_DB_USERNAME=customer-db-login
 MIST_DB_PASSWORD=
 MIST_DB_ENCRYPT=yes
 MIST_DB_TRUST_SERVER_CERTIFICATE=true
 
 # Reporting extracts — ZP-NQL's primary source, read-only for Agora.
-ALTERYX_DB_HOST=105.247.172.179
+ALTERYX_DB_HOST=customer-db-host
 ALTERYX_DB_PORT=1433
 ALTERYX_DB_DATABASE=Alteryx
-ALTERYX_DB_USERNAME=Revteck
+ALTERYX_DB_USERNAME=customer-db-login
 ALTERYX_DB_PASSWORD=
 ALTERYX_DB_ENCRYPT=yes
 ALTERYX_DB_TRUST_SERVER_CERTIFICATE=true

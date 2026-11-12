@@ -56,6 +56,7 @@ function prepare(table, row) {
     });
 
     row.addEventListener('keydown', (event) => {
+        if (event.target !== row) return;
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
         toggle();

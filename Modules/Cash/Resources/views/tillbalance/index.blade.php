@@ -85,7 +85,7 @@
         </x-notice>
     @endif
 
-    <x-card title="Which cashups">
+    <x-card title="Which cashups" collapsible :remember="'cash.tillbalance.scope:'.auth()->id()">
         <x-slot:info>
             <p>One site, a few days. Cashups whose variance is at least R{{ \App\Support\Format::n($floor, 2) }}
                either way are listed, and any a till balance is already waiting on.</p>
@@ -141,7 +141,7 @@
                 @endforeach
             @endif
 
-                <x-table :count="$cashups->count()" procedure="agora.usp_Cash_GetTillBalance" dense tools
+                <x-table layout-key="Cash.tillbalance.index.1" :count="$cashups->count()" procedure="agora.usp_Cash_GetTillBalance" dense tools
                          empty="No cashup at this site in these days has a variance to move.">
                     <x-slot:head>
                         <tr>
@@ -207,7 +207,7 @@
         </x-card>
 
         <x-card title="Till balances" flush style="margin-top:16px">
-            <x-table :count="$balances->count()" procedure="agora.usp_Cash_GetTillBalance" dense tools
+            <x-table layout-key="Cash.tillbalance.index.2" :count="$balances->count()" procedure="agora.usp_Cash_GetTillBalance" dense tools
                      empty="No till balance has a side in these days.">
                 <x-slot:head>
                     <tr>

@@ -32,6 +32,8 @@ test.describe('bank recon dashboard', () => {
         const site = url.searchParams.getAll('branches[]')[0] ?? url.searchParams.getAll('branches[0]')[0];
         expect(site).toBeTruthy();
 
+        const fold = page.locator('.dg-scope-fold');
+        if (!(await fold.evaluate((element) => element.open))) await fold.locator('> summary').click();
         await page.locator('form.dg-scope input[name="q"]').fill('0');
         await page.locator('form.dg-scope').evaluate((form) => form.requestSubmit());
         await expect(page).toHaveURL(/q=0/);

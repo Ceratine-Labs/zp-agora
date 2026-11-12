@@ -28,13 +28,20 @@ collation conflict*, and the recon views compare strings on every row.
 
 ## The order
 
+`customer-db-host` and `customer-db-login` below are placeholders. Obtain the
+real values from the deployment's private `.env` or the approved encrypted
+connection store; keep them out of tracked documents and reference assets.
+`python3 scripts/check-customer-connection-details.py` enforces this policy for
+Git-tracked `docs/` files and runs in both Composer checks. Its `--self-test`
+option verifies rejection of unsafe examples without connecting to a database.
+
 ```bash
 # 1. Point the APP connection at the instance. The other three already do.
 #    Only AGORA_DB_* moves — PUMPIT_DB_*, MIST_DB_* and ALTERYX_DB_* are
 #    already remote and stay read-only.
-AGORA_DB_HOST=105.247.172.179
+AGORA_DB_HOST=customer-db-host
 AGORA_DB_DATABASE=Agora
-AGORA_DB_USERNAME=Revteck
+AGORA_DB_USERNAME=customer-db-login
 AGORA_DB_PASSWORD=…
 AGORA_DB_ENCRYPT=yes
 AGORA_DB_TRUST_SERVER_CERTIFICATE=true   # both are required — ODBC 18 validates
@@ -87,7 +94,7 @@ warning. `tests/Feature/Seeding/E2eFixtureGuardTest.php` holds that both ways.
   legacy estate through `agora.vw_*`.
 - **The instance is in SIMPLE recovery.** No transaction-log chain, so no
   point-in-time restore. A bad migration cannot be rewound to the minute.
-- **`Revteck` is `sysadmin` on the instance.** The guard is discipline, not the
+- **`customer-db-login` is `sysadmin` on the instance.** The guard is discipline, not the
   grant.
 
 ## Going back to the local container

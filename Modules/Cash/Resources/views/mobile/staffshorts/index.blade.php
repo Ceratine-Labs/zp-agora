@@ -37,7 +37,7 @@
     @include('cash::staffshorts.partials.outcome')
 
     <form method="GET" action="{{ route('app.cash.staffshorts.phone') }}">
-        <x-params collapsible :open="! $scope->isChosen()" remember="cash-staffshorts-phone" summary="Site">
+        <x-params collapsible :open="false" :remember="'cash-staffshorts-phone:'.auth()->id()" summary="Site">
             @unless ($pinned)
                 <x-param name="branch_id" label="Site"
                          :choices="['' => 'Choose a site'] + $branches->pluck('Name', 'BranchId')->all()"

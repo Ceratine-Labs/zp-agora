@@ -63,7 +63,7 @@
             </x-notice>
         @endif
 
-        <x-table dense :count="$lines->count()" procedure="agora.usp_Recon_GetAllocation"
+        <x-table layout-key="Recon.partials.run-allocation.1" dense :count="$lines->count()" procedure="agora.usp_Recon_GetAllocation"
                  :id="'recon-alloc-'.$batch->BatchId">
             <x-slot:head>
                 <tr>

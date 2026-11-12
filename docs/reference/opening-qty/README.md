@@ -33,7 +33,7 @@ worker into a disposable local schema and rolls back its fixtures and procedure.
 > | | |
 > |---|---|
 > | `02` deployed to PumpIT | **21 Sep 2026 19:36:26** — 3 tables + 2 procedures created |
-> | Correction applied | **21 Sep 2026 19:36:38**, RunId `738E5311-8465-4993-8FC2-73665DFAF380`, by `Revteck` |
+> | Correction applied | **21 Sep 2026 19:36:38**, RunId `738E5311-8465-4993-8FC2-73665DFAF380`, by `customer-db-login` |
 > | Scope of that run | **Branch 9 only — Esikhawini Convenience.** Not the 17-site run. |
 > | Openings changed | **2,153** — 2,075 as-captured, 141 working |
 > | Dates touched | 2024-08-29 … 2026-09-20 |

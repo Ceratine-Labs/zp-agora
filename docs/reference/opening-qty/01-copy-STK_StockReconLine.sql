@@ -2,7 +2,7 @@
    PumpIT — take a copy of dbo.STK_StockReconLine before the opening-qty update
    ----------------------------------------------------------------------------
    Requested by Zululand Retail & Petroleum, 21 Sep 2026.
-   Run by:  Ryan, against the instance holding PumpIT (105.247.172.179)
+   Run by:  Ryan, against the instance holding PumpIT (customer-db-host)
    Run as:  any login with CREATE TABLE in PumpIT
 
    *** REVISION 2, 21 Sep 2026 — every object is now named in full

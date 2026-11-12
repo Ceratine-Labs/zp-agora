@@ -49,7 +49,7 @@ class WeeklyCaseGrid extends GridDefinition
     {
         return [
             new GridColumn('WeekStart', 'Week starting', format: 'date', sort: 'WeekStart'),
-            new GridColumn('RegisterName', 'Register', filter: 'set', options: ['Item Register', 'Period Items', 'Opening vs Closing', 'Balancing Breaches', 'Issue Sheet Failures', 'Count Compliance', 'Count Recency', 'Recipe vs Recon', 'Potatoes & Buns', 'Control Actions']),
+            new GridColumn('RegisterName', 'Register', filter: 'set', options: ['Item Register', 'Period Items', 'Opening vs Closing', 'Balancing Breaches', 'Issue Sheet Failures', 'Count Compliance', 'Count Recency', 'Recipe vs Recon', 'Potatoes & Buns', 'Control Actions', 'Cross-Site Patterns']),
             new GridColumn('PeriodFrom', 'Control period from', format: 'date', sort: 'PeriodFrom', visible: false),
             new GridColumn('PeriodTo', 'Control period through', format: 'date', sort: 'PeriodTo', visible: false),
             new GridColumn('EvidenceDate', 'Evidence date', format: 'date', sort: 'EvidenceDate', visible: false),
@@ -57,8 +57,8 @@ class WeeklyCaseGrid extends GridDefinition
             new GridColumn('Description', 'Item', wide: true, link: true, sort: 'Description'),
             new GridColumn('AreaDescription', 'Counting area', sort: 'AreaDescription'),
             new GridColumn('POSCode', 'POS code', sort: 'POSCode'),
-            new GridColumn('SourceSystem', 'Count system', filter: 'set', options: ['WINBRANCH', 'AURA', 'PILOT', 'NAMOS']),
-            new GridColumn('Scenario', 'Scenario', format: 'chip', options: ['OK', 'A1', 'A2', 'A3', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2', 'D3', 'D4', 'RV', 'NC', 'E1', 'E2', 'E3', 'IR', 'V', 'A4', 'C3', 'S10a', 'S10b', 'S7', 'S8', 'S11', 'S1', 'S3', 'S4', 'S4a', 'S4b', 'RECIPE', 'ACTION']),
+            new GridColumn('SourceSystem', 'Count system', filter: 'set', options: ['WINBRANCH', 'AURA', 'PILOT', 'NAMOS', 'PATTERN']),
+            new GridColumn('Scenario', 'Scenario', format: 'chip', options: ['OK', 'A1', 'A2', 'A3', 'B1', 'B2', 'C1', 'C2', 'D1', 'D2', 'D3', 'D4', 'RV', 'NC', 'E1', 'E2', 'E3', 'IR', 'V', 'A4', 'C3', 'S10a', 'S10b', 'S7', 'S8', 'S11', 'S1', 'S3', 'S4', 'S4a', 'S4b', 'RECIPE', 'ACTION', 'PATTERN']),
             new GridColumn('ReconQty', 'Recon variance', format: 'number', compactQuantity: true, sort: 'ReconQty'),
             new GridColumn('CountQty', 'Site count variance', format: 'number', compactQuantity: true, sort: 'CountQty'),
             new GridColumn('StoreroomQty', 'Count less recon', format: 'number', compactQuantity: true, sort: 'StoreroomQty'),

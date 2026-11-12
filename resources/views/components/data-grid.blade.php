@@ -94,7 +94,7 @@
     $fixed = collect($columns)->contains(fn ($v) => $v->width !== null);
 @endphp
 
-<div {{ $attributes->merge(['class' => 'data-grid'.($surface ? ' dg-surface' : '').' dg-text-'.$grid->textSize]) }}
+<div {{ $attributes->merge(['class' => 'data-grid'.($surface ? ' dg-surface' : '').' dg-text-'.$grid->textSize.' dg-height-'.(in_array($grid->state['table_height'] ?? null, ['compact', 'large'], true) ? $grid->state['table_height'] : 'normal')]) }}
      data-grid
      data-grid-key="{{ $grid->key() }}"
      data-grid-slug="{{ $slug }}"
