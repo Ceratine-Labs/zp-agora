@@ -22,6 +22,7 @@ import reconSuggest from './components/recon-suggest';
 import modal from './components/modal';
 import tableTools from './components/table-tools';
 import tableLayout from './components/table-layout';
+import tableFit from './components/table-fit';
 import linkedSelect from './components/linked-select';
 import dateSpan from './components/date-span';
 import bulkSelection from './components/bulk-selection';
@@ -65,6 +66,7 @@ window.Agora.hydrate = (root) => Promise.allSettled([
     initialize('Fragment reconciliation', () => reconMatch(root)),
     initialize('Fragment table tools', () => tableTools(root)),
     initialize('Fragment table layouts', () => tableLayout(root)),
+    initialize('Fragment table fit', () => tableFit()),
     initialize('Fragment write-back diffs', () => confirmDiff(root)),
     initialize('Fragment confirmations', () => confirmForm(root)),
     initialize('Fragment suggestions', () => reconSuggest(root)),
@@ -93,6 +95,7 @@ const initial = afterPaint().then(() => Promise.allSettled([
     initialize('Modals', modal),
     initialize('Table tools', tableTools),
     initialize('Table layouts', tableLayout),
+    initialize('Table fit', tableFit),
     initialize('Linked selects', linkedSelect),
     initialize('Date ranges', dateSpan),
     initialize('Bulk actions', bulkSelection),

@@ -2,10 +2,14 @@
     `blurb` is a line that stays on the page — use it for facts about this
     page (the window, the site). `info` is a slot for standing explanation,
     behind an <x-info> button beside the title.
---}}
-@props(['eyebrow' => null, 'title' => '', 'blurb' => null, 'art' => null])
 
-<div class="page-head">
+    `compact` is for a screen whose table needs the height: smaller art, and
+    the blurb on the title's line instead of under it (stock recon run,
+    12 Nov 2026).
+--}}
+@props(['eyebrow' => null, 'title' => '', 'blurb' => null, 'art' => null, 'compact' => false])
+
+<div @class(['page-head', 'is-compact' => $compact])>
     <div class="page-heading">
         <x-feature-art class="page-head-art" :art="$art" />
         <div class="page-heading-copy">

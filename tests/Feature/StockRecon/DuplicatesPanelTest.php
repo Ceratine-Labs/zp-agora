@@ -352,9 +352,8 @@ class DuplicatesPanelTest extends TestCase
         $this->actingAs($this->person('operations'))
             ->get(route('app.stockrecon.line', [$run, $charcoal]), ['X-Requested-With' => 'XMLHttpRequest'])
             ->assertOk()
-            ->assertSee('A duplicate issue on this chain')
+            ->assertDontSee('A duplicate issue on this chain')
             ->assertSee('D1 issue 1.000 → 0.000')
-            ->assertSee('It is taken out of the balancing and set to 0 by the commit')
             ->assertSee(route('app.stockrecon.overview', [$run, 'dup' => 'dup-'.$charcoal->Id]).'#duplicates', false);
     }
 

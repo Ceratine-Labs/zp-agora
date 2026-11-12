@@ -11,28 +11,6 @@
     HTML rather than JSON. The formatting rules live in App\Support\Format, and
     rebuilding them in JavaScript is how the two drift apart.
 --}}
-@php
-    $verdict = $item?->ChainBlocked
-        ? ['label' => 'Held back', 'tone' => 'serious', 'hint' => 'see why below', 'note' => '']
-        : \Modules\StockRecon\Services\ChainSummary::verdict(
-            (float) ($item?->ChainNetVar ?? 0),
-            $shifts->filter(fn ($s) => (bool) $s->WouldAmend)->count(),
-            $shifts->contains(fn ($s) => abs((float) $s->QtyCloseNew - (float) $s->QtyClose) > 0.0005
-                || abs((float) $s->QtyOpenNew - (float) $s->QtyOpen) > 0.0005),
-            \Modules\StockRecon\Services\ChainSummary::overLeft($shifts),
-        );
-@endphp
-{{-- What holds the chain back, listed only while something does: on a nil
-     chain the same flags are findings, not blocks. The unrecorded issues
-     (U1–U4, S1) hold nothing back since 7 Oct 2026 and say so apart. --}}
-@php($blocks = $item?->ChainBlocked ? collect([
-    $item?->BlockPossibleDuplicate, $item?->BlockNoPosLink,
-    $item?->BlockIssueNowhere, $item?->BlockAuditConflict, $item?->BlockBigAmendment, $item?->BlockPctAmendment,
-    $item?->BlockNegativeClose, $item?->BlockShortChain, $item?->BlockDormantMoved,
-])->filter()->values() : collect())
-@php($unrecorded = collect([
-    $item?->BlockPackOver, $item?->BlockSoldMore, $item?->BlockCloseExceeds, $item?->BlockNetOver,
-])->filter()->values())
 @php($groups = \Modules\StockRecon\Services\ChainSummary::groupsOfShifts($shifts))
 
 {{-- The possible duplicates on this chain (PM decision 01a10b21): those with
@@ -41,98 +19,25 @@
 @php($possible = $shifts->filter(fn ($s) => $s->DupTier === 'D2'))
 @php($unreleased = $possible->filter(fn ($s) => $s->ReleaseId === null))
 @php($releasedSince = $possible->filter(fn ($s) => $s->ReleaseId !== null && (int) $s->ReleaseId !== (int) $s->DupReleaseId))
-
 {{-- The clear duplicates on this chain (D1). The procedure has returned them
      since 1 Oct 2026 and the panel never said so: a removed one read as an
      ordinary balanced or dormant shift. Each links to its case on the run's
      duplicate-issues panel, which says where it stands. --}}
-@php($clearDups = $shifts->filter(fn ($s) => $s->DupTier === 'D1'))
 @php($caseUrl = fn ($s) => route('app.stockrecon.overview', [$run, 'dup' => 'dup-'.$s->Id]).'#duplicates')
 @php($twinOf = fn ($s) => $s->DupTwinDate ? \Illuminate\Support\Carbon::parse($s->DupTwinDate)->format('d M').' shift '.\Modules\StockRecon\Support\ShiftLabel::show($s->DupTwinShift) : 'a neighbouring shift')
 
 <div class="drill-chain">
-    <header>
-        <a class="btn-ghost" href="{{ route('app.stockrecon.helper', [$run, 'line' => $line->Id]) }}">Explain this chain</a>
-        <div class="card-t">
-            <h4>{{ $item->StockItemDescription ?? $line->StockItemNo }}</h4>
-            @if ($line->BalancingProfileName)
-                <p>Balancing profile: {{ $line->BalancingProfileName }} · correction limit {{ \App\Support\Format::qty($line->ProfileMaxAmendment) }} · share {{ $line->ProfileMaxAmendmentPct }} · minimum shifts {{ $line->ProfileMinShifts }} · keep breaks up to {{ \App\Support\Format::qty($line->ProfileKeepBreaksUpTo) }}</p>
-            @endif
-            {{-- The reading notes, behind a button (ZRP, 4 Oct 2026). --}}
-            <x-info label="How to read this chain" class="info-wide">
-                <p>Balancing amends the closing count; the opening follows, because it <em>is</em> the previous
-                   closing. Where the counted opening missed the previous closing, the opening is repaired: a
-                   break within the item’s configured limit is balanced straight through; a bigger one splits the chain and the
-                   closing before it stands.</p>
-                <p>Where two people were on a shift both are named: the counts cannot say which of them a
-                   variance belongs to. A red chip beside the outcome is hand balancing already in PumpIT that
-                   the rules do not allow; the commit puts it back.</p>
-            </x-info>
-        </div>
-        <p class="muted">
-            {{ $item->AreaDescription ?? 'area '.$line->AreaNo }}
-            · item <code>{{ $line->StockItemNo }}</code>
-            @if ($item?->POSCode) · POS <code>{{ $item->POSCode }}</code> @endif
-            @if ($item?->StockLocation) · {{ $item->StockLocation }} @endif
-            @if ($item?->UOMCode) · {{ $item->UOMCode }} @endif
-        </p>
-    </header>
-
-    <x-statstrip :stats="[
-        ['label' => 'Chain total (T)', 'value' => \App\Support\Format::qty($item?->ChainNetVar),
-         'note' => \App\Support\Format::r($item?->ChainNetVarValue),
-         'tone' => (float) ($item?->ChainNetVar ?? 0) > 0.005 ? 'warn' : 'neutral'],
-        ['label' => 'Shifts', 'value' => \App\Support\Format::n($item?->ChainShifts),
-         'note' => \App\Support\Format::n($item?->ActiveShifts).' active, '.\App\Support\Format::n($item?->DormantShifts).' dormant'],
-        /* What the chain comes to, in the chain row's words (ChainSummary::
-           verdict). It said Balanceable for any chain nothing held back,
-           including one short 2 with no over anywhere, which has nothing to
-           balance (Ryan, 7 Oct 2026). No double quotes in this comment: it
-           sits inside the attribute, and one would end it. */
-        ['label' => 'Chain', 'value' => $verdict['label'], 'note' => $verdict['hint'], 'tone' => $verdict['tone']],
-        /* How many different people appear anywhere on this chain. One is a
-           chain a single person is answerable for; six is a chain where a
-           persistent short is about the item or the process, not a person. */
-        ['label' => 'People on it', 'value' => \App\Support\Format::n($item?->DistinctEmployeeSets)],
-    ]" />
-
-    {{-- A real short with nothing to set it against says why, in a line. --}}
-    @if (! $item?->ChainBlocked && str_starts_with($verdict['label'], 'Short '))
-        <p class="muted" style="margin:8px 0 0">{{ $verdict['note'] }}</p>
-    @endif
-
-    @if ($blocks->isNotEmpty())
-        <x-notice tone="stop" title="Why this chain is reported rather than balanced">
-            <ul>
-                @foreach ($blocks as $why)<li>{{ $why }}</li>@endforeach
-            </ul>
-            @if ($item?->BlockNoPosLink)
-                <p><strong>Not a loss:</strong> the selling PLU or recipe is not reducing this item. Link it and
-                   re-run; nobody is charged.</p>
-            @endif
-        </x-notice>
-    @endif
-
-    @if ($unrecorded->isNotEmpty())
-        <x-notice tone="warn" title="An issue was not written up">
-            <ul>
-                @foreach ($unrecorded as $why)<li>{{ $why }}</li>@endforeach
-            </ul>
-            <p>It does not hold the chain back. The shifts around it balance, and whatever over no count can remove
-               stays on the shift that carries it — marked <strong>Unrecorded issue</strong> — for the missing issue
-               to be captured there.</p>
-        </x-notice>
-    @endif
-
+    {{-- NOTHING ABOVE THE GRID (Ryan, 12 Nov 2026: "can remove this entire
+         section ... no one reads it"). The panel opened on a heading, the
+         balancing profile, four figures and up to five notices before the
+         first shift; what each of them said is on the shift's own row, in the
+         Outcome column and its chips. One thing stays, because it is a press
+         and not a paragraph: a chain a possible duplicate holds back, and the
+         release that lets it through. --}}
     @if ($item?->BlockPossibleDuplicate)
         <x-notice tone="warn" title="Held back: a possible duplicate issue">
-            <p>The same issue was keyed on a neighbouring shift and this item is short by about that much, but
-               the count cannot say which issue was real. Nothing on this chain is written to PumpIT — not the
-               balancing, and not a hand amendment put back — because that could return a short somebody hid by
-               moving counts to staff pay.</p>
-            <p><strong>The way out.</strong> Somebody who has checked the issue book, the storeroom count or the
-               delivery note releases it here with a reason, and the next preview lets the chain commit. Correcting
-               the issue in PumpIT does not clear it: Agora works on what staff keyed (the original values).</p>
+            <p>Nothing on this chain is written until the possible duplicate is released, with a reason, by
+               somebody who has checked the issue book.</p>
             @if ($unreleased->isNotEmpty())
                 @include('stockrecon::partials.duplicate-release', [
                     'run' => $run,
@@ -146,33 +51,6 @@
             @if ($releasedSince->isNotEmpty())
                 <p>{{ $releasedSince->count() }} released since this preview — preview again to let the chain commit.</p>
             @endif
-        </x-notice>
-    @endif
-
-    @if ($clearDups->isNotEmpty())
-        <x-notice tone="info"
-                  :title="$clearDups->count() === 1 ? 'A duplicate issue on this chain' : $clearDups->count().' duplicate issues on this chain'">
-            @foreach ($clearDups as $dup)
-                <p>{{ \Illuminate\Support\Carbon::parse($dup->TransactionDate)->format('d M') }} shift {{ \Modules\StockRecon\Support\ShiftLabel::show($dup->ShiftNo) }}:
-                   the issue of {{ \App\Support\Format::qty($dup->QtyIssued) }} was keyed twice — the identical issue on
-                   {{ $twinOf($dup) }} arrived.
-                   @if ($dup->QtyIssuedNew !== null)
-                       It is taken out of the balancing and set to 0 by the commit, and the chain is written with it.
-                   @else
-                       Not taken out: {{ (\Illuminate\Support\Str::after((string) ($dup->DupReason ?: 'Not removed: the run did not take it out'), 'Not removed: ')) }}.
-                   @endif
-                   <a href="{{ $caseUrl($dup) }}">See the case</a>.</p>
-            @endforeach
-        </x-notice>
-    @endif
-
-    @if ((int) ($item?->RepairedOpenings ?? 0) > 0)
-        <x-notice tone="warn" collapsible
-                  :title="$item->RepairedOpenings.' '.Str::plural('opening', (int) $item->RepairedOpenings).' not equal to the previous closing'
-                      .((int) ($item->KeptBreaks ?? 0) > 0 ? ' — '.$item->KeptBreaks.' small, chain kept' : '')">
-            <p>The opening is amended to the previous closing. A break of 3 or fewer is balanced through; a
-               bigger one splits the chain and the closing before it stands. An opening <em>below</em> the
-               previous closing (S10a) stays on the exceptions report either way.</p>
         </x-notice>
     @endif
 
@@ -197,6 +75,14 @@
          is read straight across; Amend, which only the amended side has, sits
          after them. --}}
     @php($dash = fn ($v) => abs((float) $v) < 0.0005 ? '—' : \App\Support\Format::qty($v))
+    {{-- An amended figure that is not the counted one is marked IN THE GRID
+         (Ryan, 12 Nov 2026: "highlight difference between amended and original
+         ... just in the grid"). The two blocks carry the same seven columns in
+         the same order, and the reader was left to find the cells that moved
+         by comparing them across the row. `title` carries the counted figure. --}}
+    @php($moved = fn ($new, $was) => abs((float) $new - (float) $was) > 0.0005)
+    @php($was = fn ($new, $old, bool $money = false) => abs((float) $new - (float) $old) > 0.0005
+        ? 'Counted: '.($money ? \App\Support\Format::r($old) : \App\Support\Format::qty($old)) : null)
     <x-table layout-key="StockRecon.partials.chain-detail.1" :count="$shifts->count()" dense fit
              empty="This item has no other shift in the window.">
         <x-slot:head>
@@ -270,13 +156,13 @@
                      balanced read 0.000 all the way down, which looked like a
                      column that was not working (Ryan, 6 Oct 2026). --}}
                 <td class="num muted">{{ abs((float) $shift->CumulativeVar) < 0.0005 ? '—' : \App\Support\Format::qty($shift->CumulativeVar) }}</td>
-                <td class="num grp">{{ \App\Support\Format::qty($shift->QtyOpenNew) }}</td>
-                <td class="num">{{ $dash($shift->QtyIssuedAmended) }}</td>
-                <td class="num">{{ \App\Support\Format::qty($shift->QtyCloseNew) }}</td>
+                <td @class(['num', 'grp', 'is-changed' => $moved($shift->QtyOpenNew, $shift->QtyOpen)]) title="{{ $was($shift->QtyOpenNew, $shift->QtyOpen) }}">{{ \App\Support\Format::qty($shift->QtyOpenNew) }}</td>
+                <td @class(['num', 'is-changed' => $moved($shift->QtyIssuedAmended, $shift->QtyIssued)]) title="{{ $was($shift->QtyIssuedAmended, $shift->QtyIssued) }}">{{ $dash($shift->QtyIssuedAmended) }}</td>
+                <td @class(['num', 'is-changed' => $moved($shift->QtyCloseNew, $shift->QtyClose)]) title="{{ $was($shift->QtyCloseNew, $shift->QtyClose) }}">{{ \App\Support\Format::qty($shift->QtyCloseNew) }}</td>
                 <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyPOS) }}</td>
-                <td class="num">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyVarNew) }}</td>
-                <td class="num money">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::r($shift->VarValueNew) }}</td>
-                <td class="num muted">{{ $dash($shift->CumulativeVarNew) }}</td>
+                <td @class(['num', 'is-changed' => $moved($shift->QtyVarNew, $shift->QtyVar)]) title="{{ $was($shift->QtyVarNew, $shift->QtyVar) }}">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyVarNew) }}</td>
+                <td @class(['num', 'money', 'is-changed' => $moved($shift->QtyVarNew, $shift->QtyVar)]) title="{{ $was($shift->VarValueNew, $shift->VarValue, true) }}">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::r($shift->VarValueNew) }}</td>
+                <td @class(['num', 'muted', 'is-changed' => $moved($shift->CumulativeVarNew, $shift->CumulativeVar)]) title="{{ $was($shift->CumulativeVarNew, $shift->CumulativeVar) }}">{{ $dash($shift->CumulativeVarNew) }}</td>
                 <td class="num">{{ $dash($shift->AmendClose) }}</td>
                 <td class="l muted" style="font-size:12px">
                     {{ $shift->Outcome }}

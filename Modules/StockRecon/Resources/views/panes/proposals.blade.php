@@ -98,9 +98,15 @@
         $rows = $rows->filter(fn ($l) => $writableKeys->has($l->continuityKey()));
     }
     $defaultStates = $showAll ? '' : implode('|', array_diff_key($states, ['clean' => true]));
+    // What each scope pill in the action bar would put on the screen.
+    $amendableChains = $writableKeys->count();
+    $everyChains = $run->lines->unique(fn ($l) => $l->continuityKey())->count();
 @endphp
 
-<x-card title="Proposals" flush>
+{{-- No card title: the tab above already says "Proposals", and the row it
+     took is a row of the table (Ryan, 12 Nov 2026: "reduce on wasted
+     whitespace where-ever possible"). --}}
+<x-card flush>
 
     {{-- Reset to original (Ryan, 7 Oct 2026: "update the amended with the
          original column values"). Its own form, because a form cannot sit
@@ -137,18 +143,19 @@
           @if ($stampMode === 'live') data-confirm-danger @endif>
         @csrf
 
+        {{-- The count and the Extract button — the same drawer the grid shell
+             opens. On an open run they ride at the far end of the action bar;
+             they had a bar of their own above it, 48px that said "1 213
+             shifts". A closed run has no action bar, so it keeps the bar. --}}
         @isset($extract)
-            {{-- The same bar the grid shell puts above its table, and the same
-                 drawer behind the button. This screen cannot BE an
-                 <x-data-grid>, but the answer to "get me this in Excel" should
-                 not depend on that — and in journal mode the extract IS the
-                 deliverable. --}}
-            <div class="dg-bar" style="margin:12px 14px 0">
-                <span class="dg-shown">{{ \App\Support\Format::n($rows->count()) }}
-                    {{ Str::plural('shift', $rows->count()) }}</span>
-                <span class="dg-bar-gap"></span>
-                <button type="button" class="btn-ghost" data-drawer-open="dg-stockrecon-{{ $run->Id }}-extract">Extract</button>
-            </div>
+            @unless ($run->isOpen())
+                <div class="dg-bar" style="margin:8px 14px 0">
+                    <span class="dg-shown">{{ \App\Support\Format::n($rows->count()) }}
+                        {{ Str::plural('shift', $rows->count()) }}</span>
+                    <span class="dg-bar-gap"></span>
+                    <button type="button" class="btn-ghost" data-drawer-open="dg-stockrecon-{{ $run->Id }}-extract">Extract</button>
+                </div>
+            @endunless
         @endisset
 
         @if ($run->isOpen())
@@ -184,19 +191,52 @@
                        {{ config('stockrecon.reset_issues') ? 'open, issue, close and POS' : 'open, close and POS' }}, and the closing just
                        before the week, then previews again — so a chain head office balanced by hand is
                        balanced here. Reverse this run to undo it.</p>
+                    <p>Each chain row shows the number of shifts across its date range. Open it to see
+                       each numbered shift.</p>
                 </x-info>
 
                 @can('stockrecon.runs.execute')
                     <button type="submit" form="reset-{{ $run->Id }}" class="btn-ghost">Reset to original</button>
                 @endcan
+
+                {{-- WHICH CHAINS ARE ON THE SCREEN, as pills (Ryan, 12 Nov 2026:
+                     "this can be a button or a pill or just.... something").
+                     It was a sentence under the bar with a link at the end of
+                     it — "Showing amendable chains; 60 chains with nothing to
+                     amend hidden — show all chains." — and a second sentence
+                     for the chains with no movement. Same three scopes, same
+                     links, and the count each one would show. --}}
+                <span class="tt-pills-set scope-pills" role="group" aria-label="Chains shown">
+                    <span class="tt-pills-label">Show</span>
+                    <a @class(['chip', 'tt-pill', 'is-on' => ! $showAll]) @if (! $showAll) aria-current="true" @endif
+                       href="{{ request()->fullUrlWithQuery(['scope' => 'amendable', 'empty' => 'hide']) }}"
+                       title="{{ $showAll ? 'Show amendable chains only' : 'Showing amendable chains; '.\App\Support\Format::n($hiddenChains).' '.Str::plural('chain', $hiddenChains).' with nothing to amend hidden' }}">Amendable<span class="tt-pill-n">{{ \App\Support\Format::n($amendableChains) }}</span></a>
+                    @if ($emptyChains > 0)
+                        <a @class(['chip', 'tt-pill', 'is-on' => $showAll && $hideEmpty]) @if ($showAll && $hideEmpty) aria-current="true" @endif
+                           href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'hide']) }}"
+                           title="Every chain with movement; {{ \App\Support\Format::n($emptyChains) }} {{ Str::plural('chain', $emptyChains) }} with no movement hidden">With movement<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains - $emptyChains) }}</span></a>
+                    @endif
+                    <a @class(['chip', 'tt-pill', 'is-on' => $showAll && (! $hideEmpty || $emptyChains === 0)]) @if ($showAll && (! $hideEmpty || $emptyChains === 0)) aria-current="true" @endif
+                       href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}"
+                       title="{{ $showAll ? 'Showing all chains' : 'Show all chains' }}">All chains<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains) }}</span></a>
+                </span>
+
+                <span class="action-bar-end">
+                    <span class="dg-shown">{{ \App\Support\Format::n($rows->count()) }}
+                        {{ Str::plural('shift', $rows->count()) }}</span>
+                    @isset($extract)
+                        <button type="button" class="btn-ghost" data-drawer-open="dg-stockrecon-{{ $run->Id }}-extract">Extract</button>
+                    @endisset
+                </span>
             </x-action-bar>
         @endif
 
-        @if ($showAll && $emptyChains > 0)
-            {{-- Counted out loud, with the way back. A screen that silently
+        @if (! $run->isOpen() && $showAll && $emptyChains > 0)
+            {{-- Counted out loud, with the way back. On an open run this is in
+                 the action bar's far end, with the count. A screen that silently
                  decides what you are not allowed to see is worse than a long
                  one — and on a branch-month these are most of the length. --}}
-            <p class="field-help" style="margin:10px 14px 0">
+            <p class="field-help" style="margin:6px 14px 0">
                 {{ \App\Support\Format::n($emptyChains) }}
                 {{ Str::plural('chain', $emptyChains) }}
                 ({{ \App\Support\Format::n($emptyLines->count()) }}
@@ -211,17 +251,9 @@
             </p>
         @endif
 
-        @if ($run->isOpen())
-            <p class="field-help" style="margin:10px 14px 0">
-                @if ($showAll)
-                    Showing all chains — <a href="{{ request()->fullUrlWithQuery(['scope' => 'amendable', 'empty' => 'hide']) }}">show amendable chains</a>.
-                @else
-                    Showing amendable chains; {{ \App\Support\Format::n($hiddenChains) }} {{ Str::plural('chain', $hiddenChains) }} with nothing to amend hidden —
-                    <a href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}">show all chains</a>.
-                @endif
-            </p>
-        @endif
-        <p class="field-help" style="margin:10px 14px 0">Each chain row shows the number of shifts across its date range. Open it to see each numbered shift.</p>
+        @unless ($run->isOpen())
+            <p class="field-help" style="margin:6px 14px 6px">Each chain row shows the number of shifts across its date range. Open it to see each numbered shift.</p>
+        @endunless
 
         {{-- `data-tt-page`: browser paging over rows that are all already here.
              See the head of this file for why that is allowed on a form that
@@ -364,10 +396,10 @@
                     <td class="num" data-sort="{{ \App\Support\Format::n($chain->last()->QtyClose, 3) }}">{{ \App\Support\Format::qty($chain->last()->QtyClose) }}</td>
                     <td class="num" data-sort="{{ abs($chain->pos()) < 0.0005 ? '—' : \App\Support\Format::n($chain->pos(), 3) }}">{{ abs($chain->pos()) < 0.0005 ? '—' : \App\Support\Format::qty($chain->pos()) }}</td>
                     <td class="num" data-sort="{{ abs($chain->variance()) < 0.0005 ? '—' : \App\Support\Format::n($chain->variance(), 3) }}">{{ abs($chain->variance()) < 0.0005 ? '—' : \App\Support\Format::qty($chain->variance()) }}</td>
-                    <td class="num grp" data-sort="{{ \App\Support\Format::n($first->QtyOpenNew, 3) }}">{{ \App\Support\Format::qty($first->QtyOpenNew) }}</td>
-                    <td class="num" data-sort="{{ \App\Support\Format::n($chain->last()->QtyCloseNew, 3) }}">{{ \App\Support\Format::qty($chain->last()->QtyCloseNew) }}</td>
+                    <td @class(['num', 'grp', 'is-changed' => abs((float) $first->QtyOpenNew - (float) $first->QtyOpen) > 0.0005]) data-sort="{{ \App\Support\Format::n($first->QtyOpenNew, 3) }}">{{ \App\Support\Format::qty($first->QtyOpenNew) }}</td>
+                    <td @class(['num', 'is-changed' => abs((float) $chain->last()->QtyCloseNew - (float) $chain->last()->QtyClose) > 0.0005]) data-sort="{{ \App\Support\Format::n($chain->last()->QtyCloseNew, 3) }}">{{ \App\Support\Format::qty($chain->last()->QtyCloseNew) }}</td>
                     <td class="num" title="Units the balancing moves on this chain, either way" data-sort="{{ $chain->moved() < 0.0005 ? '—' : \App\Support\Format::n($chain->moved(), 3) }}">{{ $chain->moved() < 0.0005 ? '—' : \App\Support\Format::qty($chain->moved()) }}</td>
-                    <td class="num" data-sort="{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::n($chain->varianceNew(), 3) }}">{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::qty($chain->varianceNew()) }}</td>
+                    <td @class(['num', 'is-changed' => abs($chain->varianceNew() - $chain->variance()) > 0.0005]) data-sort="{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::n($chain->varianceNew(), 3) }}">{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::qty($chain->varianceNew()) }}</td>
                     @if ($run->isOpen())
                         {{-- AMEND THIS ONE CHAIN, without touching the ticks
                              (the per-shift button of 11 Sep 2026, moved up to
@@ -475,10 +507,10 @@
                         @endif
                         {{ (float) $line->QtyVar === 0.0 ? '—' : \App\Support\Format::qty($line->QtyVar) }}
                     </td>
-                    <td class="num grp" data-sort="{{ \App\Support\Format::n($line->QtyOpenNew, 3) }}">{{ \App\Support\Format::qty($line->QtyOpenNew) }}</td>
-                    <td class="num" data-sort="{{ \App\Support\Format::n($line->QtyCloseNew, 3) }}">{{ \App\Support\Format::qty($line->QtyCloseNew) }}</td>
+                    <td @class(['num', 'grp', 'is-changed' => abs((float) $line->QtyOpenNew - (float) $line->QtyOpen) > 0.0005]) data-sort="{{ \App\Support\Format::n($line->QtyOpenNew, 3) }}">{{ \App\Support\Format::qty($line->QtyOpenNew) }}</td>
+                    <td @class(['num', 'is-changed' => abs((float) $line->QtyCloseNew - (float) $line->QtyClose) > 0.0005]) data-sort="{{ \App\Support\Format::n($line->QtyCloseNew, 3) }}">{{ \App\Support\Format::qty($line->QtyCloseNew) }}</td>
                     <td class="num" data-sort="{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::n($line->AmendClose, 3) }}">{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::qty($line->AmendClose) }}</td>
-                    <td class="num" data-sort="{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($line->QtyVarNew, 3) }}">{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::qty($line->QtyVarNew) }}</td>
+                    <td @class(['num', 'is-changed' => abs((float) $line->QtyVarNew - (float) $line->QtyVar) > 0.0005]) data-sort="{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($line->QtyVarNew, 3) }}">{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::qty($line->QtyVarNew) }}</td>
                     @if ($run->isOpen())
                         <td class="fit-min"></td>
                     @endif

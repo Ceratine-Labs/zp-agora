@@ -1738,7 +1738,7 @@ class BalancingTest extends TestCase
         $this->get(route('app.stockrecon.run', $run))
             ->assertOk()
             ->assertSee('Showing amendable chains')
-            ->assertSee('show all chains')
+            ->assertSee('Show all chains')
             ->assertSee('Default filters')
             ->assertSee('data-tt-restore-defaults="stockrecon-lines-'.$run->Id.'"', false)
             ->assertSee('data-tt-pills="Balanced|Duplicate issue removed|Missing issue captured|Issue reduced|Short|Possible duplicate|Blocked|Hand amendment reversed|Unrecorded issue|Dormant"', false)
@@ -2026,8 +2026,9 @@ class BalancingTest extends TestCase
         $this->actingAs($this->person('admin'))
             ->get(route('app.stockrecon.line', [$run, $line]), ['X-Requested-With' => 'XMLHttpRequest'])
             ->assertOk()
-            ->assertSee('Short 2 · nothing to balance')
-            ->assertSee('no over to set it against')
+            // The panel is the grid alone since 12 Nov 2026; the verdict is
+            // the chain row's, asserted above.
+            ->assertDontSee('Chain total (T)')
             ->assertDontSee('Balanceable');
     }
 

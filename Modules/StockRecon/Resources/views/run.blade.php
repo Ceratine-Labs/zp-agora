@@ -8,7 +8,7 @@
      left on the reading measure; see `table.dt.fit` for what that cost. --}}
 @php(request()->attributes->set('loader_hold', 'Preparing the run…'))
 <x-app-shell :title="'Run #'.$run->Id" wide>
-    <x-page-head
+    <x-page-head compact
         eyebrow="Stock recon centre"
         :title="'Run #'.$run->Id.' — '.($branch?->Name ?? 'site '.$run->BranchId)"
         :blurb="$run->FromDate->format('j M Y').' to '.$run->ToDate->format('j M Y')
@@ -64,7 +64,7 @@
 
     @include('stockrecon::partials.released-notice')
 
-    <x-tabs :items="$tabs" :active="$tab" query="tab" label="Run" style="margin:16px 0">
+    <x-tabs :items="$tabs" :active="$tab" query="tab" label="Run" style="margin:0">
         @foreach ($panes as $key => $pane)
             <x-tab-panel :key="$key">
                 @include('stockrecon::panes.'.$key, $pane)

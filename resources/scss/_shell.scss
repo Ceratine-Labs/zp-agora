@@ -269,7 +269,7 @@ nav.primary { display: flex; align-items: stretch; flex: 1; min-width: 0; overfl
    fifteen-column table needs it most. Floored at the ordinary measure, `wide`
    can now only ever add width, which is the only thing a caller ever means by
    it. Measured 9 Sep 2026 on the stock recon proposals table. */
-body.is-wide .shell-in { max-width: min(2200px, max(1800px, calc(100vw - 96px))); }
+body.is-wide .shell-in { max-width: min(2200px, max(1800px, calc(100vw - 24px))); padding: 0 12px; }
 
 /* Widening the page must not widen the PROSE. A paragraph is read, and a line
    of it running 1800px is harder to follow than the same line at 1560 — the
@@ -281,7 +281,9 @@ body.is-wide {
   .prose,
   .notice-body { max-width: 96ch; }
 }
-.shell-main { padding: 22px 0 40px; flex: 1; }
+/* 14 and 16, from 22 and 40 (12 Nov 2026): on a screen whose table runs to the
+   bottom of the window, every pixel here is a pixel of rows. */
+.shell-main { padding: 14px 0 16px; flex: 1; }
 .shell-foot {
   border-top: 1px solid var(--line); padding: 10px 0; background: var(--surface-2);
   .shell-in { display: flex; gap: 8px; font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }

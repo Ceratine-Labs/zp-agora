@@ -18,6 +18,22 @@
   .page-actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; }
 }
 .page-heading { display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* `compact`: for a screen whose table needs the height. Smaller art, and the
+   blurb on the title's line. */
+.page-head.is-compact {
+  margin-bottom: 8px; align-items: center;
+  .page-head-art { --feature-art-size: 44px; }
+  .page-heading-copy { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 14px; }
+  .eyebrow { flex-basis: 100%; margin-bottom: 0; }
+  h1 { font-size: 24px; }
+  .blurb { margin: 0; }
+  /* Four buttons on one line at 1366, where they wrapped and cost a row. */
+  .page-actions { flex-wrap: nowrap; gap: 6px; }
+  .page-actions .btn-ghost { padding: 5px 10px; font-size: 12.5px; white-space: nowrap; }
+}
+@media (max-width: 900px) {
+  .page-head.is-compact .page-actions { flex-wrap: wrap; }
+}
 .page-heading-copy { min-width: 0; }
 .page-head-art { --feature-art-size: 72px; }
 @media (max-width: 760px) {
@@ -404,6 +420,87 @@ div.emptystate { padding: 44px 20px; text-align: center; }
    --------------------------------------------------------------------------- */
 .table-block { display: block; }
 .tl-chooser { position: relative; display: inline-block; margin: 0 0 6px; }
+/* A TABLE WITH TOOLS SHARES ITS ROWS (12 Nov 2026). The pill strip, the
+   layout chooser, the pager and the footer each had a full-width row of their
+   own: 42px for a button that says "Table layout", and a pager stacked on a
+   footer that both say "1–50 of 88". On a grid the chooser sits in the strip's
+   bottom-right corner — the last row of pills is the short one — and the pager
+   shares the footer's row. Nothing moves in the document, so every script that
+   finds these by their place still does. */
+.table-block:has(> .tt-pills, > .tt-pager) {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+
+  > * { grid-column: 1 / -1; min-width: 0; }
+  > .tt-pills { grid-row: 1; }
+  > .tl-chooser {
+    grid-row: 1; grid-column: 2; align-self: end; justify-self: end;
+    margin: 0 12px 5px 0; z-index: 2;
+    > summary { padding: 3px 10px; font-size: 12px; line-height: 18px; }
+    > .tl-panel { left: auto; right: 0; }
+  }
+  > .table-scroll { grid-row: 2; }
+  > .table-empty { grid-row: 3; }
+  > .table-foot { grid-row: 4; }
+  > .tt-pager { grid-row: 4; grid-column: 2; align-self: stretch; }
+  > .tt-pager::before { content: none; }
+}
+.table-block:has(> .tt-pager:not([hidden])) > .table-foot { grid-column: 1; }
+
+/* A table opened inside another table's row — the chain behind a stock recon
+   proposal. Its chooser shares the footer's row for the same reason, and its
+   frame takes its content's height: the table it sits in is the one that
+   scrolls, and a second frame inside the first was a second scrollbar. */
+.table-scroll .table-block {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+
+  > * { grid-column: 1 / -1; min-width: 0; }
+  > .table-scroll { grid-row: 1; max-height: none; }
+  > .table-empty { grid-row: 2; }
+  > .table-foot { grid-row: 3; }
+  > .tl-chooser {
+    grid-row: 3; grid-column: 2; align-self: center; justify-self: end; margin: 0 8px 0 0;
+    > summary { padding: 2px 9px; font-size: 11.5px; line-height: 18px; }
+    > .tl-panel { left: auto; right: 0; }
+  }
+}
+
+@media (max-width: 720px) {
+  .table-block:has(> .tt-pills, > .tt-pager) {
+    grid-template-columns: minmax(0, 1fr);
+    > .tl-chooser { grid-row: auto; grid-column: 1; justify-self: start; margin: 4px 12px; }
+    > .tt-pills { grid-row: auto; }
+    > .table-scroll, > .table-empty, > .table-foot, > .tt-pager { grid-row: auto; grid-column: 1; }
+  }
+}
+
+/* AN AMENDED FIGURE THAT IS NOT THE COUNTED ONE (Ryan, 12 Nov 2026: "highlight
+   difference between amended and original ... just in the grid"). The amended
+   block repeats the original's columns, and which cells moved was left to the
+   reader. Weight and a wash in the "good" tone, because a moved figure is the
+   balancing doing its work; the row's own wash (the shift the reader came
+   from, a balance group's rail) stays underneath. */
+table.dt tbody tr > td.is-changed,
+table.dt tbody tr.tt-group > td.is-changed,
+table.dt tbody tr.is-matched > td.is-changed {
+  background: var(--good-bg); color: var(--good-ink); font-weight: 700;
+  box-shadow: inset 0 -2px 0 var(--good);
+}
+
+/* On a laptop the strip drops the states this run has none of. On a wide
+   window they stay, greyed, so the strip keeps one shape from run to run and
+   "none blocked" reads as an answer; at 1366 they were a third row of pills
+   that could not be pressed, above a table with room for five rows. */
+@media (max-width: 1500px) {
+  .tt-pills .tt-pill:disabled { display: none; }
+}
+
+/* The last card of a tab pane ends the page; its margin was 18px of nothing
+   between a table and the footer. */
+.tabpane > .card:last-child { margin-bottom: 0; }
+
+/* The scope pills in a stock recon action bar: links wearing the pill. */
+a.tt-pill { text-decoration: none; }
+.action-bar .scope-pills { padding-left: 12px; border-left: 1px solid var(--line); }
 .tl-panel {
   position: absolute; z-index: 30; left: 0; min-width: 245px; max-height: 65vh;
   overflow: auto; padding: 12px; background: var(--surface); color: var(--ink);
@@ -642,6 +739,7 @@ table.dt thead th.is-filtered::after {
     &.is-filtered { box-shadow: inset 0 -2px 0 var(--brand); }
   }
 }
+table.dt.fit .tt-filters th { padding-left: 3px; padding-right: 3px; }
 
 /* THE FILTER ROW WAS SETTING EVERY COLUMN WIDTH, which is not what a filter
    row is for and is the reason this block is so fussy.
@@ -678,6 +776,15 @@ table.dt thead th.is-filtered::after {
 
   input { width: 46px; flex: 1 1 auto; }
   input[type="date"] { width: 118px; }
+
+  /* A `fit` table is the wide one, and its numeric columns are pinned to this
+     cell's width, eleven times over. At 46 the stock recon proposals came out
+     2074px in an 1834px frame on a 1920 window: a sideways scrollbar for the
+     sake of filter boxes nobody had typed in (12 Nov 2026). 30 holds three
+     digits, and the box still grows into any column that is wider. */
+  table.dt.fit & input:not([type="date"]):not([type="search"]) { width: 30px; }
+  table.dt.fit & { gap: 2px; }
+  table.dt.fit & .tt-op { flex-basis: 32px; width: 32px; }
 
   // A single glyph and the browser's arrow. 44 was generous for = ≠ > ≥ < ≤,
   // and it was costing 10px on every numeric column in the grid.
@@ -761,7 +868,7 @@ tr.tt-page-out { display: none; }
    --------------------------------------------------------------------------- */
 .tt-pills {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  padding: 6px 14px; border-bottom: 1px solid var(--line);
   background: var(--surface-2);
 }
 
@@ -870,7 +977,7 @@ table.dt tr[class*="bal-g"] td:first-child { box-shadow: inset 4px 0 0 var(--bal
    --------------------------------------------------------------------------- */
 .tt-pager {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-  padding: 9px 14px; border-top: 1px solid var(--line);
+  padding: 5px 14px; border-top: 1px solid var(--line);
   font-size: 12px; color: var(--ink-2);
 
   &[hidden] { display: none; }
@@ -931,12 +1038,18 @@ table.dt tr[class*="bal-g"] td:first-child { box-shadow: inset 4px 0 0 var(--bal
    --------------------------------------------------------------------------- */
 .action-bar {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 10px 14px;
+  padding: 7px 14px;
   background: var(--surface-2);
   border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
 
   .action-bar-note { margin: 0; flex: 1 1 260px; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
   .action-bar-gap { margin-left: auto; }
+  /* The far end: a row count and an extract, after the scope note whatever
+     the markup order — the bar that used to be a box of its own above this. */
+  .action-bar-end {
+    order: 2; margin-left: auto; display: flex; align-items: center; gap: 10px;
+    font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+  }
 
   /* A control that gates the press — the manual match's reason — sits beside
      it rather than under the lists, because it appears at the moment the
@@ -1379,7 +1492,7 @@ table.dt[data-tt-group-detail] .pick-target {
 .dup-pane { padding: 4px 14px 14px; min-width: 0; }
 
 .drill-chain {
-  padding: 12px 14px; min-width: 0;
+  padding: 6px 14px 8px; min-width: 0;
 
   > header {
     margin: 0 0 10px;
