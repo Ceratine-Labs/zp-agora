@@ -114,6 +114,8 @@ return [
         'app.setup.employees' => EmployeeGrid::class,
         'app.setup.employee-posts' => EmployeePostGrid::class,
         'app.setup.employee-areas' => EmployeeAreaGrid::class,
+        'app.setup.suppliers' => \Modules\Partners\Grids\SupplierGrid::class,
+        'app.setup.customers' => \Modules\Partners\Grids\CustomerGrid::class,
 
         // The per-branch stock master: the customer's row unless Agora holds
         // a live override for it, with cost, GP, stock on hand and last
