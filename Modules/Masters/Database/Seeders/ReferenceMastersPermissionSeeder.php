@@ -32,6 +32,9 @@ class ReferenceMastersPermissionSeeder extends Seeder
         'standardcategories' => 'See the standard categories, their supplier and sales GL codes and the POS categories mapped to each',
         'categorygl' => 'See every POS category\'s standard category, profit centre, GL codes and GP / days-cover band, per branch',
         'expenses' => 'See the expense codes: GL account, VAT, asset flag and approver, per branch',
+        'tills' => 'See the tills at each site, their POS and when each last cashed up',
+        'shifts' => 'See the shifts at each site and when each last cashed up',
+        'transactiontypes' => 'See the purchase-request transaction types and document counters at each site',
     ];
 
     public function run(): void

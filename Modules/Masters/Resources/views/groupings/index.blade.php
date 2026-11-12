@@ -16,8 +16,8 @@
         @php($rows = $groupings->get($kind, collect()))
         <x-card :title="$kind === 'Format' ? 'Formats' : $kind.'s'" :sub="$rows->count().' in all'">
             <x-table :layout-key="'Masters.groupings.'.$kind" tools procedure="agora.usp_Masters_GetBranchGroupings" :count="$rows->count()">
-                <thead><tr><th>Name</th><th>Branches</th><th>Carried by</th><th>In use</th><th>From PumpIT</th><th></th></tr></thead>
-                <tbody>@foreach ($rows as $row)
+                <x-slot:head><tr><th>Name</th><th>Branches</th><th>Carried by</th><th>In use</th><th>From PumpIT</th><th></th></tr></x-slot:head>
+                @foreach ($rows as $row)
                     <tr>
                         <td>{{ $row->Name }}</td>
                         <td class="num">{{ $row->BranchCount }}</td>
@@ -40,7 +40,7 @@
                             @endcan
                         </td>
                     </tr>
-                @endforeach</tbody>
+                @endforeach
             </x-table>
             @can('masters.groupings.save')
                 <details>

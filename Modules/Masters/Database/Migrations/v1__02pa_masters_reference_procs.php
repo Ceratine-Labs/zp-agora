@@ -17,6 +17,9 @@ return new class extends ProcedureMigration
             $this->path().'/usp_Masters_GridStandardCategories.sql',
             $this->path().'/usp_Masters_GridCategoryGlCodes.sql',
             $this->path().'/usp_Masters_GridExpenses.sql',
+            $this->path().'/usp_Masters_GridTills.sql',
+            $this->path().'/usp_Masters_GridShifts.sql',
+            $this->path().'/usp_Masters_GridTransactionTypes.sql',
         ];
     }
 };

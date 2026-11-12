@@ -41,10 +41,16 @@ class ReferenceMastersMenuSeeder extends Seeder
         'business/categories' => ['business', 'Categories and GP bands', 'categories', 'categorygl', 30],
         'business/standard-categories' => ['business', 'Standard categories', 'standard-categories', 'standardcategories', 40],
         'trading-rules/expense-codes' => ['trading-rules', 'Expense codes', 'expense-codes', 'expenses', 60],
+        'site-setup/tills' => ['site-setup', 'Tills', 'tills', 'tills', 10],
+        'site-setup/shifts' => ['site-setup', 'Shifts', 'shifts', 'shifts', 20],
+        'site-setup/transaction-types' => ['site-setup', 'Transaction types', 'transaction-types', 'transactiontypes', 30],
     ];
 
     public function run(): void
     {
+        // The one column Core did not seed: the masters with no placeholder.
+        MenuService::item('ho', 'setup', ['path' => 'site-setup', 'label' => 'Sites and forecourt', 'sort' => 25]);
+
         foreach (self::ITEMS as $path => [$parent, $label, $slug, $resource, $sort]) {
             MenuService::item('ho', 'setup', [
                 'path' => $path,

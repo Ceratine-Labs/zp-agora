@@ -39,8 +39,8 @@
         <x-empty-state text="Nothing recorded yet." />
     @else
         <x-table layout-key="Masters.branches.history" tools>
-            <thead><tr><th>When</th><th>Who</th><th>What</th><th>Before</th><th>After</th><th>Why</th></tr></thead>
-            <tbody>@foreach ($history as $change)
+            <x-slot:head><tr><th>When</th><th>Who</th><th>What</th><th>Before</th><th>After</th><th>Why</th></tr></x-slot:head>
+            @foreach ($history as $change)
                 <tr>
                     <td>{{ \App\Support\BusinessDate::show($change->CreatedAt) }}</td>
                     <td>{{ $change->ChangedByName ?? ($change->Source === 'migrate' ? 'Migration' : $change->CreatedBy) }}</td>
@@ -49,7 +49,7 @@
                     <td>{{ $change->NewValue ?? '—' }}</td>
                     <td>{{ $change->Reason }}</td>
                 </tr>
-            @endforeach</tbody>
+            @endforeach
         </x-table>
     @endif
 </x-card>

@@ -27,10 +27,10 @@
         @else
             @php($headings = array_keys(get_object_vars($set->first())))
             <x-table :layout-key="'Masters.'.$definition->slug().'.related.'.$index" :procedure="$definition->procedureName()" :count="$set->count()">
-                <thead><tr>@foreach ($headings as $heading)<th>{{ $heading }}</th>@endforeach</tr></thead>
-                <tbody>@foreach ($set as $item)
+                <x-slot:head><tr>@foreach ($headings as $heading)<th>{{ $heading }}</th>@endforeach</tr></x-slot:head>
+                @foreach ($set as $item)
                     <tr>@foreach ($headings as $heading)<td>{{ $item->{$heading} ?? '—' }}</td>@endforeach</tr>
-                @endforeach</tbody>
+                @endforeach
             </x-table>
         @endif
     </x-card>

@@ -158,6 +158,26 @@ class ReferenceMastersTest extends TestCase
         $this->assertSame([], $rows->pluck('Vat')->map(fn ($v) => (int) $v)->unique()->diff([0, 15])->values()->all());
     }
 
+    public function test_tills_are_per_site_with_their_pos(): void
+    {
+        $this->assertPerBranchListing('tills', 'tills', 'agora.usp_Masters_GridTills', 'vw_Till', 'TillDescription');
+    }
+
+    public function test_shifts_are_per_site_and_never_joined_on_the_number_alone(): void
+    {
+        $this->assertPerBranchListing('shifts', 'shifts', 'agora.usp_Masters_GridShifts', 'vw_Shift', 'ShiftDescription');
+
+        // Three numbers estate-wide; a site lists each of its own once.
+        $everywhere = $this->rows('agora.usp_Masters_GridShifts', implode(',', $this->db()->table('agora.Branch')->pluck('BranchId')->all()));
+        $this->assertLessThanOrEqual(3, $everywhere->pluck('ShiftNo')->unique()->count());
+        $this->assertSame($everywhere->count(), $everywhere->map(fn ($r) => $r->BranchId.':'.$r->ShiftNo)->unique()->count(), 'One row per (site, shift) — no fan-out.');
+    }
+
+    public function test_transaction_types_carry_their_document_counter(): void
+    {
+        $this->assertPerBranchListing('transaction-types', 'transactiontypes', 'agora.usp_Masters_GridTransactionTypes', 'vw_MasterTransactionType', 'TypeDescription');
+    }
+
     /**
      * What every per-branch master must do: refuse without a branch, list
      * exactly the chosen site's rows — the count the view holds for it — and
