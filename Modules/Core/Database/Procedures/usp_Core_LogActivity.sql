@@ -51,7 +51,10 @@ BEGIN
         THROW 51000, @noUser, 1;
     END
 
-    DECLARE @now DATETIME2(0) = ISNULL(@OccurredAt, SYSDATETIME());
+    /* UTC, the application's clock: ActivityLogger passes now() in UTC, and a
+       caller that passes nothing must not land two hours out on the
+       customer's SAST server (feature-rules §1, time rule 1). */
+    DECLARE @now DATETIME2(0) = ISNULL(@OccurredAt, SYSUTCDATETIME());
 
     INSERT INTO agora.UserActivity
         (BranchId, UserId, Activity, Detail, IpAddress, UserAgent, OccurredAt, CreatedAt, CreatedBy)
