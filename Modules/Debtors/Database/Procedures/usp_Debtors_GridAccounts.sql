@@ -14,20 +14,26 @@
    (debtors:send-statements) reads the same rows, so the screen and the run
    cannot disagree about who is due one.
 
-   THE ARITHMETIC is agora.vw_DebtorLedger's — the POS ledger, account
-   postings only, each once:
-     Opening  = every posting before @DateFrom
-     Debits   = invoices, debit notes and debit journals in the period
-     Credits  = payments, credit notes and credit journals in the period
+   THE ARITHMETIC is agora.vw_DebtorStatementLedger's (12 Nov 2026, as ZP
+   asked): invoices and credit notes from MIST_Trans_Customer, each document
+   once; payments from the Debtors bank lines (RCN_BankStatementLinesPumpIT)
+   by customer code; and the balance PumpIT took the account on with.
+     Opening  = every posting before @DateFrom, the take-on included
+     Debits   = invoices in the period (and a bank refund)
+     Credits  = payments and credit notes in the period
      Closing  = Opening + Debits - Credits
    A NEGATIVE balance is money the debtor has paid ahead, which is how many
    fuel accounts run.
 
-   HOW FAR BACK. The ledger PumpIT holds starts on 1 Jun 2023 at most sites
-   (22 Apr 2026 at Teds, 1 Sep 2026 at Wimpy Ladysmith). An account older than
-   that has no take-on balance in it, so its opening is whatever moved since —
-   which is why sending is off until the customer has checked the balances
-   (config debtors.send_mode).
+   CustomerCode is the PumpIT customer code (NGS00013) the statement shows
+   as its account number; AccountNo stays the till account (1002), which the
+   address list, the send record and the screen's URL are keyed on.
+
+   HOW FAR BACK. MIST holds documents from late June 2023 at most sites. An
+   account without a take-on balance (872 of 897 customers) has none from
+   before then, so its opening is whatever moved since — which is why sending
+   is off until the customer has checked the balances (config
+   debtors.send_mode).
 
    The grid procedure template (feature-rules §2), nine parameters, plus
    @AllowedBranchIds — every site the caller may see at all. Empty means no
@@ -40,7 +46,7 @@
 
    READ-ONLY.
 
-     EXEC agora.usp_Debtors_GridAccounts @BranchIds = '25', @DateFrom = '2026-09-01', @DateTo = '2026-09-30';
+     EXEC agora.usp_Debtors_GridAccounts @BranchIds = '25', @DateFrom = '2026-09-01', @DateTo = '2026-10-31';
    ============================================================================ */
 
 CREATE OR ALTER PROCEDURE [agora].[usp_Debtors_GridAccounts]
@@ -109,6 +115,8 @@ BEGIN
             @fBranchOp  nvarchar(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'BranchName'),
             @fAccount   nvarchar(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'AccountNo'),
             @fAccountOp nvarchar(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'AccountNo'),
+            @fCode      nvarchar(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'CustomerCode'),
+            @fCodeOp    nvarchar(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'CustomerCode'),
             @fName      nvarchar(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'AccountName'),
             @fNameOp    nvarchar(20)  = (SELECT TOP 1 [Op]    FROM @Filter WHERE [Column] = 'AccountName'),
             @fEmail     nvarchar(400) = (SELECT TOP 1 [Value] FROM @Filter WHERE [Column] = 'Email'),
@@ -130,22 +138,35 @@ BEGIN
         CONVERT(decimal(18,2), SUM(CASE WHEN l.TransactionDate >= @DateFrom THEN l.Credit ELSE 0 END)) AS Credits,
         CONVERT(decimal(18,2), SUM(l.Amount))                                              AS Closing,
         SUM(CASE WHEN l.TransactionDate >= @DateFrom THEN 1 ELSE 0 END)                    AS Postings,
-        MAX(CASE WHEN l.TranCode = 'R' THEN l.TransactionDate END)                         AS LastPayment,
-        MAX(l.TransactionDate)                                                             AS LastActivity
+        MAX(CASE WHEN l.TranCode = 'R' AND l.Amount < 0 THEN l.TransactionDate END)        AS LastPayment,
+        MAX(CASE WHEN l.TranCode <> 'O' THEN l.TransactionDate END)                        AS LastActivity
     INTO #Acct
-    FROM agora.vw_DebtorLedger l
+    FROM agora.vw_DebtorStatementLedger l
     WHERE l.TransactionDate <= @DateTo
       AND (@AllBranches = 1 OR l.BranchId IN (SELECT BranchId FROM @Branch))
       AND (@AllAllowed  = 1 OR l.BranchId IN (SELECT BranchId FROM @Allowed))
     GROUP BY l.BranchId, l.AccountNo
     OPTION (RECOMPILE);
 
+    /* The PumpIT customer code(s) and name behind each till account. */
+    SELECT c.SSBranchId AS BranchId,
+           CONVERT(nvarchar(16), LTRIM(RTRIM(c.DebtorID)))                                      AS AccountNo,
+           STRING_AGG(CONVERT(nvarchar(max), LTRIM(RTRIM(c.CustomerCode))), ', ')
+               WITHIN GROUP (ORDER BY LTRIM(RTRIM(c.CustomerCode)))                             AS CustomerCode,
+           MIN(NULLIF(LTRIM(RTRIM(c.CustomerName)), ''))                                        AS CustomerName
+    INTO #Cust
+    FROM [PumpIT].dbo.BRN_Customers c
+    WHERE LTRIM(RTRIM(ISNULL(c.DebtorID, ''))) <> ''
+      AND c.SSBranchId IN (SELECT BranchId FROM #Acct)
+    GROUP BY c.SSBranchId, LTRIM(RTRIM(c.DebtorID));
+
     ;WITH base AS (
         SELECT
             a.BranchId,
             b.Name                                                AS BranchName,
             a.AccountNo,
-            COALESCE(m.AccountName, a.LedgerName, a.AccountNo)    AS AccountName,
+            CONVERT(nvarchar(400), ISNULL(k.CustomerCode, a.AccountNo)) AS CustomerCode,
+            COALESCE(k.CustomerName, m.AccountName, a.LedgerName, a.AccountNo) AS AccountName,
             a.Opening, a.Debits, a.Credits, a.Closing, a.Postings,
             a.LastPayment, a.LastActivity,
             c.Email,
@@ -159,6 +180,7 @@ BEGIN
             END                                                   AS [Status]
         FROM #Acct a
         LEFT JOIN agora.Branch b ON b.BranchId = a.BranchId
+        LEFT JOIN #Cust k ON k.BranchId = a.BranchId AND k.AccountNo = a.AccountNo
         LEFT JOIN agora.vw_DebtorAccount m ON m.BranchId = a.BranchId AND m.AccountNo = a.AccountNo
         LEFT JOIN agora.DebtorContact c ON c.BranchId = a.BranchId AND c.AccountNo = a.AccountNo
         OUTER APPLY (SELECT MAX(x.CreatedAt) AS LastSentAt FROM agora.DebtorStatementSend x
@@ -173,12 +195,15 @@ BEGIN
     WHERE (@Search IS NULL
            OR base.BranchName  LIKE '%' + @Search + '%'
            OR base.AccountNo   LIKE '%' + @Search + '%'
+           OR base.CustomerCode LIKE '%' + @Search + '%'
            OR base.AccountName LIKE '%' + @Search + '%'
            OR base.Email       LIKE '%' + @Search + '%')
       AND (@fBranch IS NULL OR (CASE WHEN @fBranchOp = 'eq' THEN CASE WHEN base.BranchName = @fBranch THEN 1 ELSE 0 END
                                      ELSE CASE WHEN base.BranchName LIKE '%' + @fBranch + '%' THEN 1 ELSE 0 END END) = 1)
       AND (@fAccount IS NULL OR (CASE WHEN @fAccountOp = 'eq' THEN CASE WHEN base.AccountNo = @fAccount THEN 1 ELSE 0 END
                                       ELSE CASE WHEN base.AccountNo LIKE '%' + @fAccount + '%' THEN 1 ELSE 0 END END) = 1)
+      AND (@fCode IS NULL OR (CASE WHEN @fCodeOp = 'eq' THEN CASE WHEN base.CustomerCode = @fCode THEN 1 ELSE 0 END
+                                   ELSE CASE WHEN base.CustomerCode LIKE '%' + @fCode + '%' THEN 1 ELSE 0 END END) = 1)
       AND (@fName IS NULL OR (CASE WHEN @fNameOp = 'eq' THEN CASE WHEN base.AccountName = @fName THEN 1 ELSE 0 END
                                    ELSE CASE WHEN base.AccountName LIKE '%' + @fName + '%' THEN 1 ELSE 0 END END) = 1)
       AND (@fEmail IS NULL OR (CASE WHEN @fEmailOp = 'eq' THEN CASE WHEN base.Email = @fEmail THEN 1 ELSE 0 END
@@ -192,7 +217,7 @@ BEGIN
 
     DECLARE @Total bigint = (SELECT COUNT_BIG(*) FROM #Rows);
 
-    SELECT BranchId, BranchName, AccountNo, AccountName, Opening, Debits, Credits, Closing, Postings,
+    SELECT BranchId, BranchName, AccountNo, CustomerCode, AccountName, Opening, Debits, Credits, Closing, Postings,
            LastPayment, LastActivity, Email, CcEmail, AutoSend, LastSentAt, [Status],
            @DateFrom AS PeriodFrom, @DateTo AS PeriodTo
     FROM #Rows
@@ -201,12 +226,14 @@ BEGIN
         CASE WHEN @SortAsc = 1 THEN
             CASE @SortColumn WHEN 'BranchName'  THEN BranchName
                              WHEN 'AccountNo'   THEN AccountNo
+                             WHEN 'CustomerCode' THEN CustomerCode
                              WHEN 'AccountName' THEN AccountName
                              WHEN 'Email'       THEN Email
                              WHEN 'Status'      THEN [Status] END END ASC,
         CASE WHEN @SortAsc = 0 THEN
             CASE @SortColumn WHEN 'BranchName'  THEN BranchName
                              WHEN 'AccountNo'   THEN AccountNo
+                             WHEN 'CustomerCode' THEN CustomerCode
                              WHEN 'AccountName' THEN AccountName
                              WHEN 'Email'       THEN Email
                              WHEN 'Status'      THEN [Status] END END DESC,

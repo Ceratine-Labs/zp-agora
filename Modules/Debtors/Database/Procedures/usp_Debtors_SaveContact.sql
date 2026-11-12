@@ -14,7 +14,8 @@
 
    RULES (a refusal is THROW 51000 'AGORA:{Code}:{message}'):
      BRANCH_NOT_ALLOWED  the site is outside @AllowedBranchIds
-     UNKNOWN_ACCOUNT     no posting and no master row for the account there
+     UNKNOWN_ACCOUNT     no posting and no customer or master row for the
+                         account there
      BAD_EMAIL           the address is not one
      BAD_CC              one of the copies is not an address
      EMAIL_REQUIRED      the monthly run needs somewhere to send
@@ -48,7 +49,8 @@ BEGIN
         THROW 51000, 'AGORA:BRANCH_NOT_ALLOWED:That site is not one of yours.', 1;
 
     IF @AccountNo IS NULL
-       OR (NOT EXISTS (SELECT 1 FROM agora.vw_DebtorLedger l WHERE l.BranchId = @BranchId AND l.AccountNo = @AccountNo)
+       OR (NOT EXISTS (SELECT 1 FROM agora.vw_DebtorStatementLedger l WHERE l.BranchId = @BranchId AND l.AccountNo = @AccountNo)
+           AND NOT EXISTS (SELECT 1 FROM [PumpIT].dbo.BRN_Customers k WHERE k.SSBranchId = @BranchId AND LTRIM(RTRIM(k.DebtorID)) = @AccountNo)
            AND NOT EXISTS (SELECT 1 FROM agora.vw_DebtorAccount m WHERE m.BranchId = @BranchId AND m.AccountNo = @AccountNo))
         THROW 51000, 'AGORA:UNKNOWN_ACCOUNT:There is no such account at that site.', 1;
 

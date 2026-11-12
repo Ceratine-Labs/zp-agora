@@ -7,6 +7,10 @@
     The note is printed as rendered: it is Agora's own Blade view
     (mail/statement), every value in it escaped there, inline styles only.
 
+    The attached statement is shown under the note, from the same PDF route
+    the send attaches — ZP's detailed layout, so the preview is the whole
+    mail, not only its covering note.
+
     Props: $account, $mode, $envelope, $subject, $body, $filename
 --}}
 @php
@@ -18,9 +22,9 @@
     $list = fn (array $addresses) => $addresses === [] ? null : implode(', ', $addresses);
 @endphp
 
-<x-app-shell :title="'Email preview '.$a->AccountNo">
+<x-app-shell :title="'Email preview '.$a->StatementAccountNo">
     <x-page-head eyebrow="Debtors statements · {{ $a->BranchName }}"
-                 :title="'Email preview · '.$a->AccountNo.' '.$a->AccountName"
+                 :title="'Email preview · '.$a->StatementAccountNo.' '.$a->AccountName"
                  :blurb="'Statement for '.Carbon::parse($period['from'])->format('j M Y').' to '.Carbon::parse($period['to'])->format('j M Y')">
         <x-slot:actions>
             <a class="btn" href="{{ route('app.debtors.show', $key + $period) }}">Back to the statement</a>
@@ -56,5 +60,10 @@
         <div data-mail-preview style="background:#fff; color:#111; padding:16px 20px; border-radius:6px; max-width:720px">
             {!! $body !!}
         </div>
+    </x-card>
+
+    <x-card title="The statement attached · {{ $filename }}">
+        <iframe src="{{ route('app.debtors.pdf', $key + $period) }}" title="The attached statement"
+                data-statement-pdf style="width:100%; height:640px; border:0; background:#fff; border-radius:6px"></iframe>
     </x-card>
 </x-app-shell>

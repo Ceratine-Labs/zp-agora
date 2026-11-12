@@ -22,14 +22,17 @@
         ?: implode(', ', array_filter([$a->Postal1, $a->Postal2, $a->Postal3, $a->Postal4]));
 @endphp
 
-<x-app-shell :title="'Statement '.$a->AccountNo">
+<x-app-shell :title="'Statement '.$a->StatementAccountNo">
     <x-page-head eyebrow="Debtors statements · {{ $a->BranchName }}"
-                 :title="$a->AccountNo.' · '.$a->AccountName"
-                 :blurb="'Statement for '.$d($a->PeriodFrom).' to '.$d($a->PeriodTo).($address !== '' ? ' · '.$address : '')">
+                 :title="$a->StatementAccountNo.' · '.$a->AccountName"
+                 :blurb="'Statement for '.$d($a->PeriodFrom).' to '.$d($a->PeriodTo).' · till account '.$a->AccountNo.($address !== '' ? ' · '.$address : '')">
         <x-slot:info>
-            <p>Every posting the till made to this account: invoices, debit notes and journals raise what is owed;
-               payments, credit notes and credit journals lower it. A balance marked CR is money the debtor has paid
-               ahead.</p>
+            <p>ZP's detailed debtor statement. Invoices and credit notes are the till's documents in
+               MIST_Trans_Customer, one row per slip; payments are the Debtors lines on the bank statement
+               (RCN_BankStatementLinesPumpIT) carrying this account's PumpIT customer code; the balance brought
+               forward includes the balance PumpIT took the account on with. A balance marked CR is money the
+               debtor has paid ahead.</p>
+            <p>KM and REG fill in from MIST_Trans_Customer.ODO and .REGNO once those columns exist.</p>
             <p>Ageing takes payments against the oldest charges first, so what is still owed is the newest charges
                adding up to the balance, each aged from its own date.</p>
         </x-slot:info>
@@ -91,7 +94,7 @@
 
     <x-kpi-strip>
         <x-kpi label="Brought forward" :value="$bal($a->Opening)" :note="'At '.$d($a->PeriodFrom)" />
-        <x-kpi label="Charged" :value="Format::r($a->Debits)" :note="$lines->where('Debit', '>', 0)->count().' posting(s)'" />
+        <x-kpi label="Charged" :value="Format::r($a->Debits)" :note="$lines->where('Debit', '>', 0)->count().' document(s)'" />
         <x-kpi label="Paid and credited" :value="Format::r($a->Credits)" :note="$lines->where('Credit', '>', 0)->count().' posting(s)'" />
         <x-kpi :label="(float) $a->Closing < 0 ? 'In credit' : 'Balance due'" :value="Format::r(abs((float) $a->Closing))"
                :note="'At '.$d($a->PeriodTo)" :tone="(float) $a->Age90 + (float) $a->Age120 > 0 ? 'warn' : 'neutral'" />
@@ -123,25 +126,28 @@
                  empty="Nothing was posted to this account in the period.">
             <x-slot:head>
                 <tr>
-                    <th>Date</th><th>Type</th><th>Reference</th><th>Detail</th><th>Order</th><th>Till</th>
-                    <th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>
+                    <th>Date</th><th>Document</th><th>Type</th><th>Description</th>
+                    <th class="num">Litres</th><th>Fuel type</th><th>KM</th><th>Reg</th><th>Order nr</th>
+                    <th class="num">Amount</th><th class="num">Balance</th>
                 </tr>
             </x-slot:head>
             <tr>
                 <td class="mono">{{ $period['from'] }}</td>
-                <td colspan="7"><em>Balance brought forward</em></td>
+                <td colspan="9"><em>Balance brought forward</em></td>
                 <td class="num">{{ $bal($a->Opening) }}</td>
             </tr>
             @foreach ($lines as $l)
                 <tr>
                     <td class="mono">{{ substr((string) $l->TransactionDate, 0, 10) }}</td>
+                    <td class="mono">{{ $l->DocumentNo }}</td>
                     <td>{{ $l->TranType }}</td>
-                    <td class="mono">{{ $l->Reference }}</td>
                     <td>{{ $l->Description }}</td>
+                    <td class="num">{{ $l->Litres !== null ? number_format((float) $l->Litres, 2) : '' }}</td>
+                    <td>{{ $l->FuelType }}</td>
+                    <td class="mono">{{ $l->Km }}</td>
+                    <td class="mono">{{ $l->Reg }}</td>
                     <td class="mono">{{ $l->OrderNo }}</td>
-                    <td class="mono">{{ $l->TillNo }}</td>
-                    <td class="num">{{ (float) $l->Debit != 0.0 ? Format::r($l->Debit) : '' }}</td>
-                    <td class="num">{{ (float) $l->Credit != 0.0 ? Format::r($l->Credit) : '' }}</td>
+                    <td class="num">{{ Format::r($l->Amount) }}</td>
                     <td class="num">{{ $bal($l->Balance) }}</td>
                 </tr>
             @endforeach
@@ -183,7 +189,7 @@
     </x-card>
 
     @can('debtors.contacts.edit')
-        <x-modal id="debtor-contact" title="Where {{ $a->AccountNo }}'s statement goes">
+        <x-modal id="debtor-contact" title="Where {{ $a->StatementAccountNo }}'s statement goes">
             <form method="POST" action="{{ route('app.debtors.contact', $key) }}">
                 @csrf
                 <x-field name="email" label="Email" type="email" :value="old('email', $a->Email)"

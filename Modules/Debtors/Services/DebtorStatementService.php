@@ -97,16 +97,18 @@ class DebtorStatementService
             'issuer' => $this->issuer(),
             'note' => (string) config('debtors.remittance_note', ''),
         ])->render());
-        $dompdf->setPaper('A4');
+        // ZP's detailed layout is eleven columns wide.
+        $dompdf->setPaper('A4', 'landscape');
         $dompdf->render();
 
         return (string) $dompdf->output();
     }
 
-    /** "Statement 114 2026-09.pdf" */
+    /** "Statement NGS00013 2026-09.pdf" — the account number the debtor knows */
     public function filename(object $account): string
     {
-        $safe = preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $account->AccountNo) ?: 'account';
+        $number = (string) ($account->StatementAccountNo ?? $account->AccountNo);
+        $safe = preg_replace('/[^A-Za-z0-9_-]+/', '-', $number) ?: 'account';
 
         return 'Statement '.$safe.' '.substr((string) $account->PeriodTo, 0, 7).'.pdf';
     }
@@ -368,7 +370,7 @@ class DebtorStatementService
 
         return [
             'site' => (string) $a->BranchName,
-            'accountNo' => (string) $a->AccountNo,
+            'accountNo' => (string) ($a->StatementAccountNo ?? $a->AccountNo),
             'accountName' => (string) $a->AccountName,
             'period' => $to->format('F Y'),
             'periodEnd' => $to->format('j F Y'),

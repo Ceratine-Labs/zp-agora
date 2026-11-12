@@ -40,16 +40,18 @@ class DebtorAccountGrid extends GridDefinition
 
     public function blurb(): ?string
     {
-        return 'Every account with a balance or a posting in the period, from the till\'s own debtors ledger. '
-            .'A row opens its statement.';
+        return 'Every account with a balance or a posting in the period: the till\'s invoices (MIST), the Debtors '
+            .'bank lines and the PumpIT take-on balance. A row opens its statement.';
     }
 
     public function columns(): array
     {
         return [
             new GridColumn(key: 'BranchName', label: 'Site', sort: 'BranchName'),
-            new GridColumn(key: 'AccountNo', label: 'Account', sort: 'AccountNo', mono: true, link: true,
-                title: 'The account number at the till. Opens the statement.'),
+            new GridColumn(key: 'CustomerCode', label: 'Account', sort: 'CustomerCode', mono: true, link: true,
+                title: 'The PumpIT customer code — the account number on the statement and the bank reference. Opens the statement.'),
+            new GridColumn(key: 'AccountNo', label: 'Till account', sort: 'AccountNo', mono: true,
+                title: 'The account number at the till (MIST BusinessPartnerCode).'),
             new GridColumn(key: 'AccountName', label: 'Name', sort: 'AccountName', wide: true),
             new GridColumn(key: 'Opening', label: 'Brought forward', format: 'money', sort: 'Opening', total: true,
                 title: 'Every posting before the period. Negative = paid ahead.'),
@@ -77,6 +79,7 @@ class DebtorAccountGrid extends GridDefinition
     {
         return [
             'BranchName' => new GridFilter(column: 'BranchName', type: 'text'),
+            'CustomerCode' => new GridFilter(column: 'CustomerCode', type: 'text'),
             'AccountNo' => new GridFilter(column: 'AccountNo', type: 'text'),
             'AccountName' => new GridFilter(column: 'AccountName', type: 'text'),
             'Email' => new GridFilter(column: 'Email', type: 'text'),

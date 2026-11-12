@@ -1,152 +1,173 @@
 {{--
-    A debtor's statement of account, as the PDF that is mailed and downloaded.
+    A debtor's statement, as the PDF that is mailed and downloaded — ZP's
+    DETAILED template (12 Nov 2026): title, period, a navy band with the
+    account, its email, the last transaction date and the balance due (to) /
+    from the customer, then one row per document with litres, fuel type, KM,
+    registration, order number, amount and the running balance.
+
+    Departures from the template, on purpose:
+      * the running balance starts from the balance brought forward, not from
+        nil, so the last row agrees with the balance in the band; the first
+        row says what was brought forward and the last what is carried;
+      * the ageing the statement has always carried sits under the table.
 
     Rendered by Dompdf, which reads a narrow, older dialect of CSS: tables for
     layout, no flex or grid, no custom properties, no web fonts (DejaVu Sans is
-    built in and carries the rand sign and every accented name). Self-contained
-    on purpose — remote loading is switched off in DebtorStatementService.
+    built in). Self-contained on purpose — remote loading is switched off in
+    DebtorStatementService. A4 landscape: eleven columns do not fit portrait.
 
     Every figure is agora.usp_Debtors_GetStatement's, exactly as the statement
-    screen shows it. Black on white: it is printed.
+    screen shows it.
 
     Props: $a (the account row), $lines, $issuer, $note
 --}}
 @php
-    use App\Support\Format;
     use Illuminate\Support\Carbon;
 
-    $d = fn ($v) => $v === null ? '' : Carbon::parse((string) $v)->format('d M Y');
-    $short = fn ($v) => $v === null ? '' : Carbon::parse((string) $v)->format('d/m/Y');
-    $m = fn ($v) => (float) $v == 0.0 ? '' : Format::r($v);
-    $bal = fn ($v) => (float) $v < 0 ? Format::r(abs((float) $v)).' CR' : Format::r($v);
-    $address = array_filter([$a->Address1, $a->Address2, $a->Address3, $a->Address4]);
-    if ($address === []) {
-        $address = array_filter([$a->Postal1, $a->Postal2, $a->Postal3, $a->Postal4]);
-    }
+    $ymd = fn ($v) => $v === null ? '' : Carbon::parse((string) $v)->format('Y/m/d');
+    $n2 = fn ($v) => $v === null ? '' : number_format((float) $v, 2, '.', '');
+    $navy = '#14127a';
 @endphp
 <!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Statement {{ $a->AccountNo }}</title>
+<title>Debtor statement {{ $a->StatementAccountNo }}</title>
 <style>
-    @page { margin: 18mm 14mm 20mm 14mm; }
-    body { font-family: "DejaVu Sans", sans-serif; font-size: 9pt; color: #111; }
-    h1 { font-size: 16pt; margin: 0 0 2mm 0; letter-spacing: 0.5pt; }
-    .muted { color: #000; }
-    .small { font-size: 7.5pt; }
+    @page { margin: 10mm 10mm 12mm 10mm; }
+    body { font-family: "DejaVu Sans", sans-serif; font-size: 8pt; color: #111; }
     table { border-collapse: collapse; width: 100%; }
-    .lines th { border-bottom: 0.8pt solid #111; text-align: left; padding: 1.5mm 1.2mm; font-size: 7.5pt; }
-    .lines td { border-bottom: 0.3pt solid #ccc; padding: 1mm 1.2mm; font-size: 8pt; white-space: nowrap; }
-    .num { text-align: right; white-space: nowrap; }
-    .age th { border: 0.6pt solid #888; padding: 1.5mm; font-size: 8pt; text-align: right; background: #eee; }
-    .age td { border: 0.6pt solid #888; padding: 2mm 1.5mm; text-align: right; }
+    h1 { font-size: 15pt; margin: 0; text-align: center; letter-spacing: 0.3pt; }
+    .period { font-size: 7.5pt; font-weight: bold; margin: 1.5mm 0 1.5mm 0; }
+    .band { background: {{ $navy }}; color: #fff; font-weight: bold; }
+    .band td { padding: 1.2mm 2.5mm; }
+    .band .big { font-size: 10.5pt; }
+    .lines th { background: {{ $navy }}; color: #fff; font-size: 7pt; font-weight: bold; text-align: center;
+                padding: 1.6mm 1mm; border: 0.4pt solid #fff; }
+    .lines td { border: 0.4pt solid #9a9a9a; padding: 1.1mm 1.2mm; font-size: 7.5pt; text-align: center; }
+    .lines td.l { text-align: left; }
+    .lines td.r { text-align: right; white-space: nowrap; }
+    .lines tr.edge td { font-style: italic; background: #f1f1f6; }
+    .age th { border: 0.5pt solid #888; padding: 1.2mm; font-size: 7pt; text-align: right; background: #eee; }
+    .age td { border: 0.5pt solid #888; padding: 1.5mm 1.2mm; text-align: right; }
+    .small { font-size: 7pt; }
 </style>
 </head>
 <body>
 
 <table>
     <tr>
-        <td style="width:55%; vertical-align:top">
-            <h1>STATEMENT</h1>
-            <div><strong>{{ $a->BranchName }}</strong></div>
+        <td style="width:30%"></td>
+        <td style="width:40%; vertical-align:bottom"><h1>DEBTOR STATEMENT</h1></td>
+        <td style="width:30%; vertical-align:top; text-align:right" class="small">
+            <strong>{{ $a->BranchName }}</strong>
             @if ($issuer !== '' && $issuer !== $a->BranchName)
-                <div class="muted">{{ $issuer }}</div>
+                <br>{{ $issuer }}
             @endif
-        </td>
-        <td style="width:45%; vertical-align:top">
-            <table>
-                <tr><td class="muted">Account</td><td class="num"><strong>{{ $a->AccountNo }}</strong></td></tr>
-                <tr><td class="muted">Statement date</td><td class="num">{{ $d($a->PeriodTo) }}</td></tr>
-                <tr><td class="muted">Period</td><td class="num">{{ $d($a->PeriodFrom) }} – {{ $d($a->PeriodTo) }}</td></tr>
-                @if ($a->CreditLimit !== null && (float) $a->CreditLimit > 0)
-                    <tr><td class="muted">Credit limit</td><td class="num">{{ Format::r($a->CreditLimit) }}</td></tr>
-                @endif
-            </table>
         </td>
     </tr>
 </table>
 
-<table style="margin-top:6mm">
+<div class="period">Date From : {{ $ymd($a->PeriodFrom) }},&nbsp; Date To : {{ $ymd($a->PeriodTo) }}</div>
+
+<table class="band">
     <tr>
-        <td style="width:55%; border:0.6pt solid #888; padding:3mm; vertical-align:top">
-            <strong>{{ $a->AccountName }}</strong><br>
-            @if ($a->Contact)
-                Attn: {{ $a->Contact }}<br>
-            @endif
-            @foreach ($address as $line)
-                {{ $line }}<br>
-            @endforeach
-            @if ($a->VatNo)
-                <span class="small muted">VAT {{ $a->VatNo }}</span>
-            @endif
-        </td>
-        <td style="width:5%"></td>
-        <td style="width:40%; border:0.6pt solid #888; padding:3mm; vertical-align:top">
-            <div class="muted">{{ (float) $a->Closing < 0 ? 'In credit' : 'Balance due' }}</div>
-            <div style="font-size:12pt; font-weight:bold">{{ Format::r(abs((float) $a->Closing)) }}</div>
-            <div class="small muted">at {{ $d($a->PeriodTo) }}</div>
-        </td>
+        <td class="big" style="width:22%; padding-top:2.5mm">ACCOUNT NUMBER</td>
+        <td class="big" style="width:30%; padding-top:2.5mm">{{ $a->StatementAccountNo }}</td>
+        <td style="width:30%"></td>
+        <td style="width:18%"></td>
+    </tr>
+    <tr>
+        <td class="big">ACCOUNT NAME</td>
+        <td class="big" colspan="3">{{ $a->AccountName }}</td>
+    </tr>
+    <tr>
+        <td class="big" style="padding-top:3mm">EMAIL :</td>
+        <td style="padding-top:3mm">{{ $a->Email }}</td>
+        <td style="padding-top:3mm">LAST TRANSACTION DATE</td>
+        <td style="padding-top:3mm">{{ $ymd($a->LastTransactionDate) }}</td>
+    </tr>
+    <tr>
+        <td style="padding-bottom:2.5mm"></td>
+        <td style="padding-bottom:2.5mm"></td>
+        <td style="padding-bottom:2.5mm">BALANCE DUE (TO) / FROM CUSTOMER</td>
+        <td style="padding-bottom:2.5mm">{{ $n2($a->Closing) }}</td>
     </tr>
 </table>
 
-<table class="lines" style="margin-top:6mm">
+<table class="lines" style="margin-top:1mm">
     <thead>
         <tr>
-            <th style="width:12%">Date</th>
-            <th style="width:12%">Type</th>
-            <th style="width:9%">Reference</th>
-            <th>Detail</th>
-            <th style="width:12%">Order</th>
-            <th class="num" style="width:11%">Debit</th>
-            <th class="num" style="width:11%">Credit</th>
-            <th class="num" style="width:13%">Balance</th>
+            <th style="width:8%">DOCUMENT<br>DATE</th>
+            <th style="width:8%">DOCUMENT<br>NUMBER</th>
+            <th style="width:7.5%">DOCUMENT<br>TYPE</th>
+            <th>DESCRIPTION</th>
+            <th style="width:5.5%">LT</th>
+            <th style="width:8.5%">FUEL TYPE</th>
+            <th style="width:6.5%">KM</th>
+            <th style="width:8.5%">REG</th>
+            <th style="width:7%">ORDER NR</th>
+            <th style="width:8%">AMOUNT</th>
+            <th style="width:8%">BALANCE</th>
         </tr>
     </thead>
     <tbody>
-        <tr style="font-style:italic">
-            <td>{{ $short($a->PeriodFrom) }}</td>
-            <td colspan="6">Balance brought forward</td>
-            <td class="num">{{ $bal($a->Opening) }}</td>
+        <tr class="edge">
+            <td>{{ $ymd($a->PeriodFrom) }}</td>
+            <td></td>
+            <td></td>
+            <td class="l">Balance brought forward</td>
+            <td></td><td></td><td></td><td></td><td></td>
+            <td class="r"></td>
+            <td class="r">{{ $n2($a->Opening) }}</td>
         </tr>
         @foreach ($lines as $l)
             <tr>
-                <td>{{ $short($l->TransactionDate) }}</td>
+                <td>{{ $ymd($l->TransactionDate) }}</td>
+                <td>{{ $l->DocumentNo }}</td>
                 <td>{{ $l->TranType }}</td>
-                <td>{{ $l->Reference }}</td>
-                <td>{{ $l->Description }}</td>
+                <td class="l">{{ $l->Description }}</td>
+                <td class="r">{{ $n2($l->Litres) }}</td>
+                <td>{{ $l->FuelType }}</td>
+                <td>{{ $l->Km }}</td>
+                <td>{{ $l->Reg }}</td>
                 <td>{{ $l->OrderNo }}</td>
-                <td class="num">{{ $m($l->Debit) }}</td>
-                <td class="num">{{ $m($l->Credit) }}</td>
-                <td class="num">{{ $bal($l->Balance) }}</td>
+                <td class="r">{{ $n2($l->Amount) }}</td>
+                <td class="r">{{ $n2($l->Balance) }}</td>
             </tr>
         @endforeach
-        <tr>
-            <td colspan="5"><strong>Balance carried forward</strong></td>
-            <td class="num"><strong>{{ Format::r($a->Debits) }}</strong></td>
-            <td class="num"><strong>{{ Format::r($a->Credits) }}</strong></td>
-            <td class="num"><strong>{{ $bal($a->Closing) }}</strong></td>
+        <tr class="edge">
+            <td>{{ $ymd($a->PeriodTo) }}</td>
+            <td></td>
+            <td></td>
+            <td class="l"><strong>Balance carried forward</strong></td>
+            <td></td><td></td><td></td><td></td><td></td>
+            <td class="r"></td>
+            <td class="r"><strong>{{ $n2($a->Closing) }}</strong></td>
         </tr>
     </tbody>
 </table>
 
-<table class="age" style="margin-top:6mm">
+<table class="age" style="margin-top:4mm; width:60%">
     <tr>
         <th>Current</th><th>30 days</th><th>60 days</th><th>90 days</th><th>120 days +</th><th>Total</th>
     </tr>
     <tr>
-        <td>{{ $bal($a->AgeCurrent) }}</td>
-        <td>{{ Format::r($a->Age30) }}</td>
-        <td>{{ Format::r($a->Age60) }}</td>
-        <td>{{ Format::r($a->Age90) }}</td>
-        <td>{{ Format::r($a->Age120) }}</td>
-        <td><strong>{{ $bal($a->Closing) }}</strong></td>
+        <td>{{ $n2($a->AgeCurrent) }}</td>
+        <td>{{ $n2($a->Age30) }}</td>
+        <td>{{ $n2($a->Age60) }}</td>
+        <td>{{ $n2($a->Age90) }}</td>
+        <td>{{ $n2($a->Age120) }}</td>
+        <td><strong>{{ $n2($a->Closing) }}</strong></td>
     </tr>
 </table>
 
-@if ($note !== '')
-    <p class="small" style="margin-top:6mm">{{ $note }}</p>
-@endif
+<p class="small" style="margin-top:3mm">
+    A negative balance is money held for the customer (paid ahead).
+    @if ($note !== '')
+        {{ $note }}
+    @endif
+</p>
 
 </body>
 </html>

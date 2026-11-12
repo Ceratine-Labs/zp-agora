@@ -21,25 +21,35 @@ use Tests\TestCase;
  * Debtors statements: the arithmetic, the address list, the three send modes,
  * the monthly run, and who may do what.
  *
- * One account, TEST-D1, at branch 999 (TEST-Playwright, inactive and
- * non-trading) in the LOCAL PumpIT stub. Its ledger for July and August 2026:
+ * One till account, TEST-D1 (PumpIT customer code TEST-C1), at branch 999
+ * (TEST-Playwright, inactive and non-trading) in the LOCAL PumpIT stub, built
+ * the way ZP's statement reads it (12 Nov 2026): invoices and credit notes in
+ * MIST_Trans_Customer, payments as Debtors bank lines carrying the customer
+ * code, and a take-on balance on BRN_Customers.
  *
- *   10 Jul  invoice  1 000.00          opening for August = 600.00
- *   20 Jul  payment    400.00
- *    5 Aug  invoice    500.00   1 100.00
- *   12 Aug  payment    300.00     800.00   loaded TWICE, as MIST does — counted once
+ *    1 Jun  taken on   100.00
+ *   10 Jul  invoice  1 000.00   loaded again two hours later — counted once
+ *   20 Jul  payment    500.00                 opening for August = 600.00
+ *    5 Aug  invoice    500.00   1 100.00   two lines: 15.5 l diesel + a lube
+ *   12 Aug  payment    300.00     800.00
  *   20 Aug  credit      50.00     750.00
- *   25 Aug  invoice    200.00     950.00
+ *   25 Aug  invoice    200.00     950.00   loaded again on the next day's EOD
  *
- * plus a cash sale at the same site that must not touch the account. Aged at
- * 31 Aug, the 950.00 owed is the newest charges: 200 + 500 current, and 250 of
- * the July invoice at 30 days.
+ * plus a cash sale at the same site, a Debtors bank line for somebody else
+ * and an FNB line carrying the code — none of which touch the account. Aged
+ * at 31 Aug, the 950.00 owed is the newest charges: 200 + 500 current, and
+ * 250 of the July invoice at 30 days.
  */
 class DebtorStatementTest extends TestCase
 {
     private const BRANCH = 999;
 
     private const ACCOUNT = 'TEST-D1';
+
+    private const CODE = 'TEST-C1';
+
+    /** Whether MIST_Trans_Customer had ODO / REGNO when the test began. */
+    private ?bool $hadVehicleColumns = null;
 
     /** @var array<int, User> */
     private array $made = [];
@@ -64,6 +74,10 @@ class DebtorStatementTest extends TestCase
         if ($this->app !== null) {
             $this->cleanUp();
 
+            if ($this->hadVehicleColumns !== null) {
+                $this->vehicleColumns($this->hadVehicleColumns);
+            }
+
             foreach ($this->made as $user) {
                 UserPermission::query()->acrossBranches()->where('UserId', $user->Id)->delete();
                 $this->db()->table('agora.UserGridColumn')->where('UserId', $user->Id)->delete();
@@ -74,14 +88,15 @@ class DebtorStatementTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_the_grid_states_the_period_once_per_account_and_counts_a_double_loaded_payment_once(): void
+    public function test_the_grid_states_the_period_once_per_account_and_counts_a_double_loaded_slip_once(): void
     {
         $row = $this->gridRow();
 
         $this->assertNotNull($row, 'The account has a balance and postings in August, so it is listed.');
         $this->assertEquals(600.00, (float) $row->Opening);
-        $this->assertEquals(700.00, (float) $row->Debits);
-        $this->assertEquals(350.00, (float) $row->Credits, 'The payment MIST loaded twice is counted once.');
+        $this->assertSame(self::CODE, $row->CustomerCode);
+        $this->assertEquals(700.00, (float) $row->Debits, 'The slip MIST loaded again on the next EOD is counted once.');
+        $this->assertEquals(350.00, (float) $row->Credits, 'Payments are the Debtors bank lines with the customer code, and nobody else\'s.');
         $this->assertEquals(950.00, (float) $row->Closing);
         $this->assertSame('2026-08-12', substr((string) $row->LastPayment, 0, 10));
         $this->assertSame('No email', $row->Status);
@@ -101,6 +116,83 @@ class DebtorStatementTest extends TestCase
         $this->assertEquals(700.00, (float) $a->AgeCurrent);
         $this->assertEquals(250.00, (float) $a->Age30);
         $this->assertEquals(0.00, (float) $a->Age60 + (float) $a->Age90 + (float) $a->Age120);
+    }
+
+    public function test_the_running_balance_starts_from_the_balance_brought_forward_take_on_included(): void
+    {
+        $service = app(DebtorStatementService::class);
+
+        $august = $service->statement(self::BRANCH, self::ACCOUNT, '2026-08-01', '2026-08-31');
+        $a = $august['account'];
+
+        $this->assertSame(self::CODE, $a->StatementAccountNo, 'The statement carries the PumpIT customer code.');
+        $this->assertSame('TEST Debtor One', $a->AccountName);
+        $this->assertEquals(600.00, (float) $a->Opening, '100 taken on + 1 000 invoiced - 500 paid, the reload not counted.');
+        $first = $august['lines']->first();
+        $this->assertEquals(500.00, (float) $first->Amount);
+        $this->assertEquals(1100.00, (float) $first->Balance, 'The first row is the opening plus its own amount, not its amount alone.');
+        $this->assertEquals((float) $a->Closing, (float) $august['lines']->last()->Balance, 'The last row agrees with the balance due.');
+        $this->assertSame('2026-08-25', substr((string) $a->LastTransactionDate, 0, 10));
+
+        $this->assertSame(['127', '-300.00', '142', '147'], $august['lines']->map(fn (object $l): string => $l->TranCode === 'R'
+            ? number_format((float) $l->Amount, 2, '.', '') : $l->DocumentNo)->all(),
+            'Documents by number, the payment as the bank line, the double load once.');
+        $this->assertEquals(15.5, (float) $first->Litres, 'Litres are the fuel lines only.');
+        $this->assertSame('Diesel 10', $first->FuelType);
+        $this->assertSame('TEST-ORD-1', $first->OrderNo);
+        $this->assertSame('TL# 1 #127', $first->Description);
+
+        $winter = $service->statement(self::BRANCH, self::ACCOUNT, '2026-06-01', '2026-07-31');
+        $this->assertEquals(0.00, (float) $winter['account']->Opening);
+        $this->assertSame(['Balance taken on', 'Invoice', 'Payment'], $winter['lines']->pluck('TranType')->all());
+        $this->assertSame(['100.00', '1100.00', '600.00'],
+            $winter['lines']->map(fn ($l) => number_format((float) $l->Balance, 2, '.', ''))->all());
+        $this->assertNull($winter['account']->LedgerFrom, 'An account taken on carries no short-ledger warning.');
+    }
+
+    public function test_km_and_reg_are_blank_without_the_columns_and_fill_once_they_exist(): void
+    {
+        $service = app(DebtorStatementService::class);
+
+        $this->vehicleColumns(false);
+        $without = $service->statement(self::BRANCH, self::ACCOUNT, '2026-08-01', '2026-08-31');
+        $this->assertFalse((bool) $without['account']->HasVehicle);
+        $this->assertSame([null], $without['lines']->pluck('Km')->unique()->values()->all());
+        $this->assertSame([null], $without['lines']->pluck('Reg')->unique()->values()->all());
+
+        $this->vehicleColumns(true);
+        DB::connection(config('agora.connections.app'))->statement(
+            "UPDATE PumpIT.dbo.MIST_Trans_Customer SET ODO = '66547', REGNO = 'BF23 CH ZN'
+             WHERE MIST_BranchId = ? AND BusinessPartnerCode = ? AND TransactionNumber = '147'",
+            [self::BRANCH, self::ACCOUNT],
+        );
+
+        $with = $service->statement(self::BRANCH, self::ACCOUNT, '2026-08-01', '2026-08-31');
+        $this->assertTrue((bool) $with['account']->HasVehicle);
+        $invoice = $with['lines']->firstWhere('DocumentNo', '147');
+        $this->assertSame('66547', $invoice->Km);
+        $this->assertSame('BF23 CH ZN', $invoice->Reg);
+        $this->assertNull($with['lines']->firstWhere('DocumentNo', '127')->Km, 'A slip with no vehicle stays blank.');
+        $this->assertNull($with['lines']->firstWhere('TranCode', 'R')->Reg, 'A payment has no vehicle.');
+        $this->assertEquals((float) $without['account']->Closing, (float) $with['account']->Closing);
+    }
+
+    public function test_the_pdf_is_zp_detailed_layout(): void
+    {
+        $service = app(DebtorStatementService::class);
+        $statement = $service->statement(self::BRANCH, self::ACCOUNT, '2026-08-01', '2026-08-31');
+
+        $html = view('debtors::pdf.statement', [
+            'a' => $statement['account'], 'lines' => $statement['lines'], 'issuer' => '', 'note' => '',
+        ])->render();
+
+        foreach (['DEBTOR STATEMENT', 'Date From : 2026/08/01', 'Date To : 2026/08/31', 'ACCOUNT NUMBER', self::CODE,
+            'LAST TRANSACTION DATE', 'BALANCE DUE (TO) / FROM CUSTOMER', 'DOCUMENT<br>NUMBER', 'FUEL TYPE', 'ORDER NR',
+            'Balance brought forward', '600.00', '1100.00', '950.00', '-300.00'] as $text) {
+            $this->assertStringContainsString($text, $html);
+        }
+        $this->assertStringStartsWith('%PDF', $service->pdf($statement));
+        $this->assertSame('Statement TEST-C1 2026-08.pdf', $service->filename($statement['account']));
     }
 
     public function test_an_unknown_account_is_refused_not_rendered_empty(): void
@@ -173,7 +265,7 @@ class DebtorStatementTest extends TestCase
 
         $this->assertTrue($result['ok'], $result['message']);
         Mail::assertSent(DebtorStatementMail::class, fn (DebtorStatementMail $m) => $m->hasTo('debtor@example.test')
-            && $m->hasCc('copy@example.test') && $m->filename === 'Statement TEST-D1 2026-08.pdf');
+            && $m->hasCc('copy@example.test') && $m->filename === 'Statement TEST-C1 2026-08.pdf');
 
         $sent = $this->sends()->first();
         $this->assertSame('sent', $sent->Status);
@@ -239,8 +331,9 @@ class DebtorStatementTest extends TestCase
             ->assertSee('Sending is switched off')
             ->assertSee('debtor@example.test')
             ->assertSee('copy@example.test')
-            ->assertSee('Statement of account TEST-D1')
-            ->assertSee('Statement TEST-D1 2026-08.pdf')
+            ->assertSee('Statement of account TEST-C1')
+            ->assertSee('Statement TEST-C1 2026-08.pdf')
+            ->assertSee('data-statement-pdf', false)
             ->assertSee('The balance due at 31 August 2026 is');
 
         Mail::assertNothingSent();
@@ -252,7 +345,7 @@ class DebtorStatementTest extends TestCase
         Mail::fake();
         config(['debtors.send_mode' => 'live']);
         $this->contact();
-        $this->posting('TEST-D2', 'A', '2026-08-15', 'I', 'D', '21', 120.00, '     140');
+        $this->invoice('TEST-D2', '2026-08-15', '21', [['TEST-LUBE', 'LUBES', 1, 120.00]]);
         $sender = $this->person(['statements.view', 'statements.send']);
         $period = ['from' => '2026-08-01', 'to' => '2026-08-31'];
 
@@ -321,36 +414,84 @@ class DebtorStatementTest extends TestCase
 
     private function seedLedger(): void
     {
-        $rows = [
-            ['2026-07-10', 'I', 'D', '1', 1000.00, '     101'],
-            ['2026-07-20', 'R', 'C', '2', 400.00, '     111'],
-            ['2026-08-05', 'I', 'D', '3', 500.00, '     127'],
-            ['2026-08-12', 'R', 'C', '4', 300.00, '        '],
-            ['2026-08-12', 'R', 'C', '4', 300.00, '     134'],
-            ['2026-08-20', 'C', 'C', '5', 50.00, '     142'],
-            ['2026-08-25', 'I', 'D', '6', 200.00, '     147'],
-        ];
+        $this->db()->table('PumpIT.dbo.BRN_Customers')->insert([
+            'SSBranchId' => self::BRANCH, 'CustomerCode' => self::CODE, 'CustomerName' => 'TEST Debtor One',
+            'DebtorID' => self::ACCOUNT, 'DebtorGroupID' => self::ACCOUNT, 'CreateDateTime' => '2026-06-01 09:00:00',
+            'OpeningPumpITBalance' => 100.00,
+        ]);
 
-        foreach ($rows as [$date, $code, $drcr, $ref, $total, $eod]) {
-            $this->posting(self::ACCOUNT, 'A', $date, $code, $drcr, $ref, $total, $eod);
-        }
+        $fuel = fn (float $litres, float $amount) => ['9910405', 'FUEL9910405', $litres, $amount, 'Diesel 10'];
+
+        // 10 Jul, and the same slip loaded again two hours later in the same EOD.
+        $this->invoice(self::ACCOUNT, '2026-07-10', '101', [$fuel(30, 1000.00)], '06:10:00');
+        $this->invoice(self::ACCOUNT, '2026-07-10', '101', [$fuel(30, 1000.00)], '08:15:00');
+        $this->invoice(self::ACCOUNT, '2026-08-05', '127', [$fuel(15.5, 300.00), ['TEST-LUBE', 'LUBES', 1, 200.00]], '06:10:00', 'TEST-ORD-1');
+        $this->invoice(self::ACCOUNT, '2026-08-20', '142', [['TEST-LUBE', 'LUBES', 1, 50.00]], '06:10:00', null, 'C');
+        // 25 Aug, and the same slip again on the next day's EOD.
+        $this->invoice(self::ACCOUNT, '2026-08-25', '147', [$fuel(10, 200.00)], '06:10:00');
+        $this->invoice(self::ACCOUNT, '2026-08-26', '147', [$fuel(10, 200.00)], '06:05:00');
 
         // A cash sale at the same site: not an account posting.
-        $this->posting('CASH', null, '2026-08-05', 'I', 'D', '9', 75.00, '     127');
+        $this->invoice('CASH', '2026-08-05', '128', [$fuel(5, 75.00)]);
 
+        $this->bankLine(self::CODE, 'Debtors', '2026-07-20', 500.00);
+        $this->bankLine(self::CODE, 'Debtors', '2026-08-12', 300.00);
+        $this->bankLine('TEST-C9', 'Debtors', '2026-08-12', 999.00);   // somebody else
+        $this->bankLine(self::CODE, 'FNB', '2026-08-13', 888.00);      // not a Debtors line
+
+        // The till's account master still gives the address.
         $this->db()->table('PumpIT.dbo.DBF_CLDB_CUSTOMER')->insert([
             'SSBranchId' => self::BRANCH, 'CNUM' => self::ACCOUNT, 'INIT' => 'T', 'SNAM' => 'TEST Debtor One',
             'BADD1' => '1 TEST Street', 'CRLIMIT' => 5000,
         ]);
     }
 
-    private function posting(string $account, ?string $cust, string $date, string $code, string $drcr, string $ref, float $total, string $eod): void
+    /**
+     * One MIST load of a document: every line on the given EOD date, at the
+     * given load time.
+     *
+     * @param  array<int, array{0: string, 1: string, 2: float|int, 3: float, 4?: string}>  $lines  item, category, qty, amount, standard category
+     */
+    private function invoice(string $account, string $eod, string $number, array $lines, string $time = '06:10:00',
+        ?string $order = null, string $type = 'I'): void
     {
-        $this->db()->table('PumpIT.dbo.DBF_POSTR_CUSTOMER')->insert([
-            'SSBranchId' => self::BRANCH, 'DATE' => $date.' 00:00:00', 'TRCOD' => $code, 'CNUM' => $account,
-            'CNAM' => 'TEST Debtor One', 'DESC' => 'TEST-', 'DRCR' => $drcr, 'REF' => str_pad($ref, 8, ' ', STR_PAD_LEFT),
-            'LOGFILE' => 'XXX', 'CUST' => $cust, 'TOTAL' => $total, 'LOCATION' => 'WINBRANCH', 'EOD_CNTR' => $eod,
+        foreach ($lines as $i => $line) {
+            $this->db()->table('PumpIT.dbo.MIST_Trans_Customer')->insert([
+                'CompanyId' => 1, 'MIST_BranchId' => self::BRANCH, 'EODDate' => $eod.' 00:00:00',
+                'TransactionTime' => $time, 'PosEODNumber' => '9'.substr(str_replace('-', '', $eod), 4),
+                'TransactionNumber' => $number, 'TransTypeId' => 5, 'BusPartnerTypeId' => 1,
+                'DebitCredit' => $type === 'C' ? 'C' : 'D', 'Attendant' => 'TEST', 'TenderTypeId' => 5,
+                'DocumentNumber' => 'TL# 1 #'.$number, 'ItemCode' => $line[0].'-'.$i, 'PackSize' => 1,
+                'UnitCostPriceExcl' => 0, 'Vat' => 0, 'VatType' => 'Z', 'BusinessPartnerCode' => $account,
+                'POSSystemId' => 5, 'EODId' => 'TEST', 'PeriodId' => 0, 'TransactionDate' => $eod.' 00:00:00',
+                'TransactionType' => $type, 'BusinessPartnerType' => 'D', 'BusinessPartnerName' => 'TEST DEBTOR ONE',
+                'OrderNumber' => $order, 'ItemDescription' => 'TEST-'.$line[0], 'ItemUOM' => str_starts_with($line[1], 'FUEL') ? 'Lt' : 'Each',
+                'Category' => $line[1], 'StandardCategory' => $line[4] ?? null, 'QtyMovement' => $line[2], 'Qty' => $line[2],
+                'VatSubTypeId' => 1, 'LineTotalAmountIncl' => $line[3], 'isOMNI_LoadStatus' => 0,
+            ]);
+        }
+    }
+
+    private function bankLine(string $code, string $type, string $date, float $amount): void
+    {
+        $this->db()->table('PumpIT.dbo.RCN_BankStatementLinesPumpIT')->insert([
+            'SSBranchId' => self::BRANCH, 'LineDate' => $date.' 00:00:00', 'Description' => 'TEST- SETTLEMENT '.$code,
+            'Amount' => $amount, 'Type' => $type, 'IDState' => 2, 'ReconState' => 1, 'ReconBatchNo' => 0, 'CustomerCode' => $code,
         ]);
+    }
+
+    /** Give MIST_Trans_Customer ODO and REGNO, or take them away — the local stub only. */
+    private function vehicleColumns(bool $present): void
+    {
+        $db = $this->db();
+        $has = $db->selectOne("SELECT COL_LENGTH('PumpIT.dbo.MIST_Trans_Customer', 'ODO') AS L")->L !== null;
+        $this->hadVehicleColumns ??= $has;
+
+        if ($present && ! $has) {
+            $db->statement('ALTER TABLE PumpIT.dbo.MIST_Trans_Customer ADD ODO CHAR(10) NULL, REGNO CHAR(10) NULL');
+        } elseif (! $present && $has) {
+            $db->statement('ALTER TABLE PumpIT.dbo.MIST_Trans_Customer DROP COLUMN ODO, REGNO');
+        }
     }
 
     private function contact(): void
@@ -409,8 +550,13 @@ class DebtorStatementTest extends TestCase
 
         $db->table('agora.DebtorStatementSend')->where('BranchId', self::BRANCH)->delete();
         $db->table('agora.DebtorContact')->where('BranchId', self::BRANCH)->delete();
-        $db->table('PumpIT.dbo.DBF_POSTR_CUSTOMER')->where('SSBranchId', self::BRANCH)->delete();
         $db->table('PumpIT.dbo.DBF_CLDB_CUSTOMER')->where('SSBranchId', self::BRANCH)->delete();
+        // Only this test's rows: the recon and cashup suites keep their own at
+        // branch 999 too.
+        $db->table('PumpIT.dbo.MIST_Trans_Customer')->where('MIST_BranchId', self::BRANCH)->where('EODId', 'TEST')->delete();
+        $db->table('PumpIT.dbo.RCN_BankStatementLinesPumpIT')->where('SSBranchId', self::BRANCH)
+            ->where('Description', 'like', 'TEST- SETTLEMENT %')->delete();
+        $db->table('PumpIT.dbo.BRN_Customers')->where('SSBranchId', self::BRANCH)->where('CustomerCode', self::CODE)->delete();
     }
 
     private function db(): Connection
