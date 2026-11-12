@@ -1721,6 +1721,7 @@ The reporting engine and the 97-report library, trading dashboards and site scor
 **Acceptance**
 
 - Parity ≥ 99.5 % of totals on the 40 most-used reports (SS_Report execution log decides which) for one full month, with every residual explained in the parity dashboard
+- Legacy columns a parity query must not filter or value on (Posted, SiteClosedOff, ReadyToImport, PastelImport, fuel-type prices): [`reference/pumpit-dead-columns.md`](reference/pumpit-dead-columns.md)
 
 
 ##### T078 · Cutover: user migration completion, training, go-live checklist, PumpIT screens switched off, decommission plan
