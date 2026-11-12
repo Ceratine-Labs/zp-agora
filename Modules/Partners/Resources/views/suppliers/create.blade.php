@@ -40,5 +40,4 @@
             <div class="form-actions"><button class="btn-primary" type="submit">Add supplier</button></div>
         </x-card>
     </form>
-    @include('people::partials.confirm-diff')
 </x-app-shell>

@@ -73,5 +73,4 @@
             </x-card>
         </form>
     @endcan
-    @include('people::partials.confirm-diff')
 </x-app-shell>

@@ -5,6 +5,7 @@ import charts from './components/chart';
 import notify from './components/notify';
 import rowDetail from './components/row-detail';
 import confirmForm from './components/confirm-form';
+import confirmDiff from './components/confirm-diff';
 import checkAll from './components/check-all';
 import tabs from './components/tabs';
 import disclosure from './components/disclosure';
@@ -62,6 +63,7 @@ window.Agora.hydrate = (root) => Promise.allSettled([
     initialize('Fragment actions', () => runbar(root)),
     initialize('Fragment reconciliation', () => reconMatch(root)),
     initialize('Fragment table tools', () => tableTools(root)),
+    initialize('Fragment write-back diffs', () => confirmDiff(root)),
     initialize('Fragment confirmations', () => confirmForm(root)),
     initialize('Fragment suggestions', () => reconSuggest(root)),
     initialize('Fragment data grids', () => dataGrid(root)),
@@ -92,6 +94,7 @@ const initial = afterPaint().then(() => Promise.allSettled([
     initialize('Date ranges', dateSpan),
     initialize('Bulk actions', bulkSelection),
     initialize('Help tips', () => { window.Agora.tip = tip(); }),
+    initialize('Write-back diffs', confirmDiff),
     initialize('Confirmations', confirmForm),
     initialize('Post links', postLink),
     initialize('Duplicate release', duplicateRelease),

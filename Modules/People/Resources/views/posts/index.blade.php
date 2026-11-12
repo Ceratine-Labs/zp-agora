@@ -38,5 +38,4 @@
         @endif
     @endif
     <x-data-grid :grid="$grid" :branches="$branches" surface />
-    @include('people::partials.confirm-diff')
 </x-app-shell>

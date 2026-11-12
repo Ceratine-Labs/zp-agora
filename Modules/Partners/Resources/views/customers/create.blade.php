@@ -45,6 +45,5 @@
                 <div class="form-actions"><button class="btn-primary" type="submit" @disabled($nextCode === null)>Add customer</button></div>
             </x-card>
         </form>
-        @include('people::partials.confirm-diff')
     @endif
 </x-app-shell>
