@@ -175,7 +175,20 @@ if ls public/build/assets/*.css >/dev/null 2>&1; then
         used=$(grep -oE 'class="[^"{}@]+"' "$view" 2>/dev/null \
                | sed -E 's/^class="//; s/"$//' | tr ' ' '\n' | grep -v '^$' | sort -u)
 
+        # A PDF or mail view renders outside the app (dompdf, a mail client),
+        # so it cannot use the built stylesheet and carries its own inline
+        # <style>. Its own selectors count for that view, and only that view.
+        own=""
+        case "$view" in
+            */views/pdf/*|*/views/mail/*)
+                own=$(perl -0777 -ne 'while (/<style[^>]*>(.*?)<\/style>/gs) { my $s = $1; print "$1\n" while $s =~ /\.([a-zA-Z][A-Za-z0-9_-]*)/g }' "$view" 2>/dev/null | sort -u)
+                ;;
+        esac
+
         for class in $used; do
+            if [ -n "$own" ] && printf '%s\n' "$own" | grep -qxF "$class"; then
+                continue
+            fi
             if ! grep -qxF "$class" "$defined"; then
                 say "${view}: class=\"${class}\" is defined in no stylesheet, script or component. Dead markup, or a class copied in from somewhere that is not this application."
             fi
