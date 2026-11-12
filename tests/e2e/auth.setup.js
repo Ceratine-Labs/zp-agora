@@ -26,7 +26,7 @@ setup('sign in once and save the session', async ({ page }) => {
     await page.getByRole('button', { name: 'Sign in' }).click();
 
     await page.waitForURL('**/app');
-    await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Choose a module', level: 1 })).toBeVisible();
 
     await page.context().storageState({ path: STATE_FILE });
 });
