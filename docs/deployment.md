@@ -265,6 +265,106 @@ target anyway, but the credentials should not be sitting in the file either.
 
 ---
 
+## Queue worker — PREPARED, not installed (12 November 2026)
+
+Posting every site queues one `PostGroupSite` job per site on the `recon`
+queue (docs/recon-execute.md → "Posting every site"; Ryan's decision,
+12 Nov 2026). Live runs `QUEUE_CONNECTION=sync` today, so those jobs run
+inside the press exactly as the old loop did and the 3,600 s limits are still
+what keeps a long group alive. Until the worker below runs, **leave it on
+`sync`**: on `redis` with no worker every post sits at "queued".
+
+Nothing here has been done to the server. Each step is a change to
+`db-intel-zp`, which also runs ZP-NQL, and needs Ryan's go-ahead.
+
+**0. Read-only check: is Redis there?**
+
+```bash
+systemctl is-active redis-server; redis-cli ping
+php8.3 -m | grep -i redis           # the phpredis extension
+grep -h '^REDIS_\|^QUEUE_' /var/www/zp-nql/.env   # what ZP-NQL already uses
+```
+
+**1a. Redis present (the recommended path).** Use its own database number so
+Agora's keys never share ZP-NQL's (pick one ZP-NQL does not use). Add to
+`/var/www/agora/.env`:
+
+```
+QUEUE_CONNECTION=redis
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_DB=5
+REDIS_PREFIX=agora-database-
+REDIS_QUEUE_RETRY_AFTER=900
+```
+
+`REDIS_QUEUE_RETRY_AFTER` must exceed the job timeout
+(`recon.group_post.timeout`, 600 s), or a slow site is handed to a second
+worker while the first is still in it (harmless — the procedure refuses the
+second — but noisy). Failed jobs go to `storage/logs/failed-jobs.json`
+(`config/queue.php`); there is no `failed_jobs` table, and every answer that
+matters is in `agora.ReconGroupPost` anyway.
+
+**1b. Redis absent.** Two choices, both Ryan's: install it
+(`apt install redis-server php8.3-redis`, bound to 127.0.0.1 — the Ubuntu
+default — then 1a), or the `database` driver. The second is **not prepared**:
+Laravel's driver needs a `jobs` table in its own shape (lowercase `id`, no
+`BranchId`) on the customer's instance, which `MigrationHelper` deliberately
+cannot build. Recommended: install Redis.
+
+**2. The worker, as a systemd unit** — `/etc/systemd/system/agora-queue.service`,
+root-owned, `0644`:
+
+```ini
+[Unit]
+Description=Agora queue worker (recon every-site posts)
+After=network.target redis-server.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/agora
+ExecStart=/usr/bin/php8.3 artisan queue:work redis --queue=recon --tries=1 --sleep=3 --max-time=3600 --memory=256 --no-interaction
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/www/agora/storage/logs/queue.log
+StandardError=append:/var/www/agora/storage/logs/queue.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+One worker: sites post one at a time, the same load on PumpIT the clerks'
+morning has always been. A slow site delays the next but cannot fail it.
+`--max-time=3600` recycles the process hourly; `Restart=always` brings it
+back. Add `queue.log` to `/etc/logrotate.d/agora-scheduler`'s list.
+
+```bash
+cd /var/www/agora
+php artisan migrate:status | grep 13m_recon_group_post   # additive: one new table
+php artisan migrate --force                               # see the warning above
+php artisan config:cache
+systemctl daemon-reload && systemctl enable --now agora-queue
+systemctl status agora-queue --no-pager
+redis-cli -n 5 llen agora-database-queues:recon           # 0 when idle
+```
+
+**3. Every deploy after this** adds one line after `config:cache`, so the
+worker loads the new code and config (it finishes the job it is in first):
+
+```bash
+php artisan queue:restart
+```
+
+**Verify** with the first real press: the page answers at once, the rows go
+"queued" → "posting…" → posted, and `agora.ReconGroupPost` holds one row per
+ticked site. **Roll back** by setting `QUEUE_CONNECTION=sync`,
+`config:cache`, and `systemctl disable --now agora-queue`; a post left queued
+shows "no answer since …" after 30 minutes and can be pressed again.
+
+---
+
 ## Smoke test
 
 ```bash

@@ -120,8 +120,14 @@ return [
     |
     */
 
+    // Agora has no `failed_jobs` table, and one in Laravel's shape (no
+    // BranchId, lowercase `id`) would break MigrationHelper's rules on the
+    // customer's instance. A failed job's answer is in Agora's own state
+    // anyway (agora.ReconGroupPost), so the store is a file, under
+    // storage/logs because the deploy's --delete leaves that alone.
     'failed' => [
-        'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
+        'driver' => env('QUEUE_FAILED_DRIVER', 'file'),
+        'path' => storage_path('logs/failed-jobs.json'),
         'database' => env('DB_CONNECTION', 'sqlite'),
         'table' => 'failed_jobs',
     ],

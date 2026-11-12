@@ -90,6 +90,32 @@ return [
     // Ryan, 25 Oct 2026: confirmed bag changes must write back to PumpIT.
     'cash_bag_adjust_mode' => 'live',
 
+    /*
+    | Posting every site: one queued job per site (Ryan, 12 Nov 2026).
+    |
+    | On 28 Sep 2026 a three-month Smart ATM group timed out at 300 s because
+    | the press posted every site inside one web request. The press now queues
+    | one PostGroupSite job per ticked site and the group screen polls
+    | agora.ReconGroupPost for the answers. See docs/recon-execute.md →
+    | "Posting every site".
+    |
+    |   queue        the queue the jobs go on; the worker listens to it.
+    |   timeout      seconds one site may take before the worker gives up.
+    |                The connection's retry_after (REDIS_QUEUE_RETRY_AFTER)
+    |                MUST be longer, or a slow site is handed to a second
+    |                worker while the first is still in it.
+    |   stale_after  minutes after which a post still queued or running with
+    |                no answer may be pressed again (worker down, queue
+    |                flushed). Longer than retry_after, so a live job is never
+    |                re-queued under itself. usp_Recon_Commit refuses a run
+    |                already committed whatever this says.
+    */
+    'group_post' => [
+        'queue' => 'recon',
+        'timeout' => 600,
+        'stale_after' => 30,
+    ],
+
     'areas' => [
 
         'ABSA' => [

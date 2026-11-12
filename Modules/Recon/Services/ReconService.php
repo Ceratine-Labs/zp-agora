@@ -126,13 +126,15 @@ class ReconService
      *
      * @return array{status: object, lines: Collection<int, object>}
      */
-    public function commit(ReconRun $run): array
+    public function commit(ReconRun $run, ?int $userId = null): array
     {
         $sets = $this->procedures->callSets('usp_Recon_Commit', [
             'RunId' => $run->Id,
             'BranchId' => $run->BranchId,
             'StampMode' => (string) config('recon.stamp_mode'),
-            'UserId' => auth()->id(),
+            // A queued every-site post has no signed-in user; it passes the
+            // person who pressed (ReconGroupService::postSite()).
+            'UserId' => $userId ?? auth()->id(),
         ]);
 
         $status = ($sets[0] ?? collect())->first();

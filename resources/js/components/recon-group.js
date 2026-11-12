@@ -31,6 +31,8 @@
  * and one <tr data-group-branch="{id}"> per site in the table below it.
  */
 export default function reconGroup() {
+    pollPosts();
+
     const panel = document.querySelector('[data-recon-group]');
 
     if (!panel) return;
@@ -159,4 +161,73 @@ function mark(row, text) {
 
 function say(status, text) {
     if (status) status.textContent = text;
+}
+
+/*
+ * POSTING IS QUEUED, AND THIS WATCHES IT (12 Nov 2026).
+ *
+ * The press used to post every ticked site inside one request, and a
+ * three-month Smart ATM group timed out at 300 s. Now it queues one job per
+ * site and returns at once; each site's answer lands in agora.ReconGroupPost.
+ * This asks the server where the posts have got to every few seconds, puts
+ * each answered row in place, and reloads once nothing is still queued or
+ * running, so the stat strip and the post button are the server's again.
+ *
+ *   <div data-recon-group-posts data-posts-url="/app/recon/groups/{ref}/posts"
+ *        data-posts-active="3">
+ *     <p data-posts-status>…</p>
+ *
+ * The server sends `{active, finished, total, rows: {branchId: "<tr>…"}}`.
+ * A failed poll is retried on the next tick; the posts carry on regardless,
+ * because the worker does not need this page open.
+ */
+const POLL_MS = 3000;
+
+function pollPosts() {
+    const panel = document.querySelector('[data-recon-group-posts]');
+
+    if (!panel || !panel.dataset.postsUrl) return;
+
+    const status = panel.querySelector('[data-posts-status]');
+    const stop = window.Agora?.loader?.beside(status) ?? (() => {});
+    const shown = {};
+
+    const tick = async () => {
+        let state;
+
+        try {
+            const response = await fetch(panel.dataset.postsUrl, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+
+            if (!response.ok) throw new Error(String(response.status));
+
+            state = await response.json();
+        } catch (error) {
+            say(status, 'Could not ask how the posts are going — trying again.');
+            window.setTimeout(tick, POLL_MS * 2);
+
+            return;
+        }
+
+        for (const [branch, html] of Object.entries(state.rows || {})) {
+            if (shown[branch] === html) continue;
+
+            shown[branch] = html;
+            replace(document.querySelector(`tr[data-group-branch="${branch}"]`), html);
+        }
+
+        if (state.active > 0) {
+            say(status, `Posting in the background — ${state.finished} of ${state.total} answered. You can leave this page.`);
+            window.setTimeout(tick, POLL_MS);
+
+            return;
+        }
+
+        stop();
+        say(status, `Every queued site has answered — ${state.finished} of ${state.total}.`);
+        window.setTimeout(() => window.location.reload(), 600);
+    };
+
+    window.setTimeout(tick, POLL_MS);
 }

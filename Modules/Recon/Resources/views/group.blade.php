@@ -91,17 +91,35 @@
             </div>
         @endif
 
+        @php($postsActive = $posts->filter(fn ($p) => $p->isActive())->count())
+        @if ($postsActive > 0)
+            {{-- The posts. The press queued one job per site (12 Nov 2026);
+                 this polls agora.ReconGroupPost and replaces each row as its
+                 site answers, then reloads for the totals. Leaving the page
+                 stops nothing — the worker posts whether anyone watches. --}}
+            <div data-recon-group-posts
+                 data-posts-url="{{ route('app.recon.group.posts', $group->GroupRef) }}"
+                 data-posts-active="{{ $postsActive }}"
+                 style="margin:12px 14px 0">
+                <p class="field-help" data-posts-status>
+                    Posting {{ $postsActive }} {{ Str::plural('site', $postsActive) }} in the background, one at a
+                    time — you can leave this page.
+                </p>
+            </div>
+        @endif
+
         <form method="POST" action="{{ route('app.recon.group.execute', $group->GroupRef) }}" id="group-post"
               data-confirm-filtered="group-sites"
               data-confirm="{{ $stampMode === 'live' ? 'Reconcile the ticked sites in PumpIT?' : 'Record the ticked sites?' }}"
               data-confirm-text="{{ $stampMode === 'live'
-                  ? 'Each ticked site is committed on its own, in its own transaction, through the same procedure a single run uses. Every row is re-checked first and anything that has moved since the preview is skipped. A site that refuses is reported and the others still go. Each one can be reversed from its own run page.'
+                  ? 'Each ticked site is queued and committed on its own, in its own transaction, through the same procedure a single run uses. Every row is re-checked first and anything that has moved since the preview is skipped. A site that refuses is reported and the others still go. Each one can be reversed from its own run page.'
                   : 'Journal mode: the decisions are recorded here and nothing in PumpIT changes.' }}"
               data-confirm-action="{{ $stampMode === 'live' ? 'Post the ticked sites' : 'Record' }}"
               @if ($stampMode === 'live') data-confirm-danger @endif>
             @csrf
 
-            @php($postable = $runs->filter(fn ($r) => $r->Status === 'previewed' && $r->MatchedRows > 0))
+            @php($postable = $runs->filter(fn ($r) => $r->Status === 'previewed' && $r->MatchedRows > 0
+                && ! ($posts->get($r->BranchId)?->isActive() ?? false)))
 
             {{-- The press, above the sites it posts, and pinned there. Twenty-six
                  rows is not four hundred, but the button was still under the
@@ -117,8 +135,9 @@
                 </button>
 
                 <x-info label="What this press does">
-                    <p>Posts the ticked sites and no others. Each site commits in its own transaction, through the
-                       same procedure a single run uses, so one refusal does not take the others with it.</p>
+                    <p>Posts the ticked sites and no others. Each site is its own queued job and commits in its own
+                       transaction, through the same procedure a single run uses, so one refusal or one slow site
+                       does not take the others with it. The rows fill in as the sites answer.</p>
                     @if ($stampMode === 'live')
                         <p>Every row is re-checked against PumpIT first and anything that has moved since the preview
                            is skipped. Each site is reversed from its own run page.</p>
@@ -149,6 +168,7 @@
                     @include('recon::partials.group-row', [
                         'branch' => $site,
                         'run' => $runs->get($site->BranchId),
+                        'post' => $posts->get($site->BranchId),
                     ])
                 @endforeach
             </x-table>

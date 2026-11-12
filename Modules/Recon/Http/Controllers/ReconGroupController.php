@@ -5,6 +5,7 @@ namespace Modules\Recon\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Support\BranchContext;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -109,6 +110,7 @@ class ReconGroupController extends Controller
             'sites' => $sites,
             'unconfigured' => $unconfigured,
             'runs' => $runs,
+            'posts' => $this->groups->posts($model),
             'outstanding' => $this->groups->outstanding($model, $sites->pluck('BranchId')
                 ->map(fn (mixed $id) => (int) $id)->all()),
             'stampMode' => config('recon.stamp_mode'),
@@ -146,14 +148,16 @@ class ReconGroupController extends Controller
     }
 
     /**
-     * Post the sites the operator ticked.
+     * Queue the sites the operator ticked: one job per site.
      *
-     * One transaction per branch, through the same usp_Recon_Commit a single
-     * run uses — it is branch-scoped, it re-checks every row against the
-     * estate as it stands now, and it reports what it skipped. A branch that
-     * refuses is reported and the rest still go: twenty-six sites is
-     * twenty-six answers, and one of them being no does not make the others
-     * no.
+     * Each job posts its site through the same usp_Recon_Commit a single run
+     * uses — branch-scoped, re-checking every row against the estate as it
+     * stands, reporting what it skipped. Until 12 Nov 2026 this request did
+     * every site itself, and a three-month Smart ATM group timed out at
+     * 300 s (28 Sep 2026). Now it only queues, and the screen polls posts().
+     *
+     * On the sync queue connection the jobs run inside this request, so the
+     * sites that already answered are flashed as before.
      */
     public function execute(Request $request, string $group, BranchContext $context): RedirectResponse
     {
@@ -173,18 +177,83 @@ class ReconGroupController extends Controller
             return back()->with('refusal', __('recon::recon.no_runs_selected'));
         }
 
-        $results = $this->groups->commit($model, $runIds);
+        $results = $this->groups->queuePosts($model, $runIds, $this->userId());
+        $posts = $this->groups->posts($model);
+
+        // What has an answer already: refused before queueing, or (on the
+        // sync connection) posted or refused by its job inside this request.
+        $answered = collect($results)->map(function (array $r) use ($posts) {
+            $post = $posts->get($r['run']->BranchId);
+
+            if ($r['state'] === 'queued' && $post !== null && $post->isFinished()) {
+                return [
+                    'BranchId' => $r['run']->BranchId, 'RunId' => $r['run']->Id,
+                    'Ok' => $post->Status === 'committed', 'Code' => (string) $post->Code,
+                    'Message' => (string) $post->Message, 'Rows' => $post->CommittedRows,
+                ];
+            }
+
+            if (in_array($r['state'], ['queued', 'active'], true)) {
+                return null;
+            }
+
+            return [
+                'BranchId' => $r['run']->BranchId, 'RunId' => $r['run']->Id, 'Ok' => false,
+                'Code' => $r['code'], 'Message' => $r['message'], 'Rows' => 0,
+            ];
+        })->filter()->values();
 
         return redirect()
             ->route('app.recon.group', $model->GroupRef)
-            ->with('posted', collect($results)->map(fn (array $r) => [
-                'BranchId' => $r['run']->BranchId,
-                'RunId' => $r['run']->Id,
-                'Ok' => $r['ok'],
-                'Code' => $r['code'],
-                'Message' => $r['message'],
-                'Rows' => $r['rows'],
-            ])->all());
+            ->with('posted', $answered->all());
+    }
+
+    /**
+     * Where the queued posts have got to, for the screen to poll.
+     *
+     * JSON carrying each posted site's row as HTML, for the reason runBranch()
+     * returns HTML: the formats live in App\Support\Format. `active` reaching
+     * zero is the screen's cue to reload for the totals.
+     */
+    public function posts(string $group, BranchContext $context): JsonResponse
+    {
+        $this->refuseBranchWorkspace($context);
+
+        $model = $this->group($group)->load('runs');
+        $runs = $model->runsByBranch();
+        $posts = $this->groups->posts($model);
+        $area = $this->service->area($model->ReconArea);
+        $sites = $this->sites($context)->keyBy('BranchId');
+
+        $rows = [];
+
+        foreach ($posts as $branchId => $post) {
+            $branch = $sites->get($branchId);
+
+            if ($branch === null) {
+                continue;
+            }
+
+            $rows[(string) $branchId] = view('recon::partials.group-row', [
+                'group' => $model, 'area' => $area, 'branch' => $branch,
+                'run' => $runs->get($branchId), 'post' => $post,
+            ])->render();
+        }
+
+        return response()->json([
+            'active' => $posts->filter(fn ($post) => $post->isActive())->count(),
+            'finished' => $posts->filter(fn ($post) => $post->isFinished())->count(),
+            'total' => $posts->count(),
+            'rows' => $rows,
+        ]);
+    }
+
+    /** The signed-in user's id, as an int, for the jobs to pass to the procedure. */
+    protected function userId(): ?int
+    {
+        $id = auth()->id();
+
+        return is_numeric($id) ? (int) $id : null;
     }
 
     /**

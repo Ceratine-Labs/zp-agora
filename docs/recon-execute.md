@@ -126,9 +126,10 @@ Three other ways in, through the same guards and ledger:
   through `usp_Recon_ManualMatch`; a close one carries a variance and needs a
   reason.
 - **Every site.** `/app/recon/auto/{area}/all` opens an `agora.ReconRunGroup`
-  and previews one branch per request. Posting it calls `usp_Recon_Commit`
-  branch by branch, one transaction each, so one site refusing does not stop
-  the rest (`ReconGroupService`).
+  and previews one branch per request. Posting it queues one `PostGroupSite`
+  job per ticked site, and each job calls `usp_Recon_Commit` for its site in
+  its own transaction, so one site refusing or running slow does not stop the
+  rest (`ReconGroupService`; see "Posting every site" below).
 
 `usp_Recon_DiscardRuns` discards, closes and reopens runs. A run with anything
 processed against it (committed, reversed, or with ledger rows) is never
@@ -185,6 +186,7 @@ paged, filtered and exported on the server).
 | `ReconRunGroup` | `v1__13g_recon_run_group.php` | one press across every site |
 | `ReconCriteria` | `v1__13h_recon_criteria.php`, rekeyed by `v1__13i_recon_criteria_rekey.php` | configuration overrides, each replacing one legacy rule by its `AutoReconId` or adding one |
 | `ReconAllocation` | `v1__13k_recon_allocation.php` | the split by cashier a cash-bag match confirmed, and the staff short each line is due |
+| `ReconGroupPost` | `v1__13m_recon_group_post.php` | each site's post of an every-site group: queued, running, committed, refused or failed, with the procedure's answer |
 
 `v1__13b` to `v1__13f` extend `ReconRunLine` for near references and the
 deposit side's own id, and expose the Smart ATM deposit's key through its view.
@@ -302,3 +304,73 @@ The scoped migration `v1__13pzd_recon_run_validity` atomically installs the shar
 `v1__13pze_recon_validity_scan` adds an optional Invalid-only reader mode used by the filter and both archive proof passes. It excludes whole runs with any ineligible saved proposal before source extraction, then applies the unchanged live proof to the remaining candidates. Ordinary pages still receive complete partial/current/history classifications. Live metadata profiling reduced the all-site candidate bank reads from 2,089 proposals to 12; the deployed result count must remain unchanged.
 
 Live verification after the scan optimization retained the same invalid counts (Mine 5, Everyone 7). Mine Invalid improved from 6,858 ms to 862 ms; Everyone Invalid improved from 16,097 ms to 4,340 ms across 3,452 open runs. Ordinary Mine remained about 6.5 seconds because it still computes partial/current counts for the visible proposals; no rejected plan hint or deduplication experiment was deployed. Run 260 remained Invalid with two superseded proposals and no remaining proposals. Guarded live checks executed no archive/business writes; both releases reported zero new log bytes and healthy HTTP responses.
+
+## Posting every site — one queued job per site (12 November 2026)
+
+On 28 September 2026 a three-month Smart ATM group timed out at 300 s on live:
+`POST /app/recon/groups/{id}/execute` called `usp_Recon_Commit` for every
+ticked site inside the one request. The limits went to 3,600 s as a stopgap.
+Ryan's decision (12 Nov 2026): one queued job per site, a queue worker, and a
+group screen that polls.
+
+**The press.** `ReconGroupController::execute` calls
+`ReconGroupService::queuePosts()`: per ticked run still `previewed`, one
+`agora.ReconGroupPost` row (`queued`) and one `Modules\Recon\Jobs\PostGroupSite`
+on the `recon` queue. A run that is not a preview is answered at once
+(`NOT_PREVIEWED`), as before. A press returns in well under a second however
+many sites are ticked.
+
+**The job.** `postSite()` does for one site what the synchronous loop did:
+`selectAll`, `usp_Recon_Commit` with the presser as `@UserId`, and the group's
+totals moved only on success. Every outcome is written to the post row; a
+refusal is `refused` with the procedure's `AGORA:{Code}`, a fault is `failed`.
+The run stays a preview after either, so the site can be ticked and pressed
+again — that press is the retry. Jobs are `tries = 1`: the queue never asks
+PumpIT to stamp a second time on its own.
+
+**Why a duplicate cannot post twice.**
+
+- The job claims its row `queued → running` in one conditional `UPDATE`; a
+  second delivery finds nothing to claim and returns.
+- `usp_Recon_Commit` re-reads the run under `UPDLOCK, HOLDLOCK` and refuses
+  `RUN_ALREADY_COMMITTED`; it sets `ReconRun.Status = 'committed'` in the
+  transaction that stamps, so the run is the truth about what was posted.
+- A job the queue gives up on (timeout, a worker that died, a redelivery past
+  its one try) reaches `failed()`, which reads the run: committed means the
+  row is recorded `committed` (`ALREADY_POSTED`), otherwise `failed`
+  (`INTERRUPTED`) and nothing was stamped.
+- The group's totals move only on the row's transition into `committed`, in
+  the same transaction, so each site is counted once.
+- A post still `queued` or `running` after `recon.group_post.stale_after`
+  (30 min) can be pressed again; the procedure still refuses a committed run.
+
+**The screen.** `GET /app/recon/groups/{id}/posts` (`recon.runs.view`) returns
+`{active, finished, total, rows}` with each posted site's row as HTML;
+`recon-group.js` polls it every 3 s, replaces each row as it answers, and
+reloads once nothing is active. Leaving the page stops nothing.
+
+**Config.** `recon.group_post` in `Modules/Recon/Config/config.php`: `queue`
+(`recon`), `timeout` (600 s per site) and `stale_after` (30 min). The queue
+connection's `retry_after` must exceed `timeout`
+(`REDIS_QUEUE_RETRY_AFTER=900`). A worker's timeout cannot interrupt a SQL
+call in progress — it fires once the call returns — so a site slower than
+`timeout` still finishes its transaction and is recorded from the run.
+
+**On `QUEUE_CONNECTION=sync`** (live until the worker is installed) each job
+runs inside the press, so the request is as long as before and the answers are
+flashed on the page as they were. The worker, its unit and the env lines are
+in `docs/deployment.md` → "Queue worker".
+
+**Verified 12 Nov 2026, local container only.** `ReconGroupPostTest` (five
+tests: N sites queue N jobs and the press calls nothing; a refused and a
+faulting site mark only themselves; a duplicated or redelivered job and a
+re-press of a posted site are no-ops; an interrupted site fails alone and is
+re-queued by the next press; the sync path still flashes). By hand, with Redis
+and two `queue:work` processes against the stub: four ABSA fixture sites
+(991–994), press in 291 ms; one site's PumpIT rows held under an exclusive
+lock for 30 s — the stub has no index on `SSBranchId`, so the other sites'
+reads waited on it too — and every site answered once the lock went, each
+once: three posted and the fourth refused `NOTHING_SELECTED`; a job given a
+10 s timeout and held 42 s still committed once and was recorded
+`committed`; a re-press of the group queued only the uncommitted sites. Every
+stamp was reversed with `usp_Recon_Reverse` and the fixture removed.

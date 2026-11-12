@@ -135,4 +135,8 @@ Route::middleware('auth')->prefix('recon')->name('recon.')->group(function () {
     // sits behind `execute` exactly as a single run's does.
     Route::post('groups/{group}/execute', [ReconGroupController::class, 'execute'])
         ->middleware('can:recon.runs.execute')->name('group.execute');
+    // The press queues one job per site (12 Nov 2026); the screen polls this
+    // for each site's answer from agora.ReconGroupPost.
+    Route::get('groups/{group}/posts', [ReconGroupController::class, 'posts'])
+        ->middleware('can:recon.runs.view')->name('group.posts');
 });
