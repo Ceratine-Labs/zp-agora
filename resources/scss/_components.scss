@@ -474,16 +474,18 @@ div.emptystate { padding: 44px 20px; text-align: center; }
 }
 
 /* AN AMENDED FIGURE THAT IS NOT THE COUNTED ONE (Ryan, 12 Nov 2026: "highlight
-   difference between amended and original ... just in the grid"). The amended
+   difference between amended and original ... just in the grid", then "show
+   the amended in blue please, like a light blue instead of green"). The amended
    block repeats the original's columns, and which cells moved was left to the
-   reader. Weight and a wash in the "good" tone, because a moved figure is the
-   balancing doing its work; the row's own wash (the shift the reader came
-   from, a balance group's rail) stays underneath. */
+   reader. Weight and a light blue wash: green on these screens already says
+   "balanced", and the row the reader came from is washed green, so a green
+   cell on it could not be seen. The row's own wash and a balance group's rail
+   stay underneath. */
 table.dt tbody tr > td.is-changed,
 table.dt tbody tr.tt-group > td.is-changed,
 table.dt tbody tr.is-matched > td.is-changed {
-  background: var(--good-bg); color: var(--good-ink); font-weight: 700;
-  box-shadow: inset 0 -2px 0 var(--good);
+  background: var(--amend-bg); color: var(--amend-ink); font-weight: 700;
+  box-shadow: inset 0 -2px 0 var(--amend-line);
 }
 
 /* On a laptop the strip drops the states this run has none of. On a wide
