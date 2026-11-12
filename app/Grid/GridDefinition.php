@@ -253,6 +253,31 @@ abstract class GridDefinition
         return true;
     }
 
+    /**
+     * The route of the screen this grid sits on — the one whose permission
+     * guards the grid's rows anywhere else they can be reached: the extract
+     * and the saved layout (Core's AuthorizeAccessGrid requires every `can:`
+     * on it, and its menu entry).
+     *
+     * The GridKey IS that route name (§3.6), so the default is the key without
+     * its qualifier, or that name's `.index` for a resource listing. A grid
+     * that lives on a screen of another name says which. Null: no screen
+     * answers, and the extract is refused rather than left open.
+     */
+    public function screenRoute(): ?string
+    {
+        $base = explode(':', $this->key(), 2)[0];
+        $routes = app('router')->getRoutes();
+
+        foreach ([$base, $base.'.index'] as $name) {
+            if ($routes->hasNamedRoute($name)) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
     /** Whether the grid takes a date range. */
     public function dateRange(): bool
     {

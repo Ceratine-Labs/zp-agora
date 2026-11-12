@@ -37,6 +37,12 @@ class ReconOutstandingGrid extends GridDefinition
         return 'app.recon.outstanding';
     }
 
+    /** It sits on the recon dashboard, whose permission guards its extract. */
+    public function screenRoute(): ?string
+    {
+        return 'app.recon.dashboard';
+    }
+
     public function title(): string
     {
         return 'Outstanding items';

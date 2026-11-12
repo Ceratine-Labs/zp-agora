@@ -27,6 +27,12 @@ class StockReconRunGrid extends GridDefinition
         return 'app.stockrecon.runs';
     }
 
+    /** It sits on the stock recon centre, whose permission guards its extract. */
+    public function screenRoute(): ?string
+    {
+        return 'app.stockrecon.index';
+    }
+
     public function title(): string
     {
         return 'Balancing runs';
