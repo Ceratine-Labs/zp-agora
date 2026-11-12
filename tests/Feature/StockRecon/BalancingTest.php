@@ -1707,6 +1707,11 @@ class BalancingTest extends TestCase
      */
     public function test_an_over_covered_by_the_short_after_it_balances_rather_than_blocking(): void
     {
+        // Ryan, 12 Nov 2026 (PM question on the failing-tests task): "Yes, balance
+        // both ways (what the engine does today)". An over and the short after
+        // it are a closing counted high, and they balance on counts as a short
+        // and the over after it do. That retired the 2 Nov assertion that both
+        // stay where they were counted.
         $this->seedShelfChain([
             '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
             '2026-07-18' => [1 => [3, 0, 3, 0], 3 => [3, 0, 5, 0]],
@@ -1720,9 +1725,8 @@ class BalancingTest extends TestCase
 
         $this->assertFalse((bool) $over->FlagCloseExceedsOnHand, 'The short after it covers the over.');
         $this->assertFalse((bool) $over->ChainBlocked);
-        $this->assertEqualsWithDelta(5.0, (float) $over->QtyCloseNew, 0.005);
-        $this->assertEqualsWithDelta(2.0, (float) $over->QtyVarNew, 0.005);
-        $this->assertEqualsWithDelta(-2.0, (float) $this->lineAt($run, '2026-07-19', 1)->QtyVarNew, 0.005);
+        $this->assertEqualsWithDelta(3.0, (float) $over->QtyCloseNew, 0.005, 'The closing counted high goes 5 → 3.');
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
     }
 
     /**
@@ -1762,6 +1766,11 @@ class BalancingTest extends TestCase
      */
     public function test_a_finding_on_a_nil_chain_is_reported_and_the_chain_still_balances(): void
     {
+        // Ryan, 12 Nov 2026 (PM question on the failing-tests task): "Yes, balance
+        // both ways (what the engine does today)". An over and the short after
+        // it are a closing counted high, and they balance on counts as a short
+        // and the over after it do. That retired the 2 Nov assertion that both
+        // stay where they were counted.
         $this->seedShelfChain([
             '2026-07-17' => [1 => [4, 0, 4, 0], 3 => [4, 0, 3, 1]],
             '2026-07-18' => [1 => [3, 0, 1, 0], 3 => [1, 0, 7, 0]],
@@ -1776,10 +1785,9 @@ class BalancingTest extends TestCase
         $this->assertTrue((bool) $over->FlagCloseExceedsOnHand, 'Neither side covers the 6 alone: still U2.');
         $this->assertSame('U2', $over->ExceptionCode, 'And reported as one.');
         $this->assertFalse((bool) $over->ChainBlocked, 'But the chain is nil, so it balances.');
-        $this->assertSame('unrecorded', $over->outcomeKey());
-        $this->assertEqualsWithDelta(6, (float) $over->QtyVarNew, 0.005);
-        $this->assertEqualsWithDelta(-2, (float) $this->lineAt($run, '2026-07-18', 1)->QtyVarNew, 0.005);
-        $this->assertEqualsWithDelta(-4, (float) $this->lineAt($run, '2026-07-19', 1)->QtyVarNew, 0.005);
+        $this->assertNotSame('unrecorded', $over->outcomeKey());
+        $this->assertStringStartsNotWith('Unrecorded issue', $over->Outcome);
+        $this->assertTrue($run->lines->every(fn ($l) => abs((float) $l->QtyVarNew) < 0.005), 'Every shift balances.');
     }
 
     /**
@@ -3087,6 +3095,11 @@ class BalancingTest extends TestCase
      */
     public function test_a_chain_that_ends_over_balances_around_the_missing_issue_and_marks_what_balances_with_what(): void
     {
+        // Ryan, 12 Nov 2026 (PM question on the failing-tests task): "Yes, balance
+        // both ways (what the engine does today)". An over and the short after
+        // it are a closing counted high, and they balance on counts as a short
+        // and the over after it do. That retired the 2 Nov assertion that both
+        // stay where they were counted.
         // The balancing envelope on its own: the over left, before stage 7g
         // captures it as the missing issue (13 Oct 2026).
         config(['stockrecon.missing_issue_mode' => 'off']);
@@ -3106,15 +3119,45 @@ class BalancingTest extends TestCase
 
         $at = fn (string $date, int $shift) => $this->lineAt($run, $date, $shift);
 
-        foreach ($lines as $line) {
-            $this->assertEqualsWithDelta((float) $line->QtyVar, (float) $line->QtyVarNew, 0.005,
-                'A variance on one shift is not cancelled against another.');
-            $this->assertEqualsWithDelta((float) $line->QtyClose, (float) $line->QtyCloseNew, 0.005);
+        // Closings: 52 → 53, 34 → 27, 27 → 26, 0 → 2; the rest stand.
+        foreach ([['2026-07-17', 1, 53], ['2026-07-17', 3, 39], ['2026-07-18', 1, 27], ['2026-07-18', 3, 26],
+            ['2026-07-19', 1, 21], ['2026-07-19', 3, 7], ['2026-07-20', 1, 2], ['2026-07-20', 3, 0],
+            ['2026-07-21', 1, 0], ['2026-07-21', 3, 0]] as [$date, $shift, $close]) {
+            $this->assertEqualsWithDelta($close, (float) $at($date, $shift)->QtyCloseNew, 0.005, "{$date} shift {$shift} closes on {$close}.");
         }
+
+        // What is left: the over, on the shifts that sold from an empty shelf.
+        foreach ([['2026-07-20', 3, 18], ['2026-07-21', 1, 7], ['2026-07-21', 3, 14]] as [$date, $shift, $over]) {
+            $line = $at($date, $shift);
+            $this->assertEqualsWithDelta($over, (float) $line->QtyVarNew, 0.005);
+            $this->assertSame('unrecorded', $line->outcomeKey(), "{$date} shift {$shift} is the missing issue.");
+        }
+        $this->assertSame('U1', $at('2026-07-20', 3)->ExceptionCode, 'Still reported: it sold more than it held.');
+        $this->assertEqualsWithDelta(0.0, (float) $lines->filter(fn ($l) => $l->TransactionDate->toDateString() < '2026-07-20'
+            || ($l->TransactionDate->toDateString() === '2026-07-20' && $l->ShiftNo === 1))->sum(fn ($l) => abs((float) $l->QtyVarNew)), 0.005,
+            'Everything before the empty shelf balances to nil.');
+
+        // What balances with what.
+        $groups = ChainSummary::of($lines)->first()->balanceGroups();
+        $letter = fn (string $date, int $shift) => $groups[$at($date, $shift)->Id]['letter'] ?? null;
+
+        $this->assertSame(['A', 'A'], [$letter('2026-07-17', 1), $letter('2026-07-17', 3)]);
+        $this->assertSame(['B', 'B', 'B'], [$letter('2026-07-18', 1), $letter('2026-07-18', 3), $letter('2026-07-19', 1)]);
+        $this->assertSame(['C', 'C'], [$letter('2026-07-20', 1), $letter('2026-07-20', 3)]);
+        $this->assertSame([null, null, null], [$letter('2026-07-19', 3), $letter('2026-07-21', 1), $letter('2026-07-21', 3)],
+            'A shift nothing balanced against carries no group.');
+        $this->assertSame('18 Jul shift 3, 19 Jul shift 1', $groups[$at('2026-07-18', 1)->Id]['with']);
+        $this->assertEqualsWithDelta(18.0, $groups[$at('2026-07-20', 1)->Id]['net'], 0.005, 'Group C leaves the over.');
+        $this->assertStringContainsString('come to nil', ChainSummary::balanceNote($groups[$at('2026-07-17', 1)->Id]));
+
         $state = ChainSummary::of($lines)->first()->state();
-        $this->assertStringContainsString('short', $state['label']);
-        $this->assertStringContainsString('over', $state['label']);
-        $this->assertSame([], ChainSummary::of($lines)->first()->balanceGroups());
+        $this->assertStringStartsWith('Balance ', $state['label']);
+        $this->assertStringContainsString('over 39', $state['label']);
+
+        // On screen: the rail, the letter and the sentence behind it.
+        $html = $this->actingAs($this->person('admin'))->get(route('app.stockrecon.run', $run))->assertOk()->getContent();
+        $this->assertStringContainsString('bal-g1', (string) $html);
+        $this->assertMatchesRegularExpression('/class="bal-tag" title="Group B — balances with 18 Jul shift 3, 19 Jul shift 1\. Together they come to nil\."/', (string) $html);
     }
 
     /** The counts are read from the _Original columns, so a re-run never compounds. */
