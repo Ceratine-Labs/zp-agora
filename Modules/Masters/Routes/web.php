@@ -87,6 +87,8 @@ Route::middleware('auth')->prefix('setup')->name('setup.')->group(function () {
         'standard-categories' => 'standardcategories',
         'expense-codes' => 'expenses',
         'tills' => 'tills',
+        'shifts' => 'shifts',
+        'transaction-types' => 'transactiontypes',
     ] as $slug => $resource) {
         Route::get("{$slug}/{branch}/edit", [ReferenceMasterWriteController::class, 'edit'])
             ->defaults('resource', $slug)->middleware("can:masters.{$resource}.edit")->whereNumber('branch')->name("{$slug}.edit");

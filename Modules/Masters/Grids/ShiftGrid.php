@@ -70,4 +70,24 @@ class ShiftGrid extends ReferenceMasterGrid
             'LastCashup' => 'The latest cashup (BRN_DailyBanking) on this shift. Blank: none on record.',
         ];
     }
+
+    public function writeEntity(): ?string
+    {
+        return 'Shift';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveShift';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'ShiftDescription' => ['label' => 'Shift name', 'type' => 'text', 'column' => 'ShiftDescription', 'max' => 20,
+                'help' => 'The name PumpIT\'s capture screens show. The shift number stays, so no cashup or count moves.'],
+            'IsActive' => ['label' => 'Active', 'type' => 'bool', 'column' => 'IsActive',
+                'help' => 'Switched off, PumpIT stops offering this shift on its capture screens at this site. Refused while a counting area here still runs it.'],
+        ];
+    }
 }

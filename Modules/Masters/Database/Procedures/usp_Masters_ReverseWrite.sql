@@ -14,6 +14,8 @@
      Expense           [PumpIT].dbo.BRN_Expenses ExpenseDescription, GLCode,
                        Vat, IsActive
      Till              [PumpIT].dbo.BRN_Tills TillDescription
+     Shift             [PumpIT].dbo.BRN_Shifts ShiftDescription, IsActive
+     TransactionType   [PumpIT].dbo.BRN_TransactionType TypeDescription
 
    A text column is put back exactly as it was stored, trailing spaces and
    all; a NULL prior goes back as NULL.
@@ -207,6 +209,51 @@ BEGIN
         UPDATE [PumpIT].dbo.BRN_Tills
            SET TillDescription = (SELECT CONVERT(NVARCHAR(30), r.PriorValue) FROM @Rows r WHERE r.Field = N'TillDescription')
          WHERE SSBranchId = @BranchId AND TillNo = @TiNo;
+    END
+    ELSE IF @Entity = N'Shift'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.BRN_Shifts') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for BRN_Shifts, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @ShNo INT = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.ShiftNo');
+        DECLARE @ShFound BIT, @ShDesc NVARCHAR(20), @ShActive BIT;
+        SELECT @ShFound = 1, @ShDesc = s.ShiftDescription, @ShActive = s.IsActive
+        FROM [PumpIT].dbo.BRN_Shifts s WITH (UPDLOCK, HOLDLOCK) WHERE s.SSBranchId = @BranchId AND s.ShiftNo = @ShNo;
+
+        IF @ShFound IS NULL OR EXISTS (
+            SELECT 1 FROM @Rows r
+            WHERE ISNULL(r.NewValue, N'') <> ISNULL(CASE r.Field
+                WHEN N'ShiftDescription' THEN LTRIM(RTRIM(@ShDesc))
+                WHEN N'IsActive'         THEN CONVERT(NVARCHAR(10), CONVERT(INT, @ShActive)) END, N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the shift since. Nothing was put back.', 1;
+
+        UPDATE s
+           SET ShiftDescription = CASE WHEN EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'ShiftDescription')
+                                       THEN (SELECT CONVERT(NVARCHAR(20), r.PriorValue) FROM @Rows r WHERE r.Field = N'ShiftDescription') ELSE s.ShiftDescription END,
+               IsActive         = CASE WHEN EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'IsActive')
+                                       THEN (SELECT CONVERT(BIT, r.PriorValue) FROM @Rows r WHERE r.Field = N'IsActive') ELSE s.IsActive END
+          FROM [PumpIT].dbo.BRN_Shifts s
+         WHERE s.SSBranchId = @BranchId AND s.ShiftNo = @ShNo;
+    END
+    ELSE IF @Entity = N'TransactionType'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.BRN_TransactionType') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for BRN_TransactionType, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @TtKey NVARCHAR(2) = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.TypeCode');
+        DECLARE @TtFound BIT, @TtCur NVARCHAR(50);
+        SELECT @TtFound = 1, @TtCur = x.TypeDescription
+        FROM [PumpIT].dbo.BRN_TransactionType x WITH (UPDLOCK, HOLDLOCK) WHERE x.SSBranchId = @BranchId AND x.TypeCode = @TtKey;
+
+        IF @TtFound IS NULL OR EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'TypeDescription'
+                                       AND ISNULL(r.NewValue, N'') <> ISNULL(LTRIM(RTRIM(@TtCur)), N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the transaction type since. Nothing was put back.', 1;
+
+        UPDATE x SET TypeDescription = (SELECT CONVERT(NVARCHAR(50), r.PriorValue) FROM @Rows r WHERE r.Field = N'TypeDescription')
+          FROM [PumpIT].dbo.BRN_TransactionType x
+         WHERE x.SSBranchId = @BranchId AND x.TypeCode = @TtKey;
     END
     ELSE
         THROW 51000, 'AGORA:NOT_FOUND:This change is of a kind Agora cannot put back.', 1;

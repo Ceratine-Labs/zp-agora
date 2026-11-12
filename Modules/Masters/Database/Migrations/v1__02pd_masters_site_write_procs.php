@@ -18,6 +18,8 @@ return new class extends ProcedureMigration
         return [
             $this->path().'/usp_Masters_SaveExpense.sql',
             $this->path().'/usp_Masters_SaveTill.sql',
+            $this->path().'/usp_Masters_SaveShift.sql',
+            $this->path().'/usp_Masters_SaveTransactionType.sql',
             $this->path().'/usp_Masters_ReverseWrite.sql',
         ];
     }

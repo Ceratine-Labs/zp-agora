@@ -71,4 +71,22 @@ class TransactionTypeGrid extends ReferenceMasterGrid
             'LastNumber' => 'PumpIT\'s HighNum: the last number issued under this type at this site.',
         ];
     }
+
+    public function writeEntity(): ?string
+    {
+        return 'TransactionType';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveTransactionType';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'TypeDescription' => ['label' => 'Name', 'type' => 'text', 'column' => 'TypeDescription', 'max' => 50,
+                'help' => 'The name PumpIT\'s purchase requests show. The code, the number prefix and the last number issued are PumpIT\'s and stay as they are.'],
+        ];
+    }
 }

@@ -37,6 +37,9 @@ class MasterWriteTest extends TestCase
     /** The site masters' TEST rows, all at BRANCH: expense, till, shift, … numbers. */
     private const SITE_NO = 9901;
 
+    /** BRN_TransactionType.TypeCode is two characters. */
+    private const TYPE = 'T9';
+
     /** @var array<int, User> */
     private array $users = [];
 
@@ -65,6 +68,10 @@ class MasterWriteTest extends TestCase
             VALUES (?, ?, 'TEST-Expense ', '71139999', 0, 0, 1, 15)", [self::BRANCH, self::SITE_NO]);
         $this->db()->statement("INSERT [PumpIT].dbo.BRN_Tills (SSBranchId, TillNo, TillDescription, Location) VALUES (?, ?, 'TEST-Till', 'WINBRANCH')",
             [self::BRANCH, self::SITE_NO]);
+        $this->db()->statement("INSERT [PumpIT].dbo.BRN_Shifts (SSBranchId, ShiftNo, ShiftDescription, IsActive) VALUES (?, ?, 'TEST-Shift', 1)",
+            [self::BRANCH, self::SITE_NO]);
+        $this->db()->statement("INSERT [PumpIT].dbo.BRN_TransactionType (SSBranchId, TypeCode, TypeDescription, AlpNum, HighNum) VALUES (?, ?, 'TEST-Type', 'TT', 41)",
+            [self::BRANCH, self::TYPE]);
     }
 
     protected function tearDown(): void
@@ -306,6 +313,60 @@ class MasterWriteTest extends TestCase
             [self::BRANCH, self::SITE_NO])->TillDescription);
     }
 
+    public function test_a_shift_is_renamed_and_switched_off_but_never_while_an_area_runs_it(): void
+    {
+        $this->actingAs($this->person(['shifts.view', 'shifts.edit']));
+        $update = route('app.setup.shifts.update', ['branch' => self::BRANCH]);
+        $show = route('app.setup.shifts.show', ['branch' => self::BRANCH, 'key' => self::SITE_NO]);
+        $this->get(route('app.setup.shifts.edit', ['branch' => self::BRANCH, 'key' => self::SITE_NO]))->assertOk()
+            ->assertSee('PumpIT dbo.BRN_Shifts', false)->assertSee('data-diff-field="IsActive"', false);
+
+        // The site's real Day Shift: its counting areas run it, so it stays on.
+        $day = array_replace($this->siteProc('Shift', ['IsActive' => 0]), ['Key' => '1', 'ShiftDescription' => 'Day Shift', 'ExpectedShiftDescription' => 'Day Shift']);
+        $this->assertSiteRefused('IN_USE', 'agora.usp_Masters_SaveShift', $day);
+        $this->assertTrue((bool) $this->db()->selectOne('SELECT IsActive FROM [PumpIT].dbo.BRN_Shifts WHERE SSBranchId = ? AND ShiftNo = 1', [self::BRANCH])->IsActive);
+        $this->assertSiteRefused('DUPLICATE', 'agora.usp_Masters_SaveShift', $this->siteProc('Shift', ['ShiftDescription' => 'Night Shift']));
+        $this->assertSiteRefused('DESCRIPTION', 'agora.usp_Masters_SaveShift', $this->siteProc('Shift', ['ShiftDescription' => str_repeat('x', 21)]));
+
+        $form = ['key' => (string) self::SITE_NO, 'ShiftDescription' => 'TEST-Shift late', 'IsActive' => 0,
+            'ExpectedShiftDescription' => 'TEST-Shift', 'ExpectedIsActive' => 1, 'Reason' => 'TEST-the late shift is closed'];
+        $this->put($update, $form)->assertRedirect($show);
+        $row = $this->db()->selectOne('SELECT ShiftDescription, IsActive FROM [PumpIT].dbo.BRN_Shifts WHERE SSBranchId = ? AND ShiftNo = ?', [self::BRANCH, self::SITE_NO]);
+        $this->assertSame(['TEST-Shift late', false], [$row->ShiftDescription, (bool) $row->IsActive]);
+        $writes = $this->siteLedger('Shift');
+        $this->assertSame([['ShiftDescription', 'TEST-Shift', 'TEST-Shift late'], ['IsActive', '1', '0']],
+            $writes->map(fn ($w) => [$w->Field, $w->PriorValue, $w->NewValue])->all());
+        $this->assertSame(['SSBranchId' => self::BRANCH, 'ShiftNo' => self::SITE_NO], (array) json_decode($writes->first()->KeyJson), 'Keyed by site AND number.');
+
+        $this->post(route('app.setup.shifts.writes.reverse', ['branch' => self::BRANCH, 'write' => $writes->first()->WriteId]),
+            ['key' => (string) self::SITE_NO, 'Reason' => 'TEST-it opens again'])->assertRedirect($show);
+        $row = $this->db()->selectOne('SELECT ShiftDescription, IsActive FROM [PumpIT].dbo.BRN_Shifts WHERE SSBranchId = ? AND ShiftNo = ?', [self::BRANCH, self::SITE_NO]);
+        $this->assertSame(['TEST-Shift', true], [$row->ShiftDescription, (bool) $row->IsActive]);
+    }
+
+    public function test_a_transaction_type_is_renamed_and_its_numbering_is_never_touched(): void
+    {
+        $this->actingAs($this->person(['transactiontypes.view', 'transactiontypes.edit']));
+        $update = route('app.setup.transaction-types.update', ['branch' => self::BRANCH]);
+        $show = route('app.setup.transaction-types.show', ['branch' => self::BRANCH, 'key' => self::TYPE]);
+        $this->get(route('app.setup.transaction-types.edit', ['branch' => self::BRANCH, 'key' => self::TYPE]))->assertOk()
+            ->assertSee('PumpIT dbo.BRN_TransactionType', false)->assertDontSee('name="NumberPrefix"', false)->assertDontSee('name="LastNumber"', false);
+
+        $this->assertSiteRefused('DUPLICATE', 'agora.usp_Masters_SaveTransactionType',
+            array_replace($this->siteProc('TransactionType', ['TypeDescription' => 'Purchase Request - Expense Cash']), ['Key' => self::TYPE]));
+        $this->put($update, ['key' => self::TYPE, 'TypeDescription' => 'TEST-Type petty cash', 'ExpectedTypeDescription' => 'TEST-Type',
+            'Reason' => 'TEST-name it as the sites say it'])->assertRedirect($show);
+        $row = $this->db()->selectOne('SELECT TypeDescription, AlpNum, HighNum FROM [PumpIT].dbo.BRN_TransactionType WHERE SSBranchId = ? AND TypeCode = ?', [self::BRANCH, self::TYPE]);
+        $this->assertSame(['TEST-Type petty cash', 'TT', 41], [$row->TypeDescription, $row->AlpNum, (int) $row->HighNum]);
+        $write = $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('Entity', 'TransactionType')->where('RowKey', self::TYPE)->first();
+        $this->assertSame(['TypeDescription', 'TEST-Type', 'TEST-Type petty cash'], [$write->Field, $write->PriorValue, $write->NewValue]);
+
+        $this->post(route('app.setup.transaction-types.writes.reverse', ['branch' => self::BRANCH, 'write' => $write->WriteId]),
+            ['key' => self::TYPE, 'Reason' => 'TEST-keep the old name'])->assertRedirect($show);
+        $this->assertSame('TEST-Type', $this->db()->selectOne('SELECT TypeDescription FROM [PumpIT].dbo.BRN_TransactionType WHERE SSBranchId = ? AND TypeCode = ?',
+            [self::BRANCH, self::TYPE])->TypeDescription);
+    }
+
     /**
      * The save procedure's parameters for one of the site masters' TEST
      * rows, with every value as setUp left it and the given changes.
@@ -318,6 +379,8 @@ class MasterWriteTest extends TestCase
         $now = match ($entity) {
             'Expense' => ['ExpenseDescription' => 'TEST-Expense', 'GLCode' => '71139999', 'Vat' => 15, 'IsActive' => 1],
             'Till' => ['TillDescription' => 'TEST-Till'],
+            'Shift' => ['ShiftDescription' => 'TEST-Shift', 'IsActive' => 1],
+            'TransactionType' => ['TypeDescription' => 'TEST-Type'],
             default => throw new \InvalidArgumentException("No TEST row for {$entity}."),
         };
         $expected = [];
@@ -453,7 +516,9 @@ class MasterWriteTest extends TestCase
         $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('RowKey', (string) self::SITE_NO)->delete();
         $this->db()->statement("DELETE FROM [PumpIT].dbo.BRN_TransactionLine WHERE SSBranchId = ? AND TransactionNo = 'TEST-PR1'", [self::BRANCH]);
         $this->db()->statement("DELETE FROM [PumpIT].dbo.BRN_Transaction WHERE SSBranchId = ? AND TransactionNo = 'TEST-PR1'", [self::BRANCH]);
-        foreach (['BRN_Expenses' => 'ExpenseNo', 'BRN_Tills' => 'TillNo'] as $table => $key) {
+        $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('Entity', 'TransactionType')->where('RowKey', self::TYPE)->delete();
+        $this->db()->statement('DELETE FROM [PumpIT].dbo.BRN_TransactionType WHERE SSBranchId = ? AND TypeCode = ?', [self::BRANCH, self::TYPE]);
+        foreach (['BRN_Expenses' => 'ExpenseNo', 'BRN_Tills' => 'TillNo', 'BRN_Shifts' => 'ShiftNo'] as $table => $key) {
             $this->db()->statement("DELETE FROM [PumpIT].dbo.{$table} WHERE SSBranchId = ? AND {$key} = ?", [self::BRANCH, self::SITE_NO]);
         }
         $this->db()->table('agora.MasterWrite')->whereIn('Entity', ['ProfitCentre', 'StandardCategory'])->where('RowKey', (string) self::CENTRE)->delete();

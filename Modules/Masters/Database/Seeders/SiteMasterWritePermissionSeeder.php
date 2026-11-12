@@ -27,6 +27,8 @@ class SiteMasterWritePermissionSeeder extends Seeder
     public const PERMISSIONS = [
         'expenses' => 'Change an expense code\'s description, GL code, VAT and active flag in PumpIT (BRN_Expenses)',
         'tills' => 'Rename a till in PumpIT (BRN_Tills)',
+        'shifts' => 'Rename a shift or switch it on or off in PumpIT (BRN_Shifts)',
+        'transactiontypes' => 'Rename a transaction type in PumpIT (BRN_TransactionType)',
     ];
 
     public function run(): void
