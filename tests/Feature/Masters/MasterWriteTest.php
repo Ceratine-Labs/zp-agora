@@ -34,6 +34,9 @@ class MasterWriteTest extends TestCase
 
     private const STANDARD = 9901;
 
+    /** The site masters' TEST rows, all at BRANCH: expense, till, shift, … numbers. */
+    private const SITE_NO = 9901;
+
     /** @var array<int, User> */
     private array $users = [];
 
@@ -58,6 +61,10 @@ class MasterWriteTest extends TestCase
         $this->db()->statement("INSERT [PumpIT].dbo.SS_ProfitCentre (ProfitCentreId, ProfitCentre, IsActive) VALUES (?, 'TEST-Centre', 1)", [self::CENTRE]);
         $this->db()->statement("INSERT [PumpIT].dbo.SS_StandardCategory (StandardCategoryId, StandardCategory, SupplierGLCode, SalesGLCode, IsActive)
             VALUES (?, 'TEST-Standard', '51019999', '41019999', 1)", [self::STANDARD]);
+        $this->db()->statement("INSERT [PumpIT].dbo.BRN_Expenses (SSBranchId, ExpenseNo, ExpenseDescription, GLCode, ApproverUserId, IsAsset, IsActive, Vat)
+            VALUES (?, ?, 'TEST-Expense ', '71139999', 0, 0, 1, 15)", [self::BRANCH, self::SITE_NO]);
+        $this->db()->statement("INSERT [PumpIT].dbo.BRN_Tills (SSBranchId, TillNo, TillDescription, Location) VALUES (?, ?, 'TEST-Till', 'WINBRANCH')",
+            [self::BRANCH, self::SITE_NO]);
     }
 
     protected function tearDown(): void
@@ -224,6 +231,133 @@ class MasterWriteTest extends TestCase
         $this->assertSame('51019999', $this->db()->selectOne('SELECT SupplierGLCode FROM [PumpIT].dbo.SS_StandardCategory WHERE StandardCategoryId = ?', [self::STANDARD])->SupplierGLCode);
     }
 
+    public function test_an_expense_code_writes_one_row_refuses_the_till_balance_name_and_in_use_and_puts_back(): void
+    {
+        $this->actingAs($this->person(['expenses.view', 'expenses.edit']));
+        $update = route('app.setup.expense-codes.update', ['branch' => self::BRANCH]);
+        $show = route('app.setup.expense-codes.show', ['branch' => self::BRANCH, 'key' => self::SITE_NO]);
+        $this->get(route('app.setup.expense-codes.edit', ['branch' => self::BRANCH, 'key' => self::SITE_NO]))->assertOk()
+            ->assertSee('PumpIT dbo.BRN_Expenses', false)->assertSee('data-diff-field="GLCode"', false)->assertDontSee('name="ApproverUserId"', false);
+        $form = ['key' => (string) self::SITE_NO, 'ExpenseDescription' => 'TEST-Expense renamed', 'GLCode' => '71130100', 'Vat' => 0, 'IsActive' => 1,
+            'ExpectedExpenseDescription' => 'TEST-Expense', 'ExpectedGLCode' => '71139999', 'ExpectedVat' => 15, 'ExpectedIsActive' => 1,
+            'Reason' => 'TEST-move it to the shop GL'];
+
+        // Refusals write nothing.
+        $this->put($update, array_replace($form, ['ExpenseDescription' => 'Till Balance Control']))->assertSessionHasErrors('refusal');
+        $this->put($update, array_replace($form, ['Vat' => 14]))->assertSessionHasErrors('refusal');
+        $this->put($update, array_replace($form, ['GLCode' => '7113A']))->assertSessionHasErrors('refusal');
+        $this->put($update, array_replace($form, ['ExpectedGLCode' => '71130000']))->assertSessionHasErrors('refusal');
+        $taken = $this->db()->selectOne("SELECT TOP 1 ExpenseDescription FROM [PumpIT].dbo.BRN_Expenses WHERE SSBranchId = ? AND ExpenseNo <> ? AND ExpenseDescription NOT LIKE 'TEST-%'",
+            [self::BRANCH, self::SITE_NO])->ExpenseDescription;
+        $this->put($update, array_replace($form, ['ExpenseDescription' => $taken]))->assertSessionHasErrors('refusal');
+        $this->assertSiteRefused('RESERVED', 'agora.usp_Masters_SaveExpense', $this->reservedExpenseOff());
+
+        // A purchase request waiting for approval holds it on.
+        $this->db()->statement("INSERT [PumpIT].dbo.BRN_Transaction (SSBranchId, TransactionNo, TypeCode, SupplierCode, QuoteNo, Approved, IsDeclined, Posted)
+            VALUES (?, 'TEST-PR1', '01', 'TEST', '', 0, 0, 0)", [self::BRANCH]);
+        $this->db()->statement("INSERT [PumpIT].dbo.BRN_TransactionLine (SSBranchId, TransactionNo, TypeCode, ItemNo, ExpenseNo, IsEmailSent, IsApprovedEmailSent, Posted)
+            VALUES (?, 'TEST-PR1', '01', 1, ?, 0, 0, 0)", [self::BRANCH, self::SITE_NO]);
+        $this->assertSiteRefused('IN_USE', 'agora.usp_Masters_SaveExpense', $this->siteProc('Expense', ['IsActive' => 0]));
+        $this->assertCount(0, $this->siteLedger('Expense'));
+
+        $this->put($update, $form)->assertRedirect($show);
+        $row = $this->db()->selectOne('SELECT ExpenseDescription, GLCode, Vat, IsActive, ApproverUserId FROM [PumpIT].dbo.BRN_Expenses WHERE SSBranchId = ? AND ExpenseNo = ?',
+            [self::BRANCH, self::SITE_NO]);
+        $this->assertSame(['TEST-Expense renamed', '71130100', 0, true, 0], [$row->ExpenseDescription, $row->GLCode, (int) $row->Vat, (bool) $row->IsActive, (int) $row->ApproverUserId]);
+        $writes = $this->siteLedger('Expense')->keyBy('Field');
+        $this->assertSame(['ExpenseDescription', 'GLCode', 'Vat'], $writes->keys()->sort()->values()->all());
+        $this->assertSame(['TEST-Expense ', 'TEST-Expense renamed'], [$writes['ExpenseDescription']->PriorValue, $writes['ExpenseDescription']->NewValue]);
+        $audit = $this->db()->selectOne("SELECT * FROM agora.vw_PumpItChange WHERE Ledger = 'MasterWrite' AND LedgerId = ?", [$writes['Vat']->Id]);
+        $this->assertSame(['Masters', 'BRN_Expenses', 'Vat 15 → 0'], [$audit->Module, $audit->PumpItTable, $audit->Change]);
+        $this->get($show)->assertOk()->assertSee('Written to PumpIT')->assertSee('TEST-move it to the shop GL');
+
+        $this->post(route('app.setup.expense-codes.writes.reverse', ['branch' => self::BRANCH, 'write' => $writes->first()->WriteId]),
+            ['key' => (string) self::SITE_NO, 'Reason' => 'TEST-wrong account, put back'])->assertRedirect($show);
+        $row = $this->db()->selectOne('SELECT ExpenseDescription, GLCode, Vat FROM [PumpIT].dbo.BRN_Expenses WHERE SSBranchId = ? AND ExpenseNo = ?', [self::BRANCH, self::SITE_NO]);
+        $this->assertSame(['TEST-Expense ', '71139999', 15], [$row->ExpenseDescription, $row->GLCode, (int) $row->Vat], 'Put back exactly, trailing space and all.');
+    }
+
+    public function test_a_till_is_renamed_in_pumpit_and_nothing_else_moves(): void
+    {
+        $this->actingAs($this->person(['tills.view', 'tills.edit']));
+        $update = route('app.setup.tills.update', ['branch' => self::BRANCH]);
+        $show = route('app.setup.tills.show', ['branch' => self::BRANCH, 'key' => self::SITE_NO]);
+        $this->get(route('app.setup.tills.edit', ['branch' => self::BRANCH, 'key' => self::SITE_NO]))->assertOk()
+            ->assertSee('PumpIT dbo.BRN_Tills', false)->assertDontSee('name="Location"', false)->assertDontSee('name="TillNo"', false);
+        $form = ['key' => (string) self::SITE_NO, 'TillDescription' => 'TEST-Till front', 'ExpectedTillDescription' => 'TEST-Till', 'Reason' => 'TEST-the front till'];
+
+        $this->put($update, array_replace($form, ['TillDescription' => str_repeat('x', 31)]))->assertSessionHasErrors();
+        $this->put($update, array_replace($form, ['ExpectedTillDescription' => 'TEST-Other']))->assertSessionHasErrors('refusal');
+        $this->put($update, $form)->assertRedirect($show);
+        $this->assertSame(['TEST-Till front', 'WINBRANCH'], array_values((array) $this->db()->selectOne(
+            'SELECT TillDescription, Location FROM [PumpIT].dbo.BRN_Tills WHERE SSBranchId = ? AND TillNo = ?', [self::BRANCH, self::SITE_NO])));
+        $write = $this->siteLedger('Till')->first();
+        $this->assertSame(['TillDescription', 'TEST-Till', 'TEST-Till front', 'BRN_Tills'], [$write->Field, $write->PriorValue, $write->NewValue, $write->PumpItTable]);
+        $this->assertSame(['SSBranchId' => self::BRANCH, 'TillNo' => self::SITE_NO], (array) json_decode($write->KeyJson));
+
+        // PumpIT moves underneath: Put back refuses rather than undo that too.
+        $this->db()->statement("UPDATE [PumpIT].dbo.BRN_Tills SET TillDescription = 'TEST-Till moved' WHERE SSBranchId = ? AND TillNo = ?", [self::BRANCH, self::SITE_NO]);
+        $this->post(route('app.setup.tills.writes.reverse', ['branch' => self::BRANCH, 'write' => $write->WriteId]),
+            ['key' => (string) self::SITE_NO, 'Reason' => 'TEST-put back over a move'])->assertSessionHasErrors('refusal');
+        $this->db()->statement("UPDATE [PumpIT].dbo.BRN_Tills SET TillDescription = 'TEST-Till front' WHERE SSBranchId = ? AND TillNo = ?", [self::BRANCH, self::SITE_NO]);
+        $this->post(route('app.setup.tills.writes.reverse', ['branch' => self::BRANCH, 'write' => $write->WriteId]),
+            ['key' => (string) self::SITE_NO, 'Reason' => 'TEST-the old name was right'])->assertRedirect($show);
+        $this->assertSame('TEST-Till', $this->db()->selectOne('SELECT TillDescription FROM [PumpIT].dbo.BRN_Tills WHERE SSBranchId = ? AND TillNo = ?',
+            [self::BRANCH, self::SITE_NO])->TillDescription);
+    }
+
+    /**
+     * The save procedure's parameters for one of the site masters' TEST
+     * rows, with every value as setUp left it and the given changes.
+     *
+     * @param  array<string, mixed>  $changes
+     * @return array<string, mixed>
+     */
+    private function siteProc(string $entity, array $changes = []): array
+    {
+        $now = match ($entity) {
+            'Expense' => ['ExpenseDescription' => 'TEST-Expense', 'GLCode' => '71139999', 'Vat' => 15, 'IsActive' => 1],
+            'Till' => ['TillDescription' => 'TEST-Till'],
+            default => throw new \InvalidArgumentException("No TEST row for {$entity}."),
+        };
+        $expected = [];
+        foreach ($now as $name => $value) {
+            $expected['Expected'.$name] = $value;
+        }
+
+        return array_replace($now, $changes) + $expected + ['BranchId' => self::BRANCH, 'Key' => (string) self::SITE_NO,
+            'Reason' => 'TEST-site master change', 'UserId' => null, 'Authorized' => 1, 'WriteMode' => 'live'];
+    }
+
+    /** @return array<string, mixed> */
+    private function reservedExpenseOff(): array
+    {
+        $row = $this->db()->selectOne("SELECT ExpenseNo, GLCode, Vat FROM [PumpIT].dbo.BRN_Expenses WHERE SSBranchId = ? AND ExpenseDescription = 'Till Balance Control'", [self::BRANCH]);
+        $this->assertNotNull($row, 'The stub carries the site\'s Till Balance Control expense.');
+
+        return ['BranchId' => self::BRANCH, 'Key' => (string) $row->ExpenseNo, 'ExpenseDescription' => 'Till Balance Control', 'GLCode' => $row->GLCode,
+            'Vat' => $row->Vat, 'IsActive' => 0, 'ExpectedExpenseDescription' => 'Till Balance Control', 'ExpectedGLCode' => $row->GLCode,
+            'ExpectedVat' => $row->Vat, 'ExpectedIsActive' => 1, 'Reason' => 'TEST-switch off the control', 'UserId' => null, 'Authorized' => 1, 'WriteMode' => 'live'];
+    }
+
+    /** @param  array<string, mixed>  $parameters */
+    private function assertSiteRefused(string $code, string $procedure, array $parameters): void
+    {
+        try {
+            app(ProcedureService::class)->write($procedure, $parameters);
+            $this->fail("{$procedure} must refuse with {$code}.");
+        } catch (AgoraProcException $e) {
+            $this->assertSame($code, $e->code());
+        }
+    }
+
+    /** @return Collection<int, \stdClass> */
+    private function siteLedger(string $entity): Collection
+    {
+        return $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('Entity', $entity)
+            ->where('RowKey', (string) self::SITE_NO)->orderBy('Id')->get();
+    }
+
     /** @param  array<string, mixed>  $parameters */
     private function assertRefused(string $code, array $parameters): void
     {
@@ -268,7 +402,7 @@ class MasterWriteTest extends TestCase
         return $row;
     }
 
-    /** @return Collection<int, object> */
+    /** @return Collection<int, \stdClass> */
     private function ledger(): Collection
     {
         return $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('Entity', 'CategoryGl')
@@ -316,6 +450,12 @@ class MasterWriteTest extends TestCase
 
     private function cleanUp(): void
     {
+        $this->db()->table('agora.MasterWrite')->where('BranchId', self::BRANCH)->where('RowKey', (string) self::SITE_NO)->delete();
+        $this->db()->statement("DELETE FROM [PumpIT].dbo.BRN_TransactionLine WHERE SSBranchId = ? AND TransactionNo = 'TEST-PR1'", [self::BRANCH]);
+        $this->db()->statement("DELETE FROM [PumpIT].dbo.BRN_Transaction WHERE SSBranchId = ? AND TransactionNo = 'TEST-PR1'", [self::BRANCH]);
+        foreach (['BRN_Expenses' => 'ExpenseNo', 'BRN_Tills' => 'TillNo'] as $table => $key) {
+            $this->db()->statement("DELETE FROM [PumpIT].dbo.{$table} WHERE SSBranchId = ? AND {$key} = ?", [self::BRANCH, self::SITE_NO]);
+        }
         $this->db()->table('agora.MasterWrite')->whereIn('Entity', ['ProfitCentre', 'StandardCategory'])->where('RowKey', (string) self::CENTRE)->delete();
         $this->db()->statement('DELETE FROM [PumpIT].dbo.SS_ProfitCentre WHERE ProfitCentreId = ?', [self::CENTRE]);
         $this->db()->statement('DELETE FROM [PumpIT].dbo.SS_StandardCategory WHERE StandardCategoryId = ?', [self::STANDARD]);

@@ -11,6 +11,12 @@
      ProfitCentre      [PumpIT].dbo.SS_ProfitCentre IsActive
      StandardCategory  [PumpIT].dbo.SS_StandardCategory SupplierGLCode,
                        SalesGLCode, IsActive
+     Expense           [PumpIT].dbo.BRN_Expenses ExpenseDescription, GLCode,
+                       Vat, IsActive
+     Till              [PumpIT].dbo.BRN_Tills TillDescription
+
+   A text column is put back exactly as it was stored, trailing spaces and
+   all; a NULL prior goes back as NULL.
 
    All rows of the press (@WriteId) or none, in one transaction; each ledger
    row is marked reversed with who, when and why.
@@ -27,7 +33,7 @@
                        their change too. Nothing is written.
 
    Returns one row (Ok, Code, Message, WriteId).
-   Called by Modules/Masters/Services/MasterWriteService. Deployed by v1__02pb. */
+   Called by Modules/Masters/Services/MasterWriteService. Deployed by v1__02pb, and again by v1__02pd. */
 CREATE OR ALTER PROCEDURE agora.usp_Masters_ReverseWrite
     @BranchId INT,
     @WriteId UNIQUEIDENTIFIER,
@@ -150,6 +156,57 @@ BEGIN
                IsActive       = ISNULL((SELECT CONVERT(BIT, r.PriorValue) FROM @Rows r WHERE r.Field = N'IsActive'), s.IsActive)
           FROM [PumpIT].dbo.SS_StandardCategory s
          WHERE s.StandardCategoryId = @Sc;
+    END
+    ELSE IF @Entity = N'Expense'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.BRN_Expenses') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for BRN_Expenses, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @ExNo INT = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.ExpenseNo');
+        DECLARE @ExFound BIT, @ExDesc NVARCHAR(60), @ExGl NVARCHAR(8), @ExVat INT, @ExActive BIT;
+        SELECT @ExFound = 1, @ExDesc = e.ExpenseDescription, @ExGl = e.GLCode, @ExVat = e.Vat, @ExActive = e.IsActive
+        FROM [PumpIT].dbo.BRN_Expenses e WITH (UPDLOCK, HOLDLOCK) WHERE e.SSBranchId = @BranchId AND e.ExpenseNo = @ExNo;
+
+        IF @ExFound IS NULL OR EXISTS (
+            SELECT 1 FROM @Rows r
+            WHERE ISNULL(r.NewValue, N'') <> ISNULL(CASE r.Field
+                WHEN N'ExpenseDescription' THEN LTRIM(RTRIM(@ExDesc))
+                WHEN N'GLCode'             THEN LTRIM(RTRIM(@ExGl))
+                WHEN N'Vat'                THEN CONVERT(NVARCHAR(10), @ExVat)
+                WHEN N'IsActive'           THEN CONVERT(NVARCHAR(10), CONVERT(INT, @ExActive)) END, N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has changed the expense code since. Nothing was put back.', 1;
+
+        UPDATE e
+           SET ExpenseDescription = CASE WHEN EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'ExpenseDescription')
+                                         THEN (SELECT CONVERT(NVARCHAR(60), r.PriorValue) FROM @Rows r WHERE r.Field = N'ExpenseDescription') ELSE e.ExpenseDescription END,
+               GLCode   = CASE WHEN EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'GLCode')
+                               THEN (SELECT CONVERT(NVARCHAR(8), r.PriorValue) FROM @Rows r WHERE r.Field = N'GLCode') ELSE e.GLCode END,
+               Vat      = CASE WHEN EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'Vat')
+                               THEN (SELECT CONVERT(INT, r.PriorValue) FROM @Rows r WHERE r.Field = N'Vat') ELSE e.Vat END,
+               IsActive = CASE WHEN EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'IsActive')
+                               THEN (SELECT CONVERT(BIT, r.PriorValue) FROM @Rows r WHERE r.Field = N'IsActive') ELSE e.IsActive END
+          FROM [PumpIT].dbo.BRN_Expenses e
+         WHERE e.SSBranchId = @BranchId AND e.ExpenseNo = @ExNo;
+    END
+    ELSE IF @Entity = N'Till'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM [PumpIT].sys.triggers t
+                   WHERE t.parent_id = OBJECT_ID(N'[PumpIT].dbo.BRN_Tills') AND t.is_disabled = 0)
+            THROW 51000, 'AGORA:TRIGGER_ON:PumpIT has a trigger switched on for BRN_Tills, which would write beyond it. Nothing was put back.', 1;
+
+        DECLARE @TiNo INT = JSON_VALUE((SELECT TOP 1 KeyJson FROM @Rows), '$.TillNo');
+        DECLARE @TiFound BIT, @TiDesc NVARCHAR(30);
+        SELECT @TiFound = 1, @TiDesc = t.TillDescription
+        FROM [PumpIT].dbo.BRN_Tills t WITH (UPDLOCK, HOLDLOCK) WHERE t.SSBranchId = @BranchId AND t.TillNo = @TiNo;
+
+        IF @TiFound IS NULL OR EXISTS (SELECT 1 FROM @Rows r WHERE r.Field = N'TillDescription'
+                                       AND ISNULL(r.NewValue, N'') <> ISNULL(LTRIM(RTRIM(@TiDesc)), N''))
+            THROW 51000, 'AGORA:MOVED:PumpIT no longer holds what this change wrote — somebody has renamed the till since. Nothing was put back.', 1;
+
+        UPDATE [PumpIT].dbo.BRN_Tills
+           SET TillDescription = (SELECT CONVERT(NVARCHAR(30), r.PriorValue) FROM @Rows r WHERE r.Field = N'TillDescription')
+         WHERE SSBranchId = @BranchId AND TillNo = @TiNo;
     END
     ELSE
         THROW 51000, 'AGORA:NOT_FOUND:This change is of a kind Agora cannot put back.', 1;

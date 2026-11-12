@@ -70,4 +70,22 @@ class TillGrid extends ReferenceMasterGrid
             'LastCashup' => 'The latest cashup (BRN_DailyBanking) on this till. Blank: none on record.',
         ];
     }
+
+    public function writeEntity(): ?string
+    {
+        return 'Till';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveTill';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'TillDescription' => ['label' => 'Till name', 'type' => 'text', 'column' => 'TillDescription', 'max' => 30,
+                'help' => 'The name PumpIT\'s cashup and Z-read screens show. The till number and its POS stay as they are, so no Z-read or cashup moves.'],
+        ];
+    }
 }

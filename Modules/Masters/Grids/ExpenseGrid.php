@@ -75,4 +75,28 @@ class ExpenseGrid extends ReferenceMasterGrid
             'IsAsset' => 'PumpIT\'s asset flag. It was 0 on every code on 12 Nov 2026, those named "… ASSET" included.',
         ];
     }
+
+    public function writeEntity(): ?string
+    {
+        return 'Expense';
+    }
+
+    public function saveProcedure(): ?string
+    {
+        return 'agora.usp_Masters_SaveExpense';
+    }
+
+    public function editableFields(): array
+    {
+        return [
+            'ExpenseDescription' => ['label' => 'Description', 'type' => 'text', 'column' => 'ExpenseDescription', 'max' => 60,
+                'help' => 'What PumpIT\'s purchase requests show. Till Balance Control is never renamed: PumpIT posts till balances to it by name.'],
+            'GLCode' => ['label' => 'GL code', 'type' => 'text', 'column' => 'GLCode', 'max' => 8,
+                'help' => 'Digits only. Purchase requests and expenses loaded from now on post to it; what was posted stays where it is.'],
+            'Vat' => ['label' => 'VAT %', 'type' => 'decimal', 'column' => 'Vat', 'min' => 0, 'max' => 15, 'step' => '15',
+                'help' => '15 or 0.'],
+            'IsActive' => ['label' => 'Active', 'type' => 'bool', 'column' => 'IsActive',
+                'help' => 'Switched off, PumpIT stops offering it on new purchase requests. Refused while a request waiting for approval names it.'],
+        ];
+    }
 }

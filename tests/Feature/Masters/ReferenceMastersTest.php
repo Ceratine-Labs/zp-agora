@@ -321,7 +321,10 @@ class ReferenceMastersTest extends TestCase
         }
     }
 
-    /** @return Collection<int, object> */
+    /**
+     * @param  array<string, mixed>  $extra
+     * @return Collection<int, object>
+     */
     private function rows(string $procedure, ?string $branches = null, array $extra = []): Collection
     {
         return app(ProcedureService::class)->callSets($procedure, array_replace([
