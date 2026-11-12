@@ -46,7 +46,7 @@ BEGIN
            b.IsAdminEntity,
            b.IsActive,
            (SELECT COUNT(*) FROM agora.BranchProfitCentre x WHERE x.BranchId = b.BranchId) AS ProfitCentreCount,
-           (SELECT STRING_AGG(pc.Name, N', ') WITHIN GROUP (ORDER BY pc.Name)
+           (SELECT STRING_AGG(CONVERT(nvarchar(max), pc.Name), N', ') WITHIN GROUP (ORDER BY pc.Name)
             FROM agora.BranchProfitCentre x
             JOIN agora.vw_ProfitCentre pc ON pc.ProfitCentreId = x.ProfitCentreId
             WHERE x.BranchId = b.BranchId) AS ProfitCentres,

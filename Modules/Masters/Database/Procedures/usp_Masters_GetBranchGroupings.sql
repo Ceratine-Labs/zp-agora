@@ -18,7 +18,7 @@ BEGIN
            (SELECT COUNT(*) FROM agora.Branch b WHERE b.DeletedAt IS NULL AND
                 ((g.Kind = N'Region' AND b.RegionId = g.Id) OR (g.Kind = N'Brand' AND b.BrandId = g.Id)
                  OR (g.Kind = N'Format' AND b.FormatId = g.Id))) AS BranchCount,
-           (SELECT STRING_AGG(b.Name, N', ') WITHIN GROUP (ORDER BY b.Name)
+           (SELECT STRING_AGG(CONVERT(nvarchar(max), b.Name), N', ') WITHIN GROUP (ORDER BY b.Name)
             FROM agora.Branch b WHERE b.DeletedAt IS NULL AND
                 ((g.Kind = N'Region' AND b.RegionId = g.Id) OR (g.Kind = N'Brand' AND b.BrandId = g.Id)
                  OR (g.Kind = N'Format' AND b.FormatId = g.Id))) AS Branches

@@ -172,7 +172,7 @@ BEGIN
 
         INSERT INTO agora.MasterChange (BranchId, Entity, EntityId, Field, PriorValue, NewValue, Reason, Source, CreatedAt, CreatedBy)
         SELECT m.BranchId, N'Branch', m.BranchId, N'ProfitCentres', NULL,
-               (SELECT STRING_AGG(pc.Name, N', ') WITHIN GROUP (ORDER BY pc.Name)
+               (SELECT STRING_AGG(CONVERT(nvarchar(max), pc.Name), N', ') WITHIN GROUP (ORDER BY pc.Name)
                 FROM agora.BranchProfitCentre x JOIN agora.vw_ProfitCentre pc ON pc.ProfitCentreId = x.ProfitCentreId
                 WHERE x.BranchId = m.BranchId),
                N'Migrated from SDK_CategoryGLCode', N'migrate', @Now, @UserId
@@ -197,7 +197,7 @@ BEGIN
            s.BrandId AS LegacyBrandId, br.Name AS Brand,
            s.ClassId AS LegacyClassId, f.Name AS [Format],
            b.Status, b.POSType, b.IsAdminEntity, b.IsTrading, b.IsActive,
-           (SELECT STRING_AGG(pc.Name, N', ') WITHIN GROUP (ORDER BY pc.Name)
+           (SELECT STRING_AGG(CONVERT(nvarchar(max), pc.Name), N', ') WITHIN GROUP (ORDER BY pc.Name)
             FROM agora.BranchProfitCentre x JOIN agora.vw_ProfitCentre pc ON pc.ProfitCentreId = x.ProfitCentreId
             WHERE x.BranchId = b.BranchId) AS ProfitCentres,
            b.MigratedAt

@@ -102,11 +102,11 @@ BEGIN
             THROW 51000, 'AGORA:BRANCH_FORMAT:That format does not exist or is no longer in use.', 1;
 
         DECLARE @OldCentres NVARCHAR(400) = (
-            SELECT STRING_AGG(pc.Name, N', ') WITHIN GROUP (ORDER BY pc.Name)
+            SELECT STRING_AGG(CONVERT(nvarchar(max), pc.Name), N', ') WITHIN GROUP (ORDER BY pc.Name)
             FROM agora.BranchProfitCentre x JOIN agora.vw_ProfitCentre pc ON pc.ProfitCentreId = x.ProfitCentreId
             WHERE x.BranchId = @BranchId);
         DECLARE @NewCentres NVARCHAR(400) = (
-            SELECT STRING_AGG(pc.Name, N', ') WITHIN GROUP (ORDER BY pc.Name)
+            SELECT STRING_AGG(CONVERT(nvarchar(max), pc.Name), N', ') WITHIN GROUP (ORDER BY pc.Name)
             FROM @Wanted w JOIN agora.vw_ProfitCentre pc ON pc.ProfitCentreId = w.ProfitCentreId);
 
         INSERT INTO agora.MasterChange (BranchId, Entity, EntityId, Field, PriorValue, NewValue, Reason, Source, CreatedAt, CreatedBy)
