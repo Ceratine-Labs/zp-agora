@@ -203,6 +203,38 @@ class ReferenceMastersTest extends TestCase
             ->assertOk()->assertSee('POS identifier')->assertSee($pumps->where('BranchId', (int) $branch)->where('FuelTypeNo', (int) $grade->FuelTypeNo)->first()->PumpNo);
     }
 
+    public function test_utility_meters_are_per_site_with_their_last_reading(): void
+    {
+        $this->assertPerBranchListing('meters', 'meters', 'agora.usp_Masters_GridUtilityMeters', 'vw_UtilityMeter', 'MeterNo');
+
+        // The last reading is the latest BRN_UtilityTransaction row for the meter.
+        $branch = $this->someBranch('vw_UtilityTransaction');
+        $meter = $this->rows('agora.usp_Masters_GridUtilityMeters', $branch)->sortByDesc('ReadingCount')->first();
+        $latest = $this->db()->selectOne('SELECT COUNT(*) AS n, MAX(TransactionDate) AS last FROM agora.vw_UtilityTransaction
+            WHERE BranchId = ? AND UtilityType = ? AND MeterNo = ?', [$branch, $meter->UtilityType, $meter->MeterNo]);
+        $this->assertSame((int) $latest->n, (int) $meter->ReadingCount);
+        $this->assertSame(substr((string) $latest->last, 0, 10), substr((string) $meter->LastReadingDate, 0, 10));
+
+        $this->actingAs($this->person(['meters.view']));
+        $this->get(route('app.setup.meters.show', ['branch' => $branch, 'key' => $meter->RowKey]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->assertSee('Last ten readings');
+    }
+
+    public function test_merchant_and_terminal_numbers_union_the_three_tables(): void
+    {
+        $this->assertPerBranchListing('terminals', 'terminals', 'agora.usp_Masters_GridTerminals', 'vw_MasterTerminal', 'Number');
+
+        $all = $this->rows('agora.usp_Masters_GridTerminals', implode(',', $this->db()->table('agora.Branch')->pluck('BranchId')->all()));
+        $this->assertSame(['ABSA merchant', 'Cash device terminal', 'Smart ATM terminal'], $all->pluck('Kind')->unique()->sort()->values()->all());
+        $this->assertSame(['Not recorded'], $all->where('Kind', 'Cash device terminal')->pluck('Active')->unique()->values()->all(),
+            'The cash-device table has no active flag; the listing does not invent one.');
+    }
+
+    public function test_statement_criteria_list_the_older_recon_rules(): void
+    {
+        $this->assertPerBranchListing('statement-criteria', 'reconcriteria', 'agora.usp_Masters_GridReconCriteria', 'vw_MasterReconCriteria', 'Code');
+    }
+
     /**
      * What every per-branch master must do: refuse without a branch, list
      * exactly the chosen site's rows — the count the view holds for it — and

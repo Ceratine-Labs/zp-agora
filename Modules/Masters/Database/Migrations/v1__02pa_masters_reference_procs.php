@@ -23,6 +23,9 @@ return new class extends ProcedureMigration
             $this->path().'/usp_Masters_GridFuelTypes.sql',
             $this->path().'/usp_Masters_GridTanks.sql',
             $this->path().'/usp_Masters_GridPumps.sql',
+            $this->path().'/usp_Masters_GridUtilityMeters.sql',
+            $this->path().'/usp_Masters_GridTerminals.sql',
+            $this->path().'/usp_Masters_GridReconCriteria.sql',
         ];
     }
 };

@@ -38,6 +38,9 @@ class ReferenceMastersPermissionSeeder extends Seeder
         'fueltypes' => 'See the fuel grades at each forecourt, their POS codes and pumps',
         'tanks' => 'See the tanks at each forecourt and the pumps drawing from them',
         'pumps' => 'See every pump, its reading order, grade and tank, per forecourt',
+        'meters' => 'See the utility meters at each site and when each was last read',
+        'terminals' => 'See the ABSA merchant, Smart ATM and cash-device terminal numbers at each site',
+        'reconcriteria' => 'See the older bank-statement recon criteria (SS_ReconCriteria) at each site',
     ];
 
     public function run(): void

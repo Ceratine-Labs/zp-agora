@@ -47,6 +47,9 @@ class ReferenceMastersMenuSeeder extends Seeder
         'site-setup/fuel-types' => ['site-setup', 'Fuel types', 'fuel-types', 'fueltypes', 40],
         'site-setup/tanks' => ['site-setup', 'Tanks', 'tanks', 'tanks', 50],
         'site-setup/pumps' => ['site-setup', 'Pumps', 'pumps', 'pumps', 60],
+        'people-assets/meters' => ['people-assets', 'Utility meters', 'meters', 'meters', 30],
+        'site-setup/terminals' => ['site-setup', 'Merchant and terminal numbers', 'terminals', 'terminals', 70],
+        'site-setup/statement-criteria' => ['site-setup', 'Statement criteria', 'statement-criteria', 'reconcriteria', 80],
     ];
 
     public function run(): void
