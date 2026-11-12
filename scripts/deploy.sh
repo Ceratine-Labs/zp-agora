@@ -172,6 +172,9 @@ fi
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+# The recon queue worker (agora-queue.service, 12 Nov 2026) keeps the old
+# code in memory until told; it finishes the job it is in, then restarts.
+php artisan queue:restart
 chown -R www-data:www-data bootstrap/cache
 : > storage/logs/laravel.log
 systemctl restart php8.3-fpm

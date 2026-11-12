@@ -265,7 +265,13 @@ target anyway, but the credentials should not be sitting in the file either.
 
 ---
 
-## Queue worker — PREPARED, not installed (12 November 2026)
+## Queue worker — INSTALLED 12 November 2026
+
+> Installed on Ryan's go-ahead, 12 Nov 2026: Redis DB 5, prefix
+> `agora-database-`, `agora-queue.service` enabled, `queue.log` in
+> `/etc/logrotate.d/agora-scheduler`, `.env` backed up as
+> `.env.bak-20261112-queue`. `scripts/deploy.sh` now runs
+> `php artisan queue:restart`. The steps below are what was done.
 
 Posting every site queues one `PostGroupSite` job per site on the `recon`
 queue (docs/recon-execute.md → "Posting every site"; Ryan's decision,
