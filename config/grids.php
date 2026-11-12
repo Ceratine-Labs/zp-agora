@@ -104,6 +104,7 @@ return [
         'app.setup.users' => UserGrid::class,
         'app.setup.roles' => RoleGrid::class,
         'app.setup.branches' => BranchMasterGrid::class,
+        'app.setup.profit-centres' => \Modules\Masters\Grids\ProfitCentreGrid::class,
 
         // The per-branch stock master: the customer's row unless Agora holds
         // a live override for it, with cost, GP, stock on hand and last
