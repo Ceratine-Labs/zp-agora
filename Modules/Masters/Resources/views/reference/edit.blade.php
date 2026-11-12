@@ -51,5 +51,4 @@
             <div class="form-actions"><button class="btn-primary" type="submit">Save to PumpIT</button></div>
         </x-card>
     </form>
-    @include('masters::partials.confirm-diff')
 </x-app-shell>
