@@ -12,6 +12,7 @@ use Modules\Core\Badges\LoadsFailedBadge;
 use Modules\Core\Badges\PurchaseRequestsAwaitingBadge;
 use Modules\Core\Badges\ZReadsUnallocatedBadge;
 use Modules\Core\Console\MigrateUsersCommand;
+use Modules\Core\Http\Middleware\EndInactiveSessions;
 use Modules\Core\Http\Middleware\EnforceMenuAccess;
 use Modules\Core\Http\Middleware\RequirePasswordChange;
 use Modules\Core\Http\Middleware\ResolveBranchContext;
@@ -56,7 +57,11 @@ class CoreServiceProvider extends ServiceProvider
     public function boot(): void
     {
         /*
-         | Core's two web middleware.
+         | Core's web middleware.
+         |
+         | EndInactiveSessions: an account deactivated or locked while signed
+         | in is signed out on its next request. FIRST, so nothing below is
+         | worked out for a session that is about to end.
          |
          | ResolveBranchContext: every request inside /app resolves the
          | workspace, the branch and the user's grants before a controller
@@ -73,6 +78,7 @@ class CoreServiceProvider extends ServiceProvider
          | with before anything is refused on the menu's account.
          */
         $this->pushWebMiddleware([
+            EndInactiveSessions::class,
             ResolveBranchContext::class,
             RequirePasswordChange::class,
             EnforceMenuAccess::class,

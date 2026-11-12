@@ -191,7 +191,18 @@ class UserAccessService
             }
         }
 
-        $person->forceFill($fields)->save();
+        $couldSignIn = $person->canSignIn();
+        $person->forceFill($fields);
+
+        // Taking away the right to sign in also kills every remember-me
+        // cookie issued before it. EndInactiveSessions ends the open sessions
+        // on their next request; this is what stops an old cookie bringing
+        // one back if the account is switched on again later.
+        if ($couldSignIn && ! $person->canSignIn()) {
+            $person->setRememberToken(Str::random(60));
+        }
+
+        $person->save();
     }
 
     /** Put this account beyond signing in until the person resets it themselves. */
