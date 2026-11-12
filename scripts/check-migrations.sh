@@ -118,6 +118,27 @@ for file in $files; do
     if grep -qiE "(CREATE|ALTER|DROP|TRUNCATE)[[:space:]]+(TABLE|INDEX|VIEW|PROCEDURE|SCHEMA)?[[:space:]]*\[?dbo\]?\." <<< "$code"; then
         say "$file: DDL against the dbo schema. The customer runs schema changes to their own tables."
     fi
+
+    # `$table->dateTime('X', 0)` is the legacy DATETIME on SQL Server, not
+    # DATETIME2(0): Laravel's grammar reads a precision of 0 as "none" (12 Nov
+    # 2026, commit ecc8ffc). MigrationHelper::stamp() is the way to make one.
+    #
+    # Only for what is new since HEAD. A committed migration has run, and is
+    # immutable: its DATETIME columns are live and stay as they are. A file that
+    # is untracked is checked whole; a committed file is refused only if it now
+    # carries MORE of them than it did at HEAD, which is an edit that should not
+    # have been made in the first place.
+    dt0='dateTime\([^)]*,[[:space:]]*0[[:space:]]*\)'
+    now_count=$(grep -cE "$dt0" <<< "$code")
+    if git cat-file -e "HEAD:$file" 2>/dev/null; then
+        head_count=$(git show "HEAD:$file" | sed -E 's;//.*$;;; s;^[[:space:]]*\*.*$;;' | grep -cE "$dt0")
+    else
+        head_count=0
+    fi
+    if [ "$now_count" -gt "$head_count" ]; then
+        line=$(grep -nE "$dt0" "$file" | tail -1 | cut -d: -f1)
+        say "$file:$line: dateTime(..., 0) makes a legacy DATETIME on SQL Server. Use MigrationHelper::stamp(\$table, 'Column') for DATETIME2(0)."
+    fi
 done
 
 if [ "$fail" -eq 0 ]; then

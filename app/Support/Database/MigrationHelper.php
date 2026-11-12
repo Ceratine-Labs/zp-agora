@@ -159,8 +159,14 @@ class MigrationHelper
         self::stamp($table, 'UpdatedAt');
     }
 
-    /** A nullable DATETIME2(0) stamp column. */
-    protected static function stamp(Blueprint $table, string $column): void
+    /**
+     * A nullable DATETIME2(0) stamp column.
+     *
+     * Public so a migration's own instants (ReversedAt, ConfirmedAt …) use it
+     * instead of `$table->dateTime($c, 0)`, which emits the legacy DATETIME.
+     * scripts/check-migrations.sh refuses that in any new migration.
+     */
+    public static function stamp(Blueprint $table, string $column): void
     {
         $table->rawColumn($column, 'DATETIME2(0)')->nullable();
     }
