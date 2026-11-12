@@ -21,6 +21,9 @@ use Modules\Core\Grids\RoleGrid;
 use Modules\Core\Grids\UserGrid;
 use Modules\Debtors\Grids\DebtorAccountGrid;
 use Modules\Masters\Grids\BranchMasterGrid;
+use Modules\People\Grids\EmployeeAreaGrid;
+use Modules\People\Grids\EmployeeGrid;
+use Modules\People\Grids\EmployeePostGrid;
 use Modules\Product\Grids\CriticalLineGrid;
 use Modules\Product\Grids\StockItemGrid;
 use Modules\Recon\Grids\ReconBankSideGrid;
@@ -104,6 +107,9 @@ return [
         'app.setup.users' => UserGrid::class,
         'app.setup.roles' => RoleGrid::class,
         'app.setup.branches' => BranchMasterGrid::class,
+        'app.setup.employees' => EmployeeGrid::class,
+        'app.setup.employee-posts' => EmployeePostGrid::class,
+        'app.setup.employee-areas' => EmployeeAreaGrid::class,
         'app.setup.profit-centres' => \Modules\Masters\Grids\ProfitCentreGrid::class,
         'app.setup.standard-categories' => \Modules\Masters\Grids\StandardCategoryGrid::class,
         'app.setup.categories' => \Modules\Masters\Grids\CategoryGlGrid::class,
