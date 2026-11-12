@@ -138,20 +138,31 @@ class MigrationHelper
      * attribute and stamping a fake id would be worse than an honest null.
      * The procedure sets them from its @UserId argument; PHP does not
      * (plan §3.3).
+     *
+     * DATETIME2(0), as the plan specifies and as softDeletes() writes. Not
+     * `dateTime(..., 0)`: Laravel's SQL Server grammar treats a precision of 0
+     * as "none" and emits the legacy DATETIME, which is how every audit column
+     * before 12 Nov 2026 came out as DATETIME (existing columns are unchanged).
      */
     public static function addAuditColumns(Blueprint $table): void
     {
-        $table->dateTime('CreatedAt', 0)->nullable();
+        self::stamp($table, 'CreatedAt');
         $table->integer('CreatedBy')->nullable();
-        $table->dateTime('UpdatedAt', 0)->nullable();
+        self::stamp($table, 'UpdatedAt');
         $table->integer('UpdatedBy')->nullable();
     }
 
     /** Timestamps without the who — for rows nothing edits. */
     public static function addTimestamps(Blueprint $table): void
     {
-        $table->dateTime('CreatedAt', 0)->nullable();
-        $table->dateTime('UpdatedAt', 0)->nullable();
+        self::stamp($table, 'CreatedAt');
+        self::stamp($table, 'UpdatedAt');
+    }
+
+    /** A nullable DATETIME2(0) stamp column. */
+    protected static function stamp(Blueprint $table, string $column): void
+    {
+        $table->rawColumn($column, 'DATETIME2(0)')->nullable();
     }
 
     /**
