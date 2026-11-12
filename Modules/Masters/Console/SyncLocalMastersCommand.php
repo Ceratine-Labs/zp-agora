@@ -47,6 +47,7 @@ class SyncLocalMastersCommand extends Command
         'SS_Branch_SMARTATM_TerminalNo' => [['SMARTATMTerminalNoId'], ['SMARTATMTerminalNoId', 'SSBranchId', 'SMARTATM_TerminalNo', 'Description', 'IsActive']],
         'SS_Branch_CASHDEVICE_TerminalNo' => [['CASHDEVICETerminalNoId'], ['CASHDEVICETerminalNoId', 'SSBranchId', 'CASHDEVICE_TerminalNo', 'Description']],
         'SS_ReconCriteriaGroup' => [['CriteriaGroupId'], ['CriteriaGroupId', 'Code', 'Description', 'SQLTableName', 'SQLFieldName', 'ReconFieldName', 'DataType', 'IsActive']],
+        'bankrecon.BankAccount' => [['BankAccountId'], ['BankAccountId', 'BranchId', 'MethodOfPaymentId', 'Type', 'BankName', 'AccountName', 'AccountNumber', 'IsActive', 'IsDeleted', 'CreatedBy', 'CreatedAt', 'ModifiedBy', 'ModifiedAt']],
         'SS_ReconCriteria' => [['SSBranchId', 'CriteriaId'], ['SSBranchId', 'CriteriaId', 'CriteriaGroupId', 'Code', 'Description', 'Reference', 'ReferenceStartPosition', 'ReferenceEndPosition', 'ReconStartPosition', 'ReconEndPosition', 'IsAutoReconcile']],
     ];
 
@@ -74,12 +75,14 @@ class SyncLocalMastersCommand extends Command
         $this->shape($stub, $database);
 
         foreach (self::TABLES as $table => [$key, $columns]) {
-            $rows = $source->table("dbo.{$table}")->select($columns)->get();
+            $qualified = str_contains($table, '.') ? $table : "dbo.{$table}";
+            $target = str_contains($table, '.') ? str_replace('.', '].[', $table) : "dbo].[{$table}";
+            $rows = $source->table($qualified)->select($columns)->get();
             $inserted = 0;
 
             foreach ($rows as $row) {
                 $where = implode(' AND ', array_map(fn (string $c) => "[{$c}] = ?", $key));
-                $exists = $stub->selectOne("SELECT 1 AS Found FROM [{$database}].dbo.[{$table}] WHERE {$where}",
+                $exists = $stub->selectOne("SELECT 1 AS Found FROM [{$database}].[{$target}] WHERE {$where}",
                     array_map(fn (string $c) => $row->{$c}, $key));
                 if ($exists !== null) {
                     continue;
@@ -87,7 +90,7 @@ class SyncLocalMastersCommand extends Command
 
                 $list = implode(', ', array_map(fn (string $c) => "[{$c}]", $columns));
                 $marks = implode(', ', array_fill(0, count($columns), '?'));
-                $stub->insert("INSERT [{$database}].dbo.[{$table}] ({$list}) VALUES ({$marks})",
+                $stub->insert("INSERT [{$database}].[{$target}] ({$list}) VALUES ({$marks})",
                     array_map(fn (string $c) => $row->{$c}, $columns));
                 $inserted++;
             }

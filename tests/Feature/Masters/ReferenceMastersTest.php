@@ -235,6 +235,16 @@ class ReferenceMastersTest extends TestCase
         $this->assertPerBranchListing('statement-criteria', 'reconcriteria', 'agora.usp_Masters_GridReconCriteria', 'vw_MasterReconCriteria', 'Code');
     }
 
+    public function test_bank_accounts_list_the_customers_bankrecon_accounts(): void
+    {
+        $this->assertPerBranchListing('bank-accounts', 'bankaccounts', 'agora.usp_Masters_GridBankAccounts', 'vw_MasterBankAccount', 'AccountNumber');
+
+        $all = $this->rows('agora.usp_Masters_GridBankAccounts', implode(',', $this->db()->table('agora.Branch')->pluck('BranchId')->all()));
+        $this->assertSame((int) $this->db()->selectOne('SELECT COUNT(*) AS n FROM agora.vw_MasterBankAccount a
+            WHERE a.IsDeleted = 0 AND EXISTS (SELECT 1 FROM agora.Branch b WHERE b.BranchId = a.BranchId)')->n, $all->count());
+        $this->assertSame([false], $all->pluck('IsDeleted')->map(fn ($d) => (bool) $d)->unique()->values()->all(), 'Deleted accounts only when asked for.');
+    }
+
     /**
      * What every per-branch master must do: refuse without a branch, list
      * exactly the chosen site's rows — the count the view holds for it — and

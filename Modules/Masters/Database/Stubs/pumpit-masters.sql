@@ -113,3 +113,22 @@ IF OBJECT_ID('dbo.BRN_Pump') IS NOT NULL AND COL_LENGTH('dbo.BRN_Pump', 'Order')
 GO
 IF OBJECT_ID('dbo.BRN_Pump') IS NOT NULL AND COL_LENGTH('dbo.BRN_Pump', 'CreateDateTime') IS NULL
     ALTER TABLE dbo.BRN_Pump ADD CreateDateTime DATETIME NULL;
+GO
+IF SCHEMA_ID('bankrecon') IS NULL EXEC('CREATE SCHEMA bankrecon');
+GO
+IF OBJECT_ID('bankrecon.BankAccount') IS NULL
+CREATE TABLE bankrecon.BankAccount (
+    BankAccountId INT NOT NULL PRIMARY KEY,
+    BranchId INT NOT NULL,
+    MethodOfPaymentId INT NOT NULL,
+    [Type] NVARCHAR(50) NULL,
+    BankName NVARCHAR(80) NOT NULL,
+    AccountName NVARCHAR(120) NOT NULL,
+    AccountNumber NVARCHAR(40) NOT NULL,
+    IsActive BIT NOT NULL,
+    IsDeleted BIT NOT NULL,
+    CreatedBy INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL,
+    ModifiedBy INT NULL,
+    ModifiedAt DATETIME2 NULL
+);

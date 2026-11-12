@@ -67,6 +67,7 @@ Route::middleware('auth')->prefix('setup')->name('setup.')->group(function () {
         'meters' => 'meters',
         'terminals' => 'terminals',
         'statement-criteria' => 'reconcriteria',
+        'bank-accounts' => 'bankaccounts',
     ] as $slug => $resource) {
         Route::get($slug, [ReferenceMasterController::class, 'index'])
             ->defaults('resource', $slug)->middleware("can:masters.{$resource}.view")->name("{$slug}.index");

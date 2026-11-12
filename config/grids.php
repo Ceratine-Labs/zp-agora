@@ -122,6 +122,7 @@ return [
         'app.setup.meters' => \Modules\Masters\Grids\UtilityMeterGrid::class,
         'app.setup.terminals' => \Modules\Masters\Grids\TerminalGrid::class,
         'app.setup.statement-criteria' => \Modules\Masters\Grids\ReconCriteriaGrid::class,
+        'app.setup.bank-accounts' => \Modules\Masters\Grids\BankAccountGrid::class,
         'app.setup.employees' => EmployeeGrid::class,
         'app.setup.employee-posts' => EmployeePostGrid::class,
         'app.setup.employee-areas' => EmployeeAreaGrid::class,
