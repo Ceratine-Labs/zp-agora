@@ -53,7 +53,7 @@
 
     {{-- Is each day reconciled? Fetched after the page shows: across every
          site a month is a second or two (Ryan, 13 Nov 2026). --}}
-    <x-card title="Reconciled days">
+    <x-card title="Reconciled days" collapsible>
         <x-slot:info>
             <p>Each counting area's day is decided by the latest posted run that covers it. Green: every area posted
                and nothing left open. Orange: posted, but a chain is held back, an amendment was not written or was
