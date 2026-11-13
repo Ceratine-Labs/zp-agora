@@ -348,8 +348,10 @@ class ManagedRolesTest extends TestCase
         $this->delete(route('app.setup.roles.destroy', $role->Id))->assertForbidden();
         $this->put(route('app.setup.users.roles.update', $reader->Id), ['roles' => [$role->Id]])->assertForbidden();
         $this->get(route('app.grids.extract', ['grid' => 'app.setup.roles']))->assertOk();
-        $this->actingAs($this->person())->get(route('app.grids.extract', ['grid' => 'app.setup.roles']))->assertForbidden();
-        $this->get(route('app.grids.extract', ['grid' => 'app.setup.users']))->assertForbidden();
+        // Somebody with no access at all is turned away before the grid's own
+        // gate (EnforceMenuAccess), to the access-required page.
+        $this->actingAs($this->person())->get(route('app.grids.extract', ['grid' => 'app.setup.roles']))->assertRedirect(route('app.access-required'));
+        $this->get(route('app.grids.extract', ['grid' => 'app.setup.users']))->assertRedirect(route('app.access-required'));
     }
 
     public function test_role_grid_filters_counts_and_users_grid_include_inherited_permissions(): void
