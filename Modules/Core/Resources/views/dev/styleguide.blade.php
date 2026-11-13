@@ -378,6 +378,31 @@
             </div>
         </x-core::gallery-entry>
 
+        @php
+            // A made-up October: mostly reconciled, a held week, two days not
+            // posted, the month's tail not over yet.
+            $calMonth = \Illuminate\Support\Carbon::parse('2026-10-01');
+            $calDays = fn (int $seed) => collect(range(1, 31))->map(fn (int $d) => (object) [
+                'Day' => sprintf('2026-10-%02d', $d),
+                'DayStatus' => $d > 28 ? 'later' : ($d % 7 === 0 ? 'none' : (in_array($d, [12, 13 + $seed], true) ? 'open' : ($d >= 18 && $d <= 22 ? 'partial' : 'done'))),
+                'Summary' => 'Sample day',
+                'AmendedLines' => $d % 5 === 0 ? 3 : 0,
+            ]);
+            $calLegend = \Modules\StockRecon\Services\ReconDayService::LEGEND;
+        @endphp
+        <x-core::gallery-entry name="x-day-calendar">
+            <div class="gal-variant">
+                <p class="eyebrow">One site — two bands, so the month reads without scrolling</p>
+                <x-day-calendar :rows="[['label' => 'Sample site', 'days' => $calDays(0)]]" :month="$calMonth" :legend="$calLegend"
+                                :href="fn ($row, $date) => '#'" prev="#" />
+            </div>
+            <div class="gal-variant">
+                <p class="eyebrow">Several sites — one band each, scrolling sideways on a phone</p>
+                <x-day-calendar :rows="[['label' => 'Site A', 'days' => $calDays(0)], ['label' => 'Site B', 'days' => $calDays(2)]]"
+                                :month="$calMonth" :legend="$calLegend" :href="fn ($row, $date) => '#'" />
+            </div>
+        </x-core::gallery-entry>
+
         <x-core::gallery-entry name="x-table">
             <div class="gal-variant">
                 <p class="eyebrow">A result set with its procedure named and its count stated</p>

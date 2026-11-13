@@ -461,6 +461,20 @@ class ComponentCatalogue
                 ],
             ],
             [
+                'name' => 'x-day-calendar',
+                'group' => 'Data',
+                'summary' => 'A month of days, one coloured cell each, per row: is each day done?',
+                'notes' => 'Built for the stock recon centre\'s reconciled days (Ryan, 13 Nov 2026). `rows` is one entry per site — `label`, `days` (the procedure\'s rows: `Day`, `DayStatus`, `Summary`, `AmendedLines`) — and the STATUS is the procedure\'s (`agora.usp_StockRecon_DayStatus`): `done` green, `partial` orange (`--serious-fill`, not `--warn`, which reads yellow beside green), `open` red, `none` grey, `later` a dashed outline so it never reads as no counts. **Never colour alone**: the day number is in every cell and the procedure\'s sentence is its title and accessible name. Amended is a white dot, never a colour — it is balancing doing its job. One row splits into two bands (1–16, 17–end); several keep one band and scroll sideways in their own container. `href(row, date)` links the coloured cells; grey ones are not links. The month arrows carry `data-fragment-link`, so inside a `data-fragment` they replace the fragment rather than the page.',
+                'props' => [
+                    ['rows', 'array', '[]', 'One per site: label, days'],
+                    ['month', '?Carbon', 'null', 'The month shown'],
+                    ['href', '?Closure', 'null', 'fn ($row, $date) => the link for a coloured cell'],
+                    ['legend', 'array', '[]', 'status => what the colour means'],
+                    ['prev', '?string', 'null', 'Previous month link'],
+                    ['next', '?string', 'null', 'Next month link; null hides it'],
+                ],
+            ],
+            [
                 'name' => 'x-facts',
                 'group' => 'Structure',
                 'summary' => 'A block of labelled facts about one record — the body of a detail screen.',
