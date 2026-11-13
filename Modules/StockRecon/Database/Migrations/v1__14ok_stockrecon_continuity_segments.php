@@ -8,7 +8,10 @@ return new class extends Migration
     public function up(): void
     {
         $schema = config('agora.schema');
-        DB::statement("ALTER TABLE [{$schema}].[StockReconRunLine] ADD [ContinuitySegment] INT NULL");
+        // Guarded: a database that already carries the column (a local copy
+        // built from a later snapshot) must not stop every migration after it.
+        DB::statement("IF COL_LENGTH('[{$schema}].[StockReconRunLine]', 'ContinuitySegment') IS NULL
+            ALTER TABLE [{$schema}].[StockReconRunLine] ADD [ContinuitySegment] INT NULL");
         DB::unprepared("CREATE OR ALTER VIEW [{$schema}].[vw_StockReconRunLineWithWaste] AS
             SELECT v.*, r.WasteAuthorizationId, r.AuthorizedGoodWaste, r.AppliedGoodWaste,
                    r.BalancingProfileId, r.BalancingProfileName, r.BalancingProfileRevision,

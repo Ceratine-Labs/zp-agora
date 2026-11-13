@@ -131,7 +131,8 @@ up)
                 database/stubs/pumpit-assets.sql \
                 database/stubs/pumpit-debtors.sql \
                 database/stubs/pumpit-people.sql \
-                database/stubs/pumpit-settings.sql; do
+                database/stubs/pumpit-settings.sql \
+                database/stubs/pumpit-purchasing.sql; do
         [ -f "$stub" ] || continue
         docker exec -i "$NAME" /opt/mssql-tools18/bin/sqlcmd \
             -S localhost -U sa -P "$(sa_password)" -C -b -d PumpIT \
