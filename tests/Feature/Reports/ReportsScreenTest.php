@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Reports;
 
+use Illuminate\Support\Facades\Gate;
 use Modules\Core\Models\User;
 use Tests\TestCase;
 
@@ -25,6 +26,13 @@ class ReportsScreenTest extends TestCase
         if (! $user) {
             $this->markTestSkipped('No seeded administrator — run php artisan seed:master first.');
         }
+
+        // These tests are about the screens, not who may see them: since managed
+        // roles (23 Oct 2026) a seeder creates each report's permission and
+        // grants it to nobody, so a fresh database's administrator sees no
+        // reports. Allow every ability in memory rather than granting rows
+        // (this test is read-only).
+        Gate::before(fn () => true);
 
         return $user;
     }
@@ -82,13 +90,13 @@ class ReportsScreenTest extends TestCase
 
     public function test_the_caveat_on_waste_is_on_the_page_not_only_in_the_procedure(): void
     {
-        // PumpIT records no approval state for waste. A report headed "Waste to
-        // approve" that quietly showed captured waste instead would be read as
-        // an approval queue, and an empty one would be read as "nothing
-        // outstanding". The screen has to say so.
+        // What waste counts against a shortage is a rule the clerk reads on the
+        // screen, not one buried in the procedure. The wording is the config's
+        // (it changed when waste authorization was built), so the test reads it
+        // from there rather than pinning a sentence.
         $this->actingAs($this->admin())
             ->get('/app/reports/waste')
             ->assertOk()
-            ->assertSee('no approval columns', false);
+            ->assertSee((string) config('reports.reports.waste.caveat'));
     }
 }

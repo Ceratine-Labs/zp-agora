@@ -581,14 +581,15 @@ class ComponentRenderTest extends TestCase
             $body = file_get_contents($file);
 
             // #abc, #aabbcc, rgb(), hsl() — anything that names a colour rather
-            // than referring to a token. The app bar's brand mark is the one
-            // exception and it is an SVG logo, not a themed surface.
+            // than referring to a token. The brand mark is the one exception
+            // and it is an SVG logo, not a themed surface. It moved out of the
+            // app bar into its own component in c20d7a7.
             if (preg_match('/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/', $body)) {
                 $offenders[] = basename($file);
             }
         }
 
-        $this->assertSame(['app-bar.blade.php'], $offenders,
+        $this->assertSame(['agora-mark.blade.php'], $offenders,
             'A component named a colour. Use a token from resources/scss/_tokens.scss.');
     }
 }
