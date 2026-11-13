@@ -123,6 +123,39 @@ class DebtorStatementController extends Controller
     }
 
     /**
+     * A test of one statement to one address: the user's own, or one typed.
+     * Allowed in every send mode, 'off' included — it never reaches the
+     * debtor (DebtorStatementService::sendTest).
+     */
+    public function sendTest(Request $request, int $branch, string $account): RedirectResponse
+    {
+        $request->validate([
+            'target' => ['required', 'in:me,other'],
+            'address' => ['required_if:target,other', 'nullable', 'email', 'max:200'],
+        ]);
+
+        $address = $request->input('target') === 'me'
+            ? (string) $request->user()?->EmailAddress
+            : (string) $request->input('address');
+
+        if (trim($address) === '') {
+            return back()->withErrors(['refusal' => 'Your user has no email address. Type one instead. Nothing was mailed.']);
+        }
+
+        [$from, $to] = $this->period($request);
+
+        try {
+            $result = $this->statements->sendTest($branch, $account, $from, $to, $address, $request->user()?->Id);
+        } catch (AgoraProcException $e) {
+            return back()->withErrors(['refusal' => $e->getMessage()]);
+        }
+
+        return $result['ok']
+            ? back()->with('status', $result['message'])
+            : back()->withErrors(['refusal' => $result['message']]);
+    }
+
+    /**
      * Email the statements of the accounts ticked on the list, for the period
      * the list shows. The mails go AFTER the response: a statement is a PDF and
      * a round trip to the mail server each, and a hundred of them would outrun

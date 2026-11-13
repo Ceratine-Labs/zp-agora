@@ -46,6 +46,9 @@
             @can('debtors.contacts.edit')
                 <button type="button" class="btn" data-modal-open="debtor-contact">Email address</button>
             @endcan
+            @can('debtors.statements.test')
+                <button type="button" class="btn" data-modal-open="debtor-send-test">Send a test</button>
+            @endcan
             @can('debtors.statements.send')
                 @if ($mode !== 'off')
                     <form method="POST" action="{{ route('app.debtors.send', $key) }}" style="display:inline"
@@ -182,13 +185,55 @@
                     <td class="num">{{ $bal($s->ClosingBalance) }}</td>
                     <td>{{ $s->SentTo }}</td>
                     <td>{{ $s->Mode === 'test' ? 'Test' : 'Live' }}</td>
-                    <td>{{ $s->Trigger === 'schedule' ? 'Monthly run' : 'Sent by hand' }}</td>
+                    <td>{{ match ($s->Trigger) { 'schedule' => 'Monthly run', 'test' => 'Test to one address', default => 'Sent by hand' } }}</td>
                     <td>{{ $s->Status === 'sent' ? 'Sent' : 'Failed: '.$s->Error }}</td>
                     <td>{{ $s->SentBy ?? ($s->Trigger === 'schedule' ? 'Agora' : '') }}</td>
                 </tr>
             @endforeach
         </x-table>
     </x-card>
+
+    @can('debtors.statements.test')
+        @php $myEmail = trim((string) auth()->user()?->EmailAddress); @endphp
+        <x-modal id="debtor-send-test" title="Send a test of {{ $a->StatementAccountNo }}'s statement">
+            <form method="POST" action="{{ route('app.debtors.sendTest', $key) }}" data-send-test
+                  data-confirm="Send a test statement?"
+                  data-confirm-text="It goes only to the address chosen here, marked TEST, with the PDF attached. Nothing goes to the debtor."
+                  data-confirm-action="Send the test">
+                @csrf
+                <input type="hidden" name="from" value="{{ $period['from'] }}">
+                <input type="hidden" name="to" value="{{ $period['to'] }}">
+
+                <p style="margin-top:0">
+                    The statement for {{ $d($a->PeriodFrom) }} to {{ $d($a->PeriodTo) }}, exactly as the debtor would
+                    get it, with [TEST] in the subject. It is recorded under Mailed as a test and never counts as
+                    Last mailed. It works while sending to debtors is switched off.
+                </p>
+
+                <label class="field-check" style="display:flex; gap:8px; align-items:center; margin:8px 0">
+                    <input type="radio" name="target" value="me" @checked(old('target', $myEmail !== '' ? 'me' : 'other') === 'me') @disabled($myEmail === '')>
+                    My address: {{ $myEmail !== '' ? $myEmail : 'none on your user' }}
+                </label>
+                <label class="field-check" style="display:flex; gap:8px; align-items:center; margin:8px 0">
+                    <input type="radio" name="target" value="other" @checked(old('target', $myEmail !== '' ? 'me' : 'other') === 'other')>
+                    Another address
+                </label>
+                <x-field name="address" label="Address" type="email" :value="old('address')"
+                         help="One address. Used when Another address is chosen." />
+
+                <div class="btn-row">
+                    <button type="submit" class="btn-primary">Send the test</button>
+                </div>
+            </form>
+        </x-modal>
+        <script>
+            // Typing an address chooses "Another address", so a typed address is never ignored.
+            document.querySelectorAll('[data-send-test]').forEach(function (form) {
+                var other = form.querySelector('input[name="target"][value="other"]');
+                form.querySelector('input[name="address"]').addEventListener('input', function () { other.checked = true; });
+            });
+        </script>
+    @endcan
 
     @can('debtors.contacts.edit')
         <x-modal id="debtor-contact" title="Where {{ $a->StatementAccountNo }}'s statement goes">

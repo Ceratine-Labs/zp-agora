@@ -37,6 +37,19 @@ test.describe('debtors statements', () => {
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         expect(overflow).toBeLessThanOrEqual(1);
 
+        // Send a test: the window opens, and typing an address chooses
+        // "Another address". Closed without sending — the PHP test sends.
+        const testButton = page.getByRole('button', { name: 'Send a test' });
+        if (await testButton.count()) {
+            await testButton.click();
+            const dialog = page.locator('#debtor-send-test');
+            await expect(dialog.getByText('My address:')).toBeVisible();
+            await dialog.locator('input[name="address"]').fill('checker@example.test');
+            await expect(dialog.locator('input[name="target"][value="other"]')).toBeChecked();
+            await page.screenshot({ path: info.outputPath('send-test.png') });
+            await page.keyboard.press('Escape');
+        }
+
         const href = await page.getByRole('link', { name: 'Download' }).getAttribute('href');
         const response = await page.request.get(href);
         expect(response.status()).toBe(200);

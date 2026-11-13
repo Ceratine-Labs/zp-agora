@@ -10,7 +10,8 @@ Route::middleware('auth')->group(function () {
     /*
      | ---- Debtors statements ---------------------------------------------------
      |
-     | `view` reads the list, a statement and its PDF. `send` mails one — and
+     | `view` reads the list, a statement and its PDF. `test` mails one, marked
+     | TEST, to the user's own or a typed address — never the debtor. `send` mails one — and
      | whether that reaches the debtor is config('debtors.send_mode'), not this
      | permission. `edit` changes where a debtor's statement goes and whether
      | the account is on the monthly run. Nothing here writes PumpIT.
@@ -32,6 +33,11 @@ Route::middleware('auth')->group(function () {
 
     Route::post('debtors/statements/{branch}/{account}/send', [DebtorStatementController::class, 'send'])
         ->middleware('can:debtors.statements.send')->whereNumber('branch')->name('debtors.send');
+
+    // A test to one address — the user's own or a typed one — in every send
+    // mode, 'off' included; it never reaches the debtor.
+    Route::post('debtors/statements/{branch}/{account}/send-test', [DebtorStatementController::class, 'sendTest'])
+        ->middleware('can:debtors.statements.test')->whereNumber('branch')->name('debtors.sendTest');
 
     Route::post('debtors/statements/{branch}/{account}/contact', [DebtorStatementController::class, 'saveContact'])
         ->middleware('can:debtors.contacts.edit')->whereNumber('branch')->name('debtors.contact');

@@ -219,9 +219,68 @@ class DebtorStatementService
             ]);
         }
 
+        $this->record($a, $sentTo, $mode, $trigger, $status, $error, $userId);
+
+        if ($status !== 'sent') {
+            return ['ok' => false, 'logged' => true, 'message' => 'The mail server refused it: '.$error];
+        }
+
+        return ['ok' => true, 'message' => $mode === 'test'
+            ? "Test statement mailed to {$sentTo} — not to the debtor."
+            : "Statement mailed to {$sentTo}."];
+    }
+
+    /**
+     * Mail one statement to ONE address somebody typed (or their own), as a
+     * test. Works in every send mode, 'off' included: it never goes to the
+     * debtor's address or copies, never to debtors.bcc, the subject and body
+     * say TEST and name where it would go live, and it is recorded with
+     * Mode 'test' — which Last mailed ignores.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    public function sendTest(int $branchId, string $accountNo, ?string $from, ?string $to, string $address, ?int $userId): array
+    {
+        $address = trim($address);
+
+        if (filter_var($address, FILTER_VALIDATE_EMAIL) === false) {
+            return ['ok' => false, 'message' => "'{$address}' is not an email address. Nothing was mailed."];
+        }
+
+        $statement = $this->statement($branchId, $accountNo, $from, $to);
+        $a = $statement['account'];
+
+        $debtor = implode(', ', array_values(array_filter(array_merge(
+            [trim((string) $a->Email)],
+            array_map('trim', explode(',', (string) $a->CcEmail)),
+        ))));
+        $status = 'sent';
+        $error = null;
+
+        try {
+            Mail::to($address)->send($this->mail($statement, $debtor !== '' ? $debtor : 'no address on file yet'));
+        } catch (Throwable $e) {
+            $status = 'failed';
+            $error = mb_substr($e->getMessage(), 0, 400);
+            Log::error('agora.debtors.statement-test-mail-failed', [
+                'mail' => DebtorStatementMail::TEMPLATE_CODE, 'branch' => $branchId, 'account' => $accountNo,
+                'to' => $address, 'error' => $e->getMessage(),
+            ]);
+        }
+
+        $this->record($a, $address, 'test', 'test', $status, $error, $userId);
+
+        return $status === 'sent'
+            ? ['ok' => true, 'message' => "Test statement mailed to {$address}. Nothing went to the debtor."]
+            : ['ok' => false, 'message' => 'The mail server refused it: '.$error];
+    }
+
+    /** One row in agora.DebtorStatementSend: what was mailed, to whom, and whether it went. */
+    protected function record(object $a, string $sentTo, string $mode, string $trigger, string $status, ?string $error, ?int $userId): void
+    {
         $this->db()->table(config('agora.schema').'.DebtorStatementSend')->insert([
-            'BranchId' => $branchId,
-            'AccountNo' => $accountNo,
+            'BranchId' => $a->BranchId,
+            'AccountNo' => $a->AccountNo,
             'AccountName' => mb_substr((string) $a->AccountName, 0, 60),
             'PeriodFrom' => substr((string) $a->PeriodFrom, 0, 10),
             'PeriodTo' => substr((string) $a->PeriodTo, 0, 10),
@@ -235,14 +294,6 @@ class DebtorStatementService
             'CreatedAt' => now('UTC'),
             'CreatedBy' => $userId,
         ]);
-
-        if ($status !== 'sent') {
-            return ['ok' => false, 'logged' => true, 'message' => 'The mail server refused it: '.$error];
-        }
-
-        return ['ok' => true, 'message' => $mode === 'test'
-            ? "Test statement mailed to {$sentTo} — not to the debtor."
-            : "Statement mailed to {$sentTo}."];
     }
 
     /**

@@ -427,9 +427,11 @@ class DebtorStatementTest extends TestCase
 
     public function test_without_view_the_list_is_refused(): void
     {
+        // Somebody with no access at all is turned away before the route's
+        // own gate (EnforceMenuAccess), to the access-required page.
         $this->actingAs($this->person([]))
             ->get(route('app.debtors.index'))
-            ->assertForbidden();
+            ->assertRedirect(route('app.access-required'));
     }
 
     public function test_somebody_who_may_send_and_edit_is_offered_both(): void
@@ -442,6 +444,91 @@ class DebtorStatementTest extends TestCase
             ->assertOk()
             ->assertSee('Send statement')
             ->assertSee('data-modal-open="debtor-contact"', false);
+    }
+
+    public function test_a_test_goes_only_to_the_typed_address_while_sending_is_off_and_never_counts_as_last_mailed(): void
+    {
+        Mail::fake();
+        $this->contact();
+        $tester = $this->person(['statements.view', 'statements.test']);
+
+        $this->actingAs($tester)
+            ->post(route('app.debtors.sendTest', ['branch' => self::BRANCH, 'account' => self::ACCOUNT]), [
+                'from' => '2026-08-01', 'to' => '2026-08-31', 'target' => 'other', 'address' => 'checker@example.test',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', 'Test statement mailed to checker@example.test. Nothing went to the debtor.');
+
+        Mail::assertSent(DebtorStatementMail::class, fn (DebtorStatementMail $m) => $m->hasTo('checker@example.test')
+            && ! $m->hasTo('debtor@example.test') && ! $m->hasCc('copy@example.test')
+            && str_starts_with($m->envelope()->subject, '[TEST for debtor@example.test, copy@example.test]')
+            && str_starts_with($m->pdf, '%PDF'));
+        Mail::assertSentCount(1);
+
+        $sent = $this->sends()->first();
+        $this->assertSame(['test', 'test', 'sent', 'checker@example.test'], [$sent->Mode, $sent->Trigger, $sent->Status, $sent->SentTo]);
+        $this->assertEquals(950.00, (float) $sent->ClosingBalance);
+        $this->assertNull($this->gridRow()->LastSentAt);
+    }
+
+    public function test_my_address_is_the_signed_in_users_own_and_a_bad_address_is_refused(): void
+    {
+        Mail::fake();
+        $tester = $this->person(['statements.view', 'statements.test']);
+        $url = route('app.debtors.sendTest', ['branch' => self::BRANCH, 'account' => self::ACCOUNT]);
+
+        // No debtor address on file: the test still goes, and says so.
+        $this->actingAs($tester)->post($url, ['from' => '2026-08-01', 'to' => '2026-08-31', 'target' => 'me'])
+            ->assertSessionHasNoErrors();
+        Mail::assertSent(DebtorStatementMail::class, fn (DebtorStatementMail $m) => $m->hasTo($tester->EmailAddress)
+            && str_starts_with($m->envelope()->subject, '[TEST for no address on file yet]'));
+
+        $this->actingAs($tester)->post($url, ['target' => 'other', 'address' => 'not-an-address'])
+            ->assertSessionHasErrors('address');
+        $this->actingAs($tester)->post($url, ['target' => 'other'])
+            ->assertSessionHasErrors('address');
+        Mail::assertSentCount(1);
+        $this->assertSame(1, $this->sends()->count());
+    }
+
+    public function test_view_send_and_test_are_each_their_own_permission(): void
+    {
+        Mail::fake();
+        config(['debtors.send_mode' => 'live']);
+        $this->contact();
+        $show = route('app.debtors.show', ['branch' => self::BRANCH, 'account' => self::ACCOUNT, 'from' => '2026-08-01', 'to' => '2026-08-31']);
+        $test = route('app.debtors.sendTest', ['branch' => self::BRANCH, 'account' => self::ACCOUNT]);
+        $send = route('app.debtors.send', ['branch' => self::BRANCH, 'account' => self::ACCOUNT]);
+        $body = ['from' => '2026-08-01', 'to' => '2026-08-31', 'target' => 'other', 'address' => 'checker@example.test'];
+
+        // Nothing: turned away from the statement and the test alike.
+        $nobody = $this->person([]);
+        $this->actingAs($nobody)->get($show)->assertRedirect(route('app.access-required'));
+        $this->actingAs($nobody)->post($test, $body)->assertRedirect(route('app.access-required'));
+
+        // View only: reads it, offered neither send nor test, may post neither.
+        $reader = $this->person(['statements.view']);
+        $this->actingAs($reader)->get($show)->assertOk()
+            ->assertDontSee('data-modal-open="debtor-send-test"', false)
+            ->assertDontSee('Send statement');
+        $this->actingAs($reader)->post($test, $body)->assertForbidden();
+        $this->actingAs($reader)->post($send, $body)->assertForbidden();
+
+        // Send without test: mails the debtor, but no test window.
+        $sender = $this->person(['statements.view', 'statements.send']);
+        $this->actingAs($sender)->get($show)->assertOk()
+            ->assertSee('Send statement')
+            ->assertDontSee('data-modal-open="debtor-send-test"', false);
+        $this->actingAs($sender)->post($test, $body)->assertForbidden();
+
+        // Test without send: the test window, but cannot mail the debtor.
+        $tester = $this->person(['statements.view', 'statements.test']);
+        $this->actingAs($tester)->get($show)->assertOk()
+            ->assertSee('data-modal-open="debtor-send-test"', false)
+            ->assertDontSee('Send statement');
+        $this->actingAs($tester)->post($send, $body)->assertForbidden();
+
+        Mail::assertNothingSent();
     }
 
     // ---- fixture -------------------------------------------------------------
