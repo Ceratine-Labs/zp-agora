@@ -1149,3 +1149,35 @@ The press is under the chain's grid on a posted run, for holders of
 `stockrecon.runs.reverse`; its confirmation lists every PumpIT row and column it
 writes, old → new. From the proposals table it opens the chain page, which
 carries the form. (`tests/Feature/StockRecon/ChainReversalTest`.)
+
+## Reconciled days (13 November 2026)
+
+Runs overlap: rolling windows, and a site posts what it can while a chain
+waits for head office. Nothing said whether a day was done (Ryan, 13 Nov 2026),
+so the centre opens on a month calendar, one row per site, and
+`agora.usp_StockRecon_DayStatus` answers it.
+
+* **The unit is an area-day**: a counting area at a site on a date with recon
+  lines, read as the preview reads them (excluded area groups and active
+  cumulative meters left out).
+* **The latest posted run decides** — `Status = 'committed'`, not a reset, with
+  lines for that area on that date, inside its `CompleteTo`. Earlier runs over
+  the same day are history; the latest is what PumpIT now says.
+* **Open on that run** for the area-day: a held chain (`ChainBlocked`); a
+  proposed amendment not written (skipped for any reason except "another run
+  already amended this shift", or never ticked); an amendment reversed since;
+  counts captured after the run (the source holds more lines than the run saw —
+  on 13 Nov every area-day of Ngwenya's 5–11 Nov run matched exactly, so a
+  difference is new counts, not noise).
+* **A day** is green when every area is posted with nothing open, orange when
+  some are posted or something is open, red when it was counted and nothing is
+  posted, grey with no counts or when it is today or later. Amended shows as a
+  dot, never a colour.
+
+A cell opens the day: each area and its deciding run, the lines that keep it
+open with the procedure's reason (a possible duplicate, a missing shift, a
+correction too large to be a miscount), and every run whose window includes it.
+Across 21 sites a month reads in about two seconds on the live instance, so the
+calendar is a fragment fetched after the centre shows. Read-only: nothing is
+written anywhere.
+

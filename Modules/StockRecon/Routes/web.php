@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\StockRecon\Http\Controllers\BalancingProfileController;
 use Modules\StockRecon\Http\Controllers\CountingAreaController;
+use Modules\StockRecon\Http\Controllers\ReconDayController;
 use Modules\StockRecon\Http\Controllers\StockReconController;
 use Modules\StockRecon\Http\Controllers\StockReconGroupController;
 use Modules\StockRecon\Http\Controllers\StockReconHelperController;
@@ -83,6 +84,13 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
 
     Route::get('/', [StockReconController::class, 'index'])
         ->middleware('can:stockrecon.runs.view')->name('index');
+
+    // Is each day reconciled? The month calendar (a fragment the centre fetches
+    // after it shows) and one day behind a cell (Ryan, 13 Nov 2026).
+    Route::get('days', [ReconDayController::class, 'calendar'])
+        ->middleware('can:stockrecon.runs.view')->name('days');
+    Route::get('days/{branch}/{day}', [ReconDayController::class, 'show'])
+        ->middleware('can:stockrecon.runs.view')->whereNumber('branch')->name('days.show');
 
     // Discarding previews across the site. Declared BEFORE runs/{run} so a
     // literal segment cannot be read as a run id.

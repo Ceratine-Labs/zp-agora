@@ -51,6 +51,20 @@
 
     @include('stockrecon::partials.open-run')
 
+    {{-- Is each day reconciled? Fetched after the page shows: across every
+         site a month is a second or two (Ryan, 13 Nov 2026). --}}
+    <x-card title="Reconciled days">
+        <x-slot:info>
+            <p>Each counting area's day is decided by the latest posted run that covers it. Green: every area posted
+               and nothing left open. Orange: posted, but a chain is held back, an amendment was not written or was
+               reversed, counts arrived after the run, or some areas are not posted yet. Red: counted, nothing posted.
+               Grey: no counts, or the day is not over. A dot marks a day balancing amended.</p>
+        </x-slot:info>
+        <div data-fragment="{{ route('app.stockrecon.days', array_filter(['branch_id' => $branchId ?: null, 'month' => request()->query('month')])) }}">
+            <p class="dcal-loading">Reading the month…</p>
+        </div>
+    </x-card>
+
     <x-card title="Balance a period">
         <x-slot:info>
             <p>The preview reads the recon lines in PumpIT and writes nothing there. A branch-month takes a

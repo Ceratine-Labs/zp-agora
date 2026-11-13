@@ -1943,3 +1943,65 @@ dialog.modal {
   display: flex; align-items: center; justify-content: center;
   padding: 6px; margin: -6px; cursor: pointer;
 }
+
+/* ---------------------------------------------------------------------------
+   <x-day-calendar>: is each day done? (Ryan, 13 Nov 2026.) Green reconciled,
+   orange partly, red not, grey no counts or not over yet — the -fill tokens,
+   which hold white text at a readable contrast in both themes. Orange is
+   --serious, not --warn: --warn is amber and read as yellow beside green. The
+   day number is in every cell and the procedure's sentence is its name, so
+   the colour is never the only signal. A dot marks a day balancing amended.
+   --------------------------------------------------------------------------- */
+.dcal { display: grid; gap: 10px; }
+.dcal-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.dcal-month { font-family: var(--font-display); font-size: 18px; min-width: 9ch; text-align: center; }
+.dcal-nav { padding: 2px 10px; font-size: 18px; line-height: 1.2; }
+.dcal-legend {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 0 auto; padding: 0;
+  list-style: none; font-size: 12px;
+}
+.dcal-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.dcal-swatch {
+  position: relative; display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+}
+.dcal-scroll { overflow-x: auto; display: grid; gap: 8px; justify-items: start; }
+.dcal-grid { width: auto; border-collapse: separate; border-spacing: 3px; }
+.dcal-grid th {
+  font-size: 11px; font-weight: 500; text-align: center; padding: 0 0 2px;
+  color: var(--muted); opacity: .75;
+}
+.dcal-grid th.is-weekend { opacity: 1; font-weight: 700; }
+.dcal-grid th.dcal-site {
+  text-align: left; white-space: nowrap; padding: 0 10px 0 0; opacity: 1;
+  font-size: 12px; font-weight: 600; color: var(--ink);
+}
+.dcal-grid td { padding: 0; }
+.dcal-cell {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 30px; border-radius: var(--r);
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  text-decoration: none; color: #fff;
+}
+a.dcal-cell:hover, a.dcal-cell:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.dcal-cell.is-done, .dcal-swatch.is-done { background: var(--good-fill); }
+.dcal-cell.is-partial, .dcal-swatch.is-partial { background: var(--serious-fill); }
+.dcal-cell.is-open, .dcal-swatch.is-open { background: var(--crit-fill); }
+.dcal-cell.is-none, .dcal-swatch.is-none {
+  background: var(--surface-3); color: var(--muted); font-weight: 500; border: 1px solid var(--line);
+}
+/* Not over yet: an outline, so it never reads as a day with no counts. */
+.dcal-cell.is-later, .dcal-swatch.is-later {
+  background: transparent; color: var(--muted); font-weight: 500; border: 1px dashed var(--line);
+}
+.dcal-cell.is-later { opacity: .7; }
+.dcal-dot {
+  position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .25);
+}
+.dcal-swatch .dcal-dot { top: 4px; right: 4px; width: 5px; height: 5px; }
+.dcal-loading { color: var(--muted); padding: 6px 0; }
+@media (max-width: 600px) {
+  .dcal-legend { margin-left: 0; }
+  .dcal-cell { width: 26px; height: 26px; font-size: 11px; }
+  .dcal-grid { border-spacing: 2px; }
+}
