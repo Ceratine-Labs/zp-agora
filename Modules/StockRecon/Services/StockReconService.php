@@ -635,6 +635,28 @@ class StockReconService
     }
 
     /**
+     * The shifts on this run another run has already amended, each with the
+     * run that holds it (Ryan, 14 Nov 2026, run #70235), from
+     * agora.usp_StockRecon_AmendedElsewhere: run line id => holding run id.
+     * The page badges and unticks them; a failure here never stops it.
+     *
+     * @return Collection<int, int>
+     */
+    public function amendedElsewhere(StockReconRun $run): Collection
+    {
+        try {
+            return $this->procedures->call('usp_StockRecon_AmendedElsewhere', [
+                'BranchId' => $run->BranchId,
+                'RunId' => $run->Id,
+            ])->mapWithKeys(fn ($row) => [(int) $row->RunLineId => (int) $row->HeldByRunId]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return collect();
+        }
+    }
+
+    /**
      * The items on a run whose standing amendments were worked out against a
      * POS quantity PumpIT has since changed (Caltex Ulundi, 14 Nov 2026), from
      * agora.usp_StockRecon_PosMovedCheck. A warning only: a failure here never

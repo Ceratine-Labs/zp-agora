@@ -76,7 +76,18 @@
     // Worst-last, with the default first: the strip opens on the pill it is
     // scoped to, and the states it is hiding read left to right after it.
     $stateOrder = implode('|', $states);
-    $ready = $run->lines->where('WouldAmend', true)->where('CommitState', 'pending')->count();
+    /*
+     * Shifts another run already amended (Ryan, 14 Nov 2026, run #70235: 58
+     * of 81 items, and the commit wrote 2 shifts). Line id => the run holding
+     * it. They are badged, left unticked and kept out of the press: the commit
+     * would skip each one anyway, as "already carries an amendment".
+     */
+    $elsewhere = $elsewhere ?? collect();
+    $ready = $run->lines->where('WouldAmend', true)->where('CommitState', 'pending')
+        ->reject(fn ($l) => $elsewhere->has($l->Id))->count();
+    $heldLines = $run->lines->filter(fn ($l) => $elsewhere->has($l->Id));
+    $heldItems = $heldLines->unique(fn ($l) => $l->AreaNo.'|'.$l->StockItemNo)->count();
+    $heldRuns = $heldLines->map(fn ($l) => $elsewhere->get($l->Id))->unique()->sort()->values();
 
     /*
      * Chains that carry nothing: flagged too short to balance AND with a nil
@@ -128,6 +139,17 @@
 
     @if ($globalRefusal ?? null)
         <x-notice tone="warn" title="Global comparison unavailable"><p>{{ $globalRefusal }}</p></x-notice>
+    @endif
+
+    @if ($heldItems > 0)
+        <x-notice tone="warn" title="Already amended on another run — {{ $heldItems }} {{ Str::plural('item', $heldItems) }}, {{ $heldLines->count() }} {{ Str::plural('shift', $heldLines->count()) }}"
+                  style="margin:12px 14px 0">
+            <p>These items were already amended on
+                @foreach ($heldRuns as $held)<a href="{{ route('app.stockrecon.run', $held) }}">run #{{ $held }}</a>{{ $loop->last ? '' : ($loop->remaining === 1 ? ' and ' : ', ') }}@endforeach.
+               Each is marked <strong>Amended on run #…</strong> below, and its shifts are left unticked and out of the
+               count: amending them here would be skipped. To balance one here instead, open that run and reverse the
+               item's chain, then preview again.</p>
+        </x-notice>
     @endif
 
     <form method="POST" action="{{ route('app.stockrecon.commit', $run) }}" id="commit-{{ $run->Id }}"
@@ -352,11 +374,13 @@
             @foreach (\Modules\StockRecon\Services\ChainSummary::of($rows) as $chain)
                 @php($state = $chain->state())
                 @php($first = $chain->first())
-                <tr class="tt-group" data-tt-group-head="{{ $chain->key }}" tabindex="0" aria-expanded="false"
+                @php($chainHeld = $chain->lines->map(fn ($l) => $elsewhere->get($l->Id))->filter()->unique()->sort()->values())
+                @php($chainFree = $chain->lines->filter(fn ($l) => $l->isWritable() && ! $elsewhere->has($l->Id))->count())
+                <tr @class(['tt-group', 'is-held-elsewhere' => $chainHeld->isNotEmpty()]) data-tt-group-head="{{ $chain->key }}" tabindex="0" aria-expanded="false"
                     data-detail-url="{{ route('app.stockrecon.line', [$run, $first]) }}">
                     @if ($run->isOpen())
                         <td class="pick">
-                            @if ($chain->writable() > 0)
+                            @if ($chainFree > 0)
                                 <label class="pick-target">
                                     <input type="checkbox" data-tt-group-check
                                            aria-label="Every amendable shift of {{ $first->StockItemNo }}">
@@ -374,6 +398,10 @@
                     </td>
                     <td class="cell-name">
                         <span class="tt-caret" aria-hidden="true"></span>{{ $first->itemLabel() }}
+                        @foreach ($chainHeld as $held)
+                            <a class="chip held-elsewhere" href="{{ route('app.stockrecon.run', $held) }}"
+                               title="{{ $chain->lines->filter(fn ($l) => $elsewhere->get($l->Id) === $held)->count() }} of this item's shifts already carry an amendment from run #{{ $held }}. Reverse the item's chain there to balance it here.">Amended on run #{{ $held }}</a>
+                        @endforeach
                         @if (($globalChains[$chain->key]->GroupRawOffset ?? 0) > 0)
                             <a class="muted" href="{{ route('app.stockrecon.global', $run) }}#group-{{ $globalChains[$chain->key]->PreProductionTypeNo }}">Group contains raw offsets · {{ $globalChains[$chain->key]->PreProductionTypeNo }} · unconverted</a>
                         @endif
@@ -407,7 +435,7 @@
                              posts `only` with the chain's writable shifts and
                              the commit narrows to them — the same commit,
                              re-check and reversal. --}}
-                        @php($writable = $chain->lines->filter(fn ($l) => $l->isWritable()))
+                        @php($writable = $chain->lines->filter(fn ($l) => $l->isWritable() && ! $elsewhere->has($l->Id)))
                         <td class="fit-min">
                             @if ($writable->isNotEmpty())
                                 <button type="submit" name="only" value="{{ $writable->pluck('Id')->implode(',') }}"
@@ -437,7 +465,13 @@
                     data-tt-group="{{ $chain->key }}">
                     @if ($run->isOpen())
                         <td class="pick">
-                            @if ($line->isWritable())
+                            @if ($line->isWritable() && $elsewhere->has($line->Id))
+                                {{-- Already amended on another run: shown, never
+                                     in the press (Ryan, 14 Nov 2026). --}}
+                                <input type="checkbox" data-check disabled
+                                       title="Already amended on run #{{ $elsewhere->get($line->Id) }}"
+                                       aria-label="{{ $line->StockItemNo }} on {{ $line->TransactionDate->toDateString() }} shift {{ $line->ShiftNo }} is already amended on run #{{ $elsewhere->get($line->Id) }}">
+                            @elseif ($line->isWritable())
                                 <input type="checkbox" name="lines[]" value="{{ $line->Id }}" data-check
                                        aria-label="Amend {{ $line->StockItemNo }} on {{ $line->TransactionDate->toDateString() }} shift {{ $line->ShiftNo }}"
                                        @checked($line->Selected)>
@@ -459,6 +493,9 @@
                         <x-chip :tone="$line->tone()" :title="$line->Outcome">{{ $line->outcomeLabel() }}</x-chip>
                         @if ($line->ExceptionCode)
                             <br>@include('stockrecon::partials.code', ['code' => $line->ExceptionCode])
+                        @endif
+                        @if ($elsewhere->has($line->Id) && $line->CommitState !== 'committed')
+                            <br><span class="drill-line-id">amended on run #{{ $elsewhere->get($line->Id) }}</span>
                         @endif
                         @if ($line->CommitState === 'skipped')
                             <br><span class="drill-line-id">{{ $line->BlockReason }}</span>

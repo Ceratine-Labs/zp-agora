@@ -2016,3 +2016,12 @@ a.dcal-cell:hover, a.dcal-cell:focus-visible { outline: 2px solid var(--ink); ou
 .day-area-meta { margin: 0; padding: 10px 14px; }
 .day-area-body tr.is-flagged > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 .day-area-body td:first-child { min-width: 12em; }
+
+/* An item another run already amended (stock recon, 14 Nov 2026): a link to
+   that run, in the amended blue, so it reads "done there" rather than as a
+   warning about this run's figures. */
+a.chip.held-elsewhere {
+  margin-left: 6px; text-decoration: none;
+  background: var(--amend-bg); color: var(--amend-ink);
+  &:hover, &:focus-visible { text-decoration: underline; }
+}

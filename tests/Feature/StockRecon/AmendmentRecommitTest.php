@@ -9,7 +9,12 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Core\Models\Permission;
+use Modules\Core\Models\User;
+use Modules\Core\Models\UserPermission;
+use Modules\Core\Services\PermissionService;
 use Modules\StockRecon\Models\StockReconRun;
+use Modules\StockRecon\Services\StockReconService;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -144,6 +149,30 @@ class AmendmentRecommitTest extends TestCase
         $this->assertSame(1, $this->amendments($first)->where('State', 'reversed')->count());
         $this->assertSame(1, $this->amendments($second)->where('State', 'active')->count());
         $this->assertSource([[10, 0, 10, 1]]);
+    }
+
+    public function test_a_run_shows_items_another_run_already_amended_badged_and_unticked(): void
+    {
+        $this->migrateActiveKey();
+        $first = $this->newRun();
+        $this->proposal($first, 1, [10, 0, 10, 1], [10, 9]);
+        $second = $this->newRun();
+        $line = $this->proposal($second, 1, [10, 0, 10, 1], [10, 9], source: false);
+        $this->commit($first, 'journal');
+
+        $service = app(StockReconService::class);
+        $this->assertSame([$line => (int) $first->Id], $service->amendedElsewhere($second)->all());
+        $this->assertSame([], $service->amendedElsewhere($first)->all(), 'A run\'s own amendments are not elsewhere.');
+
+        $viewer = $this->person(['stockrecon.runs.view', 'stockrecon.runs.execute']);
+        $html = $this->actingAs($viewer)->get(route('app.stockrecon.run', $second))->assertOk()->getContent();
+        $this->assertStringContainsString('Already amended on another run — 1 item, 1 shift', $html);
+        $this->assertStringContainsString('Amended on run #'.$first->Id, $html);
+        $this->assertMatchesRegularExpression('/<input type="checkbox" data-check disabled\s+title="Already amended on run #'.$first->Id.'"/', $html);
+        $this->assertStringNotContainsString('name="lines[]" value="'.$line.'"', $html, 'The shift is out of the press.');
+
+        $this->reverse($first);
+        $this->assertSame([], $service->amendedElsewhere($second)->all(), 'Once reversed there, it is free here.');
     }
 
     public function test_a_reset_can_repeat_with_issue_pos_and_the_negative_anchor_line_retained_in_history(): void
@@ -313,6 +342,24 @@ class AmendmentRecommitTest extends TestCase
     {
         $migration = require base_path('Modules/StockRecon/Database/Migrations/v1__14l_stockrecon_active_amendments.php');
         $migration->up();
+    }
+
+    /** @param  array<int, string>  $codes */
+    private function person(array $codes): User
+    {
+        $user = User::query()->acrossBranches()->create([
+            'BranchId' => 2, 'EmailAddress' => 'TEST-recommit-'.uniqid().'@agora.invalid', 'UserName' => 'TEST-recommit',
+            'IsActive' => true, 'IsLocked' => false, 'Workspace' => 'ho', 'PasswordHash' => 'TEST-only-'.Str::random(24),
+        ]);
+        foreach ($codes as $code) {
+            UserPermission::query()->acrossBranches()->create([
+                'BranchId' => 2, 'UserId' => (int) $user->Id,
+                'PermissionId' => (int) Permission::query()->acrossBranches()->where('Code', $code)->firstOrFail()->Id,
+            ]);
+        }
+        app(PermissionService::class)->forget($user);
+
+        return $user;
     }
 
     private function db(): Connection

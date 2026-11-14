@@ -273,6 +273,9 @@ class StockReconController extends Controller
                 // These hidden empty chains remain counted, with a visible way
                 // to include them. The complete amendable set stays in the form.
                 'hideEmpty' => $request->query('empty') !== 'show',
+                // Shifts another run already amended (Ryan, 14 Nov 2026):
+                // badged with that run, unticked and out of the press.
+                'elsewhere' => $this->service->amendedElsewhere($run),
                 'extract' => $this->grids->build(
                     $this->registry->findOrFail('app.stockrecon.run'),
                     $this->paneGridRequest($request, $run, 'proposals', $entryTab),
