@@ -173,7 +173,8 @@ class ReconDayTest extends TestCase
             ->assertOk()
             ->assertSee('Till quantities are missing in PumpIT — 1 item in 1 area cannot balance yet')
             ->assertSee('data-area="91"', false)
-            ->assertSee('1 missing till quantity')
+            ->assertSee('What remains')
+            ->assertSee('?tab=area-91', false)
             ->assertSee('TEST days item one')
             ->assertSee('7.000 · whole day')
             ->assertSee('agora.usp_StockRecon_DayItems');
