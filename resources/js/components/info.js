@@ -7,8 +7,13 @@
  * run off the right edge (a button beside a field in the last column, or on
  * a phone).
  */
+// <x-menu-button> behaves the same way (14 Nov 2026): one open at a time,
+// Escape or a click elsewhere closes it. Its panel is anchored right, so the
+// nudge below finds no .info-body and leaves it alone.
+const OPEN = 'details.info[open], details.menu-button[open]';
+
 export default function info(root = document) {
-    root.querySelectorAll('details.info:not([data-info-ready])').forEach((el) => {
+    root.querySelectorAll('details.info:not([data-info-ready]), details.menu-button:not([data-info-ready])').forEach((el) => {
         el.setAttribute('data-info-ready', '');
 
         el.addEventListener('toggle', () => {
@@ -16,7 +21,7 @@ export default function info(root = document) {
 
             if (!el.open || !body) return;
 
-            document.querySelectorAll('details.info[open]').forEach((other) => {
+            document.querySelectorAll(OPEN).forEach((other) => {
                 if (other !== el) other.open = false;
             });
 
@@ -35,7 +40,7 @@ export default function info(root = document) {
     document.documentElement.dataset.infoWired = '1';
 
     document.addEventListener('click', (event) => {
-        document.querySelectorAll('details.info[open]').forEach((el) => {
+        document.querySelectorAll(OPEN).forEach((el) => {
             if (!el.contains(event.target)) el.open = false;
         });
     });
@@ -43,7 +48,7 @@ export default function info(root = document) {
     document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
 
-        document.querySelectorAll('details.info[open]').forEach((el) => {
+        document.querySelectorAll(OPEN).forEach((el) => {
             el.open = false;
             el.querySelector(':scope > summary')?.focus();
         });

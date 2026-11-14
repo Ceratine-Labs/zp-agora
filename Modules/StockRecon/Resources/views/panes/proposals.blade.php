@@ -141,16 +141,60 @@
         <x-notice tone="warn" title="Global comparison unavailable"><p>{{ $globalRefusal }}</p></x-notice>
     @endif
 
-    @if ($heldItems > 0)
-        <x-notice tone="warn" title="Already amended on another run — {{ $heldItems }} {{ Str::plural('item', $heldItems) }}, {{ $heldLines->count() }} {{ Str::plural('shift', $heldLines->count()) }}"
-                  style="margin:12px 14px 0">
-            <p>These items were already amended on
-                @foreach ($heldRuns as $held)<a href="{{ route('app.stockrecon.run', $held) }}">run #{{ $held }}</a>{{ $loop->last ? '' : ($loop->remaining === 1 ? ' and ' : ', ') }}@endforeach.
-               Each is marked <strong>Amended on run #…</strong> below, and its shifts are left unticked and out of the
-               count: amending them here would be skipped. To balance one here instead, open that run and reverse the
-               item's chain, then preview again.</p>
-        </x-notice>
-    @endif
+
+    {{-- THE TOP OF THE TABLE, in one row (Ryan, 14 Nov 2026: "combine the top
+         info alert make it red, put a color icon, and on the right of it in a
+         col 6 or something, a card with the show movements"). Left: the one
+         alert, red, when items here are already amended on another run.
+         Right: what the table is showing and the way to change it — the
+         chain scope pills that sat in the action bar, and on a posted run the
+         chains with no movement. One column when there is no alert. The
+         Extract press moved to the page's Run actions menu. --}}
+    <div class="run-top">
+        @if ($heldItems > 0)
+            <x-notice tone="stop" icon
+                      title="Already amended on another run — {{ $heldItems }} {{ Str::plural('item', $heldItems) }}, {{ $heldLines->count() }} {{ Str::plural('shift', $heldLines->count()) }}">
+                <p>These items were already amended on
+                    @foreach ($heldRuns as $held)<a href="{{ route('app.stockrecon.run', $held) }}">run #{{ $held }}</a>{{ $loop->last ? '' : ($loop->remaining === 1 ? ' and ' : ', ') }}@endforeach.
+                   Each is marked <strong>Amended on run #…</strong> below, and its shifts are left unticked and out of the
+                   count: amending them here would be skipped. To balance one here instead, open that run and reverse the
+                   item's chain, then preview again.</p>
+            </x-notice>
+        @endif
+        <x-card title="What the table shows" :sub="\App\Support\Format::n($rows->count()).' '.Str::plural('shift', $rows->count())">
+            <div class="run-shown-line">
+                @if ($run->isOpen())
+                    <span class="tt-pills-set" role="group" aria-label="Chains shown">
+                        <span class="tt-pills-label">Show</span>
+                        <a @class(['chip', 'tt-pill', 'is-on' => ! $showAll]) @if (! $showAll) aria-current="true" @endif
+                           href="{{ request()->fullUrlWithQuery(['scope' => 'amendable', 'empty' => 'hide']) }}"
+                           title="{{ $showAll ? 'Show amendable chains only' : 'Showing amendable chains; '.\App\Support\Format::n($hiddenChains).' '.Str::plural('chain', $hiddenChains).' with nothing to amend hidden' }}">Amendable<span class="tt-pill-n">{{ \App\Support\Format::n($amendableChains) }}</span></a>
+                        @if ($emptyChains > 0)
+                            <a @class(['chip', 'tt-pill', 'is-on' => $showAll && $hideEmpty]) @if ($showAll && $hideEmpty) aria-current="true" @endif
+                               href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'hide']) }}"
+                               title="Every chain with movement; {{ \App\Support\Format::n($emptyChains) }} {{ Str::plural('chain', $emptyChains) }} with no movement hidden">With movement<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains - $emptyChains) }}</span></a>
+                        @endif
+                        <a @class(['chip', 'tt-pill', 'is-on' => $showAll && (! $hideEmpty || $emptyChains === 0)]) @if ($showAll && (! $hideEmpty || $emptyChains === 0)) aria-current="true" @endif
+                           href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}"
+                           title="{{ $showAll ? 'Showing all chains' : 'Show all chains' }}">All chains<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains) }}</span></a>
+                    </span>
+                @elseif ($emptyChains > 0)
+                    <span class="tt-pills-set" role="group" aria-label="Chains shown">
+                        <span class="tt-pills-label">Show</span>
+                        <a @class(['chip', 'tt-pill', 'is-on' => $hideEmpty]) @if ($hideEmpty) aria-current="true" @endif
+                           href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'hide']) }}"
+                           title="Hide the {{ \App\Support\Format::n($emptyChains) }} {{ Str::plural('chain', $emptyChains) }} ({{ \App\Support\Format::n($emptyLines->count()) }} {{ Str::plural('shift', $emptyLines->count()) }}) with no movement">With movement<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains - $emptyChains) }}</span></a>
+                        <a @class(['chip', 'tt-pill', 'is-on' => ! $hideEmpty]) @if (! $hideEmpty) aria-current="true" @endif
+                           href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}"
+                           title="Show every chain, those with no movement too">All chains<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains) }}</span></a>
+                    </span>
+                    <span class="muted">{{ \App\Support\Format::n($emptyChains) }} {{ Str::plural('chain', $emptyChains) }}
+                        ({{ \App\Support\Format::n($emptyLines->count()) }} {{ Str::plural('shift', $emptyLines->count()) }}) with no movement</span>
+                @endif
+            </div>
+            <p class="field-help run-shown-hint">Each chain row shows the number of shifts across its date range. Open it to see each numbered shift.</p>
+        </x-card>
+    </div>
 
     <form method="POST" action="{{ route('app.stockrecon.commit', $run) }}" id="commit-{{ $run->Id }}"
           data-loader="{{ $stampMode === 'live' ? 'Amending in PumpIT…' : 'Recording the amendments…' }}"
@@ -165,20 +209,6 @@
           @if ($stampMode === 'live') data-confirm-danger @endif>
         @csrf
 
-        {{-- The count and the Extract button — the same drawer the grid shell
-             opens. On an open run they ride at the far end of the action bar;
-             they had a bar of their own above it, 48px that said "1 213
-             shifts". A closed run has no action bar, so it keeps the bar. --}}
-        @isset($extract)
-            @unless ($run->isOpen())
-                <div class="dg-bar" style="margin:8px 14px 0">
-                    <span class="dg-shown">{{ \App\Support\Format::n($rows->count()) }}
-                        {{ Str::plural('shift', $rows->count()) }}</span>
-                    <span class="dg-bar-gap"></span>
-                    <button type="button" class="btn-ghost" data-drawer-open="dg-stockrecon-{{ $run->Id }}-extract">Extract</button>
-                </div>
-            @endunless
-        @endisset
 
         @if ($run->isOpen())
             {{-- The press, ABOVE the rows it acts on. It used to sit in a
@@ -221,61 +251,10 @@
                     <button type="submit" form="reset-{{ $run->Id }}" class="btn-ghost">Reset to original</button>
                 @endcan
 
-                {{-- WHICH CHAINS ARE ON THE SCREEN, as pills (Ryan, 12 Nov 2026:
-                     "this can be a button or a pill or just.... something").
-                     It was a sentence under the bar with a link at the end of
-                     it — "Showing amendable chains; 60 chains with nothing to
-                     amend hidden — show all chains." — and a second sentence
-                     for the chains with no movement. Same three scopes, same
-                     links, and the count each one would show. --}}
-                <span class="tt-pills-set scope-pills" role="group" aria-label="Chains shown">
-                    <span class="tt-pills-label">Show</span>
-                    <a @class(['chip', 'tt-pill', 'is-on' => ! $showAll]) @if (! $showAll) aria-current="true" @endif
-                       href="{{ request()->fullUrlWithQuery(['scope' => 'amendable', 'empty' => 'hide']) }}"
-                       title="{{ $showAll ? 'Show amendable chains only' : 'Showing amendable chains; '.\App\Support\Format::n($hiddenChains).' '.Str::plural('chain', $hiddenChains).' with nothing to amend hidden' }}">Amendable<span class="tt-pill-n">{{ \App\Support\Format::n($amendableChains) }}</span></a>
-                    @if ($emptyChains > 0)
-                        <a @class(['chip', 'tt-pill', 'is-on' => $showAll && $hideEmpty]) @if ($showAll && $hideEmpty) aria-current="true" @endif
-                           href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'hide']) }}"
-                           title="Every chain with movement; {{ \App\Support\Format::n($emptyChains) }} {{ Str::plural('chain', $emptyChains) }} with no movement hidden">With movement<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains - $emptyChains) }}</span></a>
-                    @endif
-                    <a @class(['chip', 'tt-pill', 'is-on' => $showAll && (! $hideEmpty || $emptyChains === 0)]) @if ($showAll && (! $hideEmpty || $emptyChains === 0)) aria-current="true" @endif
-                       href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}"
-                       title="{{ $showAll ? 'Showing all chains' : 'Show all chains' }}">All chains<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains) }}</span></a>
-                </span>
 
-                <span class="action-bar-end">
-                    <span class="dg-shown">{{ \App\Support\Format::n($rows->count()) }}
-                        {{ Str::plural('shift', $rows->count()) }}</span>
-                    @isset($extract)
-                        <button type="button" class="btn-ghost" data-drawer-open="dg-stockrecon-{{ $run->Id }}-extract">Extract</button>
-                    @endisset
-                </span>
             </x-action-bar>
         @endif
 
-        @if (! $run->isOpen() && $showAll && $emptyChains > 0)
-            {{-- Counted out loud, with the way back. On an open run this is in
-                 the action bar's far end, with the count. A screen that silently
-                 decides what you are not allowed to see is worse than a long
-                 one — and on a branch-month these are most of the length. --}}
-            <p class="field-help" style="margin:6px 14px 0">
-                {{ \App\Support\Format::n($emptyChains) }}
-                {{ Str::plural('chain', $emptyChains) }}
-                ({{ \App\Support\Format::n($emptyLines->count()) }}
-                {{ Str::plural('shift', $emptyLines->count()) }})
-                @if ($hideEmpty)
-                    with no movement hidden —
-                    <a href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}">show them</a>.
-                @else
-                    with no movement —
-                    <a href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'hide']) }}">hide them</a>.
-                @endif
-            </p>
-        @endif
-
-        @unless ($run->isOpen())
-            <p class="field-help" style="margin:6px 14px 6px">Each chain row shows the number of shifts across its date range. Open it to see each numbered shift.</p>
-        @endunless
 
         {{-- `data-tt-page`: browser paging over rows that are all already here.
              See the head of this file for why that is allowed on a form that
@@ -376,6 +355,11 @@
                 @php($first = $chain->first())
                 @php($chainHeld = $chain->lines->map(fn ($l) => $elsewhere->get($l->Id))->filter()->unique()->sort()->values())
                 @php($chainFree = $chain->lines->filter(fn ($l) => $l->isWritable() && ! $elsewhere->has($l->Id))->count())
+                {{-- Everything it would write is held by another run: it does
+                     not "balance" here, so it does not say it would. --}}
+                @if ($chainHeld->isNotEmpty() && $chainFree === 0 && $chain->writable() > 0)
+                    @php($state = ['label' => 'Amended elsewhere', 'tone' => 'neutral', 'title' => 'Every shift this run would write is already amended on run #'.$chainHeld->implode(', #').'. Reverse it there to balance it here.'])
+                @endif
                 <tr @class(['tt-group', 'is-held-elsewhere' => $chainHeld->isNotEmpty()]) data-tt-group-head="{{ $chain->key }}" tabindex="0" aria-expanded="false"
                     data-detail-url="{{ route('app.stockrecon.line', [$run, $first]) }}">
                     @if ($run->isOpen())

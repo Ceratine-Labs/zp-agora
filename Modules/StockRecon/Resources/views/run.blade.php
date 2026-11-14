@@ -14,20 +14,30 @@
         :blurb="$run->FromDate->format('j M Y').' to '.$run->ToDate->format('j M Y')
                 .' · '.$run->days().' '.Str::plural('day', $run->days())
                 .' · '.($run->AreaNo === null ? 'every counting area' : 'one counting area')">
+        {{-- One menu for the page's secondary presses, the shifts extract
+             with them (Ryan, 14 Nov 2026). The Amend press stays in the
+             proposals' own bar. --}}
         <x-slot:actions>
-            <a class="btn-ghost" href="{{ route('app.stockrecon.helper', $run) }}">Explain this run</a>
-            <a class="btn-ghost" href="{{ route('app.stockrecon.tutorial') }}">Tutorial</a>
-            <a class="btn-ghost" href="{{ route('app.stockrecon.index') }}">Run another</a>
-            @unless ($run->isCommitted())
-                <form method="POST" action="{{ route('app.stockrecon.discard', $run) }}" data-loader="Discarding…"
-                      data-confirm="Discard run #{{ $run->Id }}?"
-                      data-confirm-text="This preview and its {{ $run->TotalRows }} {{ Str::plural('shift', $run->TotalRows) }} go. Nothing in PumpIT is affected — a preview is a record of a read."
-                      data-confirm-action="Discard" data-confirm-danger>
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn-ghost">Discard</button>
-                </form>
-            @endunless
+            <x-menu-button label="Run actions">
+                <a href="{{ route('app.stockrecon.helper', $run) }}">Explain this run</a>
+                <a href="{{ route('app.stockrecon.tutorial') }}">Tutorial</a>
+                <a href="{{ route('app.stockrecon.index') }}">Run another</a>
+                @isset($panes['proposals']['extract'])
+                    <hr>
+                    <button type="button" data-drawer-open="dg-stockrecon-{{ $run->Id }}-extract">Extract shifts…</button>
+                @endisset
+                @unless ($run->isCommitted())
+                    <hr>
+                    <form method="POST" action="{{ route('app.stockrecon.discard', $run) }}" data-loader="Discarding…"
+                          data-confirm="Discard run #{{ $run->Id }}?"
+                          data-confirm-text="This preview and its {{ $run->TotalRows }} {{ Str::plural('shift', $run->TotalRows) }} go. Nothing in PumpIT is affected — a preview is a record of a read."
+                          data-confirm-action="Discard" data-confirm-danger>
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="danger">Discard this preview</button>
+                    </form>
+                @endunless
+            </x-menu-button>
         </x-slot:actions>
     </x-page-head>
 

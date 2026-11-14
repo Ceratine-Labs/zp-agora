@@ -2023,3 +2023,56 @@ a.dcal-cell:hover, a.dcal-cell:focus-visible { outline: 2px solid var(--ink); ou
 a.held-elsewhere-link { margin-left: 6px; text-decoration: none; }
 a.held-elsewhere-link:hover .chip, a.held-elsewhere-link:focus-visible .chip { text-decoration: underline; }
 .chip.held-elsewhere { background: var(--amend-bg); color: var(--amend-ink); }
+
+/* <x-notice icon>: a round mark in the tone's colour before the title
+   (Ryan, 14 Nov 2026, the stock recon run's one alert). */
+.notice.notice-with-icon {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: start;
+  > h3, > .notice-body { grid-column: 2; }
+  > .notice-icon {
+    grid-row: 1 / span 2; display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--warn); color: #fff; font-weight: 800; font-size: 15px; line-height: 1;
+  }
+  &.notice-stop > .notice-icon { background: var(--crit); }
+  &.notice-info > .notice-icon { background: var(--brand); }
+}
+
+/* <x-menu-button>: secondary presses behind one button (14 Nov 2026). */
+.menu-button {
+  position: relative; display: inline-block;
+  > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  > summary::-webkit-details-marker { display: none; }
+  .menu-button-caret {
+    width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid currentColor; transition: transform .15s;
+  }
+  &[open] .menu-button-caret { transform: rotate(180deg); }
+  > .menu-button-body {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 40; min-width: 220px;
+    display: flex; flex-direction: column; padding: 4px;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 22px #0003;
+    > a, > button, > form > button {
+      display: block; width: 100%; text-align: left; padding: 8px 12px; border: 0; border-radius: 4px;
+      background: transparent; color: var(--ink); font: inherit; font-size: 13px; text-decoration: none; cursor: pointer;
+      &:hover, &:focus-visible { background: var(--surface-2); }
+    }
+    > form { margin: 0; }
+    .danger { color: var(--crit-ink); }
+    > hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  }
+}
+@media (prefers-reduced-motion: reduce) { .menu-button .menu-button-caret { transition: none; } }
+
+/* The stock recon proposals: the one alert beside what the table shows
+   (Ryan, 14 Nov 2026: "combine the top info alert make it red ... and on the
+   right of it in a col 6 ... a card with the show movements"). One column
+   when there is no alert, and on a narrow screen. */
+.run-top {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 12px;
+  margin: 12px 14px 0;
+  > .notice, > .card { margin: 0; }
+  .run-shown-line { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0; }
+  .run-shown-hint { margin: 8px 0 0; }
+}

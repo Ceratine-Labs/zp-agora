@@ -890,6 +890,20 @@
         {{-- ============================================================ Messages --}}
         <h2 id="g-messages" class="sg-group">Messages</h2>
 
+        <x-core::gallery-entry name="x-menu-button">
+            <div class="gal-variant">
+                <p class="eyebrow">Secondary presses behind one button — open it</p>
+                <x-menu-button label="Run actions">
+                    <a href="#">Explain this run</a>
+                    <a href="#">Tutorial</a>
+                    <hr>
+                    <button type="button">Extract shifts…</button>
+                    <hr>
+                    <button type="button" class="danger">Discard this preview</button>
+                </x-menu-button>
+            </div>
+        </x-core::gallery-entry>
+
         <x-core::gallery-entry name="x-notice">
             <div class="gal-variant">
                 <p class="eyebrow">Three tones, and the fold that keeps the headline visible</p>
@@ -902,6 +916,9 @@
                 </x-notice>
                 <x-notice tone="stop" title="That run cannot be discarded" style="margin-bottom: 12px;">
                     It has already been committed. Reverse it instead — the trail stays.
+                </x-notice>
+                <x-notice tone="stop" icon title="Already amended on another run — 3 items, 9 shifts" style="margin-bottom: 12px;">
+                    <p>With <code>icon</code>: the one alert a screen most needs read, marked in its tone's colour.</p>
                 </x-notice>
                 <x-notice tone="warn" collapsible title="31 lines did not match">
                     Twenty-eight are timing: the bank posted them on the next working day. Three are amounts that

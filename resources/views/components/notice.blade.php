@@ -14,9 +14,11 @@
 
     Tones: warn (default) · stop · info.
 --}}
-@props(['tone' => 'warn', 'title' => null, 'collapsible' => false, 'open' => false])
+{{-- `icon`: a round mark in the tone's colour before the title, for the one
+     notice a screen most needs read (Ryan, 14 Nov 2026). --}}
+@props(['tone' => 'warn', 'title' => null, 'collapsible' => false, 'open' => false, 'icon' => false])
 
-@php($class = 'notice notice-'.$tone.($collapsible ? ' notice-fold' : ''))
+@php($class = 'notice notice-'.$tone.($collapsible ? ' notice-fold' : '').($icon ? ' notice-with-icon' : ''))
 
 @if ($collapsible && $title)
     <details {{ $attributes->merge(['class' => $class]) }} @if ($open) open @endif>
@@ -25,6 +27,7 @@
     </details>
 @else
     <div {{ $attributes->merge(['class' => $class]) }}>
+        @if ($icon)<span class="notice-icon" aria-hidden="true">!</span>@endif
         @if ($title)<h3>{{ $title }}</h3>@endif
         <div class="notice-body">{{ $slot }}</div>
     </div>

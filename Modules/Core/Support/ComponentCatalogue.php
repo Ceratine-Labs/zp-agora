@@ -733,6 +733,16 @@ class ComponentCatalogue
                     ['title', '?string', 'null', 'The headline'],
                     ['collapsible', 'bool', 'false', 'Fold the body'],
                     ['open', 'bool', 'false', 'Which way it starts'],
+                    ['icon', 'bool', 'false', 'A round mark in the tone\'s colour before the title'],
+                ],
+            ],
+            [
+                'name' => 'x-menu-button',
+                'group' => 'Structure',
+                'summary' => 'A page\'s secondary presses folded behind one button.',
+                'notes' => 'Built for the stock recon run header (Ryan, 14 Nov 2026: "the buttons at the top can be put into a drop down including the shifts bar"): Explain, Tutorial, Run another, Extract shifts and Discard. A `<details>`, so it opens from the keyboard with no script; `info.js` closes it on Escape or a click elsewhere and keeps one open at a time. Items are links, buttons, or a form holding one button; `class="danger"` paints a destructive one and `<hr>` separates groups. Not for the page\'s primary press.',
+                'props' => [
+                    ['label', 'string', "'Actions'", 'What the button says'],
                 ],
             ],
             [
