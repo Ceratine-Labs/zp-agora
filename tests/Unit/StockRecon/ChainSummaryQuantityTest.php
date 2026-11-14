@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\StockRecon;
 
+use Modules\StockRecon\Models\StockReconRunLine;
 use Modules\StockRecon\Services\ChainSummary;
 use PHPUnit\Framework\TestCase;
 
@@ -19,5 +20,20 @@ class ChainSummaryQuantityTest extends TestCase
         $this->assertStringContainsString('short of 7.5.', ChainSummary::balanceNote([
             'letter' => 'A', 'series' => 1, 'with' => 'a shift', 'net' => -7.5,
         ]));
+    }
+
+    public function test_a_chain_with_shorts_and_overs_left_names_both_totals(): void
+    {
+        // RRM-RFG CHICKEN BURGER PIE, run #70235 (Ryan, 14 Nov 2026): the
+        // shifts' variances after the run; shorts 11, overs 16, net +5.
+        $lines = collect([1, 2, 1, 0, -4, 4, 0, 1, -5, 4, -2, 2, 0, 1])->map(fn ($v, $i) => (new StockReconRunLine)->forceFill([
+            'Id' => $i + 1, 'AreaNo' => 1, 'StockItemNo' => '12', 'ContinuitySegment' => 0, 'ChainBlocked' => false,
+            'QtyVarNew' => $v, 'QtyVar' => $v, 'WouldAmend' => false, 'CommitState' => 'pending', 'ChainNetVar' => 5,
+        ]));
+
+        $state = ChainSummary::of($lines)->first()->state();
+
+        $this->assertSame('Total short: 11 · Total over: 16', $state['label']);
+        $this->assertStringContainsString('net +5', $state['title']);
     }
 }

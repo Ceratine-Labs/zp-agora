@@ -131,8 +131,15 @@ final class ChainSummary
         if ($overAfter > 0.0005 && $shortAfter > 0.0005) {
             $writes = $this->writable();
 
-            return ['label' => ($writes > 0 ? 'Amend '.$writes.' · ' : '').'short '.self::quantity($shortAfter).' and over '.self::quantity($overAfter).' remain',
-                'tone' => 'warn', 'title' => 'Shorts stay on their own shifts; an over on another shift cannot cancel them.'];
+            // "Total short: 11 · Total over: 16" (Ryan, 14 Nov 2026): it read
+            // "short 11 and over 16 remain", which nobody could follow without
+            // being told it was two sums over the chain's shifts.
+            $net = $overAfter - $shortAfter;
+
+            return ['label' => ($writes > 0 ? 'Amend '.$writes.' · ' : '').'Total short: '.self::quantity($shortAfter).' · Total over: '.self::quantity($overAfter),
+                'tone' => 'warn', 'title' => 'After this run: the short shifts add up to '.self::quantity($shortAfter)
+                    .' and the over shifts to '.self::quantity($overAfter).' (net '.($net > 0 ? '+' : '').self::quantity($net).'). '
+                    .'Shorts stay on their own shifts; an over on another shift cannot cancel them.'];
         }
 
         if ($this->lines->contains(fn ($l) => $l->reducesIssue())) {
