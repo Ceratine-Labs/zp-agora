@@ -2704,6 +2704,53 @@ class BalancingTest extends TestCase
         }
     }
 
+    public function test_a_short_then_an_over_on_a_continuous_handover_balances_and_is_not_an_issue(): void
+    {
+        config(['stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        // ZIG ZAG SIZE PAPER, Engen Manguzi, 26-30 Oct (Ryan, 14 Nov 2026:
+        // "shouldnt be an issue.. on row is a short the next missing issue"):
+        // each day closes one or two low, the night opens on it and ends over
+        // by the same. Runs previewed before 12 Nov left both and called the
+        // over a missing issue; the short before it is that over coming back.
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [42, 0, 41, 1], 3 => [41, 0, 41, 0]],
+            '2026-07-18' => [1 => [41, 0, 39, 1], 3 => [39, 0, 39, 1]],
+            '2026-07-19' => [1 => [39, 0, 37, 1], 3 => [37, 0, 36, 2]],
+            '2026-07-20' => [1 => [36, 0, 34, 0], 3 => [34, 0, 32, 4]],
+            '2026-07-21' => [1 => [32, 0, 30, 2], 3 => [30, 0, 30, 0]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 50]);
+        $run = $this->previewArea(self::SHELF_AREA);
+
+        foreach ($run->lines->where('StockItemNo', self::DUP_ITEM) as $l) {
+            $this->assertEqualsWithDelta(0.0, (float) $l->QtyVarNew, 0.005, "{$l->TransactionDate->toDateString()} shift {$l->ShiftNo} balances to nil.");
+            $this->assertNull($l->QtyIssuedNew, 'No issue is added or taken away.');
+        }
+        foreach (['2026-07-18' => 40, '2026-07-19' => 38, '2026-07-20' => 36] as $day => $close) {
+            $this->assertEqualsWithDelta($close, (float) $this->lineAt($run, $day, 1)->QtyCloseNew, 0.005, "{$day} day close corrected.");
+        }
+    }
+
+    public function test_an_over_smaller_than_one_issue_says_so_rather_than_capture_the_missing_issue(): void
+    {
+        config(['stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        // An over of 1 with nothing short to set it against, on an item issued
+        // in fifties: it cannot be a missing issue (Ryan, 14 Nov 2026).
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [10, 0, 10, 0], 3 => [10, 0, 10, 0]],
+            '2026-07-18' => [1 => [10, 0, 10, 1], 3 => [10, 0, 10, 0]],
+            '2026-07-19' => [1 => [10, 0, 10, 0], 3 => [10, 0, 10, 0]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 50]);
+        $line = $this->lineAt($this->previewArea(self::SHELF_AREA), '2026-07-18', 1);
+
+        $this->assertEqualsWithDelta(1.0, (float) $line->QtyVarNew, 0.005);
+        $this->assertSame('Over 1 left, under one issue of 50: likely a till timing difference', $line->Outcome);
+        $this->assertSame('Over 1 left, under one issue of 50', $line->outcomeLabel());
+    }
+
     public function test_a_remaining_short_can_reduce_whole_multiples_and_leave_the_remainder(): void
     {
         config(['stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);

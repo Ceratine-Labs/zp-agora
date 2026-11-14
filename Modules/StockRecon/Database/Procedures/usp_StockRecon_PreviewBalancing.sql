@@ -2136,6 +2136,14 @@ BEGIN
                received less than it sold (7 Oct 2026). It is the missing
                issue, on the shift that needs it captured. At most 70
                characters against the column's 80. */
+            /* Smaller than one issue (Ryan, 14 Nov 2026, ZIG ZAG SIZE PAPER at
+               Engen Manguzi, issued in fifties): an over of 1 cannot be an
+               issue nobody wrote up, so the row does not ask for one to be
+               captured. Multiples of 0 or 1 say nothing about it and keep the
+               sentence below. At most 77 characters against the column's 80. */
+            WHEN a.EffVarNew > @eps AND a.Mult > 1 AND a.EffVarNew < a.Mult - @eps
+                                              THEN N'Over ' + FORMAT(a.EffVarNew, '0.###') + N' left, under one issue of '
+                                                   + FORMAT(a.Mult, '0.###') + N': likely a till timing difference'
             WHEN a.EffVarNew > @eps           THEN 'Unrecorded issue, over left: capture the missing issue on this shift'
             /* The qty leads, so it is on the pill and in the extract. At most
                74 characters against the column's 80. */
