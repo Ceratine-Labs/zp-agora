@@ -178,3 +178,33 @@ BEGIN
     );
 END;
 GO
+
+/* The till quantities PumpIT rolls into STK_StockReconLine.QtyComputer, and
+   STK_Area.Shift_TimeBased, which says which of the two an area reads
+   (14 Nov 2026, agora.vw_StockReconTillQty): a shift-based area (0) matches
+   DBF_P3TRANS_STKRECON to its item by POS code and location; a time-based
+   area (1) reads DBF_P3TRANS_STOCKRECON_ShiftTimeBased by area and item,
+   leaving out stock adjustments. Shape only: the columns the view reads, at
+   the customer's types. */
+IF COL_LENGTH('dbo.STK_Area', 'Shift_TimeBased') IS NULL ALTER TABLE dbo.STK_Area ADD Shift_TimeBased BIT NOT NULL DEFAULT 0;
+
+IF OBJECT_ID('dbo.DBF_P3TRANS_STKRECON') IS NULL
+CREATE TABLE dbo.DBF_P3TRANS_STKRECON (
+    SSBranchId INT            NOT NULL,
+    [DATE]     DATETIME       NOT NULL,
+    CODE       CHAR(16)       NULL,
+    [LOCATION] VARCHAR(10)    NULL,
+    Qty        DECIMAL(38, 6) NULL,
+    ShiftNo    INT            NULL
+);
+
+IF OBJECT_ID('dbo.DBF_P3TRANS_STOCKRECON_ShiftTimeBased') IS NULL
+CREATE TABLE dbo.DBF_P3TRANS_STOCKRECON_ShiftTimeBased (
+    SSBranchId        INT            NOT NULL,
+    [DATE]            DATETIME       NOT NULL,
+    CODE              CHAR(16)       NULL,
+    origindescription VARCHAR(16)    NULL,
+    quantity          DECIMAL(19, 6) NULL,
+    AreaNo            INT            NULL,
+    StockItemNo       NVARCHAR(5)    NULL
+);

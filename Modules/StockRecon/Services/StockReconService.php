@@ -612,6 +612,29 @@ class StockReconService
     }
 
     /**
+     * The run's days where PumpIT's till quantity on the recon lines disagrees
+     * with what the tills sold (Chantal Peens, 13 Nov 2026, "COMPUTER QTY").
+     * Those shifts cannot balance however they are amended until PumpIT's
+     * quantities are updated. Reads only; an error here never stops the run
+     * page, it just leaves the warning off.
+     *
+     * @return Collection<int, object>
+     */
+    public function tillQtyGaps(StockReconRun $run): Collection
+    {
+        try {
+            return $this->procedures->call('usp_StockRecon_TillQtyCheck', [
+                'BranchId' => $run->BranchId,
+                'RunId' => $run->Id,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return collect();
+        }
+    }
+
+    /**
      * The duplicate issues a run found — the "Duplicate issues" panel on the
      * run and on its exceptions (Ryan, 1 Oct 2026).
      *
