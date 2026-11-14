@@ -487,12 +487,12 @@ div.emptystate { padding: 44px 20px; text-align: center; }
    reader. Weight and a light blue wash: green on these screens already says
    "balanced", and the row the reader came from is washed green, so a green
    cell on it could not be seen. The row's own wash and a balance group's rail
-   stay underneath. */
+   stay underneath. No underline (ZP via Ryan, 14 Nov 2026: "keep the amended
+   blue as it is now but no underlining"): the blue wash and weight carry it. */
 table.dt tbody tr > td.is-changed,
 table.dt tbody tr.tt-group > td.is-changed,
 table.dt tbody tr.is-matched > td.is-changed {
   background: var(--amend-bg); color: var(--amend-ink); font-weight: 700;
-  box-shadow: inset 0 -2px 0 var(--amend-line);
 }
 
 /* On a laptop the strip drops the states this run has none of. On a wide
