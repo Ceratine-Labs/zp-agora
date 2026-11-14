@@ -10,6 +10,7 @@ use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserPermission;
 use Modules\Core\Services\PermissionService;
+use Modules\StockRecon\Services\ReconDayService;
 use Tests\TestCase;
 
 /**
@@ -134,6 +135,48 @@ class ReconDayTest extends TestCase
         $this->actingAs($other)
             ->get(route('app.stockrecon.days', ['month' => '2031-03']))
             ->assertForbidden();
+    }
+
+    public function test_a_day_opens_each_area_onto_its_items_and_flags_missing_till_quantities(): void
+    {
+        // Area 91's item T1 sold 7 at the till on 2 Mar; its recon line carries a POS of 0.
+        $db = DB::connection('agora');
+        $db->table('PumpIT.dbo.STK_Area')->where('SSBranchId', self::BRANCH)->whereIn('AreaNo', [91, 92])->update(['Shift_TimeBased' => 0]);
+        foreach ([[91, 'T1', 'TEST days item one'], [92, 'T2', 'TEST days item two']] as [$area, $item, $name]) {
+            $db->table('PumpIT.dbo.STK_StockMaster')->insert([
+                'SSBranchId' => self::BRANCH, 'StockItemNo' => $item, 'StockItemDescription' => $name,
+                'UOMCode' => 'EA', 'AreaNo' => $area, 'QtyVarAllowance' => 0, 'IsDoCloseQtyCalc' => 0,
+                'POSCode' => 'TEST-D'.$item, 'Location' => 'TPOS',
+            ]);
+        }
+        foreach ([[4, 1], [3, 3]] as [$qty, $shift]) {
+            $db->table('PumpIT.dbo.DBF_P3TRANS_STKRECON')->insert([
+                'SSBranchId' => self::BRANCH, 'DATE' => '2031-03-02 10:00', 'CODE' => 'TEST-DT1',
+                'LOCATION' => 'TPOS', 'Qty' => $qty, 'ShiftNo' => $shift,
+            ]);
+        }
+
+        $items = app(ReconDayService::class)->items(self::BRANCH, '2031-03-02');
+
+        $this->assertSame([91, 92], $items->keys()->map(fn ($k) => (int) $k)->sort()->values()->all());
+        $t1 = $items->get(91)->firstWhere('StockItemNo', 'T1');
+        $this->assertSame('day', $t1->Kind);
+        $this->assertEqualsWithDelta(7.0, (float) $t1->QtyTill, 0.0005);
+        $this->assertEqualsWithDelta(7.0, (float) $t1->QtyMissing, 0.0005);
+        $this->assertEqualsWithDelta(0.0, (float) $t1->QtyPOS, 0.0005);
+        $t2 = $items->get(92)->firstWhere('StockItemNo', 'T2');
+        $this->assertNull($t2->Kind, 'No till sales for T2: nothing is missing.');
+        $this->assertNull($t2->QtyTill);
+
+        $this->actingAs($this->person(['stockrecon.runs.view']))
+            ->get(route('app.stockrecon.days.show', ['branch' => self::BRANCH, 'day' => '2031-03-02']))
+            ->assertOk()
+            ->assertSee('Till quantities are missing in PumpIT — 1 item in 1 area cannot balance yet')
+            ->assertSee('data-area="91"', false)
+            ->assertSee('1 missing till quantity')
+            ->assertSee('TEST days item one')
+            ->assertSee('7.000 · whole day')
+            ->assertSee('agora.usp_StockRecon_DayItems');
     }
 
     // ---- fixture -------------------------------------------------------------

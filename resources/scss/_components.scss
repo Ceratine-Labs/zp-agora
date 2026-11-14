@@ -2005,3 +2005,14 @@ a.dcal-cell:hover, a.dcal-cell:focus-visible { outline: 2px solid var(--ink); ou
   .dcal-cell { width: 26px; height: 26px; font-size: 11px; }
   .dcal-grid { border-spacing: 2px; }
 }
+
+/* The reconciled-day page (stock recon, 14 Nov 2026): one fold per counting
+   area, opening onto its items. An item whose till quantity is missing in
+   PumpIT carries the warn tint in its first cell, so the eye finds it in a
+   long area without reading the Missing column. */
+.day-areas { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.day-areas > .card { margin: 0; }
+.day-areas .card-h .right { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.day-area-meta { margin: 0; padding: 10px 14px; }
+.day-area-body tr.is-flagged > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+.day-area-body td:first-child { min-width: 12em; }

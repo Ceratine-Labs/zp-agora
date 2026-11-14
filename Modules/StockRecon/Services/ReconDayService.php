@@ -19,6 +19,8 @@ class ReconDayService
 {
     public const PROCEDURE = 'agora.usp_StockRecon_DayStatus';
 
+    public const ITEMS_PROCEDURE = 'agora.usp_StockRecon_DayItems';
+
     /** The procedure's DayStatus, as the calendar names it. */
     public const LEGEND = [
         'done' => 'Reconciled',
@@ -78,7 +80,7 @@ class ReconDayService
      * One site, one day: its areas, what keeps it open, and every run whose
      * window includes it.
      *
-     * @return array{areas: Collection<int, object>, open: Collection<int, object>, runs: Collection<int, object>}
+     * @return array{areas: Collection<int, object>, open: Collection<int, object>, runs: Collection<int, object>, items: Collection<int|string, Collection<int, object>>}
      */
     public function day(int $branchId, string $day): array
     {
@@ -94,6 +96,30 @@ class ReconDayService
             'areas' => $sets[0] ?? collect(),
             'open' => $sets[1] ?? collect(),
             'runs' => $sets[2] ?? collect(),
+            'items' => $this->items($branchId, $day),
         ];
+    }
+
+    /**
+     * Every item counted in each area that day, with what the tills sold
+     * beside the POS on its recon lines (Ryan, 14 Nov 2026, for Chantal
+     * Peens's "COMPUTER QTY" check), keyed by area. From
+     * agora.usp_StockRecon_DayItems. The day page still answers without it,
+     * so a failure reports and returns nothing.
+     *
+     * @return Collection<int|string, Collection<int, object>>
+     */
+    public function items(int $branchId, string $day): Collection
+    {
+        try {
+            return $this->procedures->call(self::ITEMS_PROCEDURE, [
+                'BranchId' => $branchId,
+                'Day' => $day,
+            ])->groupBy('AreaNo');
+        } catch (\Throwable $e) {
+            report($e);
+
+            return collect();
+        }
     }
 }

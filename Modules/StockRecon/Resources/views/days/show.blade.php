@@ -7,10 +7,17 @@
     large to be a miscount — and last every run whose window includes the day,
     so the overlap is on the screen rather than in somebody's head.
 
-    Props: $areas, $open, $runs, $branch, $date
+    Each counting area is a fold (Ryan, 14 Nov 2026): open it for every item
+    counted that day, with what the tills sold beside the POS on its recon
+    lines (Chantal Peens's "COMPUTER QTY" check, agora.usp_StockRecon_DayItems)
+    and the lines still open on the deciding run. An area with a missing till
+    quantity starts open, under a notice that says how many.
+
+    Props: $areas, $open, $runs, $items (rows by AreaNo), $branch, $date
 --}}
 @php
     use App\Support\BusinessDate;
+    use App\Support\Format;
     use Modules\StockRecon\Services\ReconDayService;
 
     $tone = ['done' => 'good', 'partial' => 'serious', 'open' => 'crit'];
@@ -19,6 +26,11 @@
         : ($areas->every(fn ($a) => $a->AreaStatus === 'done') ? 'done'
         : ($areas->every(fn ($a) => $a->AreaStatus === 'open') ? 'open' : 'partial'));
     $site = $branch?->Name ?? 'Site';
+    $items = $items ?? collect();
+    $shown = $areas->pluck('AreaNo')->all();
+    $flagged = $items->only($shown)->map(fn ($rows) => $rows->whereNotNull('Kind')->count())->filter();
+    $missingItems = (int) $flagged->sum();
+    $missingAreas = $flagged->count();
 @endphp
 
 <x-app-shell :title="$site.' · '.$date->format('j M Y')">
@@ -36,50 +48,83 @@
         </x-slot:actions>
     </x-page-head>
 
-    <x-card title="Counting areas">
-        <x-table layout-key="StockRecon.days.areas" procedure="agora.usp_StockRecon_DayStatus" :count="$areas->count()" dense
-                 empty="Nothing was counted at this site on this day.">
-            <x-slot:head>
-                <tr><th>Area</th><th>State</th><th>What is open</th><th class="num">Lines</th><th>Decided by</th><th>Posted</th></tr>
-            </x-slot:head>
-            @foreach ($areas as $a)
-                <tr>
-                    <td>{{ $a->AreaDescription ?? 'Area '.$a->AreaNo }}</td>
-                    <td><x-chip :tone="$tone[$a->AreaStatus] ?? 'neutral'">{{ $word[$a->AreaStatus] ?? $a->AreaStatus }}</x-chip></td>
-                    <td>{{ $a->Summary }}</td>
-                    <td class="num">{{ $a->CountedLines }}</td>
-                    <td>
-                        @if ($a->RunId)
-                            <a href="{{ route('app.stockrecon.run', $a->RunId) }}">Run {{ $a->RunId }}</a>
-                            <span class="muted">· {{ substr((string) $a->RunFrom, 0, 10) }} to {{ substr((string) $a->RunTo, 0, 10) }}</span>
-                        @else
-                            <span class="muted">No posted run</span>
-                        @endif
-                    </td>
-                    <td>{{ $a->RunId ? BusinessDate::show($a->CommittedAt).($a->CommittedByName ? ' · '.$a->CommittedByName : '') : '' }}</td>
-                </tr>
-            @endforeach
-        </x-table>
-    </x-card>
+    @if ($missingItems > 0)
+        <x-notice tone="warn" title="Till quantities are missing in PumpIT — {{ $missingItems }} {{ Str::plural('item', $missingItems) }} in {{ $missingAreas }} {{ Str::plural('area', $missingAreas) }} cannot balance yet" style="margin-bottom:16px">
+            <p>What the tills sold does not match the POS quantity on these items' recon lines, so they cannot balance
+               however they are amended. Update the computer quantities in PumpIT, then preview this day again.
+               The areas concerned are open below.</p>
+        </x-notice>
+    @endif
 
-    <x-card title="What keeps it open" :sub="$open->isEmpty() ? null : $open->count().' line(s) on the deciding runs'">
-        <x-table layout-key="StockRecon.days.open" procedure="agora.usp_StockRecon_DayStatus" :count="$open->count()" dense tools
-                 empty="Nothing is open on a posted run for this day.">
-            <x-slot:head>
-                <tr><th>Area</th><th>Item</th><th class="num">Shift</th><th>What</th><th>Why</th><th>Run</th></tr>
-            </x-slot:head>
-            @foreach ($open as $l)
-                <tr>
-                    <td>{{ $l->AreaDescription ?? 'Area '.$l->AreaNo }}</td>
-                    <td>{{ $l->ItemDescription ?? $l->StockItemNo }} <span class="muted mono">{{ $l->StockItemNo }}</span></td>
-                    <td class="num">{{ $l->ShiftNo }}</td>
-                    <td><x-chip :tone="$l->Kind === 'Held back' ? 'serious' : ($l->Kind === 'Reversed' ? 'warn' : 'neutral')">{{ $l->Kind }}</x-chip></td>
-                    <td>{{ $l->Reason }}</td>
-                    <td><a href="{{ route('app.stockrecon.run', $l->RunId) }}">Run {{ $l->RunId }}</a></td>
-                </tr>
-            @endforeach
-        </x-table>
-    </x-card>
+    <div class="day-areas">
+        @forelse ($areas as $a)
+            @php
+                $rows = $items->get($a->AreaNo, collect());
+                $gaps = $rows->whereNotNull('Kind')->count();
+                $areaOpen = $open->where('AreaNo', $a->AreaNo);
+                $sub = trim(($a->Summary ? $a->Summary.' · ' : '').$a->CountedLines.' '.Str::plural('line', (int) $a->CountedLines).' · '.$rows->count().' '.Str::plural('item', $rows->count())
+                    .($a->RunId ? ' · decided by run '.$a->RunId.' ('.substr((string) $a->RunFrom, 0, 10).' to '.substr((string) $a->RunTo, 0, 10).')' : ' · no posted run'));
+            @endphp
+            <x-card :title="$a->AreaDescription ?? 'Area '.$a->AreaNo" :sub="$sub" collapsible flush :open="$gaps > 0"
+                    data-area="{{ $a->AreaNo }}">
+                <x-slot:actions>
+                    @if ($gaps > 0)<x-chip tone="warn">{{ $gaps }} missing till {{ Str::plural('quantity', $gaps) }}</x-chip>@endif
+                    <x-chip :tone="$tone[$a->AreaStatus] ?? 'neutral'">{{ $word[$a->AreaStatus] ?? $a->AreaStatus }}</x-chip>
+                </x-slot:actions>
+                <div class="day-area-body">
+                    <p class="muted day-area-meta">
+                        @if ($a->RunId)
+                            <a href="{{ route('app.stockrecon.run', $a->RunId) }}">Open run {{ $a->RunId }}</a>
+                            · posted {{ BusinessDate::show($a->CommittedAt) }}{{ $a->CommittedByName ? ' · '.$a->CommittedByName : '' }}
+                        @else
+                            No posted run has balanced this area for this day.
+                        @endif
+                    </p>
+                    <x-table layout-key="StockRecon.days.items.1" procedure="agora.usp_StockRecon_DayItems" :count="$rows->count()" dense tools
+                             empty="No item lines were found for this area.">
+                        <x-slot:head>
+                            <tr>
+                                <th>Item</th><th class="num">Shifts</th><th class="num">Open</th><th class="num">Issued</th><th class="num">Close</th>
+                                <th class="num">POS</th><th class="num">Till sold</th><th class="num">Missing</th><th class="num">Variance</th>
+                                <th>What keeps it open</th>
+                            </tr>
+                        </x-slot:head>
+                        @foreach ($rows as $i)
+                            @php($lines = $areaOpen->where('StockItemNo', $i->StockItemNo))
+                            <tr @class(['is-flagged' => $i->Kind !== null])>
+                                <td>{{ $i->StockItemDescription ?? $i->StockItemNo }} <span class="muted mono">{{ $i->StockItemNo }}</span></td>
+                                <td class="num">{{ $i->Shifts }}</td>
+                                <td class="num">{{ Format::n($i->QtyOpen, 3) }}</td>
+                                <td class="num">{{ Format::n($i->QtyIssued, 3) }}</td>
+                                <td class="num">{{ Format::n($i->QtyClose, 3) }}</td>
+                                <td class="num">{{ Format::n($i->QtyPOS, 3) }}</td>
+                                <td class="num">{{ $i->QtyTill === null ? '—' : Format::n($i->QtyTill, 3) }}</td>
+                                <td class="num">
+                                    @if ($i->Kind === 'day')
+                                        <x-chip tone="warn" title="No POS on any shift this day">{{ Format::n($i->QtyMissing, 3) }} · whole day</x-chip>
+                                    @elseif ($i->Kind === 'part')
+                                        <x-chip tone="warn" title="A shift is missing its POS">{{ Format::n($i->QtyMissing, 3) }} · a shift</x-chip>
+                                    @endif
+                                </td>
+                                <td class="num">{{ Format::n($i->QtyVar, 3) }}</td>
+                                <td>
+                                    @foreach ($lines as $l)
+                                        <div>
+                                            <x-chip :tone="$l->Kind === 'Held back' ? 'serious' : ($l->Kind === 'Reversed' ? 'warn' : 'neutral')">{{ $l->Kind }}</x-chip>
+                                            <span class="muted">shift {{ $l->ShiftNo }} ·</span> {{ $l->Reason }}
+                                            <a href="{{ route('app.stockrecon.run', $l->RunId) }}">Run {{ $l->RunId }}</a>
+                                        </div>
+                                    @endforeach
+                                </td>
+                            </tr>
+                        @endforeach
+                    </x-table>
+                </div>
+            </x-card>
+        @empty
+            <x-empty-state text="Nothing was counted at this site on this day." />
+        @endforelse
+    </div>
 
     <x-card title="Runs over this day" sub="Every run whose window includes it, newest first">
         <x-table layout-key="StockRecon.days.runs" procedure="agora.usp_StockRecon_DayStatus" :count="$runs->count()" dense

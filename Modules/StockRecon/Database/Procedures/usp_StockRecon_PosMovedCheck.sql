@@ -7,7 +7,7 @@
     before that day's till quantities reached PumpIT. With a POS of 0 it read
     Loose Cigarette S as 61 short and cut the issue from 300 to 240. Head
     office's update script later filled the POS in (63), so the cut that stood
-    in PumpIT now made the shift 62 short. 117 items at 8 sites were in the
+    in PumpIT now left the shift 62 over. 117 items at 8 sites were in the
     same state that day.
 
     An amendment is only as right as the POS it was worked out on. Per item
