@@ -2020,8 +2020,6 @@ a.dcal-cell:hover, a.dcal-cell:focus-visible { outline: 2px solid var(--ink); ou
 /* An item another run already amended (stock recon, 14 Nov 2026): a link to
    that run, in the amended blue, so it reads "done there" rather than as a
    warning about this run's figures. */
-a.chip.held-elsewhere {
-  margin-left: 6px; text-decoration: none;
-  background: var(--amend-bg); color: var(--amend-ink);
-  &:hover, &:focus-visible { text-decoration: underline; }
-}
+a.held-elsewhere-link { margin-left: 6px; text-decoration: none; }
+a.held-elsewhere-link:hover .chip, a.held-elsewhere-link:focus-visible .chip { text-decoration: underline; }
+.chip.held-elsewhere { background: var(--amend-bg); color: var(--amend-ink); }

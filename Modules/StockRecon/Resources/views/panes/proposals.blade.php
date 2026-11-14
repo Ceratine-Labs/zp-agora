@@ -399,8 +399,8 @@
                     <td class="cell-name">
                         <span class="tt-caret" aria-hidden="true"></span>{{ $first->itemLabel() }}
                         @foreach ($chainHeld as $held)
-                            <a class="chip held-elsewhere" href="{{ route('app.stockrecon.run', $held) }}"
-                               title="{{ $chain->lines->filter(fn ($l) => $elsewhere->get($l->Id) === $held)->count() }} of this item's shifts already carry an amendment from run #{{ $held }}. Reverse the item's chain there to balance it here.">Amended on run #{{ $held }}</a>
+                            <a class="held-elsewhere-link" href="{{ route('app.stockrecon.run', $held) }}"
+                               title="{{ $chain->lines->filter(fn ($l) => $elsewhere->get($l->Id) === $held)->count() }} of this item's shifts already carry an amendment from run #{{ $held }}. Reverse the item's chain there to balance it here."><x-chip class="held-elsewhere" :dot="false">Amended on run #{{ $held }}</x-chip></a>
                         @endforeach
                         @if (($globalChains[$chain->key]->GroupRawOffset ?? 0) > 0)
                             <a class="muted" href="{{ route('app.stockrecon.global', $run) }}#group-{{ $globalChains[$chain->key]->PreProductionTypeNo }}">Group contains raw offsets · {{ $globalChains[$chain->key]->PreProductionTypeNo }} · unconverted</a>
