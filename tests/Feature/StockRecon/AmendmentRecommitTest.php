@@ -133,7 +133,8 @@ class AmendmentRecommitTest extends TestCase
             $this->fail('An active amendment from another run must still block this shift.');
         } catch (AgoraProcException $e) {
             $this->assertSame('ALL_SKIPPED', $e->code());
-            $this->assertStringContainsString('another run', $e->getMessage());
+            // The reason names the run holding the amendment (14 Nov 2026).
+            $this->assertStringContainsString('from run #'.$first->Id.'.', $e->getMessage());
         }
         $this->assertSame(0, $this->amendments($second)->count());
         $this->assertSame(1, $this->amendments($first)->where('State', 'active')->count());

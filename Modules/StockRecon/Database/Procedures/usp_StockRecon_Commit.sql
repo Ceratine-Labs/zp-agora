@@ -580,7 +580,16 @@ BEGIN
     /* This shift already carries an amendment nobody has reversed. Two live
        amendments on one row means two "prior" values and no way to know which
        is the real one, so the second is refused rather than stacked. */
-    UPDATE c SET SkipReason = 'This shift already carries an amendment from another run. Reverse that first.'
+    /* The reason names the run that holds it (14 Nov 2026): "from another
+       run" sent Pongola hunting through its history for which one to reverse,
+       and since 12 Nov the site can reverse just that item's chain on it. */
+    UPDATE c SET SkipReason = CONCAT(N'This shift already carries an amendment from run #',
+           (SELECT TOP 1 a.RunId FROM agora.StockReconAmendment a
+            WHERE a.BranchId = @BranchId AND a.[State] = 'active'
+              AND a.AreaNo = c.AreaNo AND a.StockItemNo = c.StockItemNo
+              AND a.TransactionDate = c.TransactionDate AND a.ShiftNo = c.ShiftNo
+            ORDER BY a.RunId DESC),
+           N'. Reverse this item''s chain on that run first.')
     FROM #cand c
     WHERE c.SkipReason IS NULL
       AND EXISTS (
