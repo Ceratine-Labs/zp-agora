@@ -2065,14 +2065,12 @@ a.held-elsewhere-link:hover .chip, a.held-elsewhere-link:focus-visible .chip { t
 }
 @media (prefers-reduced-motion: reduce) { .menu-button .menu-button-caret { transition: none; } }
 
-/* The stock recon proposals: the one alert beside what the table shows
-   (Ryan, 14 Nov 2026: "combine the top info alert make it red ... and on the
-   right of it in a col 6 ... a card with the show movements"). One column
-   when there is no alert, and on a narrow screen. */
-.run-top {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 12px;
-  margin: 12px 14px 0;
-  > .notice, > .card { margin: 0; }
-  .run-shown-line { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0; }
-  .run-shown-hint { margin: 8px 0 0; }
+/* The stock recon proposals' one alert, on one thin line (Ryan, 14 Nov 2026:
+   "make the strip at the top thin ... some of the guys work on very small
+   laptops"): the runs that already carry this run's items, as links. */
+.notice.notice-thin {
+  padding: 6px 12px; align-items: center;
+  > .notice-icon { width: 18px; height: 18px; font-size: 12px; grid-row: auto; }
+  > .notice-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+  .notice-run { font-weight: 700; color: inherit; }
 }

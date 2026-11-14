@@ -166,7 +166,8 @@ class AmendmentRecommitTest extends TestCase
 
         $viewer = $this->person(['stockrecon.runs.view', 'stockrecon.runs.execute']);
         $html = $this->actingAs($viewer)->get(route('app.stockrecon.run', $second))->assertOk()->getContent();
-        $this->assertStringContainsString('Already amended on another run — 1 item, 1 shift', $html);
+        $this->assertStringContainsString('Amendments already carried out on runs:', $html);
+        $this->assertStringContainsString('>#'.$first->Id.'</a>', $html);
         $this->assertStringContainsString('Amended on run #'.$first->Id, $html);
         $this->assertMatchesRegularExpression('/<input type="checkbox" data-check disabled\s+title="Already amended on run #'.$first->Id.'"/', $html);
         $this->assertStringNotContainsString('name="lines[]" value="'.$line.'"', $html, 'The shift is out of the press.');

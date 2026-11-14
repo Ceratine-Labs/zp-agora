@@ -1040,6 +1040,19 @@ class TableTools {
         if (!existing) container.prepend(strip);
 
         /*
+         * ADOPTED sets (Ryan, 14 Nov 2026: "put this next to chain"): a
+         * server-rendered set of link pills — the stock recon chain scope,
+         * which changes the page and not the rows — marked
+         * data-tt-strip-for="<table id>" joins the end of the strip, so the
+         * filters read as one row on a small laptop. Moving it again on a
+         * later set keeps it last.
+         */
+        if (this.table.id) {
+            document.querySelectorAll(`[data-tt-strip-for="${CSS.escape(this.table.id)}"]`)
+                .forEach((adopted) => strip.append(adopted));
+        }
+
+        /*
          * The pill the screen opens on. A default this particular run has no
          * rows for would open the table empty, which reads as a broken screen
          * rather than as a scope — so it quietly falls back to All.
