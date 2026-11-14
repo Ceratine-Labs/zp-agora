@@ -309,8 +309,9 @@ class StockReconController extends Controller
         // Till quantities PumpIT has not rolled into the recon lines: those
         // shifts cannot balance until it does (Chantal Peens, 13 Nov 2026).
         $tillGaps = $this->service->tillQtyGaps($run);
+        $posMoved = $this->service->posMovedChains($run);
 
-        return view('stockrecon::run', $frame + ['run' => $run, 'panes' => $panes, 'tillGaps' => $tillGaps]);
+        return view('stockrecon::run', $frame + ['run' => $run, 'panes' => $panes, 'tillGaps' => $tillGaps, 'posMoved' => $posMoved]);
     }
 
     /**

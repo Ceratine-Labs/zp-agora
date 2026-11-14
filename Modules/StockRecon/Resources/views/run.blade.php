@@ -69,6 +69,7 @@
 
     @include('stockrecon::partials.released-notice')
     @include('stockrecon::partials.till-gaps-notice', ['tillGaps' => $tillGaps ?? collect()])
+    @include('stockrecon::partials.pos-moved-notice', ['posMoved' => $posMoved ?? collect(), 'run' => $run])
 
     <x-tabs :items="$tabs" :active="$tab" query="tab" label="Run" style="margin:0">
         @foreach ($panes as $key => $pane)

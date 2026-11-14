@@ -635,6 +635,28 @@ class StockReconService
     }
 
     /**
+     * The items on a run whose standing amendments were worked out against a
+     * POS quantity PumpIT has since changed (Caltex Ulundi, 14 Nov 2026), from
+     * agora.usp_StockRecon_PosMovedCheck. A warning only: a failure here never
+     * stops the run page, so it reports and returns nothing.
+     *
+     * @return Collection<int, object>
+     */
+    public function posMovedChains(StockReconRun $run): Collection
+    {
+        try {
+            return $this->procedures->call('usp_StockRecon_PosMovedCheck', [
+                'BranchId' => $run->BranchId,
+                'RunId' => $run->Id,
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return collect();
+        }
+    }
+
+    /**
      * The duplicate issues a run found — the "Duplicate issues" panel on the
      * run and on its exceptions (Ryan, 1 Oct 2026).
      *
