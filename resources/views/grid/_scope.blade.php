@@ -12,7 +12,8 @@
     drop the other's search — a bug that only ever appears on the screens that
     matter most, the ones with a summary above a detail.
 
-    Props: $grid, $branches, $formId
+    Props: $grid, $branches, $formId, $scopeOpen (null = remembered per user;
+    true / false = the page decides and the fold does not remember)
 --}}
 @php
     $definition = $grid->definition;
@@ -20,7 +21,11 @@
     $mine = array_map($p, ['q', 'branches', 'from', 'to', 'sort', 'dir', 'page', 'size', 'f']);
 @endphp
 
+@if (($scopeOpen ?? null) === null)
 <details class="dg-scope-fold" data-remember="grid-scope:{{ auth()->id() }}:{{ $grid->key() }}">
+@else
+<details class="dg-scope-fold" @if ($scopeOpen) open @endif>
+@endif
 <summary>Filters</summary>
 <form class="dg-scope" id="{{ $formId }}" method="GET" action="{{ $grid->baseUrl }}">
     @foreach ($grid->query as $name => $value)

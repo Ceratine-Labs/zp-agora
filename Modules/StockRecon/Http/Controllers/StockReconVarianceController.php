@@ -22,6 +22,15 @@ class StockReconVarianceController extends Controller
 
     public function index(Request $request, StockReconVarianceGrid $grid, BranchContext $context): View
     {
+        // A selection has been made once the scope form or a column filter has
+        // been submitted: anything in the query string before the defaults
+        // below go in. Chantal Peens, 12 Nov 2026: open the filters when the
+        // screen opens so people see them; once a selection is made, hide the
+        // filters and the totals above the grid to give it the screen.
+        $picked = collect($request->query())->except(['page', 'size', 'sort', 'dir'])->filter(
+            fn ($v) => $v !== null && $v !== '' && $v !== []
+        )->isNotEmpty();
+
         // The month to date, in the date range itself, so the period is on the
         // screen rather than implied by the procedure's default. Any period
         // may be chosen; the procedure bounds it by lines, not days.
@@ -37,6 +46,7 @@ class StockReconVarianceController extends Controller
 
         return view('stockrecon::variance', [
             'grid' => $result,
+            'picked' => $picked,
             'areas' => app(ProcedureService::class)->call('agora.usp_StockRecon_VarianceAreas', [
                 'BranchIds' => implode(',', $result->gridQuery->branchIds) ?: null,
                 'AllowedBranchIds' => implode(',', $context->allowed()) ?: null,

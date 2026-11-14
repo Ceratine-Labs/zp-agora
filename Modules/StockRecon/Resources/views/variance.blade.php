@@ -8,7 +8,9 @@
     The strip reads the procedure's third result set (GridResult::totals), so
     it always describes exactly the lines the grid matched — filters included.
 
-    Props: $grid (App\Grid\GridResult), $branches (sites for the selector, or null)
+    Props: $grid (App\Grid\GridResult), $branches (sites for the selector, or null),
+           $picked (a selection has been made: the filters and the summary
+           above the grid fold away, Chantal Peens 12 Nov 2026)
 --}}
 @php
     $t = $grid->totals;
@@ -42,35 +44,40 @@
         </x-slot:actions>
     </x-page-head>
 
-    @if ((int) ($t['ExcludedMeterRows'] ?? 0) > 0)
-        <x-notice tone="info" title="Cumulative water meters are separate" style="margin-bottom:16px">
-            <p>{{ \App\Support\Format::n($t['ExcludedMeterRows']) }} mapped meter readings in the selected sites and dates
-                are excluded from physical stock quantities and money totals, before the filters below.
-                <a href="{{ route('app.stockrecon.water', \Illuminate\Support\Arr::only($grid->query, ['branches', 'from', 'to'])) }}">Review meter reconciliation</a>.</p>
-        </x-notice>
-    @endif
+    {{-- The summary folds away once a selection is made, so the grid gets the
+         screen; it opens again from its own summary line. --}}
+    <details class="dg-scope-fold variance-summary" @if (! ($picked ?? false)) open @endif>
+    <summary>Summary</summary>
+        @if ((int) ($t['ExcludedMeterRows'] ?? 0) > 0)
+            <x-notice tone="info" title="Cumulative water meters are separate" style="margin-bottom:16px">
+                <p>{{ \App\Support\Format::n($t['ExcludedMeterRows']) }} mapped meter readings in the selected sites and dates
+                    are excluded from physical stock quantities and money totals, before the filters below.
+                    <a href="{{ route('app.stockrecon.water', \Illuminate\Support\Arr::only($grid->query, ['branches', 'from', 'to'])) }}">Review meter reconciliation</a>.</p>
+            </x-notice>
+        @endif
 
-    @if ($grid->refusal === null && (int) ($t['Lines'] ?? 0) > 0)
-        {{-- After balancing, with the figure as counted under each. --}}
-        <x-statstrip style="margin-bottom:16px" :stats="[
-            ['label' => 'Value variance', 'value' => \App\Support\Format::r($t['ValueVar'] ?? null),
-             'note' => $was('ValueVarOriginal'), 'tone' => $tone($t['ValueVar'] ?? null)],
-            ['label' => 'Value short', 'value' => \App\Support\Format::r($t['ValueShort'] ?? null),
-             'note' => $was('ValueShortOriginal'), 'tone' => $tone($t['ValueShort'] ?? null)],
-            ['label' => 'Value over', 'value' => \App\Support\Format::r($t['ValueOver'] ?? null),
-             'note' => $was('ValueOverOriginal'), 'tone' => $tone($t['ValueOver'] ?? null)],
-            ['label' => 'Quantity variance', 'value' => \App\Support\Format::n($t['QtyVar'] ?? null, 3),
-             'note' => $was('QtyVarOriginal', 3)],
-            ['label' => 'POS quantity', 'value' => \App\Support\Format::n($t['QtyComputer'] ?? null, 3),
-             'note' => $was('QtyComputerOriginal', 3)],
-            ['label' => 'Lines', 'value' => \App\Support\Format::n($t['Lines'] ?? null),
-             'note' => \App\Support\Format::n($t['LinesAmended'] ?? null).' amended by balancing'],
-        ]" />
-    @endif
+        @if ($grid->refusal === null && (int) ($t['Lines'] ?? 0) > 0)
+            {{-- After balancing, with the figure as counted under each. --}}
+            <x-statstrip style="margin-bottom:16px" :stats="[
+                ['label' => 'Value variance', 'value' => \App\Support\Format::r($t['ValueVar'] ?? null),
+                 'note' => $was('ValueVarOriginal'), 'tone' => $tone($t['ValueVar'] ?? null)],
+                ['label' => 'Value short', 'value' => \App\Support\Format::r($t['ValueShort'] ?? null),
+                 'note' => $was('ValueShortOriginal'), 'tone' => $tone($t['ValueShort'] ?? null)],
+                ['label' => 'Value over', 'value' => \App\Support\Format::r($t['ValueOver'] ?? null),
+                 'note' => $was('ValueOverOriginal'), 'tone' => $tone($t['ValueOver'] ?? null)],
+                ['label' => 'Quantity variance', 'value' => \App\Support\Format::n($t['QtyVar'] ?? null, 3),
+                 'note' => $was('QtyVarOriginal', 3)],
+                ['label' => 'POS quantity', 'value' => \App\Support\Format::n($t['QtyComputer'] ?? null, 3),
+                 'note' => $was('QtyComputerOriginal', 3)],
+                ['label' => 'Lines', 'value' => \App\Support\Format::n($t['Lines'] ?? null),
+                 'note' => \App\Support\Format::n($t['LinesAmended'] ?? null).' amended by balancing'],
+            ]" />
+        @endif
 
-    <p class="muted">Comparison view · Open, issued, close and POS quantities are available under Columns.
-        Shortages include only authorized good waste; unapproved and bad waste are excluded.</p>
-    <x-data-grid :grid="$grid" :branches="$branches" class="variance-grid" surface>
+        <p class="muted">Comparison view · Open, issued, close and POS quantities are available under Columns.
+            Shortages include only authorized good waste; unapproved and bad waste are excluded.</p>
+    </details>
+    <x-data-grid :grid="$grid" :branches="$branches" class="variance-grid" surface :scope-open="! ($picked ?? false)">
         <x-slot:scope>
             <div class="field">
                 <label for="variance-area">Area</label>

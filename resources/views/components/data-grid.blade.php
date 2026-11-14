@@ -53,6 +53,10 @@
       bulk      slot: what to offer when rows are ticked. Rendered inside the
                 selection bar, which is hidden until something is ticked.
       surface   draw the grid as a panel rather than bare on the page.
+      scopeOpen null (default): the Filters fold opens or closes as this user
+                last left it. true / false: the page decides, and the fold
+                does not remember (the variance screen, 14 Nov 2026: open
+                until a selection is made, then out of the way).
 
     ABOUT `surface`. The toolbar has declared `border: 1px solid var(--line)`
     and a top-rounded radius since T014, and the mobile card list below it has
@@ -71,6 +75,7 @@
     'grid',
     'branches' => null,
     'surface' => false,
+    'scopeOpen' => null,
 ])
 
 @php
@@ -100,7 +105,7 @@
      data-grid-slug="{{ $slug }}"
      data-state-url="{{ $grid->stateUrl() }}">
 
-    @include('grid._scope', ['grid' => $grid, 'branches' => $branches, 'formId' => $formId, 'scope' => $scope ?? null])
+    @include('grid._scope', ['grid' => $grid, 'branches' => $branches, 'formId' => $formId, 'scope' => $scope ?? null, 'scopeOpen' => $scopeOpen])
 
     {{-- The error state (feature-rules, proposed §C). A procedure that REFUSES
          — a range it cannot usefully answer — is a message to the person, not a

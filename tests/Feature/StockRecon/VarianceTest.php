@@ -255,6 +255,25 @@ class VarianceTest extends TestCase
         $page->assertSee('tone-value tone-crit', false);
     }
 
+    public function test_filters_open_until_a_selection_then_filters_and_summary_fold_away(): void
+    {
+        // Chantal Peens, 12 Nov 2026: open the filters when the screen opens;
+        // once a selection is made, hide the filters and the top section.
+        $this->actingAs($this->person(['stockrecon.variance.view']));
+
+        $first = $this->get(route('app.stockrecon.variance'))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/<details class="dg-scope-fold"\s+open\s*>\s*<summary>Filters/', $first);
+        $this->assertMatchesRegularExpression('/<details class="dg-scope-fold variance-summary"\s+open\s*>/', $first);
+        $this->assertStringNotContainsString('data-remember="grid-scope:', $first);
+
+        $picked = $this->get(route('app.stockrecon.variance', ['from' => '2030-01-01', 'to' => '2030-01-02']))
+            ->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/<details class="dg-scope-fold"\s*>\s*<summary>Filters/', $picked);
+        $this->assertMatchesRegularExpression('/<details class="dg-scope-fold variance-summary"\s*>/', $picked);
+        // Folded, not gone: the totals are still on the page behind the summary line.
+        $this->assertStringContainsString('Value variance', $picked);
+    }
+
     public function test_it_needs_its_own_grant(): void
     {
         $this->actingAs($this->person([]))

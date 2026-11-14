@@ -313,6 +313,15 @@ table.dg.is-fixed { table-layout: fixed; }
 
 .data-grid.is-resizing { cursor: col-resize; user-select: none; }
 
+// The variance screen's summary (totals and notes) folds away once a selection
+// is made (14 Nov 2026); its summary line reads like the grid's Filters line.
+.variance-summary > summary {
+  cursor: pointer;
+  padding: 12px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
 // Give names spare space, keep data rows on one line, and wrap only headings.
 // Saved pixel widths still take priority over these automatic defaults.
 .variance-grid {
