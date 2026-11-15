@@ -82,6 +82,7 @@ function open(table, row, columns) {
     cell.innerHTML = '<p class="row-detail-loading">Reading the rows behind this…</p>';
     holder.append(cell);
     row.after(holder);
+    pinUnderHead(table, holder);
 
     row.classList.add('is-open');
     row.setAttribute('aria-expanded', 'true');
@@ -118,6 +119,23 @@ function open(table, row, columns) {
  * inherits) and sat over the first shift. Ryan: "when the row opens the first
  * row cuts off". Each component marks what it wires, so this is safe to run.
  */
+/*
+ * The outer head's height, for a nested table's head to pin beneath it (Ryan,
+ * 15 Nov 2026: the chain's Original / Amended headings scrolled away). Only
+ * the browser knows it: the outer head is two rows, the labels wrap.
+ */
+function pinUnderHead(table, holder) {
+    const head = table.tHead;
+
+    if (!head) return;
+
+    const apply = () => holder.style.setProperty('--outer-head-h', `${Math.round(head.getBoundingClientRect().height)}px`);
+
+    apply();
+
+    if (window.ResizeObserver) new ResizeObserver(apply).observe(head);
+}
+
 function wire(cell) {
     if (window.Agora && typeof window.Agora.hydrate === 'function') window.Agora.hydrate(cell);
 }

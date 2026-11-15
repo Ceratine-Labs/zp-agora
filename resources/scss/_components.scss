@@ -461,7 +461,12 @@ div.emptystate { padding: 44px 20px; text-align: center; }
   isolation: isolate;
 
   > * { grid-column: 1 / -1; min-width: 0; }
-  > .table-scroll { grid-row: 1; max-height: none; }
+  /* No frame of its own (Ryan, 15 Nov 2026: "those headers need to be sticky
+     as the user scrolls"). A frame that scrolls sideways is still a scroll
+     container, so the chain's head stuck to it, a box that never scrolls up
+     or down, and the Original / Amended headings went off the top with the
+     rows. Without one they pin in the outer frame, under its head. */
+  > .table-scroll { grid-row: 1; max-height: none; overflow: visible; }
   > .table-empty { grid-row: 2; }
   > .table-foot { grid-row: 3; }
   > .tl-chooser {
@@ -1362,6 +1367,12 @@ tr.is-expandable {
 tr.row-detail > td {
   background: var(--surface-2); padding: 0;
   border-bottom: 1px solid var(--line);
+}
+/* The nested table's head pins UNDER the outer table's head, whose height
+   row-detail.js writes as --outer-head-h on the detail row. */
+tr.row-detail .table-scroll table.dt thead th { top: var(--outer-head-h, 0px); }
+tr.row-detail .table-scroll table.dt thead tr:nth-child(2) th {
+  top: calc(var(--outer-head-h, 0px) + var(--head-row-h, 0px));
 }
 .row-detail-loading, .row-detail-error { margin: 0; padding: 14px; font-size: 12.5px; color: var(--muted); }
 .row-detail-error { color: var(--crit-ink); }
