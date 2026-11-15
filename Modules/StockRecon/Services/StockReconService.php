@@ -639,10 +639,11 @@ class StockReconService
      * The till gaps as a lookup for the grids (Ryan, 15 Nov 2026: "show a red
      * dash on pos sales that havent pulled through"): 'Y-m-d|area|@LOCATION'
      * for a whole till missing that day, 'Y-m-d|area|item' for one item's quantity,
-     * each with the sentence the cell's tooltip shows. A shift is marked by
-     * posGap() only where its own POS is empty: a day where one shift carries
-     * its quantity and another does not is reported at day level, so the
-     * shift that does carry it is not accused.
+     * each with the sentence the cell's tooltip shows. An item short on a day
+     * marks every one of its shifts that day: the check is day level and
+     * cannot say which shift lost its quantity (run 80506: the tills sold 9,
+     * PumpIT carried 3, all on one shift). A missing till marks only the
+     * shifts of items sold through it whose POS is empty.
      *
      * @param  Collection<int, object>  $tillGaps
      * @return array<string, string>
@@ -671,13 +672,20 @@ class StockReconService
      */
     public static function posGap(array $index, mixed $date, mixed $areaNo, mixed $itemNo, mixed $qtyPos, ?string $location = null): ?string
     {
-        if ($index === [] || abs((float) $qtyPos) > 0.0005) {
+        if ($index === []) {
             return null;
         }
         $day = $date instanceof \DateTimeInterface ? $date->format('Y-m-d') : substr((string) $date, 0, 10);
 
-        return $index[$day.'|'.$areaNo.'|'.$itemNo]
-            ?? ($location !== null && trim($location) !== '' ? $index[$day.'|'.$areaNo.'|@'.strtoupper(trim($location))] ?? null : null);
+        if (isset($index[$day.'|'.$areaNo.'|'.$itemNo])) {
+            return $index[$day.'|'.$areaNo.'|'.$itemNo];
+        }
+
+        if (abs((float) $qtyPos) > 0.0005 || $location === null || trim($location) === '') {
+            return null;
+        }
+
+        return $index[$day.'|'.$areaNo.'|@'.strtoupper(trim($location))] ?? null;
     }
 
     /**
