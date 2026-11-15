@@ -2041,6 +2041,31 @@ a.held-elsewhere-link:hover .chip, a.held-elsewhere-link:focus-visible .chip { t
   &.notice-info > .notice-icon { background: var(--brand); }
 }
 
+/* <x-notice icon collapsible>: one thin line, icon then headline, the
+   explanation behind a "Details" toggle at the right (Ryan, 15 Nov 2026). */
+.notice.notice-fold.notice-with-icon {
+  display: block; padding: 0;
+  > summary {
+    display: flex; align-items: center; gap: 10px; padding: 7px 12px;
+    h3 { flex: 1; font-size: 14px; margin: 0; }
+    h3::before { content: none; }
+  }
+  .notice-icon {
+    flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--warn); color: #fff; font-weight: 800; font-size: 13px; line-height: 1;
+  }
+  &.notice-stop .notice-icon { background: var(--crit); }
+  &.notice-info .notice-icon { background: var(--brand); }
+  .notice-toggle {
+    flex: none; font-size: 12px; font-weight: 600; text-decoration: underline; white-space: nowrap;
+    &::after { content: ' ▸'; text-decoration: none; display: inline-block; margin-left: 4px; }
+  }
+  &[open] .notice-toggle::after { content: ' ▾'; }
+  &[open] > summary { border-bottom: 1px solid var(--line); }
+  > .notice-body { padding: 10px 12px 12px 42px; }
+}
+
 /* <x-menu-button>: secondary presses behind one button (14 Nov 2026). */
 .menu-button {
   position: relative; display: inline-block;

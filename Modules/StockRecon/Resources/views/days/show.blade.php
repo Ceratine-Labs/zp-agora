@@ -49,7 +49,7 @@
     </x-page-head>
 
     @if ($missingItems > 0)
-        <x-notice tone="warn" title="Till quantities are missing in PumpIT — {{ $missingItems }} {{ Str::plural('item', $missingItems) }} in {{ $missingAreas }} {{ Str::plural('area', $missingAreas) }} cannot balance yet" style="margin-bottom:16px">
+        <x-notice tone="warn" icon collapsible title="Till quantities are missing in PumpIT: {{ $missingItems }} {{ Str::plural('item', $missingItems) }} in {{ $missingAreas }} {{ Str::plural('area', $missingAreas) }} cannot balance yet" style="margin-bottom:16px">
             <p>What the tills sold does not match the POS quantity on these items' recon lines, so they cannot balance
                however they are amended. Update the computer quantities in PumpIT, then preview this day again.
                They are listed under What remains.</p>

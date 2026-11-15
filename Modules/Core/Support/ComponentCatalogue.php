@@ -733,7 +733,7 @@ class ComponentCatalogue
                     ['title', '?string', 'null', 'The headline'],
                     ['collapsible', 'bool', 'false', 'Fold the body'],
                     ['open', 'bool', 'false', 'Which way it starts'],
-                    ['icon', 'bool', 'false', 'A round mark in the tone\'s colour before the title'],
+                    ['icon', 'bool', 'false', 'A round mark in the tone\'s colour before the title; with collapsible, one thin line and a Details toggle'],
                 ],
             ],
             [
