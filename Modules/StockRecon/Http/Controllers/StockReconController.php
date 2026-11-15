@@ -405,15 +405,18 @@ class StockReconController extends Controller
         abort_unless($line->RunId === $run->Id && $line->BranchId === $run->BranchId, 404);
 
         try {
-            $html = Str::markdown($explainer->explain($run, $line), ['html_input' => 'strip', 'allow_unsafe_links' => false]);
+            $answer = $explainer->explain($run, $line);
+            $html = Str::markdown($answer['text'], ['html_input' => 'strip', 'allow_unsafe_links' => false]);
+            $by = $answer['by'];
             $error = null;
         } catch (\Throwable $e) {
             report($e);
             $html = null;
+            $by = null;
             $error = $e instanceof \RuntimeException ? $e->getMessage() : 'The explanation could not be read just now. Try again in a moment.';
         }
 
-        return view('stockrecon::partials.chain-explain', ['html' => $html, 'error' => $error]);
+        return view('stockrecon::partials.chain-explain', ['html' => $html, 'by' => $by, 'error' => $error]);
     }
 
     /**

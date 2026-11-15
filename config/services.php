@@ -41,4 +41,9 @@ return [
         'key' => env('ANTHROPIC_API_KEY'),
     ],
 
+    // Its fallback while that account has no credit (Ryan, 15 Nov 2026).
+    'ollama' => [
+        'key' => env('OLLAMA_API_KEY'),
+    ],
+
 ];

@@ -6,6 +6,7 @@ HOW A SHIFT IS READ
 - One shift's closing count is the next shift's opening. Cumulative is the running total of variance along the chain.
 - The chain total T (the last cumulative as counted) is fixed by the dates: T < 0 is a real loss somewhere, T = 0 means every variance is a counting artefact, T > 0 means more was sold than was ever received.
 - A dormant shift opened and closed equal with nothing moving.
+- Which way each cause pushes, so you never reverse them: till sales missing (POS too low) or an issue booked that never arrived make a shift read SHORT. A delivery that was not captured, or POS too high, makes it read OVER. A closing counted too low makes that shift short and the next shift over by the same amount; too high, the reverse. Missing till sales can never explain an over.
 
 WHAT AGORA DOES (THE BALANCING)
 - It assumes most shift-to-shift variances are miscounts. It moves closing (and so the next opening) counts so a short is absorbed by a later over and the chain's real loss lands where it can be accounted for. The latest count in the chain always stands. Balancing moves variance between shifts; it never removes it.

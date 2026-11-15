@@ -3,12 +3,14 @@
 namespace Modules\StockRecon\Services;
 
 use Anthropic\Client;
+use Anthropic\Core\Exceptions\AuthenticationException;
 use Anthropic\Core\Exceptions\BadRequestException;
 use Anthropic\Core\Exceptions\RateLimitException;
 use App\Support\Format;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
 use Modules\StockRecon\Support\ShiftLabel;
@@ -33,13 +35,16 @@ class ChainExplainer
 
     public function available(): bool
     {
-        return filled(config('services.anthropic.key'));
+        return filled(config('services.anthropic.key')) || filled(config('services.ollama.key'));
     }
 
-    public function explain(StockReconRun $run, StockReconRunLine $line): string
+    /**
+     * @return array{text: string, by: string}
+     */
+    public function explain(StockReconRun $run, StockReconRunLine $line): array
     {
         if (! $this->available()) {
-            throw new RuntimeException('Chain explanations are not switched on: there is no Anthropic key.');
+            throw new RuntimeException('Chain explanations are not switched on: there is no Anthropic or Ollama key.');
         }
 
         $chain = $this->recon->chain($run, $line);
@@ -47,10 +52,73 @@ class ChainExplainer
         $config = config('stockrecon.explain');
 
         return Cache::remember(
-            'stockrecon:explain:'.sha1($config['model'].'|'.$this->system().'|'.$facts),
+            'stockrecon:explain:'.sha1($config['model'].'|'.$config['fallback']['model'].'|'.$this->system().'|'.$facts),
             now()->addHours((int) $config['cache_hours']),
-            fn () => $this->ask($facts),
+            fn () => $this->answer($facts),
         );
+    }
+
+    /**
+     * Claude first; Ollama Cloud while ZP's Anthropic account has no credit
+     * (Ryan, 15 Nov 2026: "if there is no credit on the acc, please use the
+     * ollama key for now"). A topped-up account takes over again by itself.
+     *
+     * @return array{text: string, by: string}
+     */
+    protected function answer(string $facts): array
+    {
+        if (filled(config('services.anthropic.key'))) {
+            try {
+                return ['text' => $this->ask($facts), 'by' => 'Claude'];
+            } catch (RuntimeException $e) {
+                if (! $e->getPrevious() instanceof BadRequestException && ! $e->getPrevious() instanceof AuthenticationException) {
+                    throw $e;
+                }
+                if (blank(config('services.ollama.key'))) {
+                    throw $e;
+                }
+            }
+        }
+
+        return ['text' => $this->askOllama($facts), 'by' => config('stockrecon.explain.fallback.model').' (Ollama Cloud)'];
+    }
+
+    /**
+     * Ollama Cloud's OpenAI-compatible endpoint. Its reasoning models spend
+     * tokens thinking first; at medium effort glm-5.3 thought past 16,000
+     * tokens and a minute on a six-shift chain, at low it answered in five
+     * seconds (measured 15 Nov 2026), so low it is.
+     */
+    protected function askOllama(string $facts): string
+    {
+        $cfg = config('stockrecon.explain.fallback');
+
+        $response = Http::timeout((int) $cfg['timeout'])
+            ->acceptJson()
+            ->withToken((string) config('services.ollama.key'))
+            ->post(rtrim((string) $cfg['base_url'], '/').'/chat/completions', [
+                'model' => $cfg['model'],
+                'max_tokens' => (int) $cfg['max_tokens'],
+                'reasoning_effort' => $cfg['reasoning_effort'],
+                'messages' => [
+                    ['role' => 'system', 'content' => $this->system()],
+                    ['role' => 'user', 'content' => "Explain this chain.\n\n".$facts],
+                ],
+            ]);
+
+        if ($response->status() === 429) {
+            throw new RuntimeException('The explanation service is busy just now. Try again in a minute.');
+        }
+        if (! $response->successful()) {
+            throw new RuntimeException('The explanation service refused the request ('.$response->status().'). Try again later.');
+        }
+
+        $text = trim((string) $response->json('choices.0.message.content'));
+        if ($text === '') {
+            throw new RuntimeException('The explanation came back empty. Try again in a moment.');
+        }
+
+        return $text;
     }
 
     public function system(): string
@@ -141,6 +209,8 @@ class ChainExplainer
                 throw new RuntimeException('The Anthropic account behind ZP\'s key has no credit left. Ask head office to top it up, then try again.', 0, $e);
             }
             throw $e;
+        } catch (AuthenticationException $e) {
+            throw new RuntimeException('ZP\'s Anthropic key was refused. Ask head office to check it.', 0, $e);
         } catch (RateLimitException $e) {
             throw new RuntimeException('Anthropic is busy just now. Try again in a minute.', 0, $e);
         }

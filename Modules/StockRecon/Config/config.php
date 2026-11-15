@@ -560,5 +560,15 @@ return [
         'effort' => 'medium',
         'max_tokens' => 8000,
         'cache_hours' => 12,
+        // While ZP's Anthropic account has no credit (15 Nov 2026), or its key
+        // is refused: Ollama Cloud on services.ollama.key (Ceratine's key, the
+        // only one of the three on hand that Ollama accepted that day).
+        'fallback' => [
+            'base_url' => 'https://ollama.com/v1',
+            'model' => 'glm-5.3',
+            'reasoning_effort' => 'low',
+            'max_tokens' => 16000,
+            'timeout' => 120,
+        ],
     ],
 ];
