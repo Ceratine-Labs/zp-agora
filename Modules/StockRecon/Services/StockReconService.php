@@ -3,6 +3,7 @@
 namespace Modules\StockRecon\Services;
 
 use App\Exceptions\AgoraProcException;
+use App\Support\Format;
 use App\Support\ProcedureService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
@@ -632,6 +633,51 @@ class StockReconService
 
             return collect();
         }
+    }
+
+    /**
+     * The till gaps as a lookup for the grids (Ryan, 15 Nov 2026: "show a red
+     * dash on pos sales that havent pulled through"): 'Y-m-d|area|@LOCATION'
+     * for a whole till missing that day, 'Y-m-d|area|item' for one item's quantity,
+     * each with the sentence the cell's tooltip shows. A shift is marked by
+     * posGap() only where its own POS is empty: a day where one shift carries
+     * its quantity and another does not is reported at day level, so the
+     * shift that does carry it is not accused.
+     *
+     * @param  Collection<int, object>  $tillGaps
+     * @return array<string, string>
+     */
+    public function posGapIndex(Collection $tillGaps): array
+    {
+        $index = [];
+        foreach ($tillGaps as $g) {
+            $day = substr((string) $g->TransactionDate, 0, 10);
+            if ($g->Kind === 'feed') {
+                $index[$day.'|'.$g->AreaNo.'|@'.strtoupper(trim((string) $g->Location))] = 'Till sales missing: no sales at all from the '.$g->Location.' till reached PumpIT on this day.';
+            } else {
+                $index[$day.'|'.$g->AreaNo.'|'.$g->StockItemNo] = 'Till sales missing: the tills sold '
+                    .Format::qty($g->QtyTill).' of this item on this day, PumpIT has '.Format::qty($g->QtyRecon).'.';
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * Why this shift's POS is missing, or null when it is not (or is not
+     * known to be).
+     *
+     * @param  array<string, string>  $index
+     */
+    public static function posGap(array $index, mixed $date, mixed $areaNo, mixed $itemNo, mixed $qtyPos, ?string $location = null): ?string
+    {
+        if ($index === [] || abs((float) $qtyPos) > 0.0005) {
+            return null;
+        }
+        $day = $date instanceof \DateTimeInterface ? $date->format('Y-m-d') : substr((string) $date, 0, 10);
+
+        return $index[$day.'|'.$areaNo.'|'.$itemNo]
+            ?? ($location !== null && trim($location) !== '' ? $index[$day.'|'.$areaNo.'|@'.strtoupper(trim($location))] ?? null : null);
     }
 
     /**

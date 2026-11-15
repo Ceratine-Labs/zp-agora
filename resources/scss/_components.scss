@@ -2132,3 +2132,16 @@ a.held-elsewhere-link:hover .chip, a.held-elsewhere-link:focus-visible .chip { t
   }
   .chain-explain-src { font-size: 11.5px; margin: 4px 0 0; }
 }
+
+/* POS that never reached PumpIT (Ryan, 15 Nov 2026: "show a red dash on pos
+   sales that havent pulled through ... or like a exclamation"): the cell turns
+   red with a round mark, and its title says which till or item is missing. */
+td.pos-missing {
+  color: var(--crit-ink); background: var(--crit-bg); font-weight: 700; cursor: help;
+  .pos-missing-mark {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; margin-right: 4px; border-radius: 50%;
+    background: var(--crit); color: #fff; font-size: 10px; font-weight: 800; line-height: 1;
+    vertical-align: 1px;
+  }
+}

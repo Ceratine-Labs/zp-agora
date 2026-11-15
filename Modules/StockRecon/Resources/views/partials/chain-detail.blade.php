@@ -116,6 +116,8 @@
         @foreach ($shifts as $shift)
             {{-- The group it balances in, as on the proposals: rail and letter. --}}
             @php($group = $groups[(int) $shift->Id] ?? null)
+            {{-- Till sales that never reached PumpIT (Ryan, 15 Nov 2026). --}}
+            @php($posGap = \Modules\StockRecon\Services\StockReconService::posGap($posGaps ?? [], $shift->TransactionDate, $item?->AreaNo, $item?->StockItemNo, $shift->QtyPOS, $item?->StockLocation))
             <tr @class(['is-matched' => (bool) $shift->IsClicked, 'bal-g'.($group['series'] ?? 0) => $group !== null])>
                 <td class="l fit-min">{{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }}</td>
                 <td class="num">{{ \Modules\StockRecon\Support\ShiftLabel::show($shift->ShiftNo) }}</td>
@@ -146,7 +148,7 @@
                 </td>
                 <td class="num">{{ (float) $shift->QtyIssued === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyIssued) }}</td>
                 <td class="num">{{ \App\Support\Format::qty($shift->QtyClose) }}</td>
-                <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyPOS) }}</td>
+                <td @class(['num', 'pos-missing' => $posGap]) @if ($posGap) title="{{ $posGap }}" @endif>@if ($posGap)<span class="pos-missing-mark" aria-label="{{ $posGap }}">!</span>@endif{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyPOS) }}</td>
                 <td class="num">
                     @if ($group)
                         <span class="bal-tag" title="{{ \Modules\StockRecon\Services\ChainSummary::balanceNote($group) }}">{{ $group['letter'] }}</span>
@@ -168,7 +170,7 @@
                 <td @class(['num', 'grp', 'is-changed' => $moved($shift->QtyOpenNew, $shift->QtyOpen)]) title="{{ $was($shift->QtyOpenNew, $shift->QtyOpen) }}">{{ \App\Support\Format::qty($shift->QtyOpenNew) }}</td>
                 <td @class(['num', 'is-changed' => $moved($shift->QtyIssuedAmended, $shift->QtyIssued)]) title="{{ $was($shift->QtyIssuedAmended, $shift->QtyIssued) }}">{{ $dash($shift->QtyIssuedAmended) }}</td>
                 <td @class(['num', 'is-changed' => $moved($shift->QtyCloseNew, $shift->QtyClose)]) title="{{ $was($shift->QtyCloseNew, $shift->QtyClose) }}">{{ \App\Support\Format::qty($shift->QtyCloseNew) }}</td>
-                <td class="num">{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyPOS) }}</td>
+                <td @class(['num', 'pos-missing' => $posGap]) @if ($posGap) title="{{ $posGap }}" @endif>@if ($posGap)<span class="pos-missing-mark" aria-label="{{ $posGap }}">!</span>@endif{{ (float) $shift->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyPOS) }}</td>
                 <td @class(['num', 'is-changed' => $moved($shift->QtyVarNew, $shift->QtyVar)]) title="{{ $was($shift->QtyVarNew, $shift->QtyVar) }}">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::qty($shift->QtyVarNew) }}</td>
                 <td @class(['num', 'money', 'is-changed' => $moved($shift->QtyVarNew, $shift->QtyVar)]) title="{{ $was($shift->VarValueNew, $shift->VarValue, true) }}">{{ (float) $shift->QtyVarNew === 0.0 ? '—' : \App\Support\Format::r($shift->VarValueNew) }}</td>
                 <td @class(['num', 'muted', 'is-changed' => $moved($shift->CumulativeVarNew, $shift->CumulativeVar)]) title="{{ $was($shift->CumulativeVarNew, $shift->CumulativeVar) }}">{{ $dash($shift->CumulativeVarNew) }}</td>

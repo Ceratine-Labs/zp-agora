@@ -507,7 +507,10 @@
                     </td>
                     <td class="num" data-sort="{{ (float) $line->QtyIssued === 0.0 ? '—' : \App\Support\Format::n($line->QtyIssued, 3) }}">{{ (float) $line->QtyIssued === 0.0 ? '—' : \App\Support\Format::qty($line->QtyIssued) }}</td>
                     <td class="num" data-sort="{{ \App\Support\Format::n($line->QtyClose, 3) }}">{{ \App\Support\Format::qty($line->QtyClose) }}</td>
-                    <td class="num" data-sort="{{ (float) $line->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($line->QtyPOS, 3) }}">{{ (float) $line->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($line->QtyPOS) }}</td>
+                    {{-- Till sales that never reached PumpIT: a red mark, not a plain
+                         dash (Ryan, 15 Nov 2026). --}}
+                    @php($posGap = \Modules\StockRecon\Services\StockReconService::posGap($posGaps ?? [], $line->TransactionDate, $line->AreaNo, $line->StockItemNo, $line->QtyPOS, $line->StockLocation))
+                    <td @class(['num', 'pos-missing' => $posGap]) data-sort="{{ (float) $line->QtyPOS === 0.0 ? '—' : \App\Support\Format::n($line->QtyPOS, 3) }}" @if ($posGap) title="{{ $posGap }}" @endif>@if ($posGap)<span class="pos-missing-mark" aria-label="{{ $posGap }}">!</span>@endif{{ (float) $line->QtyPOS === 0.0 ? '—' : \App\Support\Format::qty($line->QtyPOS) }}</td>
                     {{-- `data-sort` so the letter beside the figure never reaches
                          the sort or the filter. --}}
                     <td class="num" data-sort="{{ (float) $line->QtyVar === 0.0 ? '—' : \App\Support\Format::n($line->QtyVar, 3) }}">

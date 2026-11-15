@@ -241,6 +241,10 @@ class StockReconController extends Controller
             $frame['tab'] = 'overview';
         }
 
+        // Till quantities PumpIT has not rolled into the recon lines: those
+        // shifts cannot balance until it does (Chantal Peens, 13 Nov 2026).
+        $tillGaps = $this->service->tillQtyGaps($run);
+
         $panes = [];
         if (in_array('proposals', $permitted, true)) {
             $run->load('lines');
@@ -277,6 +281,9 @@ class StockReconController extends Controller
                 // Shifts another run already amended (Ryan, 14 Nov 2026):
                 // badged with that run, unticked and out of the press.
                 'elsewhere' => $this->service->amendedElsewhere($run),
+                // POS cells whose till sales never reached PumpIT, marked red
+                // (Ryan, 15 Nov 2026).
+                'posGaps' => $this->service->posGapIndex($tillGaps),
                 'extract' => $this->grids->build(
                     $this->registry->findOrFail('app.stockrecon.run'),
                     $this->paneGridRequest($request, $run, 'proposals', $entryTab),
@@ -310,9 +317,6 @@ class StockReconController extends Controller
             ];
         }
 
-        // Till quantities PumpIT has not rolled into the recon lines: those
-        // shifts cannot balance until it does (Chantal Peens, 13 Nov 2026).
-        $tillGaps = $this->service->tillQtyGaps($run);
         $posMoved = $this->service->posMovedChains($run);
 
         return view('stockrecon::run', $frame + ['run' => $run, 'panes' => $panes, 'tillGaps' => $tillGaps, 'posMoved' => $posMoved]);
@@ -379,6 +383,7 @@ class StockReconController extends Controller
             'run' => $run,
             'line' => $line,
             ...$this->service->chain($run, $line),
+            'posGaps' => $this->service->posGapIndex($this->service->tillQtyGaps($run)),
             // Reverse this item: what it would put back, on a committed run only.
             'reversible' => $run->isCommitted()
                 ? $this->service->activeChainAmendments($run, $line->AreaNo, $line->StockItemNo)
