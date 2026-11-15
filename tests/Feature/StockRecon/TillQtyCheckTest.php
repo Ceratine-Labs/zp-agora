@@ -81,7 +81,7 @@ class TillQtyCheckTest extends TestCase
 
         $html = view('stockrecon::partials.till-gaps-notice', ['tillGaps' => $gaps, 'run' => $run])->render();
 
-        $this->assertStringContainsString('Till quantities are missing in PumpIT — 2 items on 1 day cannot balance yet', $html);
+        $this->assertStringContainsString('Till quantities are missing in PumpIT: 2 items on 1 day. These shifts cannot balance yet', $html);
         $this->assertStringContainsString('TEST till item one', $html);
         $this->assertStringContainsString('usp_StockRecon_TillQtyCheck', $html);
 
