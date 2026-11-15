@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    // Stock recon chain explanations (Ryan, 15 Nov 2026): ZP's own Anthropic
+    // key, carried over from the ZP Chat app.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+    ],
+
 ];

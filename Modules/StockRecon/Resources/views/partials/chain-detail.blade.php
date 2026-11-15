@@ -27,6 +27,15 @@
 @php($twinOf = fn ($s) => $s->DupTwinDate ? \Illuminate\Support\Carbon::parse($s->DupTwinDate)->format('d M').' shift '.\Modules\StockRecon\Support\ShiftLabel::show($s->DupTwinShift) : 'a neighbouring shift')
 
 <div class="drill-chain">
+    {{-- Explain this chain (Ryan, 15 Nov 2026: "give a button to explain the
+         run in the same way you did now"). Shown only with an Anthropic key.
+         A button, not a form: this fragment sits inside the commit form. --}}
+    @if (app(\Modules\StockRecon\Services\ChainExplainer::class)->available())
+        <div class="chain-explain" data-chain-explain="{{ route('app.stockrecon.line.explain', [$run, $line]) }}">
+            <button type="button" class="btn-ghost btn-row" data-chain-explain-go>Explain this chain</button>
+            <div class="chain-explain-body" aria-live="polite" hidden></div>
+        </div>
+    @endif
     {{-- NOTHING ABOVE THE GRID (Ryan, 12 Nov 2026: "can remove this entire
          section ... no one reads it"). The panel opened on a heading, the
          balancing profile, four figures and up to five notices before the

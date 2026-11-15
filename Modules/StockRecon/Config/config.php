@@ -547,4 +547,18 @@ return [
             'tone' => 'neutral', 'label' => 'Issue reduced at balancing',
             'blurb' => 'An issue was over-captured or captured twice. Confirm with the issue book.'],
     ],
+
+    /*
+    | "Explain this chain" (Ryan, 15 Nov 2026: "give a button to explain the
+    | run in the same way you did now"). The chain's own figures go to Claude
+    | with the method in Resources/prompts/explain-chain.md; the answer is kept
+    | for cache_hours against the exact facts sent, so a second press, or a
+    | colleague's, costs nothing. No key in services.anthropic.key, no button.
+    */
+    'explain' => [
+        'model' => 'claude-opus-5-5',
+        'effort' => 'medium',
+        'max_tokens' => 8000,
+        'cache_hours' => 12,
+    ],
 ];

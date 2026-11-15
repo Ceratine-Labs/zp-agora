@@ -122,6 +122,11 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
     Route::get('runs/{run}/lines/{line}', [StockReconController::class, 'line'])
         ->middleware('can:stockrecon.runs.view')->name('line');
 
+    // The chain read back in plain words (Ryan, 15 Nov 2026). POST: it spends
+    // money on ZP's Anthropic key, so a prefetch or a crawler never triggers it.
+    Route::post('runs/{run}/lines/{line}/explain', [StockReconController::class, 'explain'])
+        ->middleware(['can:stockrecon.runs.view', 'throttle:20,1'])->name('line.explain');
+
     Route::post('runs/{run}/commit', [StockReconController::class, 'commit'])
         ->middleware('can:stockrecon.runs.execute')->name('commit');
     Route::post('runs/{run}/reverse', [StockReconController::class, 'reverse'])

@@ -19,6 +19,7 @@ use Modules\StockRecon\Grids\StockReconExceptionGrid;
 use Modules\StockRecon\Http\Requests\BalancePreviewRequest;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
+use Modules\StockRecon\Services\ChainExplainer;
 use Modules\StockRecon\Services\ExceptionNavigation;
 use Modules\StockRecon\Services\GlobalOverviewExport;
 use Modules\StockRecon\Services\ProposalMetric;
@@ -390,6 +391,29 @@ class StockReconController extends Controller
         return $request->ajax()
             ? view('stockrecon::partials.chain-detail', $data)
             : view('stockrecon::chain', $data);
+    }
+
+    /**
+     * "Explain this chain" (Ryan, 15 Nov 2026): the chain's figures read back
+     * in plain words by Claude. A fragment for the chain panel; a failure is
+     * a notice in its place, never an error page.
+     */
+    public function explain(StockReconRun $run, StockReconRunLine $line, ChainExplainer $explainer): View
+    {
+        $run = StockReconRun::query()->findOrFail($run->getKey());
+        $line = StockReconRunLine::query()->findOrFail($line->getKey());
+        abort_unless($line->RunId === $run->Id && $line->BranchId === $run->BranchId, 404);
+
+        try {
+            $html = Str::markdown($explainer->explain($run, $line), ['html_input' => 'strip', 'allow_unsafe_links' => false]);
+            $error = null;
+        } catch (\Throwable $e) {
+            report($e);
+            $html = null;
+            $error = $e instanceof \RuntimeException ? $e->getMessage() : 'The explanation could not be read just now. Try again in a moment.';
+        }
+
+        return view('stockrecon::partials.chain-explain', ['html' => $html, 'error' => $error]);
     }
 
     /**

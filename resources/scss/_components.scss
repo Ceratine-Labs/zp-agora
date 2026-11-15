@@ -2113,3 +2113,22 @@ a.held-elsewhere-link:hover .chip, a.held-elsewhere-link:focus-visible .chip { t
   > .notice-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
   .notice-run { font-weight: 700; color: inherit; }
 }
+
+/* "Explain this chain" (Ryan, 15 Nov 2026): the button above the chain grid
+   and Claude's reading of it, set as text to be read, not a notice. */
+.chain-explain {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 8px 14px;
+  > .chain-explain-body {
+    width: 100%; max-width: 78ch; padding: 10px 14px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+    font-size: 13px; line-height: 1.5; color: var(--ink);
+  }
+  .chain-explain-text {
+    > p:first-child { font-weight: 600; }
+    p { margin: 0 0 8px; }
+    ul { margin: 0 0 8px; padding-left: 18px; }
+    li { margin: 2px 0; }
+  }
+  .chain-explain-src { font-size: 11.5px; margin: 4px 0 0; }
+}
