@@ -68,6 +68,21 @@
                     || $open->where('AreaNo', $a->AreaNo)->where('StockItemNo', $i->StockItemNo)->isNotEmpty())
                 ->map(fn ($i) => (object) ((array) $i + ['AreaStatus' => $a->AreaStatus]));
         })->values();
+        /* Each item's own state (Ryan, 15 Nov 2026: "green to posted, yellow
+           for run but not amended, red for no run"), from the procedure's
+           fourth set; and "Only what remains" holds the area tabs to exactly
+           the items the What remains tab lists. */
+        $itemStatus = $itemStatus ?? collect();
+        $rowTone = ['done' => 'good', 'partial' => 'warn', 'open' => 'crit'];
+        $rowWord = ['done' => 'Posted', 'partial' => 'Run, not amended', 'open' => 'No run'];
+        $rowTip = [
+            'done' => 'On the posted run that decides this area, nothing left open',
+            'partial' => 'On the posted run, but a line is held back, not written, reversed since, or counted after the run',
+            'open' => 'No posted run has balanced this item for this day',
+        ];
+        $stateOf = fn ($i) => $itemStatus->get($i->AreaNo.':'.$i->StockItemNo, 'open');
+        $remainKeys = $remains->map(fn ($i) => $i->AreaNo.':'.$i->StockItemNo)->flip();
+        $onlyRemains = request()->query('only') === 'remains';
         $tabItems = collect([
             ['key' => 'runs', 'label' => 'Runs over this day', 'count' => $runs->count()],
             ['key' => 'remains', 'label' => 'What remains', 'count' => $remains->count(),
@@ -81,6 +96,18 @@
         $asked = (string) request()->query('tab', 'runs');
         $activeTab = collect($tabItems)->contains('key', $asked) ? $asked : 'runs';
     @endphp
+
+    <div class="day-tabs-bar">
+        <label class="day-only-remains" title="In every area tab, show only the items the What remains tab lists">
+            <input type="checkbox" data-tt-only-toggle="remains" data-tt-only-scope=".day-tabs" @checked($onlyRemains)>
+            Only what remains
+        </label>
+        <span class="day-legend muted">
+            <x-chip tone="good">Posted</x-chip>
+            <x-chip tone="warn">Run, not amended</x-chip>
+            <x-chip tone="crit">No run</x-chip>
+        </span>
+    </div>
 
     <x-tabs :items="$tabItems" :active="$activeTab" query="tab" label="Day" class="day-tabs">
         <x-tab-panel key="runs">
@@ -106,19 +133,24 @@
 
         <x-tab-panel key="remains">
             <x-card flush>
-                <x-table layout-key="StockRecon.days.remains.1" procedure="agora.usp_StockRecon_DayItems" :count="$remains->count()" dense tools
+                <x-table layout-key="StockRecon.days.remains.2" procedure="agora.usp_StockRecon_DayItems" :count="$remains->count()" dense tools
+                         :data-tt-only="$onlyRemains ? 'remains' : null"
                          empty="Nothing remains: every item counted this day balances and has its till quantities.">
                     <x-slot:head>
                         <tr>
-                            <th>Area</th><th>Item</th><th class="num">Variance</th><th class="num">POS</th><th class="num">Till sold</th>
+                            <th>Area</th><th>Item</th><th>Run</th><th class="num">Variance</th><th class="num">POS</th><th class="num">Till sold</th>
                             <th class="num">Missing</th><th>What keeps it open</th>
                         </tr>
                     </x-slot:head>
                     @foreach ($remains as $i)
-                        @php $lines = $open->where('AreaNo', $i->AreaNo)->where('StockItemNo', $i->StockItemNo); @endphp
-                        <tr @class(['is-flagged' => $i->Kind !== null])>
+                        @php
+                            $lines = $open->where('AreaNo', $i->AreaNo)->where('StockItemNo', $i->StockItemNo);
+                            $state = $stateOf($i);
+                        @endphp
+                        <tr class="row-{{ $rowTone[$state] }}" data-tt-in="remains">
                             <td><a href="{{ request()->fullUrlWithQuery(['tab' => 'area-'.$i->AreaNo]) }}">{{ $i->AreaDescription ?? 'Area '.$i->AreaNo }}</a></td>
                             <td>{{ $i->StockItemDescription ?? $i->StockItemNo }} <span class="muted mono">{{ $i->StockItemNo }}</span></td>
+                            <td data-tone="{{ $rowTone[$state] }}"><x-chip :tone="$rowTone[$state]" :title="$rowTip[$state]">{{ $rowWord[$state] }}</x-chip></td>
                             <td class="num">{{ Format::n($i->QtyVar, 3) }}</td>
                             <td class="num">{{ Format::n($i->QtyPOS, 3) }}</td>
                             <td class="num">{{ $i->QtyTill === null ? '—' : Format::n($i->QtyTill, 3) }}</td>
@@ -164,19 +196,24 @@
                             · no posted run has balanced this area for this day
                         @endif
                     </p>
-                    <x-table layout-key="StockRecon.days.items.1" procedure="agora.usp_StockRecon_DayItems" :count="$rows->count()" dense tools
+                    <x-table layout-key="StockRecon.days.items.2" procedure="agora.usp_StockRecon_DayItems" :count="$rows->count()" dense tools
+                             :data-tt-only="$onlyRemains ? 'remains' : null"
                              empty="No item lines were found for this area.">
                         <x-slot:head>
                             <tr>
-                                <th>Item</th><th class="num">Shifts</th><th class="num">Open</th><th class="num">Issued</th><th class="num">Close</th>
+                                <th>Item</th><th>Run</th><th class="num">Shifts</th><th class="num">Open</th><th class="num">Issued</th><th class="num">Close</th>
                                 <th class="num">POS</th><th class="num">Till sold</th><th class="num">Missing</th><th class="num">Variance</th>
                                 <th>What keeps it open</th>
                             </tr>
                         </x-slot:head>
                         @foreach ($rows as $i)
-                            @php $lines = $areaOpen->where('StockItemNo', $i->StockItemNo); @endphp
-                            <tr @class(['is-flagged' => $i->Kind !== null])>
+                            @php
+                                $lines = $areaOpen->where('StockItemNo', $i->StockItemNo);
+                                $state = $stateOf($i);
+                            @endphp
+                            <tr class="row-{{ $rowTone[$state] }}" data-tt-in="{{ $remainKeys->has($i->AreaNo.':'.$i->StockItemNo) ? 'remains' : '' }}">
                                 <td>{{ $i->StockItemDescription ?? $i->StockItemNo }} <span class="muted mono">{{ $i->StockItemNo }}</span></td>
+                                <td data-tone="{{ $rowTone[$state] }}"><x-chip :tone="$rowTone[$state]" :title="$rowTip[$state]">{{ $rowWord[$state] }}</x-chip></td>
                                 <td class="num">{{ $i->Shifts }}</td>
                                 <td class="num">{{ Format::n($i->QtyOpen, 3) }}</td>
                                 <td class="num">{{ Format::n($i->QtyIssued, 3) }}</td>

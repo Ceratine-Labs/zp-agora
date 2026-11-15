@@ -45,7 +45,8 @@
      calendar  @FromDate..@ToDate, the sites in @BranchIds: one row per site
                per day.
      detail    @DetailBranchId + @DetailDay: that day's areas, the lines that
-               keep it open, and every run whose window includes it.
+               keep it open, every run whose window includes it, and each
+               item's own state (done / partial / open, 15 Nov 2026).
 
    Read-only. Reads Agora's run ledger and the PumpIT recon lines; writes
    nothing anywhere.
@@ -246,6 +247,53 @@ BEGIN
           AND @DetailDay BETWEEN r.FromDate AND r.ToDate
           AND r.Status IN ('committed', 'reversed', 'previewed')
         ORDER BY ISNULL(r.CommittedAt, r.CreatedAt) DESC, r.Id DESC;
+
+        /* 4. Each item counted that day, its area's state read item by item
+              (Ryan, 15 Nov 2026: "green to posted, yellow for run but not
+              amended, red for no run"). The same rules as the area, over one
+              item's lines on the deciding run:
+                done     on it, nothing held, left, reversed or counted after
+                partial  on it, something open
+                open     not on a posted run */
+        SELECT c.AreaNo, c.StockItemNo, c.CountedLines,
+               ISNULL(r.RunLines, 0) AS RunLines,
+               ISNULL(r.OpenLines, 0) + ISNULL(v.ReversedLines, 0) AS OpenLines,
+               CASE WHEN o.RunId IS NULL OR ISNULL(r.RunLines, 0) = 0 THEN 'open'
+                    WHEN ISNULL(r.OpenLines, 0) + ISNULL(v.ReversedLines, 0) > 0
+                      OR c.CountedLines > r.RunLines THEN 'partial'
+                    ELSE 'done' END AS ItemStatus
+        FROM (
+            SELECT l.AreaNo, l.StockItemNo, COUNT_BIG(*) AS CountedLines
+            FROM agora.vw_StockReconLine l
+            WHERE l.BranchId = @DetailBranchId
+              AND l.TransactionDate >= @DetailDay AND l.TransactionDate < DATEADD(day, 1, @DetailDay)
+              AND NOT EXISTS (SELECT 1 FROM agora.StockReconMeter meter
+                  WHERE meter.BranchId = l.BranchId AND meter.AreaNo = l.AreaNo
+                    AND meter.StockItemNo = l.StockItemNo AND meter.IsActive = 1)
+            GROUP BY l.AreaNo, l.StockItemNo
+        ) c
+        JOIN #Open o ON o.BranchId = @DetailBranchId AND o.AreaNo = c.AreaNo AND o.[Day] = @DetailDay
+        OUTER APPLY (
+            SELECT COUNT_BIG(*) AS RunLines,
+                   SUM(CASE WHEN rl.ChainBlocked = 1 THEN 1
+                            WHEN rl.CommitState = 'skipped'
+                                 AND ISNULL(rl.BlockReason, N'') NOT LIKE N'%amendment from another run%' THEN 1
+                            WHEN rl.CommitState = 'pending' AND rl.WouldAmend = 1 THEN 1
+                            ELSE 0 END) AS OpenLines
+            FROM agora.StockReconRunLine rl
+            WHERE o.RunId IS NOT NULL
+              AND rl.BranchId = o.BranchId AND rl.RunId = o.RunId AND rl.AreaNo = c.AreaNo
+              AND rl.StockItemNo = c.StockItemNo AND rl.TransactionDate = o.[Day]
+        ) r
+        OUTER APPLY (
+            SELECT COUNT_BIG(*) AS ReversedLines
+            FROM agora.StockReconAmendment am
+            WHERE o.RunId IS NOT NULL
+              AND am.BranchId = o.BranchId AND am.RunId = o.RunId AND am.AreaNo = c.AreaNo
+              AND am.StockItemNo = c.StockItemNo AND am.TransactionDate = o.[Day]
+              AND am.State = 'reversed'
+        ) v
+        ORDER BY c.AreaNo, c.StockItemNo;
 
         RETURN;
     END;

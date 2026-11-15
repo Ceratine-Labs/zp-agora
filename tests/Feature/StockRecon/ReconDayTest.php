@@ -137,6 +137,36 @@ class ReconDayTest extends TestCase
             ->assertForbidden();
     }
 
+    /**
+     * Ryan, 15 Nov 2026: "green to posted, yellow for run but not amended, red
+     * for no run". The area's rules, item by item, on the deciding run.
+     */
+    public function test_each_item_takes_its_own_state_from_the_deciding_run(): void
+    {
+        $state = fn (string $day) => app(ReconDayService::class)->day(self::BRANCH, $day)['itemStatus']->all();
+
+        $this->assertSame(['91:T1' => 'done', '92:T2' => 'done'], $state('2031-03-01'), 'Skipped as amended elsewhere is done.');
+        $this->assertSame(['91:T1' => 'partial', '92:T2' => 'partial'], $state('2031-03-02'), 'Held back; reversed since.');
+        $this->assertSame(['91:T1' => 'done', '92:T2' => 'open'], $state('2031-03-03'), 'R2 covers area 91 only.');
+        $this->assertSame(['91:T1' => 'open', '92:T2' => 'open'], $state('2031-03-04'));
+        $this->assertSame(['91:T1' => 'done', '91:T3' => 'open'], $state('2031-03-05'), 'T3 was counted after the run.');
+        $this->assertSame(['91:T1' => 'open'], $state('2031-03-06'), 'A preview and a reset decide nothing.');
+        $this->assertSame(['91:T1' => 'partial'], $state('2031-03-07'), 'An amendment never ticked.');
+
+        $this->actingAs($this->person(['stockrecon.runs.view']))
+            ->get(route('app.stockrecon.days.show', ['branch' => self::BRANCH, 'day' => '2031-03-03', 'only' => 'remains']))
+            ->assertOk()
+            ->assertSee('data-tt-only-toggle="remains"', false)
+            ->assertSee('data-tt-only="remains"', false)
+            ->assertSee('class="row-good"', false)
+            ->assertSee('class="row-crit"', false)
+            ->assertSee('No run');
+
+        $this->assertStringNotContainsString('data-tt-only="remains"',
+            $this->get(route('app.stockrecon.days.show', ['branch' => self::BRANCH, 'day' => '2031-03-03']))->getContent(),
+            'Unticked by default.');
+    }
+
     public function test_a_day_opens_each_area_onto_its_items_and_flags_missing_till_quantities(): void
     {
         // Area 91's item T1 sold 7 at the till on 2 Mar; its recon line carries a POS of 0.

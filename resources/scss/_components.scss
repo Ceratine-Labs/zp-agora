@@ -2007,11 +2007,17 @@ a.dcal-cell:hover, a.dcal-cell:focus-visible { outline: 2px solid var(--ink); ou
 }
 
 /* The reconciled-day page (stock recon, 14 Nov 2026): a tab per counting
-   area, onto its items. An item whose till quantity is missing in
-   PumpIT carries the warn tint in its first cell, so the eye finds it in a
-   long area without reading the Missing column. */
+   area, onto its items. Each item's first cell carries its run state
+   (15 Nov 2026: green posted, yellow on a run with something open, red no
+   run) so the eye reads a long area down its left edge. A missing till
+   quantity keeps its own chip in the Missing column. */
 .day-area-meta { margin: 0; padding: 10px 14px; }
-.day-tabs tr.is-flagged > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+.day-tabs tr.row-good > td:first-child { box-shadow: inset 3px 0 0 var(--good); }
+.day-tabs tr.row-warn > td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+.day-tabs tr.row-crit > td:first-child { box-shadow: inset 3px 0 0 var(--crit); }
+.day-tabs-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 8px; }
+.day-only-remains { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; }
+.day-legend { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .day-tabs table td:first-child { min-width: 12em; }
 
 /* An item another run already amended (stock recon, 14 Nov 2026): a link to

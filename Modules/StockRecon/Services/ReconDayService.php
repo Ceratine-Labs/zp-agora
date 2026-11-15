@@ -80,7 +80,7 @@ class ReconDayService
      * One site, one day: its areas, what keeps it open, and every run whose
      * window includes it.
      *
-     * @return array{areas: Collection<int, object>, open: Collection<int, object>, runs: Collection<int, object>, items: Collection<int|string, Collection<int, object>>}
+     * @return array{areas: Collection<int, object>, open: Collection<int, object>, runs: Collection<int, object>, itemStatus: Collection<string, string>, items: Collection<int|string, Collection<int, object>>}
      */
     public function day(int $branchId, string $day): array
     {
@@ -96,6 +96,9 @@ class ReconDayService
             'areas' => $sets[0] ?? collect(),
             'open' => $sets[1] ?? collect(),
             'runs' => $sets[2] ?? collect(),
+            // Each item's own done / partial / open, keyed "area:item" (15 Nov 2026).
+            'itemStatus' => ($sets[3] ?? collect())
+                ->mapWithKeys(fn ($s) => [$s->AreaNo.':'.$s->StockItemNo => (string) $s->ItemStatus]),
             'items' => $this->items($branchId, $day),
         ];
     }

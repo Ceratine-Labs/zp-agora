@@ -49,6 +49,11 @@
                              filter row, opening scoped to that value.
                              `data-tt-pill-order="A|B|C"` fixes their order.
       data-tone="good"       on a <td>: the chip tone that column's pill takes.
+      data-tt-only="remains" hold the table to rows whose `data-tt-in` names
+                             that scope; a checkbox with
+                             `data-tt-only-toggle="remains"` and
+                             `data-tt-only-scope="<selector>"` flips it on every
+                             tools table inside the selector, kept as ?only=.
 --}}
 @props([
     'procedure' => null,

@@ -108,6 +108,34 @@ export default function tableTools(root = document) {
         // re-applied to what is there now. Without this the tools would go on
         // holding references to rows the DOM has thrown away.
         table.addEventListener('table-tools:rescan', () => tools.refresh());
+        // A scope changed (`data-tt-only`): the same rows, filtered again.
+        table.addEventListener('table-tools:reapply', () => { tools.page = 1; tools.apply(); });
+    });
+
+    fresh('[data-tt-only-toggle]', 'data-tt-only-ready').forEach(onlyToggle);
+}
+
+/**
+ * A checkbox that holds every tools table inside `data-tt-only-scope` to the
+ * rows in one scope (`data-tt-only-toggle="remains"`), and keeps the choice in
+ * the URL (`?only=remains`) so a reload or a copied link opens the same way.
+ * The server renders the first state, so nothing flashes.
+ */
+function onlyToggle(box) {
+    const scope = box.dataset.ttOnlyToggle;
+    const within = document.querySelector(box.dataset.ttOnlyScope || 'body') || document.body;
+
+    box.addEventListener('change', () => {
+        within.querySelectorAll('table[data-table-tools]').forEach((table) => {
+            if (box.checked) table.dataset.ttOnly = scope;
+            else delete table.dataset.ttOnly;
+            table.dispatchEvent(new CustomEvent('table-tools:reapply'));
+        });
+
+        const url = new URL(window.location.href);
+        if (box.checked) url.searchParams.set('only', scope);
+        else url.searchParams.delete('only');
+        window.history.replaceState(window.history.state, '', url);
     });
 }
 
@@ -907,6 +935,13 @@ class TableTools {
     }
 
     matches(row) {
+        // A scope a page control holds the table to (`data-tt-only` on the
+        // table, each row's `data-tt-in` naming the scopes it belongs to —
+        // the reconciled day's "Only what remains", 15 Nov 2026). It is a
+        // filter like any other, so the count and the pages follow it.
+        const only = this.table.dataset.ttOnly;
+        if (only && !(row.dataset.ttIn || '').split(/\s+/).includes(only)) return false;
+
         return this.columns.every((column) => {
             if (column.skip) return true;
 
