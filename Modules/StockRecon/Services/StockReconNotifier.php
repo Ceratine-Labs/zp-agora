@@ -36,6 +36,9 @@ class StockReconNotifier
 
             return new AdjustmentLoggedMail((int) $run->BranchId, [
                 'adj' => [
+                    'field' => match ($adj->Field ?? 'close') {
+                        'open' => 'opening', 'issue' => 'issue', default => 'closing',
+                    },
                     'run' => (string) $run->Id,
                     'site' => $this->site((int) $run->BranchId),
                     'area' => (string) ($line->AreaDescription ?? 'Area '.$line->AreaNo),

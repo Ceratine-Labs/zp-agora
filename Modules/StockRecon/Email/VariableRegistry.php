@@ -8,7 +8,8 @@ use Modules\Email\Support\TemplateDefinition;
 /**
  * Stock recon mail (Ryan, 16 Nov 2026: "send me an email ... whenever there's
  * an edit logged or a support call"): one to the people in
- * config('stockrecon.notify') when a closing is adjusted by hand, and one when
+ * config('stockrecon.notify') when a shift's opening, issue or closing is adjusted
+ * by hand (the closing only until the afternoon of 16 Nov), and one when
  * a support request is raised on a chain.
  */
 final class VariableRegistry implements RegistryContract
@@ -18,17 +19,18 @@ final class VariableRegistry implements RegistryContract
         return [
             new TemplateDefinition(
                 'stockrecon', 'stockrecon.adjustment_logged',
-                'Stock recon: closing adjusted by hand — {{adj.item}}, {{adj.site}}',
+                'Stock recon: {{adj.field}} adjusted by hand — {{adj.item}}, {{adj.site}}',
                 <<<'HTML'
-<p>A closing count was adjusted by hand on run <strong>#{{adj.run}}</strong>.</p><table><tr><td>Site</td><td>{{adj.site}}</td></tr><tr><td>Area</td><td>{{adj.area}}</td></tr><tr><td>Item</td><td>{{adj.item}}</td></tr><tr><td>Shift</td><td>{{adj.shift}}</td></tr><tr><td>Counted closing</td><td>{{adj.counted}}</td></tr><tr><td>Agora proposed</td><td>{{adj.prior}}</td></tr><tr><td>Set by hand to</td><td><strong>{{adj.new}}</strong></td></tr><tr><td>Reason</td><td>{{adj.reason}}</td></tr><tr><td>By</td><td>{{adj.by}}</td></tr></table><p>It changes the run only; it reaches PumpIT when somebody presses Amend. Open the run: <a href="{{url}}">{{url}}</a></p><p>Agora — Zululand Retail &amp; Petroleum</p>
+<p>A shift's {{adj.field}} was adjusted by hand on run <strong>#{{adj.run}}</strong>.</p><table><tr><td>Site</td><td>{{adj.site}}</td></tr><tr><td>Area</td><td>{{adj.area}}</td></tr><tr><td>Item</td><td>{{adj.item}}</td></tr><tr><td>Shift</td><td>{{adj.shift}}</td></tr><tr><td>Changed</td><td>The {{adj.field}}</td></tr><tr><td>As counted or keyed</td><td>{{adj.counted}}</td></tr><tr><td>Agora proposed</td><td>{{adj.prior}}</td></tr><tr><td>Set by hand to</td><td><strong>{{adj.new}}</strong></td></tr><tr><td>Reason</td><td>{{adj.reason}}</td></tr><tr><td>By</td><td>{{adj.by}}</td></tr></table><p>It changes the run only; it reaches PumpIT when somebody presses Amend. Open the run: <a href="{{url}}">{{url}}</a></p><p>Agora — Zululand Retail &amp; Petroleum</p>
 HTML,
                 <<<'TEXT'
-A closing count was adjusted by hand on run #{{adj.run}}.
+A shift's {{adj.field}} was adjusted by hand on run #{{adj.run}}.
 Site: {{adj.site}}
 Area: {{adj.area}}
 Item: {{adj.item}}
 Shift: {{adj.shift}}
-Counted closing: {{adj.counted}}
+Changed: the {{adj.field}}
+As counted or keyed: {{adj.counted}}
 Agora proposed: {{adj.prior}}
 Set by hand to: {{adj.new}}
 Reason: {{adj.reason}}
@@ -37,6 +39,7 @@ It changes the run only; it reaches PumpIT when somebody presses Amend.
 Open the run: {{url}}
 TEXT,
                 [
+                    'adj.field' => ['sample' => 'closing'],
                     'adj.run' => ['sample' => '80536'],
                     'adj.site' => ['sample' => 'Pongola Convenience Centre'],
                     'adj.area' => ['sample' => 'Debonairs BOH'],

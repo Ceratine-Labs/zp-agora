@@ -397,6 +397,28 @@ class StockReconService
     }
 
     /**
+     * One shift's proposed opening, issue and/or closing set by hand, with a
+     * reason (Ryan, 16 Nov 2026: "adjust opening, closing and issue values...
+     * not just closing"). Null leaves a value as proposed. The opening moves
+     * the previous shift's closing, the closing the next shift's opening; the
+     * issue is this shift's alone. Changes the run only; the Amend press
+     * writes it. The contract is agora.usp_StockRecon_AdjustShift's header.
+     */
+    public function adjustShift(StockReconRun $run, StockReconRunLine $line, ?float $open, ?float $issued, ?float $close, string $reason): object
+    {
+        return $this->procedures->write('usp_StockRecon_AdjustShift', [
+            'BranchId' => $run->BranchId,
+            'RunId' => $run->Id,
+            'RunLineId' => $line->Id,
+            'NewOpen' => $open,
+            'NewIssued' => $issued,
+            'NewClose' => $close,
+            'Reason' => $reason,
+            'UserId' => auth()->id(),
+        ]);
+    }
+
+    /**
      * Withdraw a release: from the next preview the possible duplicate holds
      * its chain back again. Never a delete — the release and its withdrawal
      * both stay on the ledger.

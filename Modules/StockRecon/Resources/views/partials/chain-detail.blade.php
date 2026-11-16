@@ -266,16 +266,18 @@
                         @endif
                     @endif
                 </td>
-                {{-- The pencil (Ryan, 16 Nov 2026): this shift's closing, by hand,
-                     with a reason. Not on the chain's last shift. --}}
+                {{-- The pencil (Ryan, 16 Nov 2026): this shift's opening, issue
+                     and/or closing, by hand, with a reason. On every shift not yet
+                     written; the form locks the first shift's opening and the
+                     last shift's closing. --}}
                 @if ($canAdjust)
                     <td class="fit-min">
-                        @if (! $loop->last && in_array($shift->CommitState ?? 'pending', ['pending', 'skipped'], true))
+                        @if (in_array($shift->CommitState ?? 'pending', ['pending', 'skipped'], true))
                             <button type="button" class="btn-ghost btn-row adjust-pencil"
                                     data-modal-open="adjust-close"
                                     data-modal-url="{{ route('app.stockrecon.line.adjust.form', [$run, $shift->Id]) }}"
-                                    title="Adjust this shift's closing count, with a reason"
-                                    aria-label="Adjust the closing for {{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }} shift {{ \Modules\StockRecon\Support\ShiftLabel::show($shift->ShiftNo) }}">
+                                    title="Adjust this shift's opening, issue or closing, with a reason"
+                                    aria-label="Adjust the shift for {{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }} shift {{ \Modules\StockRecon\Support\ShiftLabel::show($shift->ShiftNo) }}">
                                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
                             </button>
                         @endif

@@ -10,7 +10,11 @@
  *           CLEAR DUPLICATE ISSUE (D1) (Ryan's named go-ahead, 1 Oct 2026, PM
  *           decision 01a0f60b-0459), or raised by the over on a shift whose
  *           MISSING ISSUE is captured (Ryan's named go-ahead, 13 Oct 2026:
- *           "customer wants over to balance") — when @IssueMode is 'live' too.
+ *           "customer wants over to balance") — when @IssueMode is 'live' too —
+ *           or set by hand with a reason through usp_StockRecon_AdjustShift
+ *           (Ryan's named go-ahead, 16 Nov 2026: "want to be able to adjust
+ *           opening, closing and issue values... please implement and
+ *           deploy"); the stale-issue guards below leave a hand-set issue be.
  *
  * @StampMode  'journal' records every amendment here and writes NOTHING to
  *             PumpIT. The ledger is then the worklist an admin applies, and the
@@ -353,6 +357,9 @@ BEGIN
         WHERE r.BranchId = @BranchId AND r.RunId = @RunId
           AND r.ChainBreak > @eps AND p.PriorVariance < -@eps AND p.PriorVarianceNew < -@eps
           AND r.QtyIssuedNew > r.QtyIssued + @eps
+          /* Not an issue a person set by hand, with a reason (usp_StockRecon_AdjustShift, 16 Nov 2026). */
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconManualAdjustment hand
+                          WHERE hand.BranchId = r.BranchId AND hand.RunId = r.RunId AND hand.RunLineId = r.Id AND hand.[Field] = 'issue')
           AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
               WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
                 AND selected.AreaNo = r.AreaNo AND selected.StockItemNo = r.StockItemNo AND selected.ContinuitySegment = r.ContinuitySegment
@@ -390,6 +397,9 @@ BEGIN
         ) p
         WHERE r.BranchId = @BranchId AND r.RunId = @RunId
           AND r.QtyIssuedNew > r.QtyIssued + @eps
+          /* Not an issue a person set by hand, with a reason (usp_StockRecon_AdjustShift, 16 Nov 2026). */
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconManualAdjustment hand
+                          WHERE hand.BranchId = r.BranchId AND hand.RunId = r.RunId AND hand.RunLineId = r.Id AND hand.[Field] = 'issue')
           AND r.IssueMultiple > 1
           AND p.StandingBefore <= -r.IssueMultiple + @eps
           AND NOT EXISTS (SELECT 1 FROM agora.StockReconRunLine broken
@@ -435,6 +445,9 @@ BEGIN
         ) f
         WHERE r.BranchId = @BranchId AND r.RunId = @RunId
           AND r.QtyIssuedNew > r.QtyIssued + @eps
+          /* Not an issue a person set by hand, with a reason (usp_StockRecon_AdjustShift, 16 Nov 2026). */
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconManualAdjustment hand
+                          WHERE hand.BranchId = r.BranchId AND hand.RunId = r.RunId AND hand.RunLineId = r.Id AND hand.[Field] = 'issue')
           AND r.IssueMultiple > 1
           AND r.QtyIssuedNew - r.QtyIssued >= r.QtyVar - @eps
           AND f.LowestAfter <= -r.IssueMultiple + @eps
@@ -462,7 +475,7 @@ BEGIN
                   + ISNULL(changed.AppliedGoodWaste, 0)) - 0.0005)
                OR (changed.QtyVar >= -0.0005 AND changed.QtyVarNew < -0.0005))
           /* Not a row a person adjusted by hand, with a reason
-             (usp_StockRecon_AdjustClose, 16 Nov 2026): that is a decision,
+             (usp_StockRecon_AdjustShift, 16 Nov 2026): that is a decision,
              not a stale proposal. */
           AND changed.ManualAdjustmentId IS NULL
           AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
@@ -501,6 +514,9 @@ BEGIN
         WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
           AND rl.Selected = 1 AND rl.WouldAmend = 1 AND rl.CommitState IN ('pending', 'skipped')
           AND (rl.QtyIssuedNew > rl.QtyIssued OR (rl.QtyIssuedNew < rl.QtyIssued AND ISNULL(rl.DupTier, '') <> 'D1'))
+          /* Not an issue a person set by hand, with a reason (usp_StockRecon_AdjustShift, 16 Nov 2026). */
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconManualAdjustment hand
+                          WHERE hand.BranchId = rl.BranchId AND hand.RunId = rl.RunId AND hand.RunLineId = rl.Id AND hand.[Field] = 'issue')
           AND (NOT EXISTS (SELECT 1 FROM agora.StockReconRunLine p
                WHERE p.BranchId = rl.BranchId AND p.RunId = rl.RunId
                  AND p.AreaNo = rl.AreaNo AND p.StockItemNo = rl.StockItemNo AND p.ContinuitySegment = rl.ContinuitySegment
@@ -520,6 +536,9 @@ BEGIN
         WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId
           AND rl.Selected = 1 AND rl.WouldAmend = 1 AND rl.CommitState IN ('pending', 'skipped')
           AND (rl.QtyIssuedNew > rl.QtyIssued OR (rl.QtyIssuedNew < rl.QtyIssued AND ISNULL(rl.DupTier, '') <> 'D1'))
+          /* Not an issue a person set by hand, with a reason (usp_StockRecon_AdjustShift, 16 Nov 2026). */
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconManualAdjustment hand
+                          WHERE hand.BranchId = rl.BranchId AND hand.RunId = rl.RunId AND hand.RunLineId = rl.Id AND hand.[Field] = 'issue')
           AND (rl.QtyIssuedNew < 0 OR ISNULL(rl.IssueMultiple, 0) <= 1 OR
                ABS(ISNULL(rl.IssueMultiple, 0) - COALESCE(si.IssueMultiple, im.IssueMultiple, 0)) > 0.0005 OR
                ABS((rl.QtyIssuedNew - rl.QtyIssued) - ROUND((rl.QtyIssuedNew - rl.QtyIssued) / NULLIF(rl.IssueMultiple, 0), 0) * rl.IssueMultiple) > 0.0005))

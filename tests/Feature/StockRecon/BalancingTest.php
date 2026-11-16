@@ -513,6 +513,101 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * The opening and the issue by hand too (Ryan, 16 Nov 2026: "want to be
+     * able to adjust opening, closing and issue values... not just closing").
+     * The opening moves the shift before's closing with it, the issue is the
+     * shift's own; both reach PumpIT on Amend, priors kept, and reverse.
+     */
+    public function test_an_opening_and_an_issue_adjusted_by_hand_change_the_run_and_commit(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [40, 0, 38, 2], 3 => [38, 0, 36, 2]],
+            '2026-07-18' => [1 => [36, 0, 30, 2], 3 => [30, 0, 30, 2]],
+            '2026-07-19' => [1 => [30, 0, 28, 2], 3 => [28, 0, 26, 2]],
+            '2026-07-20' => [1 => [26, 0, 24, 2], 3 => [24, 0, 22, 2]],
+            '2026-07-21' => [1 => [22, 0, 20, 2], 3 => [20, 0, 18, 2]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $first = $this->lineAt($run, '2026-07-17', 1);
+        $before = $this->lineAt($run, '2026-07-19', 3);
+        $shift = $this->lineAt($run, '2026-07-20', 1);
+        $last = $this->lineAt($run, '2026-07-21', 3);
+
+        foreach ([
+            [$first, 39, null, null, 'TEST-first opening', 'FIRST_SHIFT'],
+            [$last, null, null, 17, 'TEST-last closing', 'LAST_SHIFT'],
+            [$shift, null, -1, null, 'TEST-negative issue', 'BAD_VALUE'],
+            [$shift, (float) $shift->QtyOpenNew, (float) $shift->QtyIssued, (float) $shift->QtyCloseNew, 'TEST-as proposed', 'NOTHING_CHANGED'],
+            [$shift, null, 10, null, 'no', 'REASON_REQUIRED'],
+        ] as [$line, $open, $issued, $close, $reason, $code]) {
+            try {
+                $this->service->adjustShift($run, $line, $open, $issued, $close, $reason);
+                $this->fail("Expected {$code}.");
+            } catch (AgoraProcException $e) {
+                $this->assertSame($code, $e->code(), $e->getMessage());
+            }
+        }
+
+        $varShift = (float) $shift->QtyVarNew;
+        $varBefore = (float) $before->QtyVarNew;
+        $proposedOpen = (float) $shift->QtyOpenNew;
+
+        // The last shift's issue can be set too: only its closing is locked.
+        $this->service->adjustShift($run, $last, null, 5, null, 'TEST-issue on the last shift');
+        $this->assertEqualsWithDelta(5, (float) $last->fresh()->QtyIssuedNew, 0.001);
+        $this->service->adjustShift($run, $last, null, 0, null, 'TEST-issue put back');
+        $this->assertNull($last->fresh()->QtyIssuedNew, 'An issue set back to what PumpIT holds is not changed at all.');
+
+        $status = $this->service->adjustShift($run, $shift, 25, 10, null, 'TEST-opening recounted, a box of 10 arrived');
+        $this->assertSame('ADJUSTED', $status->Code);
+        $this->assertCount(2, explode(',', (string) $status->Ids));
+
+        $shift = $shift->fresh();
+        $before = $before->fresh();
+        // The opening: this shift and the closing before it, the variances by the change.
+        $this->assertEqualsWithDelta(25, (float) $shift->QtyOpenNew, 0.001);
+        $this->assertEqualsWithDelta(25, (float) $before->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta($varBefore + (25 - $proposedOpen), (float) $before->QtyVarNew, 0.001);
+        // The issue: this shift only, 10 more expected on the shelf.
+        $this->assertEqualsWithDelta(10, (float) $shift->QtyIssuedNew, 0.001);
+        $this->assertEqualsWithDelta($varShift - (25 - $proposedOpen) - 10, (float) $shift->QtyVarNew, 0.001);
+        $this->assertTrue((bool) $shift->Selected && (bool) $shift->WouldAmend);
+        $this->assertTrue((bool) $before->Selected && (bool) $before->WouldAmend);
+        $this->assertStringStartsWith('Adjusted by hand: TEST-opening recounted', (string) $shift->Outcome);
+        $this->assertSame(['issue', 'open'], $this->db()->table('agora.StockReconManualAdjustment')
+            ->where('RunId', $run->Id)->where('RunLineId', $shift->Id)->orderBy('Field')->pluck('Field')->all());
+
+        // Amend writes the opening, the closing before it and the issue — no
+        // stale-issue guard refuses an issue a person set.
+        $this->service->commit($run->fresh());
+        $this->assertEqualsWithDelta(25, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(25, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 1)->QtyOpen, 0.001);
+        $this->assertEqualsWithDelta(10, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 1)->QtyIssued, 0.001);
+        $this->assertSame(1, $this->db()->table('agora.vw_PumpItChange')
+            ->where('Ref', 'Stock recon run '.$run->Id)->where('Action', 'Issue set by hand')->count());
+
+        $this->service->reverse($run->fresh(), 'TEST-opening and issue reversal');
+        $this->assertEqualsWithDelta(26, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(26, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 1)->QtyOpen, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 1)->QtyIssued, 0.001);
+
+        // Through the pencil's route: the form locks the first shift's
+        // opening, and each value changed is mailed, naming which.
+        Mail::fake();
+        $open = $this->previewArea(self::SHELF_AREA);
+        $this->actingAs($this->person('admin'));
+        $this->get(route('app.stockrecon.line.adjust.form', [$open, $this->lineAt($open, '2026-07-17', 1)]))
+            ->assertOk()->assertSee('name="issued"', false)->assertSee('first shift');
+        $target = $this->lineAt($open, '2026-07-19', 1);
+        $this->post(route('app.stockrecon.line.adjust', [$open, $target]), [
+            'open' => 29, 'issued' => (float) $target->QtyIssued, 'close' => 27, 'reason' => 'TEST-mailed opening and closing',
+        ])->assertRedirect()->assertSessionHas('adjusted');
+        Mail::assertSent(AdjustmentLoggedMail::class, 2);
+        Mail::assertSent(AdjustmentLoggedMail::class, fn ($m) => str_contains($m->envelope()->subject, 'opening adjusted by hand'));
+    }
+
+    /**
      * A missed closing count (Ryan, 16 Nov 2026, run 80529, D Cheddar Cheese
      * Kg): issued 24, closed 0, then the next shift opened 0 and counted the
      * stock back. The correction is as big as the stock, which the caps read

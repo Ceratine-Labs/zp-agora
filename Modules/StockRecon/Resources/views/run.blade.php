@@ -104,7 +104,7 @@
      (Ryan, 16 Nov 2026). Outside the commit form, so its own form can post. --}}
 @if ($run->isOpen())
     @can('stockrecon.runs.execute')
-        <x-modal id="adjust-close" title="Adjust the closing count"><p class="muted">Loading…</p></x-modal>
+        <x-modal id="adjust-close" title="Adjust the shift"><p class="muted">Loading…</p></x-modal>
     @endcan
 @endif
 </x-app-shell>

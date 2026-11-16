@@ -608,26 +608,44 @@ class StockReconController extends Controller
     public function adjustForm(StockReconRun $run, StockReconRunLine $line): View
     {
         [$run, $line] = $this->runLine($run, $line);
+        $chain = StockReconRunLine::query()
+            ->where('RunId', $run->Id)->where('AreaNo', $line->AreaNo)->where('StockItemNo', $line->StockItemNo)
+            ->where('ContinuitySegment', $line->ContinuitySegment);
+        $before = (clone $chain)->where(fn ($q) => $q->where('TransactionDate', '<', $line->TransactionDate)
+            ->orWhere(fn ($q) => $q->where('TransactionDate', $line->TransactionDate)->where('ShiftNo', '<', $line->ShiftNo)))->exists();
+        $after = (clone $chain)->where(fn ($q) => $q->where('TransactionDate', '>', $line->TransactionDate)
+            ->orWhere(fn ($q) => $q->where('TransactionDate', $line->TransactionDate)->where('ShiftNo', '>', $line->ShiftNo)))->exists();
 
-        return view('stockrecon::partials.adjust-close', ['run' => $run, 'line' => $line]);
+        return view('stockrecon::partials.adjust-close', [
+            'run' => $run, 'line' => $line, 'firstShift' => ! $before, 'lastShift' => ! $after,
+        ]);
     }
 
-    /** Set the shift's proposed closing by hand; the run page says what moved. */
+    /**
+     * Set the shift's proposed opening, issue and/or closing by hand (Ryan, 16
+     * Nov 2026: "not just closing"); the run page says what moved. A blank
+     * field, or one left at what the run proposes, is not changed.
+     */
     public function adjust(Request $request, StockReconRun $run, StockReconRunLine $line): RedirectResponse
     {
         [$run, $line] = $this->runLine($run, $line);
         $data = $request->validate([
-            'close' => ['required', 'numeric', 'min:0', 'max:999999'],
+            'open' => ['nullable', 'numeric', 'min:0', 'max:999999'],
+            'issued' => ['nullable', 'numeric', 'min:0', 'max:999999'],
+            'close' => ['nullable', 'numeric', 'min:0', 'max:999999'],
             'reason' => ['required', 'string', 'min:5', 'max:500'],
         ]);
+        $value = fn (string $key): ?float => isset($data[$key]) && $data[$key] !== '' ? (float) $data[$key] : null;
 
         try {
-            $status = $this->service->adjustClose($run, $line, (float) $data['close'], trim($data['reason']));
+            $status = $this->service->adjustShift($run, $line, $value('open'), $value('issued'), $value('close'), trim($data['reason']));
         } catch (AgoraProcException $e) {
             return back()->with('refusal', $e->getMessage());
         }
 
-        app(StockReconNotifier::class)->adjustment($run, $line, (int) $status->Id);
+        foreach (array_filter(explode(',', (string) ($status->Ids ?? $status->Id))) as $id) {
+            app(StockReconNotifier::class)->adjustment($run, $line, (int) $id);
+        }
 
         return back()->with('adjusted', $status->Message);
     }
