@@ -96,22 +96,52 @@
      * accountable case, the short nobody can balance away. Hiding on the flag
      * would take it with them. See StockReconRunLine::isEmptyChain().
      */
-    $hideEmpty = $hideEmpty ?? true;
+    /*
+     * WHICH CHAINS (Ryan, 16 Nov 2026, after the client meeting: "default to
+     * all chains ... we still keep the buttons", plus Amended / Not amended).
+     * One `scope`: amendable · movement · all (the default) · amended ·
+     * not-amended. The older pair still lands where it did: scope=all with
+     * empty=hide is "movement". Amended is a chain this run changes at least
+     * one shift of (WouldAmend: proposed, or written once posted); Not amended
+     * is every other chain, exactly as counted.
+     */
+    $scope = (string) request()->query('scope', 'all');
+    if ($scope === 'all' && request()->query('empty') === 'hide') {
+        $scope = 'movement';
+    }
+    if (! in_array($scope, ['amendable', 'movement', 'all', 'amended', 'not-amended'], true)
+        || ($scope === 'amendable' && ! $run->isOpen())) {
+        $scope = 'all';
+    }
+    $hideEmpty = in_array($scope, ['amendable', 'movement'], true);
     $emptyLines = $run->lines->filter(fn ($l) => $l->isEmptyChain());
     $emptyChains = $emptyLines->unique(fn ($l) => $l->continuityKey())->count();
-    $rows = $hideEmpty ? $run->lines->reject(fn ($l) => $l->isEmptyChain()) : $run->lines;
-    $showAll = ! $run->isOpen() || request()->query('scope') === 'all';
-    $writableKeys = $rows->filter(fn ($l) => $l->isWritable() || (float) $l->AppliedGoodWaste > 0.0005 || str_starts_with((string) $l->Outcome, 'Missing shift:'))
+    $moving = $run->lines->reject(fn ($l) => $l->isEmptyChain());
+    $writableKeys = $moving->filter(fn ($l) => $l->isWritable() || (float) $l->AppliedGoodWaste > 0.0005 || str_starts_with((string) $l->Outcome, 'Missing shift:'))
         ->map(fn ($l) => $l->continuityKey())->unique()->flip();
-    $hiddenChains = $rows->reject(fn ($l) => $writableKeys->has($l->continuityKey()))
+    $amendedKeys = $run->lines->filter(fn ($l) => (bool) $l->WouldAmend)
+        ->map(fn ($l) => $l->continuityKey())->unique()->flip();
+    $hiddenChains = $moving->reject(fn ($l) => $writableKeys->has($l->continuityKey()))
         ->unique(fn ($l) => $l->continuityKey())->count();
-    if (! $showAll) {
-        $rows = $rows->filter(fn ($l) => $writableKeys->has($l->continuityKey()));
-    }
+    $rows = match ($scope) {
+        'amendable' => $moving->filter(fn ($l) => $writableKeys->has($l->continuityKey())),
+        'movement' => $moving,
+        'amended' => $run->lines->filter(fn ($l) => $amendedKeys->has($l->continuityKey())),
+        'not-amended' => $run->lines->reject(fn ($l) => $amendedKeys->has($l->continuityKey())),
+        default => $run->lines,
+    };
+    $showAll = $scope !== 'amendable';
     $defaultStates = $showAll ? '' : implode('|', array_diff_key($states, ['clean' => true]));
     // What each scope pill in the action bar would put on the screen.
     $amendableChains = $writableKeys->count();
     $everyChains = $run->lines->unique(fn ($l) => $l->continuityKey())->count();
+    $amendedChains = $amendedKeys->count();
+    $emptyText = match ($scope) {
+        'amendable' => 'There are no amendable chains in this run. Use All chains to see the rest.',
+        'amended' => 'This run changes no chain.',
+        'not-amended' => 'This run changes every chain.',
+        default => 'The procedure ran and found no shifts in this period.',
+    };
 @endphp
 
 {{-- No card title: the tab above already says "Proposals", and the row it
@@ -157,32 +187,23 @@
             <span class="muted">· {{ $heldItems }} {{ Str::plural('item', $heldItems) }} marked below, left unticked</span>
         </x-notice>
     @endif
-    @if ($run->isOpen())
-        <span class="tt-pills-set" role="group" aria-label="Chains shown" data-tt-strip-for="stockrecon-lines-{{ $run->Id }}">
-            <span class="tt-pills-label">Show</span>
-            <a @class(['chip', 'tt-pill', 'is-on' => ! $showAll]) @if (! $showAll) aria-current="true" @endif
-               href="{{ request()->fullUrlWithQuery(['scope' => 'amendable', 'empty' => 'hide']) }}"
-               title="{{ $showAll ? 'Show amendable chains only' : 'Showing amendable chains; '.\App\Support\Format::n($hiddenChains).' '.Str::plural('chain', $hiddenChains).' with nothing to amend hidden' }}">Amendable<span class="tt-pill-n">{{ \App\Support\Format::n($amendableChains) }}</span></a>
-            @if ($emptyChains > 0)
-                <a @class(['chip', 'tt-pill', 'is-on' => $showAll && $hideEmpty]) @if ($showAll && $hideEmpty) aria-current="true" @endif
-                   href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'hide']) }}"
-                   title="Every chain with movement; {{ \App\Support\Format::n($emptyChains) }} {{ Str::plural('chain', $emptyChains) }} with no movement hidden">With movement<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains - $emptyChains) }}</span></a>
-            @endif
-            <a @class(['chip', 'tt-pill', 'is-on' => $showAll && (! $hideEmpty || $emptyChains === 0)]) @if ($showAll && (! $hideEmpty || $emptyChains === 0)) aria-current="true" @endif
-               href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}"
-               title="{{ $showAll ? 'Showing all chains' : 'Show all chains' }}">All chains<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains) }}</span></a>
-        </span>
-    @elseif ($emptyChains > 0)
-        <span class="tt-pills-set" role="group" aria-label="Chains shown" data-tt-strip-for="stockrecon-lines-{{ $run->Id }}">
-            <span class="tt-pills-label">Show</span>
-            <a @class(['chip', 'tt-pill', 'is-on' => $hideEmpty]) @if ($hideEmpty) aria-current="true" @endif
-               href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'hide']) }}"
-               title="Hide the {{ \App\Support\Format::n($emptyChains) }} {{ Str::plural('chain', $emptyChains) }} ({{ \App\Support\Format::n($emptyLines->count()) }} {{ Str::plural('shift', $emptyLines->count()) }}) with no movement">With movement<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains - $emptyChains) }}</span></a>
-            <a @class(['chip', 'tt-pill', 'is-on' => ! $hideEmpty]) @if (! $hideEmpty) aria-current="true" @endif
-               href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => 'show']) }}"
-               title="Show every chain, those with no movement too">All chains<span class="tt-pill-n">{{ \App\Support\Format::n($everyChains) }}</span></a>
-        </span>
-    @endif
+    @php
+        $scopePills = array_filter([
+            'amendable' => $run->isOpen() ? ['Amendable', $amendableChains, 'Chains with something to amend; '.\App\Support\Format::n($hiddenChains).' '.Str::plural('chain', $hiddenChains).' with nothing to amend hidden'] : null,
+            'movement' => $emptyChains > 0 ? ['With movement', $moving->unique(fn ($l) => $l->continuityKey())->count(), 'Every chain with movement; '.\App\Support\Format::n($emptyChains).' '.Str::plural('chain', $emptyChains).' with no movement hidden'] : null,
+            'all' => ['All chains', $everyChains, 'Every chain, those with no movement too'],
+            'amended' => ['Amended', $amendedChains, $run->isOpen() ? 'Chains this run changes at least one shift of' : 'Chains this run changed'],
+            'not-amended' => ['Not amended', $everyChains - $amendedChains, 'Chains this run leaves exactly as counted'],
+        ]);
+    @endphp
+    <span class="tt-pills-set" role="group" aria-label="Chains shown" data-tt-strip-for="stockrecon-lines-{{ $run->Id }}">
+        <span class="tt-pills-label">Show</span>
+        @foreach ($scopePills as $key => [$label, $count, $title])
+            <a @class(['chip', 'tt-pill', 'is-on' => $scope === $key]) @if ($scope === $key) aria-current="true" @endif
+               href="{{ request()->fullUrlWithQuery(['scope' => $key, 'empty' => null]) }}"
+               title="{{ $title }}">{{ $label }}<span class="tt-pill-n">{{ \App\Support\Format::n($count) }}</span></a>
+        @endforeach
+    </span>
 
     <form method="POST" action="{{ route('app.stockrecon.commit', $run) }}" id="commit-{{ $run->Id }}"
           data-loader="{{ $stampMode === 'live' ? 'Amending in PumpIT…' : 'Recording the amendments…' }}"
@@ -214,8 +235,8 @@
                 </button>
 
                 <a class="btn-ghost" role="button"
-                   href="{{ request()->fullUrlWithQuery(['scope' => 'amendable', 'empty' => 'hide']) }}"
-                   @if ($showAll) data-tt-defaults-reload="stockrecon-lines-{{ $run->Id }}"
+                   href="{{ request()->fullUrlWithQuery(['scope' => 'all', 'empty' => null]) }}"
+                   @if ($scope !== 'all') data-tt-defaults-reload="stockrecon-lines-{{ $run->Id }}"
                    @else data-tt-restore-defaults="stockrecon-lines-{{ $run->Id }}" @endif>Default filters</a>
 
                 <x-info label="What this press does">
@@ -261,7 +282,7 @@
                  data-tt-group-noun="chain"
                  data-tt-row-noun="shift"
                  data-row-detail
-                 :empty="$showAll ? 'The procedure ran and found no shifts in this period.' : 'There are no amendable chains in this run. Use Show all chains to see the rest.'">
+                 :empty="$emptyText">
             <x-slot:head>
                 <tr>
                     @if ($run->isOpen())

@@ -277,7 +277,7 @@ class StockReconController extends Controller
                 'globalRefusal' => $proposalGlobalRefusal,
                 // These hidden empty chains remain counted, with a visible way
                 // to include them. The complete amendable set stays in the form.
-                'hideEmpty' => $request->query('empty') !== 'show',
+                'hideEmpty' => false, // the pane decides from ?scope= (16 Nov 2026)
                 // Shifts another run already amended (Ryan, 14 Nov 2026):
                 // badged with that run, unticked and out of the press.
                 'elsewhere' => $this->service->amendedElsewhere($run),

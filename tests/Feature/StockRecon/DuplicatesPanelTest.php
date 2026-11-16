@@ -229,7 +229,9 @@ class DuplicatesPanelTest extends TestCase
         $this->assertSame('possible', $this->lineAt($run, 'TDP2', 1)->outcomeKey());
 
         $admin = $this->person('admin');
-        $this->actingAs($admin)->get(route('app.stockrecon.run', $run))
+        // The Amendable view, whose outcome pills open on what the press
+        // writes; All chains has been the default since 16 Nov 2026.
+        $this->actingAs($admin)->get(route('app.stockrecon.run', [$run, 'scope' => 'amendable']))
             ->assertOk()
             ->assertSee('data-tt-pills="Balanced|Duplicate issue removed|Missing issue captured|Issue reduced|Short|Possible duplicate|Blocked|Hand amendment reversed|Unrecorded issue|Dormant"', false)
             ->assertSee('data-tt-pill-order="Balanced|Duplicate issue removed|', false)
