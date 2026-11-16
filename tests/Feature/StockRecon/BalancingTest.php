@@ -7,8 +7,10 @@ use App\Support\ProcedureService;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
@@ -17,6 +19,7 @@ use Modules\Core\Services\PermissionService;
 use Modules\StockRecon\Models\StockReconAmendment;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
+use Modules\StockRecon\Models\StockReconSupportRequest;
 use Modules\StockRecon\Services\AreaShiftCompletionService;
 use Modules\StockRecon\Services\BalancingProfileService;
 use Modules\StockRecon\Services\ChainSummary;
@@ -302,6 +305,56 @@ class BalancingTest extends TestCase
         $this->service->reverse($run->fresh(), 'TEST-short-before-over reversal');
         $this->assertEqualsWithDelta(16, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.001);
         $this->assertEqualsWithDelta(14, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyClose, 0.001);
+    }
+
+    /**
+     * A support request on a chain (Ryan, 16 Nov 2026): the Support button on
+     * the chain row, the form with the chain filled in, the request logged
+     * with its screenshot, listed, the screenshot served, and resolved.
+     */
+    public function test_a_support_request_is_raised_on_a_chain_listed_and_resolved(): void
+    {
+        Storage::fake('local');
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [40, 0, 38, 2], 3 => [38, 0, 36, 2]],
+            '2026-07-18' => [1 => [36, 0, 30, 2], 3 => [30, 0, 30, 2]],
+            '2026-07-19' => [1 => [30, 0, 28, 2], 3 => [28, 0, 26, 2]],
+            '2026-07-20' => [1 => [26, 0, 24, 2], 3 => [24, 0, 22, 2]],
+            '2026-07-21' => [1 => [22, 0, 20, 2], 3 => [20, 0, 18, 2]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $line = $this->lineAt($run, '2026-07-18', 1);
+        $this->actingAs($this->person('admin'));
+
+        $this->get(route('app.stockrecon.run', $run))->assertOk()
+            ->assertSee(route('app.stockrecon.support.form', [$run, $run->lines->sortBy('LineNo')->first()->Id]), false)
+            ->assertSee('id="support-request"', false);
+        $this->get(route('app.stockrecon.support.form', [$run, $line]))->assertOk()
+            ->assertSee('name="message"', false)->assertSee('data-shot-capture', false)
+            ->assertSee('#'.$run->Id)->assertSee('21 Jul 2026');
+
+        $this->postJson(route('app.stockrecon.support.store', [$run, $line]), ['message' => 'no'])
+            ->assertStatus(422);
+        $png = UploadedFile::fake()->image('shot.png', 40, 30);
+        $id = $this->post(route('app.stockrecon.support.store', [$run, $line]),
+            ['message' => 'TEST-the closing on 18 Jul was counted', 'screenshot' => $png],
+            ['Accept' => 'application/json'])->assertOk()->json('id');
+
+        $ticket = StockReconSupportRequest::query()->findOrFail($id);
+        $this->assertSame('open', $ticket->Status);
+        $this->assertSame(self::DUP_ITEM, $ticket->StockItemNo);
+        $this->assertSame('2026-07-17', $ticket->ChainFrom->toDateString());
+        $this->assertSame('2026-07-21', $ticket->ChainTo->toDateString());
+        Storage::disk('local')->assertExists((string) $ticket->ScreenshotPath);
+
+        $this->get(route('app.stockrecon.support.index'))->assertOk()
+            ->assertSee('TEST-the closing on 18 Jul was counted')
+            ->assertSee(route('app.stockrecon.support.screenshot', $id), false);
+        $this->get(route('app.stockrecon.support.screenshot', $id))->assertOk();
+
+        $this->post(route('app.stockrecon.support.resolve', $id), ['note' => 'TEST-fixed'])->assertRedirect();
+        $this->assertSame('resolved', $ticket->fresh()->Status);
+        $this->get(route('app.stockrecon.support.index', ['status' => 'resolved']))->assertOk()->assertSee('TEST-fixed');
     }
 
     /**
@@ -5017,7 +5070,7 @@ class BalancingTest extends TestCase
 
         foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun', 'StockIssueMultiple', 'StockAreaSetting',
             'StockReconDuplicateRelease', 'StockWasteAuthorization', 'StockReconItemRemoval', 'StockReconAreaShiftCompletion',
-            'StockReconManualAdjustment'] as $table) {
+            'StockReconManualAdjustment', 'StockReconSupportRequest'] as $table) {
             $db->table("{$schema}.{$table}")->where('BranchId', self::BRANCH)->delete();
         }
     }

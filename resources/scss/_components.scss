@@ -2159,3 +2159,32 @@ tr.tt-group.is-missed-count > td:first-child { box-shadow: inset 3px 0 0 var(--c
   display: flex; flex-direction: column; gap: 12px;
   .adjust-close-actions { display: flex; justify-content: flex-end; gap: 8px; }
 }
+
+/* A support request on a chain (Ryan, 16 Nov 2026): the chain, a message,
+   and a screenshot marked up with a pen, a circle or an arrow. */
+.support-form {
+  display: flex; flex-direction: column; gap: 12px;
+  .support-field { display: flex; flex-direction: column; gap: 4px; }
+  .support-field label { font-size: 12px; font-weight: 600; }
+  textarea { width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r);
+             background: var(--surface); color: var(--ink); resize: vertical; }
+  .support-form-actions { display: flex; justify-content: flex-end; }
+  .support-status:empty { display: none; }
+  .support-status { margin: 0; color: var(--crit-ink); font-size: 12.5px; }
+}
+.support-shot {
+  display: flex; flex-direction: column; gap: 8px;
+  border: 1px dashed var(--line); border-radius: var(--r); padding: 10px;
+  .support-shot-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+  .support-shot-actions, .support-shot-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+  .support-shot-file { position: relative; cursor: pointer; }
+  .support-shot-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .support-shot-tools .is-on { background: var(--brand-soft); color: var(--brand-ink); }
+  .support-shot-hint { margin: 0; font-size: 12px; }
+  .support-shot-canvas { width: 100%; height: auto; border-radius: 4px; cursor: crosshair; touch-action: none; background: var(--surface-2); }
+}
+.support-done { margin: 0; padding: 10px 12px; border-radius: var(--r); background: var(--good-bg, var(--surface-2)); }
+.support-log {
+  .support-msg { white-space: pre-wrap; max-width: 60ch; }
+  .support-thumb { display: block; max-width: 160px; max-height: 90px; border: 1px solid var(--line); border-radius: 4px; }
+}

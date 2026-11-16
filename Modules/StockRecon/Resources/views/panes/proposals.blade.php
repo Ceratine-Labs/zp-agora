@@ -344,9 +344,7 @@
                          Deliberately unlabelled: the numeric "Amend" column is
                          three cells to the left and two headings reading
                          "Amend" would be worse than none. --}}
-                    @if ($run->isOpen())
-                        <th class="fit-min" data-no-tools></th>
-                    @endif
+                    <th class="fit-min" data-no-tools></th>
                 </tr>
             </x-slot:head>
 
@@ -423,15 +421,23 @@
                     <td @class(['num', 'is-changed' => abs((float) $chain->last()->QtyCloseNew - (float) $chain->last()->QtyClose) > 0.0005]) data-sort="{{ \App\Support\Format::n($chain->last()->QtyCloseNew, 3) }}">{{ \App\Support\Format::qty($chain->last()->QtyCloseNew) }}</td>
                     <td class="num" title="Units the balancing moves on this chain, either way" data-sort="{{ $chain->moved() < 0.0005 ? '—' : \App\Support\Format::n($chain->moved(), 3) }}">{{ $chain->moved() < 0.0005 ? '—' : \App\Support\Format::qty($chain->moved()) }}</td>
                     <td @class(['num', 'is-changed' => abs($chain->varianceNew() - $chain->variance()) > 0.0005]) data-sort="{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::n($chain->varianceNew(), 3) }}">{{ abs($chain->varianceNew()) < 0.0005 ? '—' : \App\Support\Format::qty($chain->varianceNew()) }}</td>
-                    @if ($run->isOpen())
                         {{-- AMEND THIS ONE CHAIN, without touching the ticks
                              (the per-shift button of 11 Sep 2026, moved up to
                              the chain when the shift rows stopped showing). It
                              posts `only` with the chain's writable shifts and
                              the commit narrows to them — the same commit,
                              re-check and reversal. --}}
-                        @php($writable = $chain->lines->filter(fn ($l) => $l->isWritable() && ! $elsewhere->has($l->Id)))
+                        @php($writable = $run->isOpen() ? $chain->lines->filter(fn ($l) => $l->isWritable() && ! $elsewhere->has($l->Id)) : collect())
                         <td class="fit-min">
+                            {{-- Support on this chain (Ryan, 16 Nov 2026): its details
+                                 filled in, a message, an annotated screenshot. --}}
+                            @can('stockrecon.runs.view')
+                                <button type="button" class="btn-ghost btn-row"
+                                        data-modal-open="support-request"
+                                        data-modal-url="{{ route('app.stockrecon.support.form', [$run, $first->Id]) }}"
+                                        title="Ask for support on this chain"
+                                        aria-label="Support request on {{ $first->StockItemNo }}">Support</button>
+                            @endcan
                             @if ($writable->isNotEmpty())
                                 <button type="submit" name="only" value="{{ $writable->pluck('Id')->implode(',') }}"
                                         class="btn-ghost btn-row"
@@ -445,7 +451,6 @@
                                 </button>
                             @endif
                         </td>
-                    @endif
                 </tr>
             {{-- Which shifts balance against which (ZRP, 7 Oct 2026): a rail
                  down the left in the group's colour and its letter beside the
@@ -546,9 +551,7 @@
                     <td @class(['num', 'is-changed' => abs((float) $line->QtyCloseNew - (float) $line->QtyClose) > 0.0005]) data-sort="{{ \App\Support\Format::n($line->QtyCloseNew, 3) }}">{{ \App\Support\Format::qty($line->QtyCloseNew) }}</td>
                     <td class="num" data-sort="{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::n($line->AmendClose, 3) }}">{{ abs($line->amendment()) < 0.0005 ? '—' : \App\Support\Format::qty($line->AmendClose) }}</td>
                     <td @class(['num', 'is-changed' => abs((float) $line->QtyVarNew - (float) $line->QtyVar) > 0.0005]) data-sort="{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::n($line->QtyVarNew, 3) }}">{{ (float) $line->QtyVarNew === 0.0 ? '—' : \App\Support\Format::qty($line->QtyVarNew) }}</td>
-                    @if ($run->isOpen())
-                        <td class="fit-min"></td>
-                    @endif
+                    <td class="fit-min"></td>
                 </tr>
             @endforeach
             @endforeach

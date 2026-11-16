@@ -9,6 +9,7 @@ use Modules\StockRecon\Http\Controllers\StockReconGroupController;
 use Modules\StockRecon\Http\Controllers\StockReconHelperController;
 use Modules\StockRecon\Http\Controllers\StockReconTutorialController;
 use Modules\StockRecon\Http\Controllers\StockReconVarianceController;
+use Modules\StockRecon\Http\Controllers\SupportRequestController;
 use Modules\StockRecon\Http\Controllers\WaterMeterController;
 use Modules\StockRecon\Http\Controllers\WeeklyStockController;
 use Modules\StockRecon\Http\Middleware\CountingAreaAccess;
@@ -133,6 +134,19 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
         ->middleware('can:stockrecon.runs.execute')->name('line.adjust.form');
     Route::post('runs/{run}/lines/{line}/adjust', [StockReconController::class, 'adjust'])
         ->middleware('can:stockrecon.runs.execute')->name('line.adjust');
+
+    // Support requests on a chain (Ryan, 16 Nov 2026): raised from a chain
+    // row, listed for head office, resolved by who may amend.
+    Route::get('runs/{run}/lines/{line}/support', [SupportRequestController::class, 'form'])
+        ->middleware('can:stockrecon.runs.view')->name('support.form');
+    Route::post('runs/{run}/lines/{line}/support', [SupportRequestController::class, 'store'])
+        ->middleware(['can:stockrecon.runs.view', 'throttle:20,1'])->name('support.store');
+    Route::get('support', [SupportRequestController::class, 'index'])
+        ->middleware('can:stockrecon.runs.view')->name('support.index');
+    Route::get('support/{ticket}/screenshot', [SupportRequestController::class, 'screenshot'])
+        ->whereNumber('ticket')->middleware('can:stockrecon.runs.view')->name('support.screenshot');
+    Route::post('support/{ticket}/resolve', [SupportRequestController::class, 'resolve'])
+        ->whereNumber('ticket')->middleware('can:stockrecon.runs.execute')->name('support.resolve');
 
     Route::post('runs/{run}/commit', [StockReconController::class, 'commit'])
         ->middleware('can:stockrecon.runs.execute')->name('commit');

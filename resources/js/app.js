@@ -29,6 +29,7 @@ import bulkSelection from './components/bulk-selection';
 import postLink from './components/post-link';
 import duplicateRelease from './components/duplicate-release';
 import chainExplain from './components/chain-explain';
+import supportRequest from './components/support-request';
 import fragment from './components/fragment';
 import loader, { afterPaint } from './components/loader';
 import * as format from './format';
@@ -107,6 +108,7 @@ const initial = afterPaint().then(() => Promise.allSettled([
     initialize('Post links', postLink),
     initialize('Duplicate release', duplicateRelease),
     initialize('Chain explain', chainExplain),
+    initialize('Support request', supportRequest),
     initialize('Reconciliation suggestions', reconSuggest),
     initialize('Data grids', dataGrid),
     initialize('Operations wall', operationsWall),

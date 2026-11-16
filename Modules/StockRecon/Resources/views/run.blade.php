@@ -22,6 +22,7 @@
                 <a href="{{ route('app.stockrecon.helper', $run) }}">Explain this run</a>
                 <a href="{{ route('app.stockrecon.tutorial') }}">Tutorial</a>
                 <a href="{{ route('app.stockrecon.index') }}">Run another</a>
+                <a href="{{ route('app.stockrecon.support.index') }}">Support requests</a>
                 @isset($panes['proposals']['extract'])
                     <hr>
                     <button type="button" data-drawer-open="dg-stockrecon-{{ $run->Id }}-extract">Extract shifts…</button>
@@ -94,6 +95,11 @@
 {{-- What every code means, opened from the "i" on the exceptions and from
      any code badge on this page (7 Oct 2026). --}}
 @include('stockrecon::partials.codes-modal')
+{{-- The Support button on a chain row opens this, its body fetched per chain
+     (Ryan, 16 Nov 2026). Outside the commit form. --}}
+@can('stockrecon.runs.view')
+    <x-modal id="support-request" title="Support request" wide><p class="muted">Loading…</p></x-modal>
+@endcan
 {{-- The pencil on a chain panel row opens this; its body is fetched per row
      (Ryan, 16 Nov 2026). Outside the commit form, so its own form can post. --}}
 @if ($run->isOpen())
