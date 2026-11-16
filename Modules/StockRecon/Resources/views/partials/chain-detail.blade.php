@@ -118,7 +118,13 @@
             @php($group = $groups[(int) $shift->Id] ?? null)
             {{-- Till sales that never reached PumpIT (Ryan, 15 Nov 2026). --}}
             @php($posGap = \Modules\StockRecon\Services\StockReconService::posGap($posGaps ?? [], $shift->TransactionDate, $item?->AreaNo, $item?->StockItemNo, $shift->QtyPOS, $item?->StockLocation))
-            <tr @class(['is-matched' => (bool) $shift->IsClicked, 'bal-g'.($group['series'] ?? 0) => $group !== null])>
+            {{-- The shift to look at, red (Ryan, 16 Nov 2026: "red row as in the
+                 detail ... just bringing the users attention to it"): a missed
+                 count Agora proposes to correct, or the shift that holds the
+                 chain back. Attention only; it says nothing about the tick. --}}
+            @php($lookHere = str_starts_with((string) $shift->Outcome, 'Missed count:')
+                || ($item?->ChainBlocked && ! str_starts_with((string) $shift->Outcome, 'Held back: another shift')))
+            <tr @class(['is-matched' => (bool) $shift->IsClicked && ! $lookHere, 'is-crit' => $lookHere, 'bal-g'.($group['series'] ?? 0) => $group !== null])>
                 <td class="l fit-min">{{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }}</td>
                 <td class="num">{{ \Modules\StockRecon\Support\ShiftLabel::show($shift->ShiftNo) }}</td>
                 {{-- Who was signed on to this counting area for this shift.

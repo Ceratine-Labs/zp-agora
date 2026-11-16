@@ -1511,6 +1511,15 @@ BEGIN
                CONVERT(bit, CASE WHEN ch.FlagMissedClose = 0
                                   AND ABS(ch.AmendClose) > ch.CfgMaxAmendment THEN 1 ELSE 0 END)
                                                                            AS FlagBigAmendment,
+               /* A missed count the caps WOULD have held back (16 Nov 2026).
+                  Only these are proposed unticked and marked: a missed count
+                  inside the caps balanced and was ticked before M1 existed,
+                  and still is. */
+               CONVERT(bit, CASE WHEN ch.FlagMissedClose = 1
+                                  AND (ABS(ch.AmendClose) > ch.CfgMaxAmendment
+                                       OR (ch.OpenRep + ch.QtyIssued > 0
+                                           AND ABS(ch.AmendClose) > ch.CfgMaxAmendmentPct * (ch.OpenRep + ch.QtyIssued)))
+                                 THEN 1 ELSE 0 END)                        AS FlagMissedCountCapped,
                /* Not on a dormant shift inside an opening-break pair (12 Nov
                   2026). It inherits the correction of the shift that counted,
                   where the cap has already judged it against what that shift
@@ -2184,7 +2193,7 @@ BEGIN
             WHEN a.EffVarNew < -@eps AND a.RowMoves = 1
                                               THEN 'Balanced, short remains: accountable'
             WHEN a.EffVarNew < -@eps          THEN 'Short: accountable, no amendment available'
-            WHEN a.FlagMissedClose = 1 AND a.ChainBlocked = 0 AND ABS(a.EffAmend) > @eps
+            WHEN a.FlagMissedCountCapped = 1 AND a.ChainBlocked = 0 AND ABS(a.EffAmend) > @eps
                                               THEN N'Missed count: closing 0, counted back next shift. Tick to correct to '
                                                    + FORMAT(a.EffCloseNew, '0.###')
             WHEN ABS(a.EffAmend) > @eps       THEN 'Balanced to zero'
@@ -2197,9 +2206,10 @@ BEGIN
         CONVERT(bit, CASE WHEN a.RowMoves = 1 OR a.IssueWrite = 1
                                OR (ABS(a.IssueAdd) > @eps AND ABS(a.QtyIssued + a.IssueAdd - a.PreIssue - a.QtyIssuedKeyed) > @tol)
                           THEN 1 ELSE 0 END),
-        /* Selected: a chain with a missed count (M1) is proposed unticked —
-           somebody decides to correct it (Ryan, 16 Nov 2026). */
-        CONVERT(bit, CASE WHEN MAX(CONVERT(int, a.FlagMissedClose)) OVER (
+        /* Selected: a chain with a missed count the caps would have held
+           back (M1) is proposed unticked — somebody decides to correct it
+           (Ryan, 16 Nov 2026). */
+        CONVERT(bit, CASE WHEN MAX(CONVERT(int, a.FlagMissedCountCapped)) OVER (
                                    PARTITION BY a.AreaNo, a.StockItemNo, a.ContinuitySegment) = 1 THEN 0
                           WHEN a.RowMoves = 1 OR a.IssueWrite = 1
                                OR (ABS(a.IssueAdd) > @eps AND ABS(a.QtyIssued + a.IssueAdd - a.PreIssue - a.QtyIssuedKeyed) > @tol)

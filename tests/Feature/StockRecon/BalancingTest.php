@@ -322,7 +322,11 @@ class BalancingTest extends TestCase
             '2026-07-20' => [1 => [55, 0, 53, 2], 3 => [53, 0, 51, 2]],
             '2026-07-21' => [1 => [51, 0, 49, 2], 3 => [49, 0, 47, 2]],
         ]);
-        $run = $this->previewArea(self::SHELF_AREA);
+        // A cap the 58 correction is over, as Debonairs BOH's was. Inside the
+        // caps the same shape balances ticked, as it always did
+        // (test_a_live_commit_writes_both_counts_and_a_reversal_puts_them_back).
+        $run = $this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'), Carbon::parse('2026-07-21'),
+            options: ['MaxAmendment' => 20], note: 'TEST-missed-count')->load('lines');
 
         $missed = $this->lineAt($run, '2026-07-18', 3);
         $next = $this->lineAt($run, '2026-07-19', 1);
