@@ -223,6 +223,7 @@ rsync -az --no-owner --no-group --delete \
   --exclude '.claude' --exclude 'test-results' \
   --exclude 'CLAUDE.md' --exclude 'CERATINE_API_INSTRUCTIONS.md' \
   --exclude 'pm_tasks.md' --exclude 'pm_response.md' \
+  --exclude 'storage/app/*' \
   --exclude 'storage/logs/*' \
   --exclude 'storage/framework/cache/data/*' \
   --exclude 'storage/framework/sessions/*' \

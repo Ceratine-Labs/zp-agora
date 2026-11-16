@@ -121,6 +121,13 @@ npm run build >/dev/null
 #       deletes tests/ from the box. That is intended.
 #   H /probe.mjs   keeps the root browser diagnostic off the server and lets
 #       the next authorized deploy remove any previously shipped copy.
+#
+# storage/app/* is excluded both ways (16 Nov 2026). It is where the server
+# keeps what people upload — the stock recon support screenshots under
+# private/stockrecon-support/{branch}/ — and none of it is in git. Without
+# the exclude, --delete removed every upload the checkout did not happen to
+# have, and a checkout shipped its own test screenshots and reference
+# captures to the box. Found on a dry run from a clean worktree.
 echo "==> shipping to ${HOST}:${REMOTE}"
 rsync -az --no-owner --no-group --delete $DRY \
     --exclude '.git' \
@@ -135,6 +142,7 @@ rsync -az --no-owner --no-group --delete $DRY \
     --exclude 'CERATINE_API_INSTRUCTIONS.md' \
     --exclude 'pm_tasks.md' \
     --exclude 'pm_response.md' \
+    --exclude 'storage/app/*' \
     --exclude 'storage/logs/*' \
     --exclude 'storage/framework/cache/data/*' \
     --exclude 'storage/framework/sessions/*' \
