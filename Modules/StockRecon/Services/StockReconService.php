@@ -8,6 +8,7 @@ use App\Support\ProcedureService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\StockRecon\Models\StockReconAmendment;
@@ -623,16 +624,39 @@ class StockReconService
      */
     public function tillQtyGaps(StockReconRun $run): Collection
     {
-        try {
-            return $this->procedures->call('usp_StockRecon_TillQtyCheck', [
-                'BranchId' => $run->BranchId,
-                'RunId' => $run->Id,
-            ]);
-        } catch (\Throwable $e) {
-            report($e);
+        // Once per run per ten minutes (16 Nov 2026): on a whole-site week the
+        // check takes seconds, and the chain panel and Explain read this copy.
+        return Cache::remember(self::tillGapsKey($run), now()->addMinutes(10), function () use ($run) {
+            try {
+                return $this->procedures->call('usp_StockRecon_TillQtyCheck', [
+                    'BranchId' => $run->BranchId,
+                    'RunId' => $run->Id,
+                ]);
+            } catch (\Throwable $e) {
+                report($e);
 
-            return collect();
-        }
+                return collect();
+            }
+        });
+    }
+
+    /**
+     * The run page's copy of the till gaps, never computed here: the chain
+     * panel opens many times a minute and must not run the check itself
+     * (16 Nov 2026, run 80527 stalled when it did).
+     *
+     * @return Collection<int, object>
+     */
+    public function cachedTillQtyGaps(StockReconRun $run): Collection
+    {
+        $cached = Cache::get(self::tillGapsKey($run));
+
+        return $cached instanceof Collection ? $cached : collect();
+    }
+
+    private static function tillGapsKey(StockReconRun $run): string
+    {
+        return 'stockrecon:tillgaps:'.$run->Id;
     }
 
     /**

@@ -48,7 +48,7 @@ class ChainExplainer
         }
 
         $chain = $this->recon->chain($run, $line);
-        $facts = $this->facts($run, $chain['item'], $chain['shifts'], $this->recon->tillQtyGaps($run));
+        $facts = $this->facts($run, $chain['item'], $chain['shifts'], $this->recon->cachedTillQtyGaps($run));
         $config = config('stockrecon.explain');
 
         return Cache::remember(

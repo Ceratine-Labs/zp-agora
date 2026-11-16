@@ -57,26 +57,33 @@ BEGIN
     FROM agora.StockReconRunLine rl
     WHERE rl.BranchId = @BranchId AND rl.RunId = @RunId;
 
-    IF OBJECT_ID('tempdb..#gaps') IS NOT NULL DROP TABLE #gaps;
+    /* Each side into its own temp table first (16 Nov 2026). As two CTEs
+       over the views joined in one statement, a whole-site week (run 80527,
+       176 items) took 76 seconds and stalled the run page; materialised,
+       the same work is about 4. */
+    IF OBJECT_ID('tempdb..#recon') IS NOT NULL DROP TABLE #recon;
+    SELECT CONVERT(date, l.TransactionDate) AS TransactionDate, l.AreaNo, l.StockItemNo,
+           SUM(CONVERT(decimal(18, 4), ISNULL(l.QtyComputer, 0))) AS QtyRecon
+    INTO #recon
+    FROM agora.vw_StockReconLine l
+    JOIN #items i ON i.AreaNo = l.AreaNo AND i.StockItemNo = l.StockItemNo
+    WHERE l.BranchId = @BranchId
+      AND l.TransactionDate >= @From AND l.TransactionDate < @Until
+    GROUP BY CONVERT(date, l.TransactionDate), l.AreaNo, l.StockItemNo
+    OPTION (RECOMPILE);
 
-    WITH recon AS (
-        SELECT CONVERT(date, l.TransactionDate) AS TransactionDate, l.AreaNo, l.StockItemNo,
-               SUM(CONVERT(decimal(18, 4), ISNULL(l.QtyComputer, 0))) AS QtyRecon
-        FROM agora.vw_StockReconLine l
-        JOIN #items i ON i.AreaNo = l.AreaNo AND i.StockItemNo = l.StockItemNo
-        WHERE l.BranchId = @BranchId
-          AND l.TransactionDate >= @From AND l.TransactionDate < @Until
-        GROUP BY CONVERT(date, l.TransactionDate), l.AreaNo, l.StockItemNo
-    ),
-    till AS (
-        SELECT CONVERT(date, t.TransactionDate) AS TransactionDate, t.AreaNo, t.StockItemNo,
-               SUM(t.Qty) AS QtyTill
-        FROM agora.vw_StockReconTillQty t
-        JOIN #items i ON i.AreaNo = t.AreaNo AND i.StockItemNo = t.StockItemNo
-        WHERE t.BranchId = @BranchId
-          AND t.TransactionDate >= @From AND t.TransactionDate < @Until
-        GROUP BY CONVERT(date, t.TransactionDate), t.AreaNo, t.StockItemNo
-    )
+    IF OBJECT_ID('tempdb..#till') IS NOT NULL DROP TABLE #till;
+    SELECT CONVERT(date, t.TransactionDate) AS TransactionDate, t.AreaNo, t.StockItemNo,
+           SUM(t.Qty) AS QtyTill
+    INTO #till
+    FROM agora.vw_StockReconTillQty t
+    JOIN #items i ON i.AreaNo = t.AreaNo AND i.StockItemNo = t.StockItemNo
+    WHERE t.BranchId = @BranchId
+      AND t.TransactionDate >= @From AND t.TransactionDate < @Until
+    GROUP BY CONVERT(date, t.TransactionDate), t.AreaNo, t.StockItemNo
+    OPTION (RECOMPILE);
+
+    IF OBJECT_ID('tempdb..#gaps') IS NOT NULL DROP TABLE #gaps;
     SELECT r.TransactionDate,
            r.AreaNo,
            CONVERT(nvarchar(10), r.StockItemNo)            AS StockItemNo,
@@ -86,8 +93,8 @@ BEGIN
            CONVERT(decimal(18, 3), t.QtyTill - r.QtyRecon) AS QtyMissing,
            CONVERT(varchar(4), CASE WHEN ABS(r.QtyRecon) < 0.005 THEN 'day' ELSE 'part' END) AS Kind
     INTO #gaps
-    FROM recon r
-    JOIN till t
+    FROM #recon r
+    JOIN #till t
       ON t.TransactionDate = r.TransactionDate AND t.AreaNo = r.AreaNo AND t.StockItemNo = r.StockItemNo
     WHERE ABS(t.QtyTill - r.QtyRecon) > 0.01;
 
@@ -112,7 +119,8 @@ BEGIN
     FROM #days dd
     JOIN agora.vw_StockReconComputerQty f ON f.MistEod = dd.MistEod
     WHERE f.BranchId = @BranchId
-    GROUP BY dd.D, f.Location;
+    GROUP BY dd.D, f.Location
+    OPTION (RECOMPILE);
 
     -- The till locations the run's items sell through, per area.
     IF OBJECT_ID('tempdb..#locs') IS NOT NULL DROP TABLE #locs;
@@ -125,13 +133,9 @@ BEGIN
 
     INSERT INTO #gaps (TransactionDate, AreaNo, StockItemNo, Location, QtyRecon, QtyTill, QtyMissing, Kind)
     SELECT ad.D, ad.AreaNo, NULL, lc.Location, ad.QtyRecon, NULL, NULL, 'feed'
-    FROM (SELECT CONVERT(date, l.TransactionDate) AS D, l.AreaNo,
-                 CONVERT(decimal(18, 3), SUM(ISNULL(l.QtyComputer, 0))) AS QtyRecon
-            FROM agora.vw_StockReconLine l
-            JOIN #items i ON i.AreaNo = l.AreaNo AND i.StockItemNo = l.StockItemNo
-           WHERE l.BranchId = @BranchId
-             AND l.TransactionDate >= @From AND l.TransactionDate < @Until
-           GROUP BY CONVERT(date, l.TransactionDate), l.AreaNo) ad
+    FROM (SELECT r.TransactionDate AS D, r.AreaNo, CONVERT(decimal(18, 3), SUM(r.QtyRecon)) AS QtyRecon
+            FROM #recon r
+           GROUP BY r.TransactionDate, r.AreaNo) ad
     JOIN #locs lc ON lc.AreaNo = ad.AreaNo
     WHERE NOT EXISTS (SELECT 1 FROM #feed f WHERE f.D = ad.D AND f.Location = lc.Location)
       AND EXISTS (SELECT 1 FROM #feed f WHERE f.Location = lc.Location);
