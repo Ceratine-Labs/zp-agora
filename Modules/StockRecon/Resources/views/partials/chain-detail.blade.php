@@ -16,6 +16,15 @@
      amend, on every shift but the chain's last (its closing is the next
      count's opening, outside the run). --}}
 @php($canAdjust = $run->isOpen() && (auth()->user()?->can('stockrecon.runs.execute') ?? false) && ! ($item?->BlockPossibleDuplicate))
+{{-- UP TO WHERE ANOTHER RUN AMENDED (Ryan, 16 Nov 2026, run 80536: "show up
+     to where a run has been amended"). Each shift another run already amended
+     says which; a line under the last of them says this run proposes from
+     there on. --}}
+@php($elsewhere = collect($elsewhere ?? []))
+@php($heldHere = $shifts->filter(fn ($s) => $elsewhere->has((int) $s->Id)))
+@php($lastHeldId = $heldHere->isNotEmpty() ? (int) $heldHere->last()->Id : null)
+@php($heldRuns = $heldHere->map(fn ($s) => $elsewhere->get((int) $s->Id))->unique()->values())
+@php($panelCols = 19 + ($canAdjust ? 1 : 0))
 
 {{-- The possible duplicates on this chain (PM decision 01a10b21): those with
      no release standing NOW, which the panel offers to release, and those
@@ -130,7 +139,7 @@
                  chain back. Attention only; it says nothing about the tick. --}}
             @php($lookHere = str_starts_with((string) $shift->Outcome, 'Missed count:')
                 || ($item?->ChainBlocked && ! str_starts_with((string) $shift->Outcome, 'Held back: another shift')))
-            <tr @class(['is-matched' => (bool) $shift->IsClicked && ! $lookHere, 'is-crit' => $lookHere, 'bal-g'.($group['series'] ?? 0) => $group !== null])>
+            <tr @class(['is-matched' => (bool) $shift->IsClicked && ! $lookHere, 'is-crit' => $lookHere, 'is-held-elsewhere' => $elsewhere->has((int) $shift->Id), 'bal-g'.($group['series'] ?? 0) => $group !== null])>
                 <td class="l fit-min">{{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }}</td>
                 <td class="num">{{ \Modules\StockRecon\Support\ShiftLabel::show($shift->ShiftNo) }}</td>
                 {{-- Who was signed on to this counting area for this shift.
@@ -189,6 +198,9 @@
                 <td class="num">{{ $dash($shift->AmendClose) }}</td>
                 <td class="l muted" style="font-size:12px">
                     {{ $shift->Outcome }}
+                    @if ($elsewhere->has((int) $shift->Id))
+                        <a href="{{ route('app.stockrecon.run', $elsewhere->get((int) $shift->Id)) }}" class="held-elsewhere-link"><x-chip class="held-elsewhere" :dot="false">Amended on run #{{ $elsewhere->get((int) $shift->Id) }}</x-chip></a>
+                    @endif
                     @if ((float) $shift->CurrentGoodWaste > 0 || (float) $shift->CurrentBadWaste > 0 || (float) $shift->PreviewAppliedGoodWaste > 0)
                         <div>Current captured waste: good {{ \App\Support\Format::qty($shift->CurrentGoodWaste) }}, bad {{ \App\Support\Format::qty($shift->CurrentBadWaste) }} · {{ $shift->CurrentWasteStatus }}.</div>
                         @if ($shift->CurrentWasteStatus === 'Authorized')
@@ -270,6 +282,16 @@
                     </td>
                 @endif
             </tr>
+            @if ($lastHeldId !== null && (int) $shift->Id === $lastHeldId)
+                <tr class="amend-boundary">
+                    <td colspan="{{ $panelCols }}">
+                        Amended up to {{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }} shift {{ \Modules\StockRecon\Support\ShiftLabel::show($shift->ShiftNo) }}
+                        on run{{ $heldRuns->count() > 1 ? 's' : '' }}
+                        @foreach ($heldRuns as $held)<a href="{{ route('app.stockrecon.run', $held) }}">#{{ $held }}</a>{{ $loop->last ? '' : ', ' }}@endforeach
+                        · {{ $loop->last ? 'to the end of this chain' : 'this run proposes from here on' }}
+                    </td>
+                </tr>
+            @endif
         @endforeach
     </x-table>
 

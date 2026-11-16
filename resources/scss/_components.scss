@@ -2188,3 +2188,13 @@ tr.tt-group.is-missed-count > td:first-child { box-shadow: inset 3px 0 0 var(--c
   .support-msg { white-space: pre-wrap; max-width: 60ch; }
   .support-thumb { display: block; max-width: 160px; max-height: 90px; border: 1px solid var(--line); border-radius: 4px; }
 }
+
+/* The chain panel: the shifts another run already amended, and the line under
+   the last of them (Ryan, 16 Nov 2026: "show up to where a run has been
+   amended"). */
+.drill-chain tr.is-held-elsewhere > td { background: var(--amend-bg); }
+.drill-chain tr.amend-boundary > td {
+  padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--amend-ink);
+  background: var(--surface); border-top: 2px solid var(--amend-ink); border-bottom: 1px solid var(--line);
+  a { color: inherit; font-weight: 700; }
+}
