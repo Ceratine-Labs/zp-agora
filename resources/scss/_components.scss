@@ -2145,3 +2145,8 @@ td.pos-missing {
     vertical-align: 1px;
   }
 }
+
+/* A chain with a missed closing count (Ryan, 16 Nov 2026: "make the row red
+   so that it draws attention"): proposed unticked, the head row red. */
+tr.tt-group.is-missed-count > td { background: var(--crit-bg); }
+tr.tt-group.is-missed-count > td:first-child { box-shadow: inset 3px 0 0 var(--crit); }

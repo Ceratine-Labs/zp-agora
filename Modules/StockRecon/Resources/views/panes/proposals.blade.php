@@ -348,7 +348,9 @@
                 @if ($chainHeld->isNotEmpty() && $chainFree === 0 && $chain->writable() > 0)
                     @php($state = ['label' => 'Amended elsewhere', 'tone' => 'neutral', 'title' => 'Every shift this run would write is already amended on run #'.$chainHeld->implode(', #').'. Reverse it there to balance it here.'])
                 @endif
-                <tr @class(['tt-group', 'is-held-elsewhere' => $chainHeld->isNotEmpty()]) data-tt-group-head="{{ $chain->key }}" tabindex="0" aria-expanded="false"
+                {{-- A missed closing count on the chain: the whole row red, so it
+                     is seen and ticked on purpose (Ryan, 16 Nov 2026). --}}
+                <tr @class(['tt-group', 'is-held-elsewhere' => $chainHeld->isNotEmpty(), 'is-missed-count' => $chain->lines->contains(fn ($l) => $l->missedCount())]) data-tt-group-head="{{ $chain->key }}" tabindex="0" aria-expanded="false"
                     data-detail-url="{{ route('app.stockrecon.line', [$run, $first]) }}">
                     @if ($run->isOpen())
                         <td class="pick">

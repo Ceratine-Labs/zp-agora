@@ -305,6 +305,55 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * A missed closing count (Ryan, 16 Nov 2026, run 80529, D Cheddar Cheese
+     * Kg): issued 24, closed 0, then the next shift opened 0 and counted the
+     * stock back. The correction is as big as the stock, which the caps read
+     * as implausible and held the whole chain back with no way to amend it.
+     * Now the chain is proposed with the closing corrected, UNTICKED, and the
+     * row says it is a missed count; ticked, it commits.
+     */
+    public function test_a_missed_closing_count_is_proposed_unticked_and_commits_when_ticked(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [40, 0, 38, 2], 3 => [38, 0, 36, 2]],
+            '2026-07-18' => [1 => [36, 0, 34, 2], 3 => [34, 24, 0, 0]],
+            '2026-07-19' => [1 => [0, 0, 57, 2], 3 => [57, 0, 55, 2]],
+            '2026-07-20' => [1 => [55, 0, 53, 2], 3 => [53, 0, 51, 2]],
+            '2026-07-21' => [1 => [51, 0, 49, 2], 3 => [49, 0, 47, 2]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+
+        $missed = $this->lineAt($run, '2026-07-18', 3);
+        $next = $this->lineAt($run, '2026-07-19', 1);
+
+        $this->assertEqualsWithDelta(-58, (float) $missed->QtyVar, 0.001);
+        $this->assertEqualsWithDelta(59, (float) $next->QtyVar, 0.001);
+        $this->assertFalse((bool) $missed->ChainBlocked, (string) $missed->Outcome);
+        $this->assertStringStartsWith('Missed count:', (string) $missed->Outcome);
+        $this->assertTrue($missed->missedCount());
+        $this->assertSame('crit', $missed->tone());
+
+        // The closing is corrected and the next opening follows it.
+        $this->assertGreaterThan(50, (float) $missed->QtyCloseNew);
+        $this->assertEqualsWithDelta((float) $missed->QtyCloseNew, (float) $next->QtyOpenNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $missed->QtyVarNew, 0.001);
+
+        // Proposed, but nothing on the chain is ticked: somebody decides.
+        $this->assertTrue((bool) $missed->WouldAmend);
+        $this->assertSame(0, $run->lines->filter(fn ($l) => (bool) $l->Selected)->count());
+
+        // Ticked, it commits: PumpIT gets the corrected closing and opening.
+        $this->db()->table('agora.StockReconRunLine')->where('RunId', $run->Id)
+            ->where('WouldAmend', 1)->update(['Selected' => 1]);
+        $this->service->commit($run->fresh());
+        $this->assertEqualsWithDelta((float) $missed->QtyCloseNew, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta((float) $missed->QtyCloseNew, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-19', 1)->QtyOpen, 0.001);
+        $this->service->reverse($run->fresh(), 'TEST-missed-count reversal');
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyClose, 0.001);
+    }
+
+    /**
      * In whole multiples, because an issue is. Short 10, then an over of 20
      * on a multiple of 10: one multiple is the short coming back and balances
      * through the closings between; the other is captured as the issue. A

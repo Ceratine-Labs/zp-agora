@@ -270,10 +270,19 @@ class StockReconRunLine extends BaseModel
         };
     }
 
+    /**
+     * A closing counted 0 that the next shift counted back (M1, Ryan, 16 Nov
+     * 2026): proposed unticked and shown red, so somebody decides to correct it.
+     */
+    public function missedCount(): bool
+    {
+        return str_starts_with((string) $this->Outcome, 'Missed count:');
+    }
+
     /** The chip tone for that outcome. */
     public function tone(): string
     {
-        if (str_starts_with((string) $this->Outcome, 'Missing shift:')) {
+        if (str_starts_with((string) $this->Outcome, 'Missing shift:') || $this->missedCount()) {
             return 'crit';
         }
 

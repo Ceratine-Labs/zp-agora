@@ -1419,7 +1419,32 @@ BEGIN
                CASE WHEN j.Mult >= 2 AND j.Weighed = 0 AND j.QtyVarRep > @eps
                      AND ROUND(j.QtyVarRep / NULLIF(j.Mult, 0), 0) >= 1
                      AND ABS(j.QtyVarRep - ROUND(j.QtyVarRep / NULLIF(j.Mult, 0), 0) * j.Mult) <= 0.10 * j.Mult
-                    THEN 1 ELSE 0 END                                      AS PackOver
+                    THEN 1 ELSE 0 END                                      AS PackOver,
+               /* M1 — A MISSED CLOSING COUNT (Ryan, 16 Nov 2026, run 80529,
+                  D Cheddar Cheese Kg: 10 Nov afternoon issued 24 and closed
+                  0, short 58.6; the night opened 0 and counted 57.24, over
+                  59.4). The closing was never counted: stock was on hand, the
+                  shift wrote 0, the next shift carried the 0 and then counted
+                  the stock back, the over within 10% of the short. The
+                  correction is as big as the stock, so the caps read it as
+                  implausible and held the whole chain back with no way to
+                  amend it. On this shift the caps do not hold the chain; the
+                  chain is proposed UNTICKED and the row says so, so somebody
+                  decides to correct it (stage 8). */
+               CONVERT(bit, CASE WHEN j.IsDormant = 0
+                                  AND ABS(j.QtyClose) < @eps
+                                  AND j.OpenRep + j.QtyIssued - j.QtyPOS > @eps
+                                  AND j.QtyVarRep < -@eps
+                                  AND ABS(LEAD(j.OpenRep) OVER (
+                                          PARTITION BY j.AreaNo, j.StockItemNo, j.ContinuitySegment
+                                          ORDER BY j.TransactionDate, j.ShiftNo)) < @eps
+                                  AND LEAD(j.QtyVarRep) OVER (
+                                          PARTITION BY j.AreaNo, j.StockItemNo, j.ContinuitySegment
+                                          ORDER BY j.TransactionDate, j.ShiftNo) > @eps
+                                  AND ABS(LEAD(j.QtyVarRep) OVER (
+                                          PARTITION BY j.AreaNo, j.StockItemNo, j.ContinuitySegment
+                                          ORDER BY j.TransactionDate, j.ShiftNo) + j.QtyVarRep) <= 0.10 * -j.QtyVarRep
+                                 THEN 1 ELSE 0 END)                        AS FlagMissedClose
         FROM joined j
     ),
     /* ----------------------------------------------------------- stage 6
@@ -1483,7 +1508,8 @@ BEGIN
                                   AND ABS(ch.QtyPOS) < @eps
                                  THEN 1 ELSE 0 END)                        AS FlagIssueWentNowhere,
                /* F1 — the plausibility caps, both halves. */
-               CONVERT(bit, CASE WHEN ABS(ch.AmendClose) > ch.CfgMaxAmendment THEN 1 ELSE 0 END)
+               CONVERT(bit, CASE WHEN ch.FlagMissedClose = 0
+                                  AND ABS(ch.AmendClose) > ch.CfgMaxAmendment THEN 1 ELSE 0 END)
                                                                            AS FlagBigAmendment,
                /* Not on a dormant shift inside an opening-break pair (12 Nov
                   2026). It inherits the correction of the shift that counted,
@@ -1491,7 +1517,8 @@ BEGIN
                   held; "what this shift held" is the miscount itself — 12
                   carried forward where 74 was due — so the share read here
                   held back the very chain the pair exists to balance. */
-               CONVERT(bit, CASE WHEN ch.OpenRep + ch.QtyIssued > 0
+               CONVERT(bit, CASE WHEN ch.FlagMissedClose = 0
+                                  AND ch.OpenRep + ch.QtyIssued > 0
                                   AND ABS(ch.AmendClose) > ch.CfgMaxAmendmentPct * (ch.OpenRep + ch.QtyIssued)
                                   AND NOT (ch.IsDormant = 1 AND ch.InOpeningOffset = 1)
                                  THEN 1 ELSE 0 END)                        AS FlagPctAmendment,
@@ -2157,6 +2184,9 @@ BEGIN
             WHEN a.EffVarNew < -@eps AND a.RowMoves = 1
                                               THEN 'Balanced, short remains: accountable'
             WHEN a.EffVarNew < -@eps          THEN 'Short: accountable, no amendment available'
+            WHEN a.FlagMissedClose = 1 AND a.ChainBlocked = 0 AND ABS(a.EffAmend) > @eps
+                                              THEN N'Missed count: closing 0, counted back next shift. Tick to correct to '
+                                                   + FORMAT(a.EffCloseNew, '0.###')
             WHEN ABS(a.EffAmend) > @eps       THEN 'Balanced to zero'
             WHEN a.RowMoves = 1 AND ABS(a.EffOpenNew - a.QtyOpen) < @tol
                                               THEN 'Restored: a hand amendment in PumpIT goes back to the count'
@@ -2167,7 +2197,11 @@ BEGIN
         CONVERT(bit, CASE WHEN a.RowMoves = 1 OR a.IssueWrite = 1
                                OR (ABS(a.IssueAdd) > @eps AND ABS(a.QtyIssued + a.IssueAdd - a.PreIssue - a.QtyIssuedKeyed) > @tol)
                           THEN 1 ELSE 0 END),
-        CONVERT(bit, CASE WHEN a.RowMoves = 1 OR a.IssueWrite = 1
+        /* Selected: a chain with a missed count (M1) is proposed unticked —
+           somebody decides to correct it (Ryan, 16 Nov 2026). */
+        CONVERT(bit, CASE WHEN MAX(CONVERT(int, a.FlagMissedClose)) OVER (
+                                   PARTITION BY a.AreaNo, a.StockItemNo, a.ContinuitySegment) = 1 THEN 0
+                          WHEN a.RowMoves = 1 OR a.IssueWrite = 1
                                OR (ABS(a.IssueAdd) > @eps AND ABS(a.QtyIssued + a.IssueAdd - a.PreIssue - a.QtyIssuedKeyed) > @tol)
                           THEN 1 ELSE 0 END),
         'pending',
