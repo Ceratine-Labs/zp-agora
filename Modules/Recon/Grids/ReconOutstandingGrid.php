@@ -9,6 +9,7 @@ use App\Grid\Sources\GridSource;
 use App\Grid\Sources\ProcedureSource;
 use App\Support\BranchContext;
 use App\Support\BusinessDate;
+use Illuminate\Support\Carbon;
 
 /**
  * The outstanding rows behind the bank recon dashboard — the Items tab.
@@ -25,7 +26,10 @@ use App\Support\BusinessDate;
  * form carries the selection through when somebody searches.
  *
  * The area and side come off the request as `area` and `side`, set by the
- * links on the summary and per-site tables.
+ * links on the pivot, the summary and the per-site tables.
+ *
+ * A Reference opens Trace (rowUrl()), the screen that finds a value's other
+ * half across both sides and every area.
  */
 class ReconOutstandingGrid extends GridDefinition
 {
@@ -62,7 +66,8 @@ class ReconOutstandingGrid extends GridDefinition
             new GridColumn(key: 'Side', label: 'Side', sort: 'Side'),
             new GridColumn(key: 'TxnDate', label: 'Date', format: 'date', sort: 'TxnDate'),
             new GridColumn(key: 'AgeDays', label: 'Age (days)', format: 'number', sort: 'AgeDays'),
-            new GridColumn(key: 'Reference', label: 'Reference', sort: 'Reference', mono: true),
+            // Opens Trace on the value (rowUrl()), where it is long enough to trace.
+            new GridColumn(key: 'Reference', label: 'Reference', sort: 'Reference', mono: true, link: true),
             new GridColumn(key: 'Detail', label: 'Detail', sort: 'Detail', wide: true),
             new GridColumn(key: 'Amount', label: 'Amount', format: 'money', sort: 'Amount', total: true),
         ];
@@ -99,6 +104,39 @@ class ReconOutstandingGrid extends GridDefinition
     public function defaultSort(): ?string
     {
         return 'TxnDate';
+    }
+
+    /**
+     * A reference opens Trace (16 Nov 2026): the same value across the whole
+     * ledger and the legacy estate behind it, at the row's own site, a
+     * fortnight either side of its date — where its other half, or the reason
+     * it has none, is found. Trace refuses a term under three characters, so
+     * a shorter reference is not a link. The window ends today: a row dated in
+     * the future (a To past today) keeps its own date inside it.
+     */
+    public function rowUrl(object $row): ?string
+    {
+        $reference = trim((string) ($row->Reference ?? ''));
+
+        if (mb_strlen($reference) < 3) {
+            return null;
+        }
+
+        try {
+            $day = Carbon::parse(substr((string) ($row->TxnDate ?? ''), 0, 10))->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $today = BusinessDate::today();
+        $end = $day->copy()->addDays(14)->min($today->greaterThan($day) ? $today : $day);
+
+        return route('app.recon.trace', array_filter([
+            'q' => $reference,
+            'branch_id' => (int) ($row->BranchId ?? 0) ?: null,
+            'from' => $day->copy()->subDays(14)->toDateString(),
+            'to' => $end->toDateString(),
+        ], fn (mixed $value) => $value !== null));
     }
 
     public function branchSelector(): bool

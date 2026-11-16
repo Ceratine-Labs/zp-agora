@@ -116,6 +116,41 @@ return [
         'stale_after' => 30,
     ],
 
+    /*
+    | The outstanding dashboard's pivot (16 Nov 2026). Presentation only: no
+    | figure depends on these, so a setting here changes a colour, a status
+    | label or a notice and never a sum. The deposit lags that DO move figures
+    | (what counts as in transit) are written in usp_Recon_DashboardOutstanding,
+    | where ZP can read and edit them.
+    |
+    |   tolerance_rand / tolerance_pct
+    |                  a one-sided gap is coloured, and a site reads Not in bank
+    |                  or Not declared, only beyond max(R tolerance_rand,
+    |                  tolerance_pct % of the larger side). 5% / R1 000 greyed a
+    |                  R6.6m gap on the largest FNB cell; this does not.
+    |   statements_behind_days
+    |                  an area whose latest classified statement line is older
+    |                  than today less this many days gets the "statements are
+    |                  late" notice: its in-transit window has moved back with it.
+    |   cache_minutes  the figures are kept this long per scope, and dropped at
+    |                  once when Agora commits, matches or reverses anything
+    |                  (the key carries agora.ReconBatch's latest Id and
+    |                  ReversedAt). Both scans take shared locks on live PumpIT,
+    |                  which has no snapshot isolation; the cache is the only
+    |                  thing between them and every click.
+    |   feeds_cache_minutes
+    |                  the feed history (first and last row ever, per site,
+    |                  area and side) changes by the day, so it is kept an hour
+    |                  per grant.
+    */
+    'dashboard' => [
+        'tolerance_rand' => 100,
+        'tolerance_pct' => 1,
+        'statements_behind_days' => 2,
+        'cache_minutes' => 5,
+        'feeds_cache_minutes' => 60,
+    ],
+
     'areas' => [
 
         'ABSA' => [

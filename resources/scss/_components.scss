@@ -656,6 +656,75 @@ table.dt {
   tbody tr.is-serious:hover, tbody tr.is-crit:hover { background: var(--surface-2); }
 }
 
+/* A TOTALS ROW: <x-table>'s `foot` slot, rendered as a <tfoot> (16 Nov 2026,
+   the bank recon pivot). It reads like the grid's `tr.dg-total`: the shaded
+   band, bold figures, a rule above. table-tools reads only the first <tbody>,
+   so a sort never moves it and a filter or a page never hides it. Only the
+   LAST foot row sticks to the bottom of the frame; a row above it (the pivot's
+   "other entities" line) scrolls with the body and comes into view at the end.
+
+   The rule is an inset shadow, not a border. In a collapsed-border table a
+   sticky cell leaves its borders behind where the row was laid out (rendered
+   in Chrome 155: the head's bottom border, a border-top here and a pinned
+   column's border-right all stay put while the cells move), so a border-top
+   would vanish exactly when the row is pinned. */
+table.dt tfoot {
+  td, th {
+    background: var(--surface-3); font-weight: 600;
+    border-bottom: 0; box-shadow: inset 0 1px 0 var(--line);
+  }
+  /* Above the body rows, and above a pinned first column's cells (z 1), as
+     they scroll up underneath it. */
+  tr:last-child > td, tr:last-child > th { position: sticky; bottom: 0; z-index: 2; }
+}
+
+/* A PINNED FIRST COLUMN: `class="pin-first"` on <x-table> (16 Nov 2026, the
+   bank recon pivot: a site name with sixteen figure columns to its right). The
+   first VISIBLE cell of every row sticks to the frame's left edge and the rest
+   of the row scrolls under it, so a figure is never read without its site.
+   First visible rather than :first-child, because a column hidden through the
+   table layout is still the first child, and the one after it is the one on
+   screen. Child combinators, so a table opened inside a row is left alone.
+
+   The stack inside the frame: body cells, then the pinned names (1), the head
+   (2) with its filter row (1), the sticky totals row (2), and the two corners
+   at 3 — the head's first cells and the totals row's — because the scrolled
+   figures beside them AND the pinned names above or below them pass under.
+   The rule down the pinned edge is a background line, not a border, for the
+   reason given above the tfoot block. */
+table.dt.pin-first {
+  > thead > tr, > tbody > tr:not(.row-detail), > tfoot > tr {
+    > :not([hidden]):not(:not([hidden]) ~ *) {
+      position: sticky; left: 0; z-index: 1;
+      background-image: linear-gradient(to left, var(--line) 1px, transparent 1px);
+    }
+  }
+  > thead > tr > :not([hidden]):not(:not([hidden]) ~ *),
+  > tfoot > tr:last-child > :not([hidden]):not(:not([hidden]) ~ *) { z-index: 3; }
+}
+/* Opaque, or the figures show through the name. A body cell takes its row's
+   ground through `inherit` (the surface, the hover band, a tone wash), so a row
+   that changes colour changes its pinned cell with it; the row's default ground
+   is the card's surface. Both under :where(), so whatever colours a row or a
+   cell on purpose (an amended figure's wash) still wins. The head and the
+   totals keep their own opaque grounds, --surface-2 and --surface-3. */
+:where(table.dt.pin-first) > tbody > tr { background-color: var(--surface); }
+:where(table.dt.pin-first > tbody > tr > :not([hidden]):not(:not([hidden]) ~ *)) {
+  background-color: inherit;
+}
+/* The frame is its own stacking context, so these z-indexes stay inside it.
+   Beside a pill strip the layout chooser is a z-index 2 grid item, and its
+   open panel lost to whatever is sticky in the frame: rendered without this,
+   the head cells covered the panel's top at 1366 and the totals row covered
+   it at 400. */
+.table-scroll:has(> table.dt.pin-first, > table.dt > tfoot) { isolation: isolate; }
+/* Keyboard focus never lands under the pinned column (WCAG 2.4.11). A cell
+   tabbed to from the right was scrolled only to the frame's left edge, which
+   the pinned names cover. `--pin-w` is the pinned column's width, kept by
+   table-tools.js (pinWidth) as the names, the layout or the text size change;
+   until it is set the padding is just the 8px. */
+.table-scroll:has(> table.dt.pin-first) { scroll-padding-left: calc(var(--pin-w, 0px) + 8px); }
+
 .table-empty { padding: 18px 14px; }
 .table-foot {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;

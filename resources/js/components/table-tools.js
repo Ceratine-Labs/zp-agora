@@ -33,6 +33,10 @@
  *   <table class="dt" data-table-tools>          — the whole thing
  *   <table data-tt-page="50">                     — cut the rows into pages
  *   <th data-no-tools>                            — no sort, no filter
+ *   <th data-tt-no-filter>                        — sorts, but no filter control:
+ *                                                   its filter-row cell stays
+ *                                                   empty (a wide table of
+ *                                                   figures, 16 Nov 2026)
  *   <th data-tt-pills="Balanced"                  — this column as a pill strip
  *       data-tt-pill-order="A|B|C">                 above the table, opening on
  *                                                   that value (`A|B`: on both)
@@ -50,6 +54,13 @@
  *                                                   instead of the rendered text
  *   <td data-sort="Balanced" data-tone="good">    — and the chip tone its pill
  *                                                   takes
+ *   <table data-tt-row-noun="site">               — what a row is called in the
+ *                                                   pill titles ("3 sites ·
+ *                                                   Not in bank"); `row` if unset
+ *   <tfoot>                                       — a totals row, left alone:
+ *                                                   only tBodies[0] is read, so
+ *                                                   nothing here sorts, filters,
+ *                                                   pages or hides it
  *
  * PAGING IS A WAY OF LOOKING, NOT A SCOPE, and that is the whole reason it is
  * allowed on a screen that stamps from tick boxes. Every row is in the
@@ -76,6 +87,7 @@ export default function tableTools(root = document) {
     // is a second head row too, and it has been sliding under the first since
     // the day the scroll container got a height.
     fresh('table.dt', 'data-sticky-ready').forEach(stickyHead);
+    fresh('table.dt.pin-first', 'data-pin-ready').forEach(pinWidth);
 
     /*
      * BEFORE the tables mount, not after.
@@ -204,12 +216,39 @@ function stickyHead(table) {
     else window.addEventListener('resize', apply);
 }
 
+/**
+ * A pinned first column's width, as `--pin-w` on its frame, for the frame's
+ * scroll-padding (`pin-first` in _components.scss): a cell that takes keyboard
+ * focus is scrolled clear of the pinned names instead of under them. The
+ * first VISIBLE heading, as the CSS pins it — hiding a column through the
+ * layout moves the pin — re-read whenever the table changes size.
+ */
+function pinWidth(table) {
+    const frame = table.closest('.table-scroll');
+    const head = table.tHead;
+
+    if (!frame || !head || !head.rows.length) return;
+
+    const apply = () => {
+        const first = Array.from(head.rows[0].cells).find((cell) => !cell.hidden);
+        if (first) frame.style.setProperty('--pin-w', `${Math.round(first.getBoundingClientRect().width)}px`);
+    };
+
+    apply();
+
+    if (window.ResizeObserver) new ResizeObserver(apply).observe(table);
+    else window.addEventListener('resize', apply);
+}
+
 /* ------------------------------------------------------------------- table */
 
 class TableTools {
     constructor(table) {
         this.table = table;
         this.head = table.tHead;
+        // The FIRST body, and only it. A <tfoot> totals row is outside it, so
+        // a sort re-appends the data rows above it, a filter or a page never
+        // hides it, and it stays the whole scope's total whatever is showing.
         this.body = table.tBodies[0];
         this.usable = Boolean(this.head && this.head.rows.length && this.body);
 
@@ -467,6 +506,10 @@ class TableTools {
                 // Its pills join the strip a column before it built, in the
                 // same row, rather than stacking a second strip above it.
                 pillJoin: th.dataset.ttPillsJoin !== undefined,
+                // Sorts, but carries no control in the filter row. A filter
+                // box under each of sixteen figure columns made the recon
+                // pivot about 1,700px wide, a sideways scroll at 1366.
+                noFilter: th.hasAttribute('data-tt-no-filter'),
             };
 
             if (!skip) column.type = this.inferType(column);
@@ -551,7 +594,10 @@ class TableTools {
             button.className = 'tt-sort';
             button.textContent = column.label;
             button.append(Object.assign(document.createElement('span'), { className: 'tt-arrow' }));
-            button.title = `Sort by ${column.label}`;
+            // The button fills the heading, so its title is the one a pointer
+            // sees: it carries the heading's own title, which said the full
+            // date or what a figure means and was never shown under "Sort by".
+            button.title = column.th.title ? `${column.th.title} · click to sort` : `Sort by ${column.label}`;
 
             column.th.textContent = '';
             column.th.append(button);
@@ -590,7 +636,7 @@ class TableTools {
             const arrow = column.th.querySelector('.tt-arrow');
             if (arrow) arrow.textContent = direction === 1 ? '▲' : '▼';
 
-            ordered = this.order.slice().sort((a, b) => this.compare(a, b, column) * direction);
+            ordered = this.order.slice().sort((a, b) => this.compare(a, b, column, direction));
         }
 
         // The rows move as blocks: a row that row-detail.js has expanded takes
@@ -621,7 +667,7 @@ class TableTools {
             const arrow = column.th.querySelector('.tt-arrow');
             if (arrow) arrow.textContent = direction === 1 ? '▲' : '▼';
 
-            ordered = this.groupOrder.slice().sort((a, b) => this.compare(a.head, b.head, column) * direction);
+            ordered = this.groupOrder.slice().sort((a, b) => this.compare(a.head, b.head, column, direction));
         }
 
         const fragment = document.createDocumentFragment();
@@ -636,15 +682,21 @@ class TableTools {
         this.apply();
     }
 
-    compare(a, b, column) {
+    /**
+     * `direction` is 1 or -1, and it turns only the values round. A missing
+     * figure sorts last in BOTH directions. It is not smaller than everything,
+     * it is absent, and burying it at the top of a descending sort hides the
+     * rows somebody is usually looking for — which is what happened while
+     * the caller multiplied this whole answer by the direction, empty
+     * branches included (16 Nov 2026: a descending sort of the recon pivot
+     * opened on its blank cells).
+     */
+    compare(a, b, column, direction = 1) {
         const left = this.text(a, column.index);
         const right = this.text(b, column.index);
 
         const empty = (value) => value === '' || value === NOTHING;
 
-        // A missing figure sorts last in BOTH directions. It is not smaller
-        // than everything, it is absent, and burying it at the top of a
-        // descending sort hides the rows somebody is usually looking for.
         if (empty(left) && empty(right)) return 0;
         if (empty(left)) return 1;
         if (empty(right)) return -1;
@@ -653,10 +705,10 @@ class TableTools {
             const l = number(left);
             const r = number(right);
 
-            if (l !== null && r !== null) return l - r;
+            if (l !== null && r !== null) return (l - r) * direction;
         }
 
-        return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+        return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }) * direction;
     }
 
     /* ------------------------------------------------------------ filtering */
@@ -720,6 +772,14 @@ class TableTools {
         // question; the cell stays so the columns still line up.
         if (column.pills) {
             cell.classList.add('tt-pilled');
+            return;
+        }
+
+        // `data-tt-no-filter`: the heading still sorts, and this cell stays
+        // empty so the columns line up. Nothing to read from it, so `matches`
+        // passes the column, exactly as for one nobody has typed in.
+        if (column.noFilter) {
+            cell.classList.add('tt-no-filter');
             return;
         }
 
@@ -1062,7 +1122,9 @@ class TableTools {
             n.textContent = String(count);
 
             button.append(dot, text, n);
-            button.title = count === 1 ? `1 shift · ${label}` : `${count} shifts · ${label}`;
+            // The table names its rows (`data-tt-row-noun`). This said
+            // "shifts" on every table, recon suggestions included.
+            button.title = `${count} ${count === 1 ? this.rowNoun : `${this.rowNoun}s`} · ${label}`;
             button.addEventListener('click', () => this.choosePill(column, value));
 
             set.append(button);

@@ -33,6 +33,12 @@ Route::middleware('auth')->prefix('recon')->name('recon.')->group(function () {
      | looking at a run.
      */
     Route::get('dashboard', [ReconDashboardController::class, 'index'])->middleware('can:recon.runs.view')->name('dashboard');
+    // The pivot as a CSV or XLSX (16 Nov 2026): the table on screen, or one
+    // row per site × area × side, from the same cached figures. Its own route
+    // rather than a registered grid key, because a `:pivot` key would make the
+    // grid service read pivot_* parameters; the screen's menu entry is checked
+    // in the controller, as the grid extract checks it.
+    Route::get('dashboard/export', [ReconDashboardController::class, 'export'])->middleware('can:recon.runs.view')->name('dashboard.export');
 
     // Scope is signed from the displayed list; SQL rechecks invalidity while
     // archiving. This keeps history, using the existing close permission.

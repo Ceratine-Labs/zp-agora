@@ -594,6 +594,62 @@
                 @endforeach
             </div>
             <div class="gal-variant">
+                <p class="eyebrow">
+                    <code>class="pin-first"</code>, a <code>foot</code> slot and <code>data-tt-no-filter</code>
+                    — the bank recon pivot's shape (16 Nov 2026). The first column stays put while the figures
+                    scroll under it; the foot is a <code>&lt;tfoot&gt;</code> that sorting, filtering and paging
+                    never touch, and its last row sticks to the bottom of the frame; a figure column marked
+                    <code>data-tt-no-filter</code> sorts but has no box in the filter row
+                </p>
+                <x-table layout-key="Core.dev.styleguide.9" tools fit dense class="pin-first" id="gal-table-pinned"
+                         data-tt-row-noun="reference" :procedure="'agora.usp_Cash_GridDailyBanking'"
+                         :count="count($fixtures['pagedRows'])">
+                    <x-slot:head>
+                        <tr>
+                            <th class="fit-min">Site</th>
+                            <th data-tt-pills data-tt-pill-order="Balanced|Short|Blocked|Unrecorded issue">State</th>
+                            <th>Reference</th>
+                            @foreach (range(1, 14) as $day)
+                                <th class="num" data-tt-no-filter title="Banked on day {{ $day }}">Day {{ $day }}</th>
+                            @endforeach
+                            <th class="num grp" data-tt-no-filter>Total</th>
+                        </tr>
+                    </x-slot:head>
+                    @foreach ($fixtures['pagedRows'] as $row)
+                        @php($tone = ['Balanced' => 'good', 'Short' => 'warn', 'Blocked' => 'serious', 'Unrecorded issue' => 'crit'][$row['state']])
+                        <tr>
+                            <td class="fit-min">{{ $row['site'] }}</td>
+                            <td data-sort="{{ $row['state'] }}" data-tone="{{ $tone }}">
+                                <x-chip :tone="$tone">{{ $row['state'] }}</x-chip>
+                            </td>
+                            <td class="mono">{{ $row['ref'] }}</td>
+                            @foreach (range(1, 14) as $day)
+                                <td class="num" data-sort="{{ $row['amount'] * $day / 10 }}">{{ \App\Support\Format::r($row['amount'] * $day / 10) }}</td>
+                            @endforeach
+                            <td class="num grp" data-sort="{{ $row['amount'] * 10.5 }}">{{ \App\Support\Format::r($row['amount'] * 10.5) }}</td>
+                        </tr>
+                    @endforeach
+                    <x-slot:foot>
+                        <tr>
+                            <td class="fit-min">Not on a row · 3 lines</td>
+                            <td></td><td></td>
+                            @foreach (range(1, 14) as $day)
+                                <td class="num"></td>
+                            @endforeach
+                            <td class="num grp">{{ \App\Support\Format::r(4125.5) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fit-min">All {{ count($fixtures['pagedRows']) }} references</td>
+                            <td></td><td></td>
+                            @foreach (range(1, 14) as $day)
+                                <td class="num">{{ \App\Support\Format::r(collect($fixtures['pagedRows'])->sum('amount') * $day / 10) }}</td>
+                            @endforeach
+                            <td class="num grp">{{ \App\Support\Format::r(collect($fixtures['pagedRows'])->sum('amount') * 10.5 + 4125.5) }}</td>
+                        </tr>
+                    </x-slot:foot>
+                </x-table>
+            </div>
+            <div class="gal-variant">
                 <p class="eyebrow">Empty — a designed answer, not a gap</p>
                 <x-table layout-key="Core.dev.styleguide.8" :count="0" empty="The procedure ran and found nothing in this period. That is an answer, not a failure." />
             </div>

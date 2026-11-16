@@ -73,6 +73,35 @@ final class GridExtract
     }
 
     /**
+     * An extract of rows the caller already holds — a screen that adds its
+     * own figures up and has no source to page through again (the bank recon
+     * pivot, 16 Nov 2026, from its cached procedure answer). The file is these
+     * rows, in this order, under these columns; the writers cannot tell it
+     * from run(). The ceiling still holds: past it nothing is written, exactly
+     * as the grid refuses.
+     *
+     * @param  array<int, GridColumn>  $columns  in the order the file carries them
+     * @param  Collection<int, object>  $rows
+     */
+    public static function fromRows(GridDefinition $definition, array $columns, Collection $rows): self
+    {
+        $ceiling = $definition->exportCeiling();
+        $total = $rows->count();
+
+        if ($total > $ceiling) {
+            throw new GridExportTooLarge($total, $ceiling);
+        }
+
+        return new self(
+            definition: $definition,
+            columns: array_values($columns),
+            rows: $rows->values(),
+            total: $total,
+            ms: 0.0,
+        );
+    }
+
+    /**
      * @param  array<int, string>|null  $keys
      * @return array<int, GridColumn>
      */

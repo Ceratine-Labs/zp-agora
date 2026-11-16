@@ -17,7 +17,11 @@
         nothing under it.
 
     `head` and the default slot are markup: the caller writes its own <th> and
-    <tr>, because a column set is the screen's business.
+    <tr>, because a column set is the screen's business. So is `foot`, which
+    becomes a <tfoot> after the body: a totals row that sorting, filtering and
+    paging never touch (table-tools reads only the body), whose last row sticks
+    to the bottom of the frame. `class="pin-first"` keeps the first column on
+    screen while the rest scroll sideways under it.
 
     `fit` is for a table with more columns than a window has room for. It lets
     the numeric HEADINGS wrap and pins every numeric column to its content
@@ -34,7 +38,7 @@
     rows were paged or truncated BY THE SERVER must not offer it: filtering page
     one of nine and calling the answer a filter is a lie.
 
-    Three attributes ride through to the table for `tools` to read. They are
+    These attributes ride through to the table for `tools` to read. They are
     attributes rather than props because they describe the rows, which are the
     caller's markup, not this component's:
 
@@ -49,6 +53,10 @@
                              filter row, opening scoped to that value.
                              `data-tt-pill-order="A|B|C"` fixes their order.
       data-tone="good"       on a <td>: the chip tone that column's pill takes.
+      data-tt-no-filter      on a <th>: the column still sorts, but its cell in
+                             the filter row stays empty.
+      data-tt-row-noun="site" on the table: what a row is called in the pill
+                             titles (and, grouped, in the count line).
       data-tt-only="remains" hold the table to rows whose `data-tt-in` names
                              that scope; a checkbox with
                              `data-tt-only-toggle="remains"` and
@@ -90,6 +98,7 @@
                @if ($tools) data-table-tools @endif>
             @isset($head)<thead>{{ $head }}</thead>@endisset
             <tbody>{{ $slot }}</tbody>
+            @isset($foot)<tfoot>{{ $foot }}</tfoot>@endisset
         </table>
     </div>
 
