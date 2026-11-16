@@ -92,8 +92,10 @@ warning. `tests/Feature/Seeding/E2eFixtureGuardTest.php` holds that both ways.
 - **Nothing in PumpIT, MIST_Import or Alteryx is ever written.** Agora writes
   to its own database only. The recon previews are `SELECT`-only and reach the
   legacy estate through `agora.vw_*`.
-- **The instance is in SIMPLE recovery.** No transaction-log chain, so no
-  point-in-time restore. A bad migration cannot be rewound to the minute.
+- **PumpIT and the MIST databases are in SIMPLE recovery; Agora is in FULL**,
+  with ZP's daily full backup (about 03:58) and a daily log backup at 22:15
+  (`scripts/sql/agora-log-backup-job.sql`). A restore to the minute has never
+  been tested, so treat a bad migration as permanent.
 - **`customer-db-login` is `sysadmin` on the instance.** The guard is discipline, not the
   grant.
 

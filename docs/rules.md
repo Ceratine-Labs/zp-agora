@@ -33,10 +33,14 @@ Petroleum trades on today.
    the Docker container, it is merely a bad habit. Against the customer's
    Agora database it destroys users, menus and eventually cashups, with no
    restore. Forward-only.
-3. **The customer's instance is in SIMPLE recovery.** No transaction-log chain,
-   so no point-in-time restore. A bad migration cannot be rewound to the
-   minute — only to whenever the last full backup happened to run, which nobody
-   has confirmed. Assume you cannot undo it.
+3. **Assume you cannot undo a bad migration.** PumpIT, MIST_Import and
+   MIST_Main are in SIMPLE recovery: no log chain, so a restore goes back only
+   to their last full backup. Agora is in FULL recovery (checked 16 Nov 2026):
+   ZP takes a full backup of it daily at about 03:58, and the SQL Agent job
+   `Agora - Daily log backup` backs up its log at 22:15 to
+   `E:\SQL\Backups\MIST\Agora`, keeping 14 days
+   (`scripts/sql/agora-log-backup-job.sql`). A restore to the minute is
+   possible on paper, but no one has ever tested one.
 4. **Dry-run destructive DDL first.** T-SQL DDL is transactional: wrap it in a
    transaction, run it, inspect `sys.tables`, roll back. Better still, build it
    into a throwaway schema and diff — see [`development.md`](development.md).
