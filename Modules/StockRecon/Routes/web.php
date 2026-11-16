@@ -127,6 +127,13 @@ Route::middleware('auth')->prefix('stock-recon')->name('stockrecon.')->group(fun
     Route::post('runs/{run}/lines/{line}/explain', [StockReconController::class, 'explain'])
         ->middleware(['can:stockrecon.runs.view', 'throttle:20,1'])->name('line.explain');
 
+    // The pencil on a chain panel row: one shift's proposed closing set by
+    // hand, with a reason (Ryan, 16 Nov 2026). The run only; Amend writes it.
+    Route::get('runs/{run}/lines/{line}/adjust', [StockReconController::class, 'adjustForm'])
+        ->middleware('can:stockrecon.runs.execute')->name('line.adjust.form');
+    Route::post('runs/{run}/lines/{line}/adjust', [StockReconController::class, 'adjust'])
+        ->middleware('can:stockrecon.runs.execute')->name('line.adjust');
+
     Route::post('runs/{run}/commit', [StockReconController::class, 'commit'])
         ->middleware('can:stockrecon.runs.execute')->name('commit');
     Route::post('runs/{run}/reverse', [StockReconController::class, 'reverse'])

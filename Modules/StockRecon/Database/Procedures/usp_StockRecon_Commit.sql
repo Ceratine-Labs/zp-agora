@@ -413,6 +413,10 @@ BEGIN
                 (changed.QtyVar - (COALESCE(changed.QtyIssuedNew, changed.QtyIssued) - changed.QtyIssued)
                   + ISNULL(changed.AppliedGoodWaste, 0)) - 0.0005)
                OR (changed.QtyVar >= -0.0005 AND changed.QtyVarNew < -0.0005))
+          /* Not a row a person adjusted by hand, with a reason
+             (usp_StockRecon_AdjustClose, 16 Nov 2026): that is a decision,
+             not a stale proposal. */
+          AND changed.ManualAdjustmentId IS NULL
           AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
               WHERE selected.BranchId = changed.BranchId AND selected.RunId = changed.RunId
                 AND selected.AreaNo = changed.AreaNo AND selected.StockItemNo = changed.StockItemNo AND selected.ContinuitySegment = changed.ContinuitySegment

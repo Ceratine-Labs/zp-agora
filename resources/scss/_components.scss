@@ -2150,3 +2150,12 @@ td.pos-missing {
    so that it draws attention"): proposed unticked, the head row red. */
 tr.tt-group.is-missed-count > td { background: var(--crit-bg); }
 tr.tt-group.is-missed-count > td:first-child { box-shadow: inset 3px 0 0 var(--crit); }
+
+/* The pencil on a chain panel row and the form it opens (Ryan, 16 Nov 2026):
+   one shift's closing, by hand, with a reason. */
+.adjust-pencil { padding: 2px 6px; line-height: 1; }
+.adjust-pencil svg { display: block; }
+.adjust-close {
+  display: flex; flex-direction: column; gap: 12px;
+  .adjust-close-actions { display: flex; justify-content: flex-end; gap: 8px; }
+}

@@ -71,6 +71,9 @@
         </x-notice>
     @endif
 
+    @if (session('adjusted'))
+        <x-notice tone="info" title="Adjusted by hand" style="margin-bottom:16px"><p>{{ session('adjusted') }}</p></x-notice>
+    @endif
     @if (session('refusal'))
         <x-notice tone="stop" title="That could not be done" style="margin-bottom:16px">
             <p>{{ session('refusal') }}</p>
@@ -91,4 +94,11 @@
 {{-- What every code means, opened from the "i" on the exceptions and from
      any code badge on this page (7 Oct 2026). --}}
 @include('stockrecon::partials.codes-modal')
+{{-- The pencil on a chain panel row opens this; its body is fetched per row
+     (Ryan, 16 Nov 2026). Outside the commit form, so its own form can post. --}}
+@if ($run->isOpen())
+    @can('stockrecon.runs.execute')
+        <x-modal id="adjust-close" title="Adjust the closing count"><p class="muted">Loading…</p></x-modal>
+    @endcan
+@endif
 </x-app-shell>

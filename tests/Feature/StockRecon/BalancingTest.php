@@ -305,6 +305,73 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * The pencil (Ryan, 16 Nov 2026): a shift's closing set by hand with a
+     * reason changes the run only — the shift and the next shift's opening,
+     * both ticked, each variance moved by exactly the change — and the Amend
+     * press writes them to PumpIT, reversibly. A chain held back is released
+     * by it. Refused: no reason, the last shift, a negative closing.
+     */
+    public function test_a_closing_adjusted_by_hand_changes_the_run_and_commits(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [40, 0, 38, 2], 3 => [38, 0, 36, 2]],
+            '2026-07-18' => [1 => [36, 0, 30, 2], 3 => [30, 0, 30, 2]],
+            '2026-07-19' => [1 => [30, 0, 28, 2], 3 => [28, 0, 26, 2]],
+            '2026-07-20' => [1 => [26, 0, 24, 2], 3 => [24, 0, 22, 2]],
+            '2026-07-21' => [1 => [22, 0, 20, 2], 3 => [20, 0, 18, 2]],
+        ]);
+        $run = $this->previewArea(self::SHELF_AREA);
+        $shift = $this->lineAt($run, '2026-07-18', 1);
+        $next = $this->lineAt($run, '2026-07-18', 3);
+        $varShift = (float) $shift->QtyVarNew;
+        $varNext = (float) $next->QtyVarNew;
+        $proposed = (float) $shift->QtyCloseNew;
+
+        foreach ([
+            [33, '', 'REASON_REQUIRED'],
+            [-1, 'TEST-negative', 'BAD_CLOSE'],
+        ] as [$close, $reason, $code]) {
+            try {
+                $this->service->adjustClose($run, $shift, $close, $reason);
+                $this->fail("Expected {$code}.");
+            } catch (AgoraProcException $e) {
+                $this->assertSame($code, $e->code(), $e->getMessage());
+            }
+        }
+        try {
+            $this->service->adjustClose($run, $this->lineAt($run, '2026-07-21', 3), 17, 'TEST-last shift');
+            $this->fail('The last shift of a chain must be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertSame('LAST_SHIFT', $e->code(), $e->getMessage());
+        }
+
+        $status = $this->service->adjustClose($run, $shift, 33, 'TEST-recounted by the manager');
+        $this->assertSame('ADJUSTED', $status->Code);
+
+        $shift = $shift->fresh();
+        $next = $next->fresh();
+        $this->assertEqualsWithDelta(33, (float) $shift->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(33, (float) $next->QtyOpenNew, 0.001);
+        $this->assertEqualsWithDelta($varShift + (33 - $proposed), (float) $shift->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta($varNext - (33 - $proposed), (float) $next->QtyVarNew, 0.001);
+        $this->assertTrue((bool) $shift->Selected && (bool) $shift->WouldAmend);
+        $this->assertTrue((bool) $next->Selected && (bool) $next->WouldAmend);
+        $this->assertStringStartsWith('Adjusted by hand: TEST-recounted', (string) $shift->Outcome);
+        $this->assertNotNull($shift->ManualAdjustmentId);
+        $this->assertSame(1, $this->db()->table('agora.StockReconManualAdjustment')
+            ->where('RunId', $run->Id)->where('Reason', 'TEST-recounted by the manager')->count());
+
+        $this->service->commit($run->fresh());
+        $this->assertEqualsWithDelta(33, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(33, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyOpen, 0.001);
+
+        $this->service->reverse($run->fresh(), 'TEST-adjusted by hand reversal');
+        $this->assertEqualsWithDelta(30, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(30, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyOpen, 0.001);
+    }
+
+    /**
      * A missed closing count (Ryan, 16 Nov 2026, run 80529, D Cheddar Cheese
      * Kg): issued 24, closed 0, then the next shift opened 0 and counted the
      * stock back. The correction is as big as the stock, which the caps read
@@ -4949,7 +5016,8 @@ class BalancingTest extends TestCase
         $db->table('agora.StockReconBalancingProfile')->where('CreatedBy', -999)->where('Name', 'TEST item profile')->delete();
 
         foreach (['StockReconAmendment', 'StockReconRunLine', 'StockReconRun', 'StockIssueMultiple', 'StockAreaSetting',
-            'StockReconDuplicateRelease', 'StockWasteAuthorization', 'StockReconItemRemoval', 'StockReconAreaShiftCompletion'] as $table) {
+            'StockReconDuplicateRelease', 'StockWasteAuthorization', 'StockReconItemRemoval', 'StockReconAreaShiftCompletion',
+            'StockReconManualAdjustment'] as $table) {
             $db->table("{$schema}.{$table}")->where('BranchId', self::BRANCH)->delete();
         }
     }

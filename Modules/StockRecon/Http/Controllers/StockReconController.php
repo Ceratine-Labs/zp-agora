@@ -596,6 +596,51 @@ class StockReconController extends Controller
         return back()->with('released', $status->Message);
     }
 
+    /**
+     * The pencil on a chain panel row (Ryan, 16 Nov 2026): the form, as the
+     * adjust modal's body. The shift as counted and as proposed, the new
+     * closing, and the reason.
+     */
+    public function adjustForm(StockReconRun $run, StockReconRunLine $line): View
+    {
+        [$run, $line] = $this->runLine($run, $line);
+
+        return view('stockrecon::partials.adjust-close', ['run' => $run, 'line' => $line]);
+    }
+
+    /** Set the shift's proposed closing by hand; the run page says what moved. */
+    public function adjust(Request $request, StockReconRun $run, StockReconRunLine $line): RedirectResponse
+    {
+        [$run, $line] = $this->runLine($run, $line);
+        $data = $request->validate([
+            'close' => ['required', 'numeric', 'min:0', 'max:999999'],
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        try {
+            $status = $this->service->adjustClose($run, $line, (float) $data['close'], trim($data['reason']));
+        } catch (AgoraProcException $e) {
+            return back()->with('refusal', $e->getMessage());
+        }
+
+        return back()->with('adjusted', $status->Message);
+    }
+
+    /**
+     * The run and the line, re-read under the branch scope and held to each
+     * other, as line() does.
+     *
+     * @return array{0: StockReconRun, 1: StockReconRunLine}
+     */
+    private function runLine(StockReconRun $run, StockReconRunLine $line): array
+    {
+        $run = StockReconRun::query()->findOrFail($run->getKey());
+        $line = StockReconRunLine::query()->findOrFail($line->getKey());
+        abort_unless($line->RunId === $run->Id && $line->BranchId === $run->BranchId, 404);
+
+        return [$run, $line];
+    }
+
     /** Withdraw a release: the possible duplicate holds its chain back again from the next preview. */
     public function withdrawRelease(Request $request, StockReconRun $run, int $release): RedirectResponse
     {

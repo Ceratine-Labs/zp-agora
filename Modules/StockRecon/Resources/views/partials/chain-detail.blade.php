@@ -12,6 +12,10 @@
     rebuilding them in JavaScript is how the two drift apart.
 --}}
 @php($groups = \Modules\StockRecon\Services\ChainSummary::groupsOfShifts($shifts))
+{{-- The pencil (Ryan, 16 Nov 2026): on an open run, for somebody who may
+     amend, on every shift but the chain's last (its closing is the next
+     count's opening, outside the run). --}}
+@php($canAdjust = $run->isOpen() && (auth()->user()?->can('stockrecon.runs.execute') ?? false) && ! ($item?->BlockPossibleDuplicate))
 
 {{-- The possible duplicates on this chain (PM decision 01a10b21): those with
      no release standing NOW, which the panel offers to release, and those
@@ -100,6 +104,7 @@
                 <th class="num grp" colspan="7">Original — as counted</th>
                 <th class="num grp" colspan="8">Amended — as this run proposes</th>
                 <th class="l"></th>
+                @if ($canAdjust)<th class="fit-min"></th>@endif
             </tr>
             <tr>
                 <th class="l fit-min">Date</th><th class="num">Shift</th><th class="l">On shift</th>
@@ -110,6 +115,7 @@
                 <th class="num">POS</th><th class="num">Variance</th><th class="num">Value</th>
                 <th class="num">Cumulative</th><th class="num">Amend</th>
                 <th class="l">Outcome</th>
+                @if ($canAdjust)<th class="fit-min"><span class="sr-only">Adjust</span></th>@endif
             </tr>
         </x-slot:head>
 
@@ -248,6 +254,21 @@
                         @endif
                     @endif
                 </td>
+                {{-- The pencil (Ryan, 16 Nov 2026): this shift's closing, by hand,
+                     with a reason. Not on the chain's last shift. --}}
+                @if ($canAdjust)
+                    <td class="fit-min">
+                        @if (! $loop->last && in_array($shift->CommitState ?? 'pending', ['pending', 'skipped'], true))
+                            <button type="button" class="btn-ghost btn-row adjust-pencil"
+                                    data-modal-open="adjust-close"
+                                    data-modal-url="{{ route('app.stockrecon.line.adjust.form', [$run, $shift->Id]) }}"
+                                    title="Adjust this shift's closing count, with a reason"
+                                    aria-label="Adjust the closing for {{ \Illuminate\Support\Carbon::parse($shift->TransactionDate)->format('d M') }} shift {{ \Modules\StockRecon\Support\ShiftLabel::show($shift->ShiftNo) }}">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.5 2.5l2 2L5 13H3v-2l8.5-8.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                            </button>
+                        @endif
+                    </td>
+                @endif
             </tr>
         @endforeach
     </x-table>

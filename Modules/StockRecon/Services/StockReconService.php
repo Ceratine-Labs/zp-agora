@@ -380,6 +380,23 @@ class StockReconService
     }
 
     /**
+     * One shift's proposed closing set by hand, with a reason (Ryan, 16 Nov
+     * 2026). Changes the run only — the shift and the next shift's opening,
+     * both ticked — and the Amend press writes them like any other amendment.
+     */
+    public function adjustClose(StockReconRun $run, StockReconRunLine $line, float $newClose, string $reason): object
+    {
+        return $this->procedures->write('usp_StockRecon_AdjustClose', [
+            'BranchId' => $run->BranchId,
+            'RunId' => $run->Id,
+            'RunLineId' => $line->Id,
+            'NewClose' => $newClose,
+            'Reason' => $reason,
+            'UserId' => auth()->id(),
+        ]);
+    }
+
+    /**
      * Withdraw a release: from the next preview the possible duplicate holds
      * its chain back again. Never a delete — the release and its withdrawal
      * both stay on the ledger.
