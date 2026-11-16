@@ -30,7 +30,6 @@ class SupportRequestController extends Controller
 
     private const DIR = 'stockrecon-support';
 
-
     /** The modal body: the chain's details, the message, the screenshot tools. */
     public function form(StockReconRun $run, StockReconRunLine $line): View
     {
