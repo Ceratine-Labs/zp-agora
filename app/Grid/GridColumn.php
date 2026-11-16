@@ -58,6 +58,9 @@ final class GridColumn
      * @param  string|null  $title  the header's tooltip, where the label alone is not enough
      * @param  bool  $link  this column's value opens the row's own resource, via GridDefinition::rowUrl()
      * @param  bool  $compactQuantity  show up to three decimals without trailing zeroes
+     * @param  array<string, string>  $tones  a chip column's own value => tone, ahead of StatusTone's
+     *                                        keywords (16 Nov 2026: a run's "Posted" green and "Previewed"
+     *                                        orange without recolouring every other grid's "Posted")
      */
     public function __construct(
         public string $key,
@@ -73,6 +76,7 @@ final class GridColumn
         public ?string $title = null,
         public bool $link = false,
         public bool $compactQuantity = false,
+        public array $tones = [],
     ) {
         if (! in_array($format, self::FORMATS, true)) {
             throw new \InvalidArgumentException(

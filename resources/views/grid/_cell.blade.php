@@ -65,7 +65,7 @@
 @elseif ($column->format === 'bool')
     <x-chip :tone="$value ? 'good' : 'neutral'">{{ $value ? 'Yes' : 'No' }}</x-chip>
 @elseif ($column->format === 'chip')
-    <x-chip :tone="\App\Grid\StatusTone::of((string) $value)">{{ $value }}</x-chip>
+    <x-chip :tone="$column->tones[(string) $value] ?? \App\Grid\StatusTone::of((string) $value)">{{ $value }}</x-chip>
 @else
     {{ $value }}
 @endif

@@ -53,8 +53,13 @@ class StockReconRunGrid extends GridDefinition
             // link: the run's name IS the run, so it opens it. An unnamed run
             // comes back described by its period rather than as a dash,
             // because a column of dashes cannot be navigated.
+            // The run number, as every run page, link and alert names it (Ryan,
+            // 16 Nov 2026: "show the run number in the run table").
+            new GridColumn(key: 'Id', label: 'Run #', mono: true, link: true),
             new GridColumn(key: 'Note', label: 'Run', sort: 'Note', wide: true, link: true),
-            new GridColumn(key: 'Status', label: 'Status', sort: 'Status', format: 'chip'),
+            // Posted green, Previewed orange (Ryan, 16 Nov 2026).
+            new GridColumn(key: 'Status', label: 'Status', sort: 'Status', format: 'chip',
+                tones: ['Posted' => 'good', 'Previewed' => 'warn']),
             new GridColumn(key: 'BranchName', label: 'Site', sort: 'BranchName'),
             new GridColumn(key: 'AreaName', label: 'Area', sort: 'AreaName'),
             new GridColumn(key: 'FromDate', label: 'From', format: 'date', sort: 'FromDate'),
