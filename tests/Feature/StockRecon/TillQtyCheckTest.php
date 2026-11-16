@@ -4,6 +4,7 @@ namespace Tests\Feature\StockRecon;
 
 use App\Support\ProcedureService;
 use Illuminate\Database\Connection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\StockRecon\Models\StockReconRun;
@@ -87,6 +88,39 @@ class TillQtyCheckTest extends TestCase
 
         $none = view('stockrecon::partials.till-gaps-notice', ['tillGaps' => collect(), 'run' => $run])->render();
         $this->assertSame('', trim($none));
+    }
+
+    /**
+     * Nyala One Stop, support request #2 (16 Nov 2026, run 80592): the till's
+     * lines for the day reached PumpIT without MIST_EOD, so the whole-till
+     * check found none and marked every item it sells red, though the recon
+     * lines carried that till's sales. A till is missing only when none of
+     * its items carries a POS that day.
+     */
+    public function test_a_till_is_missing_only_when_none_of_its_items_carries_a_pos_that_day(): void
+    {
+        $run = $this->fixture();
+        $db = $this->db();
+        // The till reported three days before (keyed), and on the day itself
+        // with MIST_EOD empty, as Nyala's 2 and 3 Nov did.
+        foreach ([['2031-01-29', '2031012999'], [self::DAY, null]] as [$day, $eod]) {
+            $db->table('PumpIT.dbo.DBF_COMPUTER_QTY')->insert([
+                'SSBranchId' => self::BRANCH, 'DATE' => $day, 'CODE' => 'TEST-TQ3', 'LOCATION' => 'TPOS',
+                'StockItemNo' => 'TTQ3', 'ShiftNo' => 1, 'Qty' => 4, 'MIST_EOD' => $eod,
+            ]);
+        }
+        $service = new StockReconService(new ProcedureService);
+
+        $this->assertSame(0, $service->tillQtyGaps($run)->where('Kind', 'feed')->count(),
+            'TTQ2 and TTQ3 carry POS that day: the TPOS till reported.');
+
+        $db->table('PumpIT.dbo.STK_StockReconLine')->where('SSBranchId', self::BRANCH)
+            ->where('TransactionDate', self::DAY)->update(['QtyComputer' => 0, 'QtyComputer_Original' => 0]);
+        Cache::flush(); // the check is cached per run for ten minutes
+        $feed = $service->tillQtyGaps($run)->where('Kind', 'feed');
+        $this->assertSame([91, 92], $feed->pluck('AreaNo')->map(fn ($a) => (int) $a)->sort()->values()->all(),
+            'With no POS from it anywhere that day, the till is missing for each area it sells.');
+        $this->assertSame('TPOS', trim((string) $feed->first()->Location));
     }
 
     private function fixture(): StockReconRun

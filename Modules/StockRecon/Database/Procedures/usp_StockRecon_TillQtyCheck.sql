@@ -29,6 +29,16 @@
     Read from agora.vw_StockReconComputerQty, PumpIT's own source for
     QtyComputer, by MistEod (its only index).
 
+    NOT WHERE THE RECON LINES CARRY THAT TILL'S SALES (Nyala One Stop, support
+    request #2, 16 Nov 2026, run 80592: "There are actually no sales for this
+    item on this day in pumpit. Shouldnt be an error"). Nyala's WINBRANCH till
+    rows for 2 and 3 Nov (212 and 221 of them) reached PumpIT with MistEod
+    NULL, so the read by MistEod found none and called the till missing, and
+    every item it sells with no sales that day was marked red — LIP ICE MUSK
+    among them, which sold nothing. The recon lines' QtyComputer comes from
+    those same rows (87 and 94 units that day), so any POS on a recon line of
+    an item that sells through the till, that day, proves the till reported.
+
     Parameters: @BranchId, @RunId
     Result: one row per day, area and item that disagrees (Kind 'day' or
             'part'), then one per day, area and till location with no sales
@@ -122,14 +132,20 @@ BEGIN
     GROUP BY dd.D, f.Location
     OPTION (RECOMPILE);
 
-    -- The till locations the run's items sell through, per area.
-    IF OBJECT_ID('tempdb..#locs') IS NOT NULL DROP TABLE #locs;
-    SELECT DISTINCT i.AreaNo, RTRIM(m.StockLocation) AS Location
-    INTO #locs
+    -- The till location each of the run's items sells through.
+    IF OBJECT_ID('tempdb..#itemLoc') IS NOT NULL DROP TABLE #itemLoc;
+    SELECT DISTINCT i.AreaNo, i.StockItemNo, RTRIM(m.StockLocation) AS Location
+    INTO #itemLoc
     FROM #items i
     JOIN agora.vw_StockMaster m
       ON m.BranchId = @BranchId AND m.AreaNo = i.AreaNo AND m.StockItemNo = i.StockItemNo
     WHERE NULLIF(RTRIM(m.StockLocation), '') IS NOT NULL;
+
+    -- The till locations the run's items sell through, per area.
+    IF OBJECT_ID('tempdb..#locs') IS NOT NULL DROP TABLE #locs;
+    SELECT DISTINCT AreaNo, Location
+    INTO #locs
+    FROM #itemLoc;
 
     INSERT INTO #gaps (TransactionDate, AreaNo, StockItemNo, Location, QtyRecon, QtyTill, QtyMissing, Kind)
     SELECT ad.D, ad.AreaNo, NULL, lc.Location, ad.QtyRecon, NULL, NULL, 'feed'
@@ -138,7 +154,12 @@ BEGIN
            GROUP BY r.TransactionDate, r.AreaNo) ad
     JOIN #locs lc ON lc.AreaNo = ad.AreaNo
     WHERE NOT EXISTS (SELECT 1 FROM #feed f WHERE f.D = ad.D AND f.Location = lc.Location)
-      AND EXISTS (SELECT 1 FROM #feed f WHERE f.Location = lc.Location);
+      AND EXISTS (SELECT 1 FROM #feed f WHERE f.Location = lc.Location)
+      /* ...and none of the till's items carries a POS that day: a POS on a
+         recon line is that till's sale, so the till did report (Nyala, 16 Nov). */
+      AND NOT EXISTS (SELECT 1 FROM #recon r
+                      JOIN #itemLoc il ON il.AreaNo = r.AreaNo AND il.StockItemNo = r.StockItemNo
+                      WHERE r.TransactionDate = ad.D AND il.Location = lc.Location AND r.QtyRecon > 0.005);
 
     SELECT g.TransactionDate,
            g.AreaNo,

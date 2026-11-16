@@ -184,6 +184,44 @@ whole of an exact over as an issue while the counted variances after it fall a
 whole multiple or more below nil (no break, no reduction or duplicate, no
 authorised waste on the chain). Preview again.
 
+### A shift adjusted by hand: opening, issue and closing (16 November 2026)
+
+The pencil on each chain panel row opens one form with the shift's opening,
+issue and closing, each starting at what the run proposes, and a reason
+(`agora.usp_StockRecon_AdjustShift`; the morning's closing-only
+`usp_StockRecon_AdjustClose` now calls it). Ryan: *"want to be able to adjust
+opening, closing and issue values... not just closing"*. It changes the run
+only; Amend writes it, priors kept, reversible.
+
+* **Opening** — the shift before closes at the same figure, so the chain still
+  joins. Locked on the chain's first shift in the run (its opening is the
+  closing of a count before the window): `FIRST_SHIFT`.
+* **Issue** — this shift only; the variance moves the other way by the change.
+  Set back to what PumpIT holds, the issue is no longer changed. Amend writes
+  it to `QtyIssued` (a new named PumpIT write, Ryan's go-ahead in the same
+  message), and the audit trail reads *Issue set by hand* (`v1__22s`). The
+  commit's stale-issue guards (`STALE_*_ISSUE`, `BOUNDARY_ISSUE`,
+  `ISSUE_MULTIPLE`) leave a hand-set issue be.
+* **Closing** — the next shift opens at it, as before. Locked on the chain's
+  last shift: `LAST_SHIFT`.
+
+Each value changed is one row in `agora.StockReconManualAdjustment` (`[Field]`
+'open', 'issue' or 'close'; `CountedClose` / `PriorCloseNew` / `NewClose`
+hold that field's values, `NextRunLineId` the other row moved) and one mail
+to `config('stockrecon.notify')` naming the field. Refused besides: a run not
+previewed, a written row, a chain a possible duplicate holds, a negative
+value, nothing changed (`NOTHING_CHANGED`), no reason.
+
+### A till is missing only when none of its sales arrived (16 November 2026)
+
+The whole-till check in `usp_StockRecon_TillQtyCheck` reads PumpIT's till
+lines by `MIST_EOD`. Nyala One Stop's WINBRANCH lines for 2 and 3 Nov arrived
+with `MIST_EOD` empty (support request #2, run 80592), so the till read as
+missing and every item it sells with no sales those days was marked red —
+LIP ICE MUSK among them, which sold nothing. A day is now a missing till only
+when, besides no keyed till lines, none of the till's items carries a POS on
+its recon lines that day (`v1__14zi`). PumpIT has since keyed those lines.
+
 ## The one fact everything follows from
 
 A shift's variance is

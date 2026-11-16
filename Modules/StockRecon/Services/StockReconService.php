@@ -707,7 +707,8 @@ class StockReconService
 
     private static function tillGapsKey(StockReconRun $run): string
     {
-        return 'stockrecon:tillgaps:v2:'.$run->Id;
+        // v3: the till check no longer calls a till missing whose sales are on the recon lines (16 Nov 2026).
+        return 'stockrecon:tillgaps:v3:'.$run->Id;
     }
 
     /**

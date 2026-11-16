@@ -208,3 +208,20 @@ CREATE TABLE dbo.DBF_P3TRANS_STOCKRECON_ShiftTimeBased (
     AreaNo            INT            NULL,
     StockItemNo       NVARCHAR(5)    NULL
 );
+
+/* PumpIT's own till lines, the source of STK_StockReconLine.QtyComputer, read
+   by agora.vw_StockReconComputerQty for the whole-till check of
+   usp_StockRecon_TillQtyCheck (15 Nov 2026), keyed by MIST_EOD (yyyymmdd +
+   site, its only index). Shape only, at the customer's types (16 Nov 2026). */
+IF OBJECT_ID('dbo.DBF_COMPUTER_QTY') IS NULL
+CREATE TABLE dbo.DBF_COMPUTER_QTY (
+    SSBranchId  INT            NULL,
+    [DATE]      DATETIME       NULL,
+    EOD_CNTR    CHAR(8)        NULL,
+    CODE        CHAR(16)       NULL,
+    [LOCATION]  NVARCHAR(10)   NULL,
+    StockItemNo NVARCHAR(10)   NULL,
+    ShiftNo     INT            NULL,
+    Qty         DECIMAL(38, 6) NULL,
+    MIST_EOD    VARCHAR(10)    NULL
+);
