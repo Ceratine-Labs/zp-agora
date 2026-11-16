@@ -383,7 +383,8 @@ class StockReconController extends Controller
             'run' => $run,
             'line' => $line,
             ...$this->service->chain($run, $line),
-            'posGaps' => $this->service->posGapIndex($this->service->tillQtyGaps($run)),
+            // No till check here (16 Nov 2026): it ran per chain open and stalled whole-site runs.
+            'posGaps' => [],
             // Reverse this item: what it would put back, on a committed run only.
             'reversible' => $run->isCommitted()
                 ? $this->service->activeChainAmendments($run, $line->AreaNo, $line->StockItemNo)
