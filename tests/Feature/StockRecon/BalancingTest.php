@@ -311,6 +311,79 @@ class BalancingTest extends TestCase
     }
 
     /**
+     * MARLBORO BEYOND RED 20'S at OK Ngwelezane (branch 3, Tobacco, item 297,
+     * multiple 10), 2–8 Nov 2026, moved onto the fixture's dates (customer,
+     * 16 Nov: "The actual short for the week shows -7 units, but the Amended
+     * shows -17"). The day of the 18th counts 10 where nothing was due, over
+     * 10, and the night counts 0 with nothing sold, short 10: a closing
+     * counted high. Captured as a missing issue before balancing, it left the
+     * short of 10 to pair with the over of the 20th and the 20th night's
+     * short of 10 against staff — the week -17 where the counts say -7.
+     */
+    public function test_an_exact_over_a_later_short_takes_back_balances_and_is_not_issued(): void
+    {
+        config(['stockrecon.stamp_mode' => 'live', 'stockrecon.issue_mode' => 'live', 'stockrecon.missing_issue_mode' => 'live']);
+        $this->seedShelfChain([
+            '2026-07-17' => [1 => [0, 30, 19, 11], 3 => [19, 0, 16, 3]],
+            '2026-07-18' => [1 => [16, 0, 10, 16], 3 => [10, 0, 0, 0]],
+            '2026-07-19' => [1 => [0, 20, 16, 4], 3 => [16, 0, 13, 3]],
+            '2026-07-20' => [1 => [13, 10, 17, 16], 3 => [17, 0, 3, 4]],
+            '2026-07-21' => [1 => [3, 0, 0, 0], 3 => [0, 0, 0, 3]],
+            '2026-07-22' => [1 => [0, 50, 43, 8], 3 => [43, 0, 36, 6]],
+            '2026-07-23' => [1 => [36, 0, 30, 5], 3 => [30, 0, 17, 7]],
+        ]);
+        $this->db()->table('PumpIT.dbo.STK_StockMaster')->where('SSBranchId', self::BRANCH)
+            ->where('StockItemNo', self::DUP_ITEM)->update(['IssueMultiple' => 10]);
+        $run = $this->service->preview(self::BRANCH, self::SHELF_AREA, Carbon::parse('2026-07-17'),
+            Carbon::parse('2026-07-23'), note: 'TEST-over-then-short')->load('lines');
+
+        $over = $this->lineAt($run, '2026-07-18', 1);
+        $short = $this->lineAt($run, '2026-07-18', 3);
+        $secondOver = $this->lineAt($run, '2026-07-20', 1);
+        $secondShort = $this->lineAt($run, '2026-07-20', 3);
+
+        $this->assertFalse((bool) $over->ChainBlocked, $over->Outcome);
+        $this->assertEqualsWithDelta(10, (float) $over->QtyVar, 0.001);
+        $this->assertEqualsWithDelta(-10, (float) $short->QtyVar, 0.001);
+        $this->assertEqualsWithDelta(-7, (float) $run->lines->sum('QtyVar'), 0.001);
+
+        // Nothing is issued: each over is a closing counted high, and the count after it takes it back.
+        $this->assertSame(0, $run->lines->whereNotNull('QtyIssuedNew')->count());
+        $this->assertEqualsWithDelta(0, (float) $over->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $over->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $short->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(7, (float) $secondOver->QtyCloseNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $secondOver->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $secondShort->QtyVarNew, 0.001);
+
+        // The week stays what the counts say: -7, on the shifts that counted it.
+        $this->assertEqualsWithDelta(-7, (float) $run->lines->sum('QtyVarNew'), 0.001);
+        $this->assertEqualsWithDelta(-1, (float) $this->lineAt($run, '2026-07-23', 1)->QtyVarNew, 0.001);
+        $this->assertEqualsWithDelta(-6, (float) $this->lineAt($run, '2026-07-23', 3)->QtyVarNew, 0.001);
+
+        // The run as it was saved before this rule: the over captured whole as
+        // an issue of 10. It is refused, not written.
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $over->Id)
+            ->update(['QtyIssuedNew' => 10, 'QtyCloseNew' => 10, 'QtyVarNew' => 0]);
+        try {
+            $this->service->commit($run);
+            $this->fail('A saved run that issues an over a later short takes back must be refused.');
+        } catch (AgoraProcException $e) {
+            $this->assertStringContainsString('a later short on the item takes back', $e->getMessage());
+        }
+        $this->db()->table('agora.StockReconRunLine')->where('Id', $over->Id)
+            ->update(['QtyIssuedNew' => null, 'QtyCloseNew' => 0, 'QtyVarNew' => 0]);
+
+        $this->service->commit($run);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(0, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyIssued, 0.001);
+        $this->assertEqualsWithDelta(7, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 1)->QtyClose, 0.001);
+        $this->service->reverse($run->fresh(), 'TEST-over-then-short reversal');
+        $this->assertEqualsWithDelta(10, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyClose, 0.001);
+        $this->assertEqualsWithDelta(17, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-20', 1)->QtyClose, 0.001);
+    }
+
+    /**
      * A support request on a chain (Ryan, 16 Nov 2026): the Support button on
      * the chain row, the form with the chain filled in, the request logged
      * with its screenshot, listed, the screenshot served, and resolved.

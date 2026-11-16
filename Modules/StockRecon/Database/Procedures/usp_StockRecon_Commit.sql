@@ -403,6 +403,54 @@ BEGIN
                 AND selected.CommitState IN ('pending', 'skipped'))
     ) THROW 51000, 'AGORA:STALE_SHORT_ISSUE:This saved run captures an issue that an earlier short on the item needs. Preview again.', 1;
 
+    /* The mirror (16 Nov 2026, OK Ngwelezane, MARLBORO BEYOND RED 20'S,
+       multiple 10): a run saved before that day captures an over of whole
+       issue multiples as a missing issue, whole, while the item falls back
+       by a whole multiple or more after it — a closing counted high that the
+       next count took back. The preview now gives such an over up to the
+       balancing; a saved run that still issues the whole of it is refused.
+
+       Read off the counted variances (QtyVar) after the issue: the lowest
+       the running total reaches below nil. A run the preview makes today
+       never trips it — an over gives up the whole multiples of that fall
+       before balancing, and balancing then moves the closings between the
+       two, so the issue can never be the whole over. Only on a chain with no
+       break, no issue reduced or taken out as a duplicate, and no authorised
+       waste: on those the preview's basis is not the counted variance, so
+       the fall read here is not the one it judged by. */
+    IF EXISTS (
+        SELECT 1
+        FROM agora.StockReconRunLine r
+        CROSS APPLY (
+            SELECT MIN(s.Through) AS LowestAfter
+            FROM (
+                SELECT SUM(x.QtyVar) OVER (ORDER BY x.TransactionDate, x.ShiftNo
+                                           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS Through
+                FROM agora.StockReconRunLine x
+                WHERE x.BranchId = r.BranchId AND x.RunId = r.RunId
+                  AND x.AreaNo = r.AreaNo AND x.StockItemNo = r.StockItemNo AND x.ContinuitySegment = r.ContinuitySegment
+                  AND (x.TransactionDate > r.TransactionDate
+                       OR (x.TransactionDate = r.TransactionDate AND x.ShiftNo > r.ShiftNo))
+            ) s
+        ) f
+        WHERE r.BranchId = @BranchId AND r.RunId = @RunId
+          AND r.QtyIssuedNew > r.QtyIssued + @eps
+          AND r.IssueMultiple > 1
+          AND r.QtyIssuedNew - r.QtyIssued >= r.QtyVar - @eps
+          AND f.LowestAfter <= -r.IssueMultiple + @eps
+          AND NOT EXISTS (SELECT 1 FROM agora.StockReconRunLine other
+              WHERE other.BranchId = r.BranchId AND other.RunId = r.RunId
+                AND other.AreaNo = r.AreaNo AND other.StockItemNo = r.StockItemNo AND other.ContinuitySegment = r.ContinuitySegment
+                AND (other.FlagChainBroken = 1 OR other.DupTier IS NOT NULL
+                     OR other.QtyIssuedNew < other.QtyIssued - @eps
+                     OR ISNULL(other.AuthorizedGoodWaste, 0) > @eps))
+          AND EXISTS (SELECT 1 FROM agora.StockReconRunLine selected
+              WHERE selected.BranchId = @BranchId AND selected.RunId = @RunId
+                AND selected.AreaNo = r.AreaNo AND selected.StockItemNo = r.StockItemNo AND selected.ContinuitySegment = r.ContinuitySegment
+                AND selected.Selected = 1 AND selected.WouldAmend = 1
+                AND selected.CommitState IN ('pending', 'skipped'))
+    ) THROW 51000, 'AGORA:STALE_LATER_SHORT_ISSUE:This saved run captures an issue that a later short on the item takes back. Preview again.', 1;
+
     /* A balanced chain may offset a counted short against a later over, but
        must never increase that short or turn an over into a new short.
        Check all rows of a selected chain, not just the ticked rows. */

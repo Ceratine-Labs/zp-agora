@@ -154,6 +154,36 @@ stays there until that run is reversed. A fresh preview over it reads the
 counts from the originals but PumpIT's issue as keyed, so the chain is held
 (F3) until the capture is reversed or Reset to original puts the issue back.
 
+### An over a later short takes back balances with it (16 November 2026)
+
+The mirror of the 12 November rule (`v1__14zg`;
+`BalancingTest::test_an_exact_over_a_later_short_takes_back_balances_and_is_not_issued`).
+OK Ngwelezane, MARLBORO BEYOND RED 20'S (branch 3, Tobacco, item 297, multiple
+10), 2–8 Nov: *"The actual short for the week shows -7 units, but the Amended
+shows -17"*. The 3 Nov day counted 10 where nothing was due (over 10) and the
+night counted 0 with nothing sold (short 10): a closing counted high, which the
+next count proves — Ryan's "balance both ways" of 12 Nov. The early exact-issue
+pass captured the over as an issue of 10 because nothing was short *before* it;
+the short was then paired with the 5 Nov day's over, and the 5 Nov night's
+short of 10 stayed against staff. Ten units of loss made on paper.
+
+* Before balancing, an exact over now also gives up the whole multiples of the
+  **deepest the chain falls after it** (on the same basis: reductions out, no
+  earlier capture), once an earlier short has taken its share, and captures
+  only the rest. Over 10 then short 10: nothing is issued, the closing moves.
+* The fall is measured from the over to the lowest point after it, not to the
+  chain's end, so a short made good later still counts; the over that made it
+  good is then the next over's own decision, and is captured if nothing is
+  short before it.
+* A fall of less than one multiple leaves the over captured whole, as before.
+* The Marlboro chain now reads 3 Nov day 10 → 0, 5 Nov day 17 → 7, no issue,
+  and the week stays −7 (8 Nov −1 and −6).
+
+**At commit.** `STALE_LATER_SHORT_ISSUE` refuses a saved run that captures the
+whole of an exact over as an issue while the counted variances after it fall a
+whole multiple or more below nil (no break, no reduction or duplicate, no
+authorised waste on the chain). Preview again.
+
 ## The one fact everything follows from
 
 A shift's variance is

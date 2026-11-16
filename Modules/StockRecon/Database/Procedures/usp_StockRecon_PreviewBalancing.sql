@@ -1123,6 +1123,7 @@ BEGIN
                   where it sits among the chain's exact overs. */
                CONVERT(decimal(18,4), ROUND(r.QtyVarRep / NULLIF(i.Mult, 0), 0) * i.Mult) AS Capture,
                CONVERT(decimal(18,4), 0) AS RunningBefore,
+               CONVERT(decimal(18,4), 0) AS FallAfter,
                CONVERT(int, 0)           AS OverNo
         INTO #preIssue
         FROM #rep r JOIN totals t ON t.AreaNo = r.AreaNo AND t.StockItemNo = r.StockItemNo AND t.ContinuitySegment = r.ContinuitySegment
@@ -1161,7 +1162,28 @@ BEGIN
            other. And a chain short by LESS than a multiple still has its
            exact over captured whole, the smaller short staying where it was
            counted — netting those would leave an over that is no multiple of
-           anything and can never be captured (the rule of 2 Nov). */
+           anything and can never be captured (the rule of 2 Nov).
+
+           AN OVER A LATER SHORT TAKES BACK IS NOT A MISSING ISSUE EITHER
+           (customer, 16 Nov 2026, OK Ngwelezane, MARLBORO BEYOND RED 20'S,
+           multiple 10: "The actual short for the week shows -7 units, but the
+           Amended shows -17"). The day of 3 Nov counted 10 where nothing was
+           due, over 10; the night counted 0 with nothing sold, short 10. A
+           closing counted high, and the next count proves it — Ryan, 12 Nov:
+           "balance both ways". Read shift by shift the over was exactly one
+           multiple, so it was captured as an issue of 10 before balancing,
+           the short of 10 was left to pair with the next over two days on,
+           and the 10 that the 5 Nov night then came up short stayed against
+           staff: ten units of loss made on paper, the week -17 for -7.
+
+           So an exact over also gives up the whole multiples of the deepest
+           the chain falls AFTER it, on the same basis, before it captures
+           anything. FallAfter is that fall: the running total right after the
+           over less the lowest the running total reaches after it. Measured
+           from the over, not to the chain's end, so a short the chain makes
+           good again later still counts; the over that made it good is the
+           next over's own decision, taken in turn. What the earlier short
+           took is given up first, so the two never claim the same multiple. */
         ;WITH basis AS (
             SELECT r.AreaNo, r.StockItemNo, r.ContinuitySegment, r.TransactionDate, r.ShiftNo,
                    r.QtyVarRep - CASE WHEN c.Amount < 0 THEN c.Amount ELSE 0 END AS V
@@ -1172,11 +1194,20 @@ BEGIN
                           WHERE o.AreaNo = r.AreaNo AND o.StockItemNo = r.StockItemNo
                             AND o.ContinuitySegment = r.ContinuitySegment AND o.Amount > 0)
         ), running AS (
-            SELECT b.AreaNo, b.StockItemNo, b.TransactionDate, b.ShiftNo,
+            SELECT b.AreaNo, b.StockItemNo, b.ContinuitySegment, b.TransactionDate, b.ShiftNo,
                    ISNULL(SUM(b.V) OVER (PARTITION BY b.AreaNo, b.StockItemNo, b.ContinuitySegment
                                          ORDER BY b.TransactionDate, b.ShiftNo
-                                         ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS RunningBefore
+                                         ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS RunningBefore,
+                   SUM(b.V) OVER (PARTITION BY b.AreaNo, b.StockItemNo, b.ContinuitySegment
+                                  ORDER BY b.TransactionDate, b.ShiftNo
+                                  ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS RunningThrough
             FROM basis b
+        ), lowest AS (
+            SELECT r.AreaNo, r.StockItemNo, r.TransactionDate, r.ShiftNo, r.RunningBefore, r.RunningThrough,
+                   MIN(r.RunningThrough) OVER (PARTITION BY r.AreaNo, r.StockItemNo, r.ContinuitySegment
+                                               ORDER BY r.TransactionDate, r.ShiftNo
+                                               ROWS BETWEEN 1 FOLLOWING AND UNBOUNDED FOLLOWING) AS LowestAfter
+            FROM running r
         ), numbered AS (
             SELECT c.AreaNo, c.StockItemNo, c.TransactionDate, c.ShiftNo,
                    ROW_NUMBER() OVER (PARTITION BY c.AreaNo, c.StockItemNo, c.ContinuitySegment
@@ -1184,9 +1215,11 @@ BEGIN
             FROM #preIssue c
             WHERE c.Amount > 0
         )
-        UPDATE c SET c.RunningBefore = x.RunningBefore, c.OverNo = n.OverNo
+        UPDATE c SET c.RunningBefore = x.RunningBefore, c.OverNo = n.OverNo,
+                     c.FallAfter = CASE WHEN x.LowestAfter < x.RunningThrough - @eps
+                                        THEN x.RunningThrough - x.LowestAfter ELSE 0 END
         FROM #preIssue c
-        JOIN running x ON x.AreaNo = c.AreaNo AND x.StockItemNo = c.StockItemNo
+        JOIN lowest x ON x.AreaNo = c.AreaNo AND x.StockItemNo = c.StockItemNo
           AND x.TransactionDate = c.TransactionDate AND x.ShiftNo = c.ShiftNo
         JOIN numbered n ON n.AreaNo = c.AreaNo AND n.StockItemNo = c.StockItemNo
           AND n.TransactionDate = c.TransactionDate AND n.ShiftNo = c.ShiftNo;
@@ -1200,9 +1233,11 @@ BEGIN
         BEGIN
             /* Short = how far below nil the chain stands before this over.
                The over gives up the whole multiples of it that fit — never
-               more than itself — and captures the rest. */
-            UPDATE c SET c.Capture = c.Amount
-                         - FLOOR((CASE WHEN s.Short < c.Amount THEN s.Short ELSE c.Amount END + @eps) / c.Mult) * c.Mult
+               more than itself — then the whole multiples of the fall after
+               it that fit in what is left (16 Nov 2026), and captures the
+               rest. */
+            UPDATE c SET c.Capture = c.Amount - g.Back
+                         - FLOOR((CASE WHEN c.FallAfter < c.Amount - g.Back THEN c.FallAfter ELSE c.Amount - g.Back END + @eps) / c.Mult) * c.Mult
             FROM #preIssue c
             OUTER APPLY (SELECT SUM(p.Capture) AS Captured
                          FROM #preIssue p
@@ -1211,6 +1246,7 @@ BEGIN
                            AND p.OverNo > 0 AND p.OverNo < c.OverNo) earlier
             CROSS APPLY (SELECT CASE WHEN c.RunningBefore - ISNULL(earlier.Captured, 0) < 0
                                      THEN -(c.RunningBefore - ISNULL(earlier.Captured, 0)) ELSE 0 END AS Short) s
+            CROSS APPLY (SELECT FLOOR((CASE WHEN s.Short < c.Amount THEN s.Short ELSE c.Amount END + @eps) / c.Mult) * c.Mult AS Back) g
             WHERE c.OverNo = @OverNo;
 
             SET @OverNo = @OverNo + 1;
