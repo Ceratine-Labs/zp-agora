@@ -178,7 +178,10 @@ php artisan view:cache
 # The recon queue worker (agora-queue.service, 12 Nov 2026) keeps the old
 # code in memory until told; it finishes the job it is in, then restarts.
 php artisan queue:restart
-chown -R www-data:www-data bootstrap/cache
+# storage too (16 Nov 2026): view:cache, migrate and seed:master run as
+# root above, and the views, cache and log they write were left root-owned,
+# so the next request that had to write one 500'd (run 80527).
+chown -R www-data:www-data bootstrap/cache storage
 : > storage/logs/laravel.log
 systemctl restart php8.3-fpm
 REMOTE_SCRIPT
