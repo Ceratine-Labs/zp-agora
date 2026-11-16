@@ -131,7 +131,7 @@ class ChainExplainer
      * touch it, then one line per shift, counted beside proposed.
      *
      * @param  Collection<int, object>  $shifts
-     * @param  Collection<int, object>  $tillGaps
+     * @param  Collection<int, \stdClass>  $tillGaps
      */
     public function facts(StockReconRun $run, ?object $item, Collection $shifts, Collection $tillGaps): string
     {

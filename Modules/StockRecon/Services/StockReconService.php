@@ -620,24 +620,27 @@ class StockReconService
      * quantities are updated. Reads only; an error here never stops the run
      * page, it just leaves the warning off.
      *
-     * @return Collection<int, object>
+     * @return Collection<int, \stdClass>
      */
     public function tillQtyGaps(StockReconRun $run): Collection
     {
         // Once per run per ten minutes (16 Nov 2026): on a whole-site week the
         // check takes seconds, and the chain panel and Explain read this copy.
-        return Cache::remember(self::tillGapsKey($run), now()->addMinutes(10), function () use ($run) {
+        // Stored as plain arrays: the cache will not unserialise objects.
+        $rows = Cache::remember(self::tillGapsKey($run), now()->addMinutes(10), function () use ($run) {
             try {
                 return $this->procedures->call('usp_StockRecon_TillQtyCheck', [
                     'BranchId' => $run->BranchId,
                     'RunId' => $run->Id,
-                ]);
+                ])->map(fn ($r) => (array) $r)->values()->all();
             } catch (\Throwable $e) {
                 report($e);
 
-                return collect();
+                return [];
             }
         });
+
+        return self::gapRows($rows);
     }
 
     /**
@@ -645,18 +648,27 @@ class StockReconService
      * panel opens many times a minute and must not run the check itself
      * (16 Nov 2026, run 80527 stalled when it did).
      *
-     * @return Collection<int, object>
+     * @return Collection<int, \stdClass>
      */
     public function cachedTillQtyGaps(StockReconRun $run): Collection
     {
-        $cached = Cache::get(self::tillGapsKey($run));
+        return self::gapRows(Cache::get(self::tillGapsKey($run)));
+    }
 
-        return $cached instanceof Collection ? $cached : collect();
+    /**
+     * @return Collection<int, \stdClass>
+     */
+    private static function gapRows(mixed $rows): Collection
+    {
+        return collect(is_array($rows) ? $rows : [])
+            ->filter(fn ($r) => is_array($r))
+            ->map(fn (array $r) => (object) $r)
+            ->values();
     }
 
     private static function tillGapsKey(StockReconRun $run): string
     {
-        return 'stockrecon:tillgaps:'.$run->Id;
+        return 'stockrecon:tillgaps:v2:'.$run->Id;
     }
 
     /**
@@ -669,7 +681,7 @@ class StockReconService
      * PumpIT carried 3, all on one shift). A missing till marks only the
      * shifts of items sold through it whose POS is empty.
      *
-     * @param  Collection<int, object>  $tillGaps
+     * @param  Collection<int, \stdClass>  $tillGaps
      * @return array<string, string>
      */
     public function posGapIndex(Collection $tillGaps): array
