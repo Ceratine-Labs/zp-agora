@@ -24,6 +24,7 @@ use Modules\StockRecon\Services\ExceptionNavigation;
 use Modules\StockRecon\Services\GlobalOverviewExport;
 use Modules\StockRecon\Services\ProposalMetric;
 use Modules\StockRecon\Services\ReconPeriods;
+use Modules\StockRecon\Services\StockReconNotifier;
 use Modules\StockRecon\Services\StockReconService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -625,6 +626,8 @@ class StockReconController extends Controller
         } catch (AgoraProcException $e) {
             return back()->with('refusal', $e->getMessage());
         }
+
+        app(StockReconNotifier::class)->adjustment($run, $line, (int) $status->Id);
 
         return back()->with('adjusted', $status->Message);
     }

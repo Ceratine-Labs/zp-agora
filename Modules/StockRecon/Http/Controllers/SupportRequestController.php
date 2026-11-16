@@ -13,6 +13,7 @@ use Modules\Core\Models\User;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
 use Modules\StockRecon\Models\StockReconSupportRequest;
+use Modules\StockRecon\Services\StockReconNotifier;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -70,6 +71,8 @@ class SupportRequestController extends Controller
             Storage::disk(self::DISK)->put($path, (string) $request->file('screenshot')->get());
             $ticket->forceFill(['ScreenshotPath' => $path])->save();
         }
+
+        app(StockReconNotifier::class)->support($run, $ticket);
 
         $message = 'Support request #'.$ticket->Id.' logged. Head office will see it under Support requests.';
 

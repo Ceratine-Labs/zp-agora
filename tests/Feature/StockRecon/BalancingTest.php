@@ -10,12 +10,15 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\User;
 use Modules\Core\Models\UserPermission;
 use Modules\Core\Services\PermissionService;
+use Modules\StockRecon\Mail\AdjustmentLoggedMail;
+use Modules\StockRecon\Mail\SupportLoggedMail;
 use Modules\StockRecon\Models\StockReconAmendment;
 use Modules\StockRecon\Models\StockReconRun;
 use Modules\StockRecon\Models\StockReconRunLine;
@@ -315,6 +318,7 @@ class BalancingTest extends TestCase
     public function test_a_support_request_is_raised_on_a_chain_listed_and_resolved(): void
     {
         Storage::fake('local');
+        Mail::fake();
         $this->seedShelfChain([
             '2026-07-17' => [1 => [40, 0, 38, 2], 3 => [38, 0, 36, 2]],
             '2026-07-18' => [1 => [36, 0, 30, 2], 3 => [30, 0, 30, 2]],
@@ -341,6 +345,8 @@ class BalancingTest extends TestCase
             ['Accept' => 'application/json'])->assertOk()->json('id');
 
         $ticket = StockReconSupportRequest::query()->findOrFail($id);
+        Mail::assertSent(SupportLoggedMail::class, fn ($m) => $m->hasTo('ryan.cruickshank@revvtech.com')
+            && str_contains($m->envelope()->subject, '#'.$id));
         $this->assertSame('open', $ticket->Status);
         $this->assertSame(self::DUP_ITEM, $ticket->StockItemNo);
         $this->assertSame('2026-07-17', $ticket->ChainFrom->toDateString());
@@ -422,6 +428,15 @@ class BalancingTest extends TestCase
         $this->service->reverse($run->fresh(), 'TEST-adjusted by hand reversal');
         $this->assertEqualsWithDelta(30, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 1)->QtyClose, 0.001);
         $this->assertEqualsWithDelta(30, (float) $this->sourceRow(self::DUP_ITEM, '2026-07-18', 3)->QtyOpen, 0.001);
+
+        // Through the pencil's route, the adjustment is mailed (16 Nov 2026).
+        Mail::fake();
+        $open = $this->previewArea(self::SHELF_AREA);
+        $this->actingAs($this->person('admin'))
+            ->post(route('app.stockrecon.line.adjust', [$open, $this->lineAt($open, '2026-07-19', 1)]), ['close' => 27, 'reason' => 'TEST-mailed adjustment'])
+            ->assertRedirect()->assertSessionHas('adjusted');
+        Mail::assertSent(AdjustmentLoggedMail::class, fn ($m) => $m->hasTo('ryan.cruickshank@revvtech.com')
+            && str_contains($m->render(), 'TEST-mailed adjustment'));
     }
 
     /**

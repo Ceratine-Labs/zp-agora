@@ -571,4 +571,13 @@ return [
             'timeout' => 120,
         ],
     ],
+
+    /*
+    | Who is mailed when something is logged on a run: a closing adjusted by
+    | hand, or a support request (Ryan, 16 Nov 2026: "send me an email on my
+    | RevTech address whenever there's an edit logged or a support call").
+    */
+    'notify' => [
+        'ryan.cruickshank@revvtech.com',
+    ],
 ];
